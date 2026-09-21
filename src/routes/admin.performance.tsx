@@ -690,13 +690,13 @@ function PerformanceCommandCenterPage() {
                     </td>
                     <td className="py-2.5 px-4">
                       <div
-                        className="text-slate-900 capitalize truncate max-w-[130px] text-[11px]"
+                        className="text-slate-900 truncate max-w-[170px] text-[11px] font-medium"
                         title={emp.lastActionText}
                       >
                         {emp.lastActionText}
                       </div>
                       {emp.lastOrderCode && (
-                        <div className="text-[10px] font-mono text-blue-600">
+                        <div className="text-[10px] font-mono text-blue-600 font-semibold">
                           {emp.lastOrderCode}
                         </div>
                       )}
@@ -1155,26 +1155,26 @@ function EmployeeDetailDrawer({
                           )}
                         />
                         <div className="flex items-center justify-between text-xs">
-                          <span className="font-semibold text-slate-900 capitalize">
+                          <span className="font-semibold text-slate-900">
                             {evt.actionLabel}
                           </span>
                           <span className="text-[11px] font-mono text-slate-400">
                             {evt.time}
                           </span>
                         </div>
-                        {evt.notes && (
+                        {evt.notes && evt.notes !== evt.actionLabel && (
                           <div className="mt-0.5 text-xs text-slate-600">
                             {evt.notes}
                           </div>
                         )}
                         {(evt.previousStatus || evt.newStatus) && (
-                          <div className="mt-0.5 text-[10px] text-slate-500">
+                          <div className="mt-0.5 text-[10px] text-slate-500 font-mono">
                             {evt.previousStatus} → {evt.newStatus}
                           </div>
                         )}
                         {evt.orderCode && (
                           <Link
-                            to={`/admin/orders/${evt.orderId}` as any}
+                            to={`/admin/orders/${evt.orderId || evt.leadId}` as any}
                             className="mt-0.5 inline-flex items-center gap-1 font-mono text-[10px] text-blue-600 hover:underline"
                             onClick={(e) => e.stopPropagation()}
                           >

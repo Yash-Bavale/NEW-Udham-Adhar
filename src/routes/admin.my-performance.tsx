@@ -582,7 +582,7 @@ function MyPerformanceDashboardPage() {
                     <td className="py-2.5 px-3 text-slate-500 text-[10px]">
                       {ord.assignedAt ? formatIST(ord.assignedAt) : "—"}
                     </td>
-                    <td className="py-2.5 px-3 capitalize text-slate-800 text-[11px]">
+                    <td className="py-2.5 px-3 text-slate-800 text-[11px] font-medium">
                       {ord.lastActionText}
                     </td>
                     <td className="py-2.5 px-3">

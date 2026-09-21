@@ -182,6 +182,76 @@ function mapEventTypeToAction(eventType: string): string {
   return "STATUS_CHANGED";
 }
 
+/**
+ * Format an event, action log, or activity log into a human-readable action label and details
+ */
+function formatLogAction(log: {
+  action_type?: string;
+  previous_status?: string | null;
+  new_status?: string | null;
+  previous_stage?: string | null;
+  new_stage?: string | null;
+  notes?: string | null;
+  activity_description?: string | null;
+  event_type?: string | null;
+  old_value?: string | null;
+  new_value?: string | null;
+}): { actionLabel: string; details: string | null } {
+  if (log.activity_description && log.activity_description.trim()) {
+    return {
+      actionLabel: log.activity_description.trim(),
+      details:
+        log.notes && log.notes !== log.activity_description
+          ? log.notes
+          : null,
+    };
+  }
+
+  const prev = (
+    log.previous_status ||
+    log.old_value ||
+    log.previous_stage ||
+    ""
+  ).trim();
+  const next = (
+    log.new_status ||
+    log.new_value ||
+    log.new_stage ||
+    ""
+  ).trim();
+
+  if (prev && next && prev.toLowerCase() !== next.toLowerCase()) {
+    const cleanPrev = prev.replace(/_/g, " ").toLowerCase();
+    const cleanNext = next.replace(/_/g, " ").toLowerCase();
+    return {
+      actionLabel: `${cleanPrev} → ${cleanNext}`,
+      details: log.notes || null,
+    };
+  }
+
+  if (next) {
+    const cleanNext = next.replace(/_/g, " ").toLowerCase();
+    return {
+      actionLabel: `Moved to ${cleanNext}`,
+      details: log.notes || null,
+    };
+  }
+
+  if (log.notes && log.notes.trim()) {
+    return {
+      actionLabel: log.notes.trim(),
+      details: null,
+    };
+  }
+
+  const rawType = log.action_type || log.event_type || "Status Updated";
+  const cleanType = rawType.replace(/_/g, " ").toLowerCase();
+  return {
+    actionLabel: cleanType,
+    details: log.notes || null,
+  };
+}
+
 /* -------------------------------------------------------------------------- */
 /*  1. SUPER ADMIN / ADMIN COMMAND CENTER METRICS                             */
 /* -------------------------------------------------------------------------- */
@@ -277,7 +347,7 @@ export const getEmployeePerformanceCommandCenter = createServerFn({
     let actionLogsQuery = adminAny
       .from("order_action_logs")
       .select(
-        "id, order_id, employee_id, employee_name, employee_role, action_type, sla_status, is_sla_breached, time_spent_since_assignment_ms, created_at",
+        "id, order_id, lead_id, employee_id, employee_name, employee_role, action_type, previous_status, new_status, previous_stage, new_stage, notes, sla_status, is_sla_breached, time_spent_since_assignment_ms, created_at",
       )
       .gte("created_at", dateRange.current.start)
       .lte("created_at", dateRange.current.end)
@@ -289,29 +359,47 @@ export const getEmployeePerformanceCommandCenter = createServerFn({
     }
     const { data: currentActionLogs } = await actionLogsQuery;
 
-    // Merge application_events for legacy data
+    // Merge application_events for operational data
     let appEventsQuery = admin
       .from("application_events")
       .select(
-        "id, application_id, event_type, note, staff_name, staff_role, created_at, created_by",
+        "id, application_id, lead_id, event_type, note, old_value, new_value, staff_name, staff_role, created_at, created_by",
       )
       .gte("created_at", dateRange.current.start)
       .lte("created_at", dateRange.current.end)
-      .limit(2000);
+      .limit(3000);
 
     const { data: currentAppEvents } = await appEventsQuery;
+
+    // Merge system activity_logs (lead & order tracking)
+    let activityLogsQuery = admin
+      .from("activity_logs")
+      .select(
+        "id, activity_type, activity_description, user_id, application_id, lead_id, created_at",
+      )
+      .gte("created_at", dateRange.current.start)
+      .lte("created_at", dateRange.current.end)
+      .order("created_at", { ascending: false })
+      .limit(3000);
+
+    if (data.employeeId) {
+      activityLogsQuery = activityLogsQuery.eq("user_id", data.employeeId);
+    }
+    const { data: currentActivityLogs } = await activityLogsQuery;
 
     const logs: any[] = [...(currentActionLogs ?? [])];
     const loggedKeySet = new Set(
       logs.map(
-        (l: any) => `${l.order_id}_${l.action_type}_${l.created_at}`,
+        (l: any) =>
+          `${l.order_id || l.lead_id}_${l.action_type}_${l.created_at}`,
       ),
     );
 
     (currentAppEvents ?? []).forEach((evt: any) => {
       const actionType = mapEventTypeToAction(evt.event_type);
-      const dedupKey = `${evt.application_id}_${actionType}_${evt.created_at}`;
+      const dedupKey = `${evt.application_id || evt.lead_id}_${actionType}_${evt.created_at}`;
       if (!loggedKeySet.has(dedupKey)) {
+        loggedKeySet.add(dedupKey);
         let matchedEmpId = evt.created_by;
         if (!matchedEmpId && evt.staff_name) {
           matchedEmpId =
@@ -319,17 +407,50 @@ export const getEmployeePerformanceCommandCenter = createServerFn({
         }
         if (!data.employeeId || matchedEmpId === data.employeeId) {
           logs.push({
-            id: evt.id,
+            id: `ae_${evt.id}`,
             order_id: evt.application_id,
+            lead_id: evt.lead_id,
             employee_id: matchedEmpId,
             employee_name: evt.staff_name || "Staff",
             employee_role: evt.staff_role || "operations",
             action_type: actionType,
+            previous_status: evt.old_value,
+            new_status: evt.new_value,
+            notes: evt.note,
             sla_status: "compliant",
             is_sla_breached: false,
             created_at: evt.created_at,
           });
         }
+      }
+    });
+
+    (currentActivityLogs ?? []).forEach((act: any) => {
+      const actionType = mapEventTypeToAction(act.activity_type);
+      const dedupKey = `${act.application_id || act.lead_id}_${actionType}_${act.created_at}`;
+      if (!loggedKeySet.has(dedupKey)) {
+        loggedKeySet.add(dedupKey);
+        const p = act.user_id ? profileMap.get(act.user_id) : null;
+        const name =
+          p?.full_name ||
+          p?.display_name ||
+          p?.email?.split("@")[0] ||
+          "Staff";
+        logs.push({
+          id: `act_${act.id}`,
+          order_id: act.application_id,
+          lead_id: act.lead_id,
+          employee_id: act.user_id,
+          employee_name: name,
+          employee_role:
+            (act.user_id && userRoleMap.get(act.user_id)) || "operations",
+          action_type: actionType,
+          activity_description: act.activity_description,
+          notes: act.activity_description,
+          sla_status: "compliant",
+          is_sla_breached: false,
+          created_at: act.created_at,
+        });
       }
     });
 
@@ -350,6 +471,13 @@ export const getEmployeePerformanceCommandCenter = createServerFn({
       .lte("created_at", dateRange.previous.end)
       .limit(2000);
 
+    const { data: prevActivityLogs } = await admin
+      .from("activity_logs")
+      .select("id, activity_type, user_id, application_id, lead_id, created_at")
+      .gte("created_at", dateRange.previous.start)
+      .lte("created_at", dateRange.previous.end)
+      .limit(2000);
+
     const pLogs: any[] = [...(prevActionLogs ?? [])];
     (prevAppEvents ?? []).forEach((evt: any) => {
       pLogs.push({
@@ -364,14 +492,25 @@ export const getEmployeePerformanceCommandCenter = createServerFn({
         created_at: evt.created_at,
       });
     });
+    (prevActivityLogs ?? []).forEach((act: any) => {
+      pLogs.push({
+        id: `act_${act.id}`,
+        order_id: act.application_id,
+        lead_id: act.lead_id,
+        employee_id: act.user_id,
+        action_type: mapEventTypeToAction(act.activity_type),
+        is_sla_breached: false,
+        created_at: act.created_at,
+      });
+    });
 
     // 4. Fetch applications with period filter
     let applicationsQuery = admin
       .from("applications")
       .select(
-        "id, application_code, assigned_to, assigned_at, order_status, fulfillment_status, application_status, is_hot, service_id, created_at, updated_at",
+        "id, application_code, customer_id, lead_id, assigned_to, assigned_at, order_status, fulfillment_status, application_status, is_hot, service_id, created_at, updated_at",
       )
-      .eq("is_deleted", false)
+      .or("is_deleted.is.null,is_deleted.eq.false")
       .limit(5000);
 
     if (data.serviceId)
@@ -388,11 +527,60 @@ export const getEmployeePerformanceCommandCenter = createServerFn({
     const startMs = new Date(dateRange.current.start).getTime();
     const endMs = new Date(dateRange.current.end).getTime();
 
-    // Build application code lookup map for the live feed
+    // Build application code & lead lookup maps
     const orderCodeMap = new Map<string, string>();
+    const leadToAppMap = new Map<string, any>();
     apps.forEach((a: any) => {
       if (a.application_code) orderCodeMap.set(a.id, a.application_code);
+      if (a.lead_id && a.application_code) leadToAppMap.set(a.lead_id, a);
     });
+
+    // Collect any missing order IDs from logs and resolve their application_code
+    const missingAppIds = Array.from(
+      new Set(
+        logs
+          .map((l: any) => l.order_id)
+          .filter((id: string) => id && !orderCodeMap.has(id)),
+      ),
+    );
+    if (missingAppIds.length > 0) {
+      const { data: extraApps } = await admin
+        .from("applications")
+        .select("id, application_code, lead_id")
+        .in("id", missingAppIds);
+      (extraApps ?? []).forEach((a: any) => {
+        if (a.application_code) orderCodeMap.set(a.id, a.application_code);
+        if (a.lead_id && a.application_code) leadToAppMap.set(a.lead_id, a);
+      });
+    }
+
+    const leadCodeMap = new Map<string, string>();
+    const missingLeadIds = Array.from(
+      new Set(
+        logs
+          .map((l: any) => l.lead_id)
+          .filter(
+            (id: string) =>
+              id && !orderCodeMap.has(id) && !leadToAppMap.has(id),
+          ),
+      ),
+    );
+    if (missingLeadIds.length > 0) {
+      const [{ data: leadApps }, { data: leadsData }] = await Promise.all([
+        admin
+          .from("applications")
+          .select("id, application_code, lead_id")
+          .in("lead_id", missingLeadIds),
+        admin.from("leads").select("id, lead_code").in("id", missingLeadIds),
+      ]);
+      (leadApps ?? []).forEach((a: any) => {
+        if (a.lead_id && a.application_code)
+          leadToAppMap.set(a.lead_id, a);
+      });
+      (leadsData ?? []).forEach((l: any) => {
+        if (l.lead_code) leadCodeMap.set(l.id, l.lead_code);
+      });
+    }
 
     const currentAssignedOrders = apps.filter((app: any) => {
       if (!app.assigned_to) return false;
@@ -405,22 +593,14 @@ export const getEmployeePerformanceCommandCenter = createServerFn({
       const updatedTime = app.updated_at
         ? new Date(app.updated_at).getTime()
         : null;
-      // For "today" — include currently active orders too
-      if (data.dateFilter === "today" || data.dateFilter === "this_month") {
-        return (
-          (assignedTime && assignedTime >= startMs && assignedTime <= endMs) ||
-          (createdTime && createdTime >= startMs && createdTime <= endMs) ||
-          (updatedTime && updatedTime >= startMs && updatedTime <= endMs) ||
-          !["completed", "order_closed", "cancelled"].includes(
-            app.fulfillment_status,
-          )
-        );
-      }
-      return (
+      const inWindow =
         (assignedTime && assignedTime >= startMs && assignedTime <= endMs) ||
         (createdTime && createdTime >= startMs && createdTime <= endMs) ||
-        (updatedTime && updatedTime >= startMs && updatedTime <= endMs)
+        (updatedTime && updatedTime >= startMs && updatedTime <= endMs);
+      const isActive = !["completed", "order_closed", "cancelled"].includes(
+        app.fulfillment_status,
       );
+      return inWindow || isActive;
     });
 
     // 5. Aggregate KPI metrics
@@ -629,11 +809,15 @@ export const getEmployeePerformanceCommandCenter = createServerFn({
         ) {
           stats.lastActionTime = log.created_at;
           stats.lastActionType = log.action_type;
-          stats.lastActionText = log.action_type
-            .replace(/_/g, " ")
-            .toLowerCase();
-          stats.lastOrderCode =
-            orderCodeMap.get(log.order_id) || null;
+          const { actionLabel } = formatLogAction(log);
+          stats.lastActionText = actionLabel;
+          const code =
+            (log.order_id && orderCodeMap.get(log.order_id)) ||
+            (log.lead_id &&
+              leadToAppMap.get(log.lead_id)?.application_code) ||
+            (log.lead_id && leadCodeMap.get(log.lead_id)) ||
+            (log.order_id ? log.order_id.slice(0, 8) : null);
+          stats.lastOrderCode = code;
         }
         if (
           !stats.firstActionTime ||
@@ -932,7 +1116,7 @@ export const getEmployeeDetailPerformance = createServerFn({
     const { data: logs } = await adminAny
       .from("order_action_logs")
       .select(
-        "id, order_id, employee_name, action_type, previous_status, new_status, previous_stage, new_stage, timestamp, created_at_ist, time_spent_since_assignment_ms, time_spent_since_previous_action_ms, sla_status, is_sla_breached, notes, source, created_at",
+        "id, order_id, lead_id, employee_name, action_type, previous_status, new_status, previous_stage, new_stage, timestamp, created_at_ist, time_spent_since_assignment_ms, time_spent_since_previous_action_ms, sla_status, is_sla_breached, notes, source, created_at",
       )
       .eq("employee_id", data.employeeId)
       .gte("created_at", dateRange.current.start)
@@ -944,7 +1128,7 @@ export const getEmployeeDetailPerformance = createServerFn({
     const { data: appEvents } = await admin
       .from("application_events")
       .select(
-        "id, application_id, event_type, note, staff_name, staff_role, created_at, created_by",
+        "id, application_id, lead_id, event_type, note, old_value, new_value, staff_name, staff_role, created_at, created_by",
       )
       .or(
         `created_by.eq.${data.employeeId},staff_name.ilike.%${empName}%`,
@@ -952,26 +1136,41 @@ export const getEmployeeDetailPerformance = createServerFn({
       .gte("created_at", dateRange.current.start)
       .lte("created_at", dateRange.current.end)
       .order("created_at", { ascending: false })
-      .limit(200);
+      .limit(300);
+
+    // Pre-existing activity_logs for this employee
+    const { data: activityLogs } = await admin
+      .from("activity_logs")
+      .select(
+        "id, activity_type, activity_description, application_id, lead_id, created_at, user_id",
+      )
+      .eq("user_id", data.employeeId)
+      .gte("created_at", dateRange.current.start)
+      .lte("created_at", dateRange.current.end)
+      .order("created_at", { ascending: false })
+      .limit(300);
 
     const allLogs = [...(logs ?? [])];
     const logSet = new Set(
       allLogs.map(
-        (l: any) => `${l.order_id}_${l.action_type}_${l.created_at}`,
+        (l: any) =>
+          `${l.order_id || l.lead_id}_${l.action_type}_${l.created_at}`,
       ),
     );
 
     (appEvents ?? []).forEach((evt: any) => {
       const actionType = mapEventTypeToAction(evt.event_type);
-      const key = `${evt.application_id}_${actionType}_${evt.created_at}`;
+      const key = `${evt.application_id || evt.lead_id}_${actionType}_${evt.created_at}`;
       if (!logSet.has(key)) {
+        logSet.add(key);
         allLogs.push({
-          id: evt.id,
+          id: `ae_${evt.id}`,
           order_id: evt.application_id,
+          lead_id: evt.lead_id,
           employee_name: evt.staff_name || empName,
           action_type: actionType,
-          previous_status: null,
-          new_status: null,
+          previous_status: evt.old_value,
+          new_status: evt.new_value,
           previous_stage: null,
           new_stage: null,
           timestamp: evt.created_at,
@@ -988,6 +1187,36 @@ export const getEmployeeDetailPerformance = createServerFn({
       }
     });
 
+    (activityLogs ?? []).forEach((act: any) => {
+      const actionType = mapEventTypeToAction(act.activity_type);
+      const key = `${act.application_id || act.lead_id}_${actionType}_${act.created_at}`;
+      if (!logSet.has(key)) {
+        logSet.add(key);
+        allLogs.push({
+          id: `act_${act.id}`,
+          order_id: act.application_id,
+          lead_id: act.lead_id,
+          employee_name: empName,
+          action_type: actionType,
+          previous_status: null,
+          new_status: null,
+          previous_stage: null,
+          new_stage: null,
+          timestamp: act.created_at,
+          created_at_ist: new Date(act.created_at).toLocaleTimeString(
+            "en-IN",
+            { hour: "2-digit", minute: "2-digit" },
+          ),
+          sla_status: "compliant",
+          is_sla_breached: false,
+          notes: act.activity_description,
+          activity_description: act.activity_description,
+          source: "employee",
+          created_at: act.created_at,
+        });
+      }
+    });
+
     allLogs.sort(
       (a, b) =>
         new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
@@ -997,18 +1226,99 @@ export const getEmployeeDetailPerformance = createServerFn({
     const { data: assignedOrders } = await admin
       .from("applications")
       .select(
-        "id, application_code, customer_id, service_id, order_status, fulfillment_status, application_status, is_hot, assigned_at, created_at, updated_at, customers(name, primary_mobile), services(service_name)",
+        "id, application_code, customer_id, service_id, order_status, fulfillment_status, application_status, is_hot, assigned_at, created_at, updated_at",
       )
       .eq("assigned_to", data.employeeId)
-      .eq("is_deleted", false)
+      .or("is_deleted.is.null,is_deleted.eq.false")
       .order("created_at", { ascending: false })
       .limit(500);
 
-    const appsList = assignedOrders ?? [];
+    const assignedApps = assignedOrders ?? [];
+    const appsList = [...assignedApps];
+
+    // Also include any orders worked by this employee in the period
+    const workedOrderIds = Array.from(
+      new Set(allLogs.map((l: any) => l.order_id).filter(Boolean)),
+    );
+    const missingWorkedIds = workedOrderIds.filter(
+      (id) => !appsList.some((a: any) => a.id === id),
+    );
+    if (missingWorkedIds.length > 0) {
+      const { data: extraWorkedApps } = await admin
+        .from("applications")
+        .select(
+          "id, application_code, customer_id, service_id, order_status, fulfillment_status, application_status, is_hot, assigned_at, created_at, updated_at",
+        )
+        .in("id", missingWorkedIds);
+      (extraWorkedApps ?? []).forEach((a: any) => appsList.push(a));
+    }
+
+    // Parallel lookups for customers and services to avoid PostgREST relationship errors
+    const custIds = Array.from(
+      new Set(appsList.map((a: any) => a.customer_id).filter(Boolean)),
+    );
+    const svcIds = Array.from(
+      new Set(appsList.map((a: any) => a.service_id).filter(Boolean)),
+    );
+
+    const [{ data: customersData }, { data: servicesData }] =
+      await Promise.all([
+        custIds.length
+          ? admin
+              .from("customers")
+              .select("id, name, primary_mobile, primary_email")
+              .in("id", custIds)
+          : { data: [] },
+        svcIds.length
+          ? admin.from("services").select("id, service_name").in("id", svcIds)
+          : { data: [] },
+      ]);
+
+    const customerMap = new Map(
+      (customersData ?? []).map((c: any) => [c.id, c]),
+    );
+    const serviceMap = new Map(
+      (servicesData ?? []).map((s: any) => [s.id, s.service_name]),
+    );
+
     const orderCodeMap = new Map<string, string>();
     appsList.forEach((a: any) => {
       if (a.application_code) orderCodeMap.set(a.id, a.application_code);
     });
+
+    const missingLogAppIds = Array.from(
+      new Set(
+        allLogs
+          .map((l: any) => l.order_id)
+          .filter((id: string) => id && !orderCodeMap.has(id)),
+      ),
+    );
+    if (missingLogAppIds.length > 0) {
+      const { data: extraLogApps } = await admin
+        .from("applications")
+        .select("id, application_code")
+        .in("id", missingLogAppIds);
+      (extraLogApps ?? []).forEach((a: any) => {
+        if (a.application_code) orderCodeMap.set(a.id, a.application_code);
+      });
+    }
+
+    const missingLogLeadIds = Array.from(
+      new Set(
+        allLogs
+          .map((l: any) => l.lead_id)
+          .filter((id: string) => id && !orderCodeMap.has(id)),
+      ),
+    );
+    if (missingLogLeadIds.length > 0) {
+      const { data: leadsData } = await admin
+        .from("leads")
+        .select("id, lead_code")
+        .in("id", missingLogLeadIds);
+      (leadsData ?? []).forEach((l: any) => {
+        if (l.lead_code) orderCodeMap.set(l.id, l.lead_code);
+      });
+    }
 
     const workedOrdersSet = new Set(
       allLogs.map((l: any) => l.order_id).filter(Boolean),
@@ -1077,31 +1387,39 @@ export const getEmployeeDetailPerformance = createServerFn({
     }
 
     // Timeline
-    const timeline = allLogs.slice(0, 100).map((log: any) => ({
-      id: log.id,
-      time:
-        log.created_at_ist ||
-        new Date(log.created_at).toLocaleTimeString("en-IN", {
-          hour: "2-digit",
-          minute: "2-digit",
-        }),
-      createdAt: log.created_at,
-      orderId: log.order_id,
-      orderCode: orderCodeMap.get(log.order_id) || log.order_id?.slice(0, 8),
-      actionType: log.action_type,
-      actionLabel: log.action_type.replace(/_/g, " "),
-      previousStatus: log.previous_status,
-      newStatus: log.new_status,
-      previousStage: log.previous_stage,
-      newStage: log.new_stage,
-      notes: log.notes,
-      slaStatus: (log.sla_status || "compliant").toLowerCase(),
-      isSlaBreached: log.is_sla_breached,
-      durationSincePrev: log.time_spent_since_previous_action_ms
-        ? `${Math.round(log.time_spent_since_previous_action_ms / 60000)}m`
-        : null,
-      source: log.source,
-    }));
+    const timeline = allLogs.slice(0, 100).map((log: any) => {
+      const { actionLabel, details } = formatLogAction(log);
+      const code =
+        orderCodeMap.get(log.order_id) ||
+        orderCodeMap.get(log.lead_id) ||
+        (log.order_id ? log.order_id.slice(0, 8) : null);
+      return {
+        id: log.id,
+        time:
+          log.created_at_ist ||
+          new Date(log.created_at).toLocaleTimeString("en-IN", {
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
+        createdAt: log.created_at,
+        orderId: log.order_id,
+        leadId: log.lead_id,
+        orderCode: code,
+        actionType: log.action_type,
+        actionLabel,
+        previousStatus: log.previous_status,
+        newStatus: log.new_status,
+        previousStage: log.previous_stage,
+        newStage: log.new_stage,
+        notes: details || log.notes,
+        slaStatus: (log.sla_status || "compliant").toLowerCase(),
+        isSlaBreached: log.is_sla_breached,
+        durationSincePrev: log.time_spent_since_previous_action_ms
+          ? `${Math.round(log.time_spent_since_previous_action_ms / 60000)}m`
+          : null,
+        source: log.source,
+      };
+    });
 
     // Order work table
     const orderWorkList = appsList.map((ord: any) => {
@@ -1117,12 +1435,14 @@ export const getEmployeeDetailPerformance = createServerFn({
       const hasAtRisk = orderLogs.some(
         (l: any) => (l.sla_status || "").toLowerCase() === "at_risk",
       );
+      const cust = customerMap.get(ord.customer_id);
+      const serviceName = serviceMap.get(ord.service_id) || "Service";
       return {
         orderId: ord.id,
         orderNumber: ord.application_code || ord.id.slice(0, 8),
-        customerName: ord.customers?.name || "Customer",
-        customerMobile: ord.customers?.primary_mobile || "—",
-        serviceName: ord.services?.service_name || "Service",
+        customerName: cust?.name || "Customer",
+        customerMobile: cust?.primary_mobile || "—",
+        serviceName,
         assignedAt: ord.assigned_at || ord.created_at,
         firstActionAt: firstAction?.created_at || null,
         lastActionAt: lastAction?.created_at || null,
@@ -1224,32 +1544,47 @@ export const getMyPerformanceDashboard = createServerFn({ method: "POST" })
     const { data: appEvents } = await admin
       .from("application_events")
       .select(
-        "id, application_id, event_type, note, staff_name, created_at, created_by",
+        "id, application_id, lead_id, event_type, note, old_value, new_value, staff_name, created_at, created_by",
       )
       .or(`created_by.eq.${employeeId},staff_name.ilike.%${empName}%`)
       .gte("created_at", dateRange.current.start)
       .lte("created_at", dateRange.current.end)
       .order("created_at", { ascending: false })
-      .limit(200);
+      .limit(300);
+
+    // Activity logs for this employee
+    const { data: activityLogs } = await admin
+      .from("activity_logs")
+      .select(
+        "id, activity_type, activity_description, application_id, lead_id, created_at, user_id",
+      )
+      .eq("user_id", employeeId)
+      .gte("created_at", dateRange.current.start)
+      .lte("created_at", dateRange.current.end)
+      .order("created_at", { ascending: false })
+      .limit(300);
 
     const myLogs = [...(logs ?? [])];
     const logSet = new Set(
       myLogs.map(
-        (l: any) => `${l.order_id}_${l.action_type}_${l.created_at}`,
+        (l: any) =>
+          `${l.order_id || l.lead_id}_${l.action_type}_${l.created_at}`,
       ),
     );
 
     (appEvents ?? []).forEach((evt: any) => {
       const actionType = mapEventTypeToAction(evt.event_type);
-      const key = `${evt.application_id}_${actionType}_${evt.created_at}`;
+      const key = `${evt.application_id || evt.lead_id}_${actionType}_${evt.created_at}`;
       if (!logSet.has(key)) {
+        logSet.add(key);
         myLogs.push({
-          id: evt.id,
+          id: `ae_${evt.id}`,
           order_id: evt.application_id,
+          lead_id: evt.lead_id,
           employee_name: empName,
           action_type: actionType,
-          previous_status: null,
-          new_status: null,
+          previous_status: evt.old_value,
+          new_status: evt.new_value,
           previous_stage: null,
           new_stage: null,
           timestamp: evt.created_at,
@@ -1265,6 +1600,35 @@ export const getMyPerformanceDashboard = createServerFn({ method: "POST" })
       }
     });
 
+    (activityLogs ?? []).forEach((act: any) => {
+      const actionType = mapEventTypeToAction(act.activity_type);
+      const key = `${act.application_id || act.lead_id}_${actionType}_${act.created_at}`;
+      if (!logSet.has(key)) {
+        logSet.add(key);
+        myLogs.push({
+          id: `act_${act.id}`,
+          order_id: act.application_id,
+          lead_id: act.lead_id,
+          employee_name: empName,
+          action_type: actionType,
+          previous_status: null,
+          new_status: null,
+          previous_stage: null,
+          new_stage: null,
+          timestamp: act.created_at,
+          created_at_ist: new Date(act.created_at).toLocaleTimeString(
+            "en-IN",
+            { hour: "2-digit", minute: "2-digit" },
+          ),
+          sla_status: "compliant",
+          is_sla_breached: false,
+          notes: act.activity_description,
+          activity_description: act.activity_description,
+          created_at: act.created_at,
+        });
+      }
+    });
+
     myLogs.sort(
       (a, b) =>
         new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
@@ -1274,21 +1638,66 @@ export const getMyPerformanceDashboard = createServerFn({ method: "POST" })
     const { data: assignedOrders } = await admin
       .from("applications")
       .select(
-        "id, application_code, customer_id, service_id, order_status, fulfillment_status, application_status, is_hot, is_hold, assigned_at, created_at, updated_at, customers(name, primary_mobile, primary_email), services(service_name)",
+        "id, application_code, customer_id, service_id, order_status, fulfillment_status, application_status, is_hot, is_hold, assigned_at, created_at, updated_at",
       )
       .eq("assigned_to", employeeId)
-      .eq("is_deleted", false)
+      .or("is_deleted.is.null,is_deleted.eq.false")
       .order("is_hot", { ascending: false })
       .order("created_at", { ascending: false })
       .limit(300);
 
     const allAssigned = assignedOrders ?? [];
 
+    // Parallel lookups for customers and services to avoid PostgREST relationship errors
+    const custIds = Array.from(
+      new Set(allAssigned.map((a: any) => a.customer_id).filter(Boolean)),
+    );
+    const svcIds = Array.from(
+      new Set(allAssigned.map((a: any) => a.service_id).filter(Boolean)),
+    );
+
+    const [{ data: customersData }, { data: servicesData }] =
+      await Promise.all([
+        custIds.length
+          ? admin
+              .from("customers")
+              .select("id, name, primary_mobile, primary_email")
+              .in("id", custIds)
+          : { data: [] },
+        svcIds.length
+          ? admin.from("services").select("id, service_name").in("id", svcIds)
+          : { data: [] },
+      ]);
+
+    const customerMap = new Map(
+      (customersData ?? []).map((c: any) => [c.id, c]),
+    );
+    const serviceMap = new Map(
+      (servicesData ?? []).map((s: any) => [s.id, s.service_name]),
+    );
+
     // Build order code lookup
     const orderCodeMap = new Map<string, string>();
     allAssigned.forEach((a: any) => {
       if (a.application_code) orderCodeMap.set(a.id, a.application_code);
     });
+
+    const missingLogAppIds = Array.from(
+      new Set(
+        myLogs
+          .map((l: any) => l.order_id)
+          .filter((id: string) => id && !orderCodeMap.has(id)),
+      ),
+    );
+    if (missingLogAppIds.length > 0) {
+      const { data: extraLogApps } = await admin
+        .from("applications")
+        .select("id, application_code")
+        .in("id", missingLogAppIds);
+      (extraLogApps ?? []).forEach((a: any) => {
+        if (a.application_code) orderCodeMap.set(a.id, a.application_code);
+      });
+    }
 
     const workedOrdersSet = new Set(
       myLogs.map((l: any) => l.order_id).filter(Boolean),
@@ -1397,15 +1806,18 @@ export const getMyPerformanceDashboard = createServerFn({ method: "POST" })
                 3_600_000,
             )
           : 0;
+        const cust = customerMap.get(ord.customer_id);
+        const serviceName = serviceMap.get(ord.service_id) || "Service";
+        const { actionLabel: lastActionLabel } = lastAction
+          ? formatLogAction(lastAction)
+          : { actionLabel: "Awaiting first action" };
         return {
           orderId: ord.id,
           orderNumber: ord.application_code || ord.id.slice(0, 8),
-          customerName: ord.customers?.name || "Customer",
-          serviceName: ord.services?.service_name || "Service",
+          customerName: cust?.name || "Customer",
+          serviceName,
           ageHours,
-          lastAction: lastAction
-            ? lastAction.action_type.replace(/_/g, " ")
-            : "Awaiting first action",
+          lastAction: lastActionLabel,
           nextAction: "Contact Customer / Review Form",
           status: ord.order_status || ord.application_status,
           stage: ord.fulfillment_status,
@@ -1422,17 +1834,20 @@ export const getMyPerformanceDashboard = createServerFn({ method: "POST" })
           (l.sla_status || "").toLowerCase() === "breached",
       );
       const isAtRisk = atRiskOrderIds.has(ord.id);
+      const cust = customerMap.get(ord.customer_id);
+      const serviceName = serviceMap.get(ord.service_id) || "Service";
+      const { actionLabel: lastActionText } = lastAction
+        ? formatLogAction(lastAction)
+        : { actionLabel: "Pending First Action" };
       return {
         orderId: ord.id,
         orderNumber: ord.application_code || ord.id.slice(0, 8),
-        customerName: ord.customers?.name || "Customer",
-        customerMobile: ord.customers?.primary_mobile || "—",
-        serviceName: ord.services?.service_name || "Service",
+        customerName: cust?.name || "Customer",
+        customerMobile: cust?.primary_mobile || "—",
+        serviceName,
         assignedAt: ord.assigned_at || ord.created_at,
         lastActionAt: lastAction?.created_at || null,
-        lastActionText: lastAction
-          ? lastAction.action_type.replace(/_/g, " ")
-          : "Pending First Action",
+        lastActionText,
         currentStage: ord.fulfillment_status,
         currentStatus: ord.order_status || ord.application_status,
         isHot: !!ord.is_hot,
@@ -1441,41 +1856,55 @@ export const getMyPerformanceDashboard = createServerFn({ method: "POST" })
     });
 
     // Activity Timeline (chronological, with order codes)
-    const activityTimeline = myLogs.slice(0, 50).map((log: any) => ({
-      id: log.id,
-      time:
-        log.created_at_ist ||
-        new Date(log.created_at).toLocaleTimeString("en-IN", {
-          hour: "2-digit",
-          minute: "2-digit",
-        }),
-      orderId: log.order_id,
-      orderCode:
-        orderCodeMap.get(log.order_id) || log.order_id?.slice(0, 8),
-      actionType: log.action_type,
-      actionLabel: log.action_type.replace(/_/g, " "),
-      notes: log.notes,
-      slaStatus: (log.sla_status || "compliant").toLowerCase(),
-      isSlaBreached: log.is_sla_breached,
-      createdAt: log.created_at,
-    }));
+    const activityTimeline = myLogs.slice(0, 50).map((log: any) => {
+      const { actionLabel, details } = formatLogAction(log);
+      const code =
+        orderCodeMap.get(log.order_id) ||
+        orderCodeMap.get(log.lead_id) ||
+        (log.order_id ? log.order_id.slice(0, 8) : null);
+      return {
+        id: log.id,
+        time:
+          log.created_at_ist ||
+          new Date(log.created_at).toLocaleTimeString("en-IN", {
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
+        orderId: log.order_id,
+        leadId: log.lead_id,
+        orderCode: code,
+        actionType: log.action_type,
+        actionLabel,
+        notes: details || log.notes,
+        slaStatus: (log.sla_status || "compliant").toLowerCase(),
+        isSlaBreached: log.is_sla_breached,
+        createdAt: log.created_at,
+      };
+    });
 
     // Recent 20 Actions
-    const recentActions = myLogs.slice(0, 20).map((log: any) => ({
-      id: log.id,
-      orderId: log.order_id,
-      orderCode: orderCodeMap.get(log.order_id) || log.order_id?.slice(0, 8),
-      action: log.action_type.replace(/_/g, " "),
-      time:
-        log.created_at_ist ||
-        new Date(log.created_at).toLocaleTimeString("en-IN", {
-          hour: "2-digit",
-          minute: "2-digit",
-        }),
-      previousState: log.previous_stage || log.previous_status || "—",
-      newState: log.new_stage || log.new_status || "—",
-      notes: log.notes,
-    }));
+    const recentActions = myLogs.slice(0, 20).map((log: any) => {
+      const { actionLabel, details } = formatLogAction(log);
+      const code =
+        orderCodeMap.get(log.order_id) ||
+        orderCodeMap.get(log.lead_id) ||
+        (log.order_id ? log.order_id.slice(0, 8) : null);
+      return {
+        id: log.id,
+        orderId: log.order_id,
+        orderCode: code,
+        action: actionLabel,
+        time:
+          log.created_at_ist ||
+          new Date(log.created_at).toLocaleTimeString("en-IN", {
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
+        previousState: log.previous_stage || log.previous_status || "—",
+        newState: log.new_stage || log.new_status || "—",
+        notes: details || log.notes,
+      };
+    });
 
     // Determine current status based on last action time
     const lastActionTime =
@@ -1567,7 +1996,9 @@ export const getLiveActivityFeed = createServerFn({ method: "POST" })
     const { data: feed } = await feedQuery;
 
     // Collect all order IDs from the feed to do a bulk code lookup
-    const feedOrderIds = [...new Set((feed ?? []).map((f: any) => f.order_id).filter(Boolean))];
+    const feedOrderIds = [
+      ...new Set((feed ?? []).map((f: any) => f.order_id).filter(Boolean)),
+    ] as string[];
     let orderCodeMap = new Map<string, string>();
     if (feedOrderIds.length > 0) {
       const { data: codeRows } = await admin
@@ -1579,49 +2010,80 @@ export const getLiveActivityFeed = createServerFn({ method: "POST" })
       });
     }
 
-    const merged: any[] = (feed ?? []).map((f: any) => ({
-      id: f.id,
-      time:
-        f.created_at_ist ||
-        new Date(f.created_at).toLocaleTimeString("en-IN", {
-          hour: "2-digit",
-          minute: "2-digit",
-        }),
-      employeeName: f.employee_name || "Staff",
-      actionType: f.action_type,
-      actionText: f.action_type.replace(/_/g, " "),
-      orderId: f.order_id,
-      orderCode: orderCodeMap.get(f.order_id) || f.order_id?.slice(0, 8),
-      notes: f.notes,
-      createdAt: f.created_at,
-    }));
+    const merged: any[] = (feed ?? []).map((f: any) => {
+      const { actionLabel, details } = formatLogAction(f);
+      return {
+        id: f.id,
+        time:
+          f.created_at_ist ||
+          new Date(f.created_at).toLocaleTimeString("en-IN", {
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
+        employeeName: f.employee_name || "Staff",
+        actionType: f.action_type,
+        actionText: actionLabel,
+        orderId: f.order_id,
+        orderCode: orderCodeMap.get(f.order_id) || f.order_id?.slice(0, 8),
+        notes: details || f.notes,
+        createdAt: f.created_at,
+      };
+    });
 
     // Also pull from application_events for completeness
-    const { data: appEvents } = await admin
+    let appEventsQuery = admin
       .from("application_events")
       .select(
-        "id, application_id, event_type, note, staff_name, created_at",
+        "id, application_id, lead_id, event_type, old_value, new_value, note, staff_name, created_at, created_by",
       )
       .order("created_at", { ascending: false })
       .limit(data.limit);
 
-    // Collect appEvent order IDs for code lookup
-    const aeOrderIds = [...new Set((appEvents ?? []).map((e: any) => e.application_id).filter(Boolean))];
-    if (aeOrderIds.length > 0) {
-      const aeIds = aeOrderIds.filter((id) => !orderCodeMap.has(id));
-      if (aeIds.length > 0) {
-        const { data: aeCodeRows } = await admin
-          .from("applications")
-          .select("id, application_code")
-          .in("id", aeIds);
-        (aeCodeRows ?? []).forEach((r: any) => {
-          if (r.application_code) orderCodeMap.set(r.id, r.application_code);
-        });
-      }
+    if (data.employeeId) {
+      appEventsQuery = appEventsQuery.eq("created_by", data.employeeId);
+    }
+    const { data: appEvents } = await appEventsQuery;
+
+    // Also pull from activity_logs
+    let actLogsQuery = admin
+      .from("activity_logs")
+      .select(
+        "id, activity_type, activity_description, application_id, lead_id, created_at, user_id",
+      )
+      .order("created_at", { ascending: false })
+      .limit(data.limit);
+
+    if (data.employeeId) {
+      actLogsQuery = actLogsQuery.eq("user_id", data.employeeId);
+    }
+    const { data: actEvents } = await actLogsQuery;
+
+    // Collect all missing order IDs for code lookup
+    const extraAppIds = [
+      ...new Set([
+        ...(appEvents ?? []).map((e: any) => e.application_id),
+        ...(actEvents ?? []).map((a: any) => a.application_id),
+      ].filter(Boolean)),
+    ].filter((id) => !orderCodeMap.has(id)) as string[];
+
+    if (extraAppIds.length > 0) {
+      const { data: aeCodeRows } = await admin
+        .from("applications")
+        .select("id, application_code")
+        .in("id", extraAppIds);
+      (aeCodeRows ?? []).forEach((r: any) => {
+        if (r.application_code) orderCodeMap.set(r.id, r.application_code);
+      });
     }
 
     (appEvents ?? []).forEach((evt: any) => {
       const actionType = mapEventTypeToAction(evt.event_type);
+      const { actionLabel, details } = formatLogAction({
+        action_type: actionType,
+        old_value: evt.old_value,
+        new_value: evt.new_value,
+        notes: evt.note,
+      });
       merged.push({
         id: `ae_${evt.id}`,
         time: new Date(evt.created_at).toLocaleTimeString("en-IN", {
@@ -1630,13 +2092,37 @@ export const getLiveActivityFeed = createServerFn({ method: "POST" })
         }),
         employeeName: evt.staff_name || "Staff",
         actionType,
-        actionText: actionType.replace(/_/g, " "),
+        actionText: actionLabel,
         orderId: evt.application_id,
         orderCode:
           orderCodeMap.get(evt.application_id) ||
           evt.application_id?.slice(0, 8),
-        notes: evt.note,
+        notes: details || evt.note,
         createdAt: evt.created_at,
+      });
+    });
+
+    (actEvents ?? []).forEach((act: any) => {
+      const actionType = mapEventTypeToAction(act.activity_type);
+      const { actionLabel } = formatLogAction({
+        action_type: actionType,
+        activity_description: act.activity_description,
+      });
+      merged.push({
+        id: `act_${act.id}`,
+        time: new Date(act.created_at).toLocaleTimeString("en-IN", {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+        employeeName: "Staff",
+        actionType,
+        actionText: actionLabel,
+        orderId: act.application_id,
+        orderCode:
+          orderCodeMap.get(act.application_id) ||
+          act.application_id?.slice(0, 8),
+        notes: act.activity_description,
+        createdAt: act.created_at,
       });
     });
 
