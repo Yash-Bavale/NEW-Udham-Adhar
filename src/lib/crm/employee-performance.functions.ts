@@ -36,81 +36,93 @@ export type DatePeriodFilter =
   | "this_month"
   | "custom";
 
+function formatTimeIST(val: string | Date | null | undefined): string {
+  if (!val) return "—";
+  try {
+    const d = typeof val === "string" ? new Date(val) : val;
+    if (Number.isNaN(d.getTime())) return "—";
+    return d.toLocaleTimeString("en-IN", {
+      timeZone: "Asia/Kolkata",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: true,
+    });
+  } catch {
+    return "—";
+  }
+}
+
 function resolveDateRange(
   filter: DatePeriodFilter,
   customStart?: string,
   customEnd?: string,
 ) {
-  const now = new Date();
+  // IST is UTC + 5 hours 30 mins
+  const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+  const nowUtc = new Date();
+  const nowIst = new Date(nowUtc.getTime() + IST_OFFSET_MS);
 
-  let currentStart = new Date();
-  let currentEnd = new Date();
-  let prevStart = new Date();
-  let prevEnd = new Date();
+  const getIstMidnightAsUtc = (dIst: Date) => {
+    return new Date(
+      Date.UTC(dIst.getUTCFullYear(), dIst.getUTCMonth(), dIst.getUTCDate(), 0, 0, 0, 0) -
+        IST_OFFSET_MS,
+    );
+  };
+  const getIstEndOfDayAsUtc = (dIst: Date) => {
+    return new Date(
+      Date.UTC(dIst.getUTCFullYear(), dIst.getUTCMonth(), dIst.getUTCDate(), 23, 59, 59, 999) -
+        IST_OFFSET_MS,
+    );
+  };
 
-  const startOfDay = (d: Date) => {
-    const res = new Date(d);
-    res.setHours(0, 0, 0, 0);
-    return res;
-  };
-  const endOfDay = (d: Date) => {
-    const res = new Date(d);
-    res.setHours(23, 59, 59, 999);
-    return res;
-  };
+  let currentStart = getIstMidnightAsUtc(nowIst);
+  let currentEnd = getIstEndOfDayAsUtc(nowIst);
+  let prevStart = new Date(currentStart.getTime() - 86_400_000);
+  let prevEnd = new Date(currentEnd.getTime() - 86_400_000);
 
   if (filter === "today") {
-    currentStart = startOfDay(now);
-    currentEnd = endOfDay(now);
-    const yest = new Date(now);
-    yest.setDate(yest.getDate() - 1);
-    prevStart = startOfDay(yest);
-    prevEnd = endOfDay(yest);
+    currentStart = getIstMidnightAsUtc(nowIst);
+    currentEnd = getIstEndOfDayAsUtc(nowIst);
+    const yestIst = new Date(nowIst.getTime() - 86_400_000);
+    prevStart = getIstMidnightAsUtc(yestIst);
+    prevEnd = getIstEndOfDayAsUtc(yestIst);
   } else if (filter === "yesterday") {
-    const yest = new Date(now);
-    yest.setDate(yest.getDate() - 1);
-    currentStart = startOfDay(yest);
-    currentEnd = endOfDay(yest);
-    const dayBefore = new Date(now);
-    dayBefore.setDate(dayBefore.getDate() - 2);
-    prevStart = startOfDay(dayBefore);
-    prevEnd = endOfDay(dayBefore);
+    const yestIst = new Date(nowIst.getTime() - 86_400_000);
+    currentStart = getIstMidnightAsUtc(yestIst);
+    currentEnd = getIstEndOfDayAsUtc(yestIst);
+    const dayBeforeIst = new Date(nowIst.getTime() - 2 * 86_400_000);
+    prevStart = getIstMidnightAsUtc(dayBeforeIst);
+    prevEnd = getIstEndOfDayAsUtc(dayBeforeIst);
   } else if (filter === "7d") {
-    currentStart = new Date(now.getTime() - 7 * 86_400_000);
-    currentEnd = now;
-    prevStart = new Date(now.getTime() - 14 * 86_400_000);
-    prevEnd = new Date(now.getTime() - 7 * 86_400_000);
+    currentStart = new Date(nowUtc.getTime() - 7 * 86_400_000);
+    currentEnd = nowUtc;
+    prevStart = new Date(nowUtc.getTime() - 14 * 86_400_000);
+    prevEnd = new Date(nowUtc.getTime() - 7 * 86_400_000);
   } else if (filter === "15d") {
-    currentStart = new Date(now.getTime() - 15 * 86_400_000);
-    currentEnd = now;
-    prevStart = new Date(now.getTime() - 30 * 86_400_000);
-    prevEnd = new Date(now.getTime() - 15 * 86_400_000);
+    currentStart = new Date(nowUtc.getTime() - 15 * 86_400_000);
+    currentEnd = nowUtc;
+    prevStart = new Date(nowUtc.getTime() - 30 * 86_400_000);
+    prevEnd = new Date(nowUtc.getTime() - 15 * 86_400_000);
   } else if (filter === "30d") {
-    currentStart = new Date(now.getTime() - 30 * 86_400_000);
-    currentEnd = now;
-    prevStart = new Date(now.getTime() - 60 * 86_400_000);
-    prevEnd = new Date(now.getTime() - 30 * 86_400_000);
+    currentStart = new Date(nowUtc.getTime() - 30 * 86_400_000);
+    currentEnd = nowUtc;
+    prevStart = new Date(nowUtc.getTime() - 60 * 86_400_000);
+    prevEnd = new Date(nowUtc.getTime() - 30 * 86_400_000);
   } else if (filter === "this_month") {
-    currentStart = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
-    currentEnd = now;
-    prevStart = new Date(
-      now.getFullYear(),
-      now.getMonth() - 1,
-      1,
-      0,
-      0,
-      0,
-      0,
+    const monthStartIst = new Date(
+      Date.UTC(nowIst.getUTCFullYear(), nowIst.getUTCMonth(), 1, 0, 0, 0, 0) - IST_OFFSET_MS,
     );
-    prevEnd = new Date(
-      now.getFullYear(),
-      now.getMonth(),
-      0,
-      23,
-      59,
-      59,
-      999,
+    currentStart = monthStartIst;
+    currentEnd = nowUtc;
+    const prevMonthStartIst = new Date(
+      Date.UTC(nowIst.getUTCFullYear(), nowIst.getUTCMonth() - 1, 1, 0, 0, 0, 0) - IST_OFFSET_MS,
     );
+    const prevMonthEndIst = new Date(
+      Date.UTC(nowIst.getUTCFullYear(), nowIst.getUTCMonth(), 0, 23, 59, 59, 999) - IST_OFFSET_MS,
+    );
+    prevStart = prevMonthStartIst;
+    prevEnd = prevMonthEndIst;
   } else if (filter === "custom" && customStart && customEnd) {
     currentStart = new Date(customStart);
     currentEnd = new Date(customEnd);
@@ -150,7 +162,7 @@ function mapEventTypeToAction(eventType: string): string {
   const norm = (eventType || "").toLowerCase();
   if (norm.includes("callback_scheduled")) return "CALLBACK_SCHEDULED";
   if (norm.includes("callback_completed")) return "CUSTOMER_CONTACTED";
-  if (norm.includes("contact_logged") || norm.includes("call_connected"))
+  if (norm.includes("contact_logged") || norm.includes("call_connected") || norm.includes("call_logged"))
     return "CUSTOMER_CONTACTED";
   if (norm.includes("customer_delay") || norm.includes("hold_started"))
     return "CUSTOMER_DELAY_ADDED";
@@ -158,32 +170,98 @@ function mapEventTypeToAction(eventType: string): string {
     return "TECHNICAL_DELAY_ADDED";
   if (norm.includes("form_submitted") || norm.includes("form_received"))
     return "FORM_REVIEWED";
-  if (norm.includes("form_link_sent") || norm.includes("form_pending"))
+  if (norm.includes("form_link_sent") || norm.includes("form_pending") || norm.includes("form_requested"))
     return "FORM_REQUESTED";
   if (
     norm.includes("document_uploaded") ||
-    norm.includes("document_received")
+    norm.includes("document_received") ||
+    norm.includes("document_verified")
   )
     return "DOCUMENT_REVIEWED";
   if (norm.includes("document_requested")) return "DOCUMENT_REQUESTED";
-  if (norm.includes("submitted_to_govt") || norm.includes("processing"))
+  if (norm.includes("submitted_to_govt") || norm.includes("portal_submission") || norm.includes("processing"))
     return "PROCESSING_STARTED";
   if (
     norm.includes("certificate_issued") ||
     norm.includes("certificate_uploaded")
   )
     return "CERTIFICATE_GENERATED";
-  if (norm.includes("completed")) return "ORDER_COMPLETED";
+  if (norm.includes("completed") || norm.includes("application_completed")) return "ORDER_COMPLETED";
   if (norm.includes("closed") || norm.includes("cancelled"))
     return "ORDER_CLOSED";
   if (norm.includes("hot_order")) return "HOT_ORDER_ADDED";
-  if (norm.includes("reassigned") || norm.includes("order_assigned"))
+  if (norm.includes("reassigned") || norm.includes("order_assigned") || norm.includes("staff_assigned"))
     return "ORDER_ASSIGNED";
-  return "STATUS_CHANGED";
+  return "STAGE_CHANGED";
+}
+
+const isUuid = (val?: string | null): boolean => {
+  if (!val) return false;
+  const t = val.trim();
+  return (
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(t) ||
+    /^[0-9a-f]{8}-[0-9a-f]{4}/i.test(t) ||
+    /^[0-9a-f]{16,}$/i.test(t)
+  );
+};
+
+const STAGE_DISPLAY_NAMES: Record<string, string> = {
+  order_received: "Order Received",
+  awaiting_customer_form: "Awaiting Form",
+  waiting_for_customer_submission: "Customer Form Pending",
+  form_submitted: "Form Submitted",
+  form_not_submitted: "Form Not Submitted",
+  technical_delay: "Technical Delay Marked",
+  customer_delay: "Customer Delay Marked",
+  government_processing: "Govt Processing Started",
+  consultation_completed: "Consultation Completed",
+  consultation_pending: "Consultation Pending",
+  application_approved: "Application Approved",
+  application_rejected: "Application Rejected",
+  order_completed: "Order Completed",
+  order_closed: "Order Closed",
+  verification_pending: "Fulfillment Verification",
+  documents_received: "Documents Received",
+  under_processing: "Processing Started",
+  under_review: "Under Review",
+  in_progress: "In Progress",
+  submitted_to_govt: "Submitted to Govt Portal",
+  certificate_ready: "Certificate Ready",
+  certificate_issued: "Certificate Issued",
+  completed: "Order Completed",
+  closed: "Order Closed",
+  cancelled: "Order Cancelled",
+  payment_pending: "Payment Pending",
+  payment_done: "Payment Done",
+  order_reopened: "Order Reopened",
+  new_lead: "New Lead",
+  send_form_link: "Form Link Resent",
+  manual_reminder: "Manual Reminder Sent",
+  start_processing: "Processing Started",
+  our_delay: "Technical Delay Marked",
+  close_manual: "Order Closed",
+  customer_hold: "Customer Delay Marked",
+  our_side_delay: "Technical Delay Marked",
+};
+
+function cleanStageOrStatus(raw?: string | null): string {
+  if (!raw) return "";
+  const trimmed = raw.trim();
+  if (isUuid(trimmed)) return ""; // NEVER display raw UUID
+  const lower = trimmed.toLowerCase();
+  if (STAGE_DISPLAY_NAMES[lower]) return STAGE_DISPLAY_NAMES[lower];
+  const withoutMoved = lower.replace(/^moved to\s+/i, "");
+  if (STAGE_DISPLAY_NAMES[withoutMoved]) return STAGE_DISPLAY_NAMES[withoutMoved];
+  if (isUuid(withoutMoved)) return "";
+  return withoutMoved
+    .split("_")
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
 }
 
 /**
  * Format an event, action log, or activity log into a human-readable action label and details
+ * Strictly removes any UUID references and avoids "Moved to" prefixes.
  */
 function formatLogAction(log: {
   action_type?: string;
@@ -197,58 +275,106 @@ function formatLogAction(log: {
   old_value?: string | null;
   new_value?: string | null;
 }): { actionLabel: string; details: string | null } {
-  if (log.activity_description && log.activity_description.trim()) {
+  const sanitizeText = (txt?: string | null): string | null => {
+    if (!txt) return null;
+    let s = txt.trim();
+    if (isUuid(s)) return null;
+    s = s.replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, "");
+    s = s.replace(/^moved to\s*$/i, "").trim();
+    return s.length > 0 ? s : null;
+  };
+
+  const notesText = sanitizeText(log.notes);
+  const actDesc = sanitizeText(log.activity_description);
+
+  if (actDesc && !/^moved to/i.test(actDesc)) {
     return {
-      actionLabel: log.activity_description.trim(),
-      details:
-        log.notes && log.notes !== log.activity_description
-          ? log.notes
-          : null,
+      actionLabel: actDesc,
+      details: notesText && notesText !== actDesc ? notesText : null,
     };
   }
 
-  const prev = (
-    log.previous_status ||
-    log.old_value ||
-    log.previous_stage ||
-    ""
-  ).trim();
-  const next = (
-    log.new_status ||
-    log.new_value ||
-    log.new_stage ||
-    ""
-  ).trim();
+  const rawType = (log.action_type || log.event_type || "").toUpperCase();
 
-  if (prev && next && prev.toLowerCase() !== next.toLowerCase()) {
-    const cleanPrev = prev.replace(/_/g, " ").toLowerCase();
-    const cleanNext = next.replace(/_/g, " ").toLowerCase();
+  const ACTION_TYPE_LABELS: Record<string, string> = {
+    ORDER_COMPLETED: "Order Completed",
+    APPLICATION_COMPLETED: "Order Completed",
+    ORDER_CLOSED: "Order Closed",
+    ORDER_REOPENED: "Order Reopened",
+    CUSTOMER_CONTACTED: "Customer Contacted",
+    CUSTOMER_DELAY_ADDED: "Customer Delay Added",
+    CUSTOMER_DELAY: "Customer Delay Added",
+    TECHNICAL_DELAY_ADDED: "Technical Delay Added",
+    TECHNICAL_DELAY: "Technical Delay Added",
+    CUSTOMER_DELAY_RESUMED: "Customer Delay Resumed",
+    TECHNICAL_DELAY_RESUMED: "Technical Delay Resumed",
+    CALLBACK_SCHEDULED: "Callback Scheduled",
+    CALLBACK_COMPLETED: "Callback Completed",
+    FORM_REVIEWED: "Form Reviewed & Verified",
+    FORM_REQUESTED: "Form Link Resent",
+    FORM_SUBMITTED: "Form Submitted",
+    DOCUMENT_REVIEWED: "Document Reviewed",
+    DOCUMENT_REQUESTED: "Documents Requested",
+    DOCUMENTS_RECEIVED: "Documents Received",
+    PAYMENT_VERIFIED: "Payment Verified",
+    PROCESSING_STARTED: "Submitted to Govt Portal",
+    PROCESSING_UPDATED: "Govt Processing Updated",
+    CERTIFICATE_GENERATED: "Certificate Issued",
+    CERTIFICATE_DELIVERED: "Certificate Delivered",
+    TICKET_REPLIED: "Ticket Replied",
+    TICKET_CREATED: "Ticket Created",
+    HOT_ORDER_ADDED: "Marked High Priority (Hot)",
+    HOT_ORDER_REMOVED: "Hot Order Removed",
+    ORDER_ASSIGNED: "Order Assigned",
+    ORDER_REASSIGNED: "Order Reassigned",
+    STAFF_ASSIGNED: "Staff Assigned",
+    NOTE_ADDED: "Internal Note Added",
+    INTERNAL_NOTE_ADDED: "Internal Note Added",
+    STAGE_CHANGED: "Stage Updated",
+    STATUS_CHANGED: "Status Updated",
+  };
+
+  const prevRaw = (log.previous_status || log.old_value || log.previous_stage || "").trim();
+  const nextRaw = (log.new_status || log.new_value || log.new_stage || "").trim();
+
+  const prevClean = cleanStageOrStatus(prevRaw);
+  const nextClean = cleanStageOrStatus(nextRaw);
+
+  if (prevClean && nextClean && prevClean.toLowerCase() !== nextClean.toLowerCase()) {
     return {
-      actionLabel: `${cleanPrev} → ${cleanNext}`,
-      details: log.notes || null,
+      actionLabel: `${prevClean} → ${nextClean}`,
+      details: notesText,
     };
   }
 
-  if (next) {
-    const cleanNext = next.replace(/_/g, " ").toLowerCase();
+  if (nextClean) {
     return {
-      actionLabel: `Moved to ${cleanNext}`,
-      details: log.notes || null,
+      actionLabel: nextClean,
+      details: notesText,
     };
   }
 
-  if (log.notes && log.notes.trim()) {
+  if (rawType && ACTION_TYPE_LABELS[rawType]) {
     return {
-      actionLabel: log.notes.trim(),
+      actionLabel: ACTION_TYPE_LABELS[rawType],
+      details: notesText,
+    };
+  }
+
+  if (notesText && notesText.length > 3 && notesText.length < 80 && !notesText.toLowerCase().includes("moved to")) {
+    return {
+      actionLabel: notesText,
       details: null,
     };
   }
 
-  const rawType = log.action_type || log.event_type || "Status Updated";
-  const cleanType = rawType.replace(/_/g, " ").toLowerCase();
+  const fallback = rawType && rawType !== "STAGE_CHANGED"
+    ? rawType.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase())
+    : "Fulfillment Verification";
+
   return {
-    actionLabel: cleanType,
-    details: log.notes || null,
+    actionLabel: fallback,
+    details: notesText,
   };
 }
 
@@ -521,8 +647,19 @@ export const getEmployeePerformanceCommandCenter = createServerFn({
         data.employeeId,
       );
 
-    const { data: allApplications } = await applicationsQuery;
+    const [{ data: allApplications }, { data: leadsAssigned }] = await Promise.all([
+      applicationsQuery,
+      admin
+        .from("leads")
+        .select("id, assigned_to, created_at, updated_at")
+        .not("assigned_to", "is", null)
+        .limit(5000),
+    ]);
     const apps = allApplications ?? [];
+    const leadAssignedMap = new Map<string, any>();
+    (leadsAssigned ?? []).forEach((l: any) => {
+      leadAssignedMap.set(l.id, l);
+    });
 
     const startMs = new Date(dateRange.current.start).getTime();
     const endMs = new Date(dateRange.current.end).getTime();
@@ -582,8 +719,20 @@ export const getEmployeePerformanceCommandCenter = createServerFn({
       });
     }
 
+    // Track assigned orders per staff member
+    const assignedOrdersPerStaff = new Map<string, Set<string>>();
+    const ensureAssignedSet = (uid: string) => {
+      if (!assignedOrdersPerStaff.has(uid)) assignedOrdersPerStaff.set(uid, new Set());
+      return assignedOrdersPerStaff.get(uid)!;
+    };
+
     const currentAssignedOrders = apps.filter((app: any) => {
-      if (!app.assigned_to) return false;
+      const effectiveAssignee =
+        app.assigned_to ||
+        (app.lead_id && leadAssignedMap.get(app.lead_id)?.assigned_to) ||
+        null;
+      if (!effectiveAssignee) return false;
+
       const assignedTime = app.assigned_at
         ? new Date(app.assigned_at).getTime()
         : null;
@@ -593,14 +742,26 @@ export const getEmployeePerformanceCommandCenter = createServerFn({
       const updatedTime = app.updated_at
         ? new Date(app.updated_at).getTime()
         : null;
-      const inWindow =
+      const leadRow = app.lead_id ? leadAssignedMap.get(app.lead_id) : null;
+      const leadUpdatedTime = leadRow?.updated_at
+        ? new Date(leadRow.updated_at).getTime()
+        : null;
+
+      const isTodayAssigned =
         (assignedTime && assignedTime >= startMs && assignedTime <= endMs) ||
         (createdTime && createdTime >= startMs && createdTime <= endMs) ||
-        (updatedTime && updatedTime >= startMs && updatedTime <= endMs);
+        (updatedTime && updatedTime >= startMs && updatedTime <= endMs) ||
+        (leadUpdatedTime && leadUpdatedTime >= startMs && leadUpdatedTime <= endMs);
+
       const isActive = !["completed", "order_closed", "cancelled"].includes(
         app.fulfillment_status,
       );
-      return inWindow || isActive;
+
+      if (isTodayAssigned || isActive) {
+        ensureAssignedSet(effectiveAssignee).add(app.id);
+        return true;
+      }
+      return false;
     });
 
     // 5. Aggregate KPI metrics
@@ -689,18 +850,21 @@ export const getEmployeePerformanceCommandCenter = createServerFn({
 
     // Tally assigned orders from application data
     currentAssignedOrders.forEach((o: any) => {
-      if (!o.assigned_to) return;
-      if (!empStatsMap.has(o.assigned_to)) {
-        const p = profileMap.get(o.assigned_to);
+      const assignee =
+        o.assigned_to ||
+        (o.lead_id && leadAssignedMap.get(o.lead_id)?.assigned_to);
+      if (!assignee) return;
+      if (!empStatsMap.has(assignee)) {
+        const p = profileMap.get(assignee);
         const name =
           p?.full_name ||
           p?.display_name ||
           p?.email?.split("@")[0] ||
           "Staff";
-        empStatsMap.set(o.assigned_to, {
-          employeeId: o.assigned_to,
+        empStatsMap.set(assignee, {
+          employeeId: assignee,
           employeeName: name,
-          employeeRole: userRoleMap.get(o.assigned_to) || "operations",
+          employeeRole: userRoleMap.get(assignee) || "operations",
           avatarUrl: p?.avatar_url,
           assigned: 0,
           workedOrders: new Set(),
@@ -720,8 +884,7 @@ export const getEmployeePerformanceCommandCenter = createServerFn({
         });
       }
 
-      const stats = empStatsMap.get(o.assigned_to)!;
-      stats.assigned += 1;
+      const stats = empStatsMap.get(assignee)!;
       if (o.is_hot) {
         stats.hotOrders.add(o.id);
         hotOrdersSet.add(o.id);
@@ -742,7 +905,7 @@ export const getEmployeePerformanceCommandCenter = createServerFn({
         stats.closedOrders.add(o.id);
         closedOrdersSet.add(o.id);
       }
-      // Count current delays from application state (don't double-count via logs)
+      // Count current delays from application state
       if (
         o.fulfillment_status === "customer_delay" ||
         o.order_status === "CUSTOMER_HOLD"
@@ -772,29 +935,56 @@ export const getEmployeePerformanceCommandCenter = createServerFn({
       if (log.is_sla_breached || slaLower === "breached") slaBreachedCount++;
       else slaCompliantCount++;
 
-      if (log.action_type === "CUSTOMER_DELAY_ADDED") customerDelaysCount++;
-      if (log.action_type === "TECHNICAL_DELAY_ADDED") technicalDelaysCount++;
-      if (log.action_type === "ORDER_REASSIGNED") reassignedCount++;
-      if (log.action_type === "HOT_ORDER_ADDED" && log.order_id)
-        hotOrdersSet.add(log.order_id);
-      if (log.action_type === "ORDER_COMPLETED" && log.order_id)
-        completedOrdersSet.add(log.order_id);
-      if (log.action_type === "ORDER_CLOSED" && log.order_id)
-        closedOrdersSet.add(log.order_id);
+      const actionType = log.action_type || "";
+      const isCompleted =
+        actionType === "ORDER_COMPLETED" ||
+        log.new_status === "completed" ||
+        /complete/i.test(log.notes || "");
+      const isClosed =
+        actionType === "ORDER_CLOSED" ||
+        log.new_status === "closed" ||
+        log.new_status === "order_closed" ||
+        /close/i.test(log.notes || "");
+      const isCustDelay =
+        actionType === "CUSTOMER_DELAY_ADDED" ||
+        actionType === "CUSTOMER_DELAY" ||
+        log.new_status === "customer_delay" ||
+        /customer.*delay/i.test(log.notes || "");
+      const isTechDelay =
+        actionType === "TECHNICAL_DELAY_ADDED" ||
+        actionType === "TECHNICAL_DELAY" ||
+        log.new_status === "technical_delay" ||
+        /technical.*delay|our.*delay/i.test(log.notes || "");
+      const isHot =
+        actionType === "HOT_ORDER_ADDED" ||
+        /hot/i.test(log.notes || "");
+      const isAssignment =
+        actionType === "ORDER_ASSIGNED" ||
+        actionType === "STAFF_ASSIGNED" ||
+        /assign/i.test(log.notes || "");
+
+      if (isCustDelay) customerDelaysCount++;
+      if (isTechDelay) technicalDelaysCount++;
+      if (actionType === "ORDER_REASSIGNED") reassignedCount++;
+      if (isHot && log.order_id) hotOrdersSet.add(log.order_id);
+      if (isCompleted && log.order_id) completedOrdersSet.add(log.order_id);
+      if (isClosed && log.order_id) closedOrdersSet.add(log.order_id);
+      if (isAssignment && empId && log.order_id) {
+        ensureAssignedSet(empId).add(log.order_id);
+      }
 
       // Per-employee rollup — only real logged actions
       if (empId && empStatsMap.has(empId)) {
         const stats = empStatsMap.get(empId)!;
         stats.actions += 1;
         if (log.order_id) stats.workedOrders.add(log.order_id);
-        if (log.action_type === "ORDER_COMPLETED" && log.order_id)
+        if (isCompleted && log.order_id)
           stats.completedOrders.add(log.order_id);
-        if (log.action_type === "ORDER_CLOSED" && log.order_id)
+        if (isClosed && log.order_id)
           stats.closedOrders.add(log.order_id);
-        if (log.action_type === "CUSTOMER_DELAY_ADDED") stats.customerDelays++;
-        if (log.action_type === "TECHNICAL_DELAY_ADDED")
-          stats.technicalDelays++;
-        if (log.action_type === "HOT_ORDER_ADDED" && log.order_id)
+        if (isCustDelay) stats.customerDelays++;
+        if (isTechDelay) stats.technicalDelays++;
+        if (isHot && log.order_id)
           stats.hotOrders.add(log.order_id);
 
         stats.slaTotalCount += 1;
@@ -826,6 +1016,13 @@ export const getEmployeePerformanceCommandCenter = createServerFn({
           stats.firstActionTime = log.created_at;
         }
       }
+    });
+
+    // Ensure every employee's assigned count reflects orders assigned today / active queue (never 0 if they worked on orders)
+    empStatsMap.forEach((stats, uid) => {
+      const assignedSet = assignedOrdersPerStaff.get(uid);
+      const assignedCount = assignedSet ? assignedSet.size : 0;
+      stats.assigned = Math.max(assignedCount, stats.workedOrders.size);
     });
 
     const totalSlaEvaluations = slaCompliantCount + slaBreachedCount;
@@ -901,6 +1098,7 @@ export const getEmployeePerformanceCommandCenter = createServerFn({
         slaPercent,
         lastActionText: s.lastActionText,
         lastActionTime: s.lastActionTime,
+        firstActionTime: s.firstActionTime,
         lastOrderCode: s.lastOrderCode,
         lastActiveAgo,
         status,
@@ -1395,12 +1593,7 @@ export const getEmployeeDetailPerformance = createServerFn({
         (log.order_id ? log.order_id.slice(0, 8) : null);
       return {
         id: log.id,
-        time:
-          log.created_at_ist ||
-          new Date(log.created_at).toLocaleTimeString("en-IN", {
-            hour: "2-digit",
-            minute: "2-digit",
-          }),
+        time: formatTimeIST(log.created_at),
         createdAt: log.created_at,
         orderId: log.order_id,
         leadId: log.lead_id,
@@ -1616,10 +1809,7 @@ export const getMyPerformanceDashboard = createServerFn({ method: "POST" })
           previous_stage: null,
           new_stage: null,
           timestamp: act.created_at,
-          created_at_ist: new Date(act.created_at).toLocaleTimeString(
-            "en-IN",
-            { hour: "2-digit", minute: "2-digit" },
-          ),
+          created_at_ist: formatTimeIST(act.created_at),
           sla_status: "compliant",
           is_sla_breached: false,
           notes: act.activity_description,
@@ -1864,12 +2054,8 @@ export const getMyPerformanceDashboard = createServerFn({ method: "POST" })
         (log.order_id ? log.order_id.slice(0, 8) : null);
       return {
         id: log.id,
-        time:
-          log.created_at_ist ||
-          new Date(log.created_at).toLocaleTimeString("en-IN", {
-            hour: "2-digit",
-            minute: "2-digit",
-          }),
+        time: formatTimeIST(log.created_at),
+        createdAt: log.created_at,
         orderId: log.order_id,
         leadId: log.lead_id,
         orderCode: code,
@@ -1878,7 +2064,6 @@ export const getMyPerformanceDashboard = createServerFn({ method: "POST" })
         notes: details || log.notes,
         slaStatus: (log.sla_status || "compliant").toLowerCase(),
         isSlaBreached: log.is_sla_breached,
-        createdAt: log.created_at,
       };
     });
 
@@ -2086,10 +2271,7 @@ export const getLiveActivityFeed = createServerFn({ method: "POST" })
       });
       merged.push({
         id: `ae_${evt.id}`,
-        time: new Date(evt.created_at).toLocaleTimeString("en-IN", {
-          hour: "2-digit",
-          minute: "2-digit",
-        }),
+        time: formatTimeIST(evt.created_at),
         employeeName: evt.staff_name || "Staff",
         actionType,
         actionText: actionLabel,
@@ -2110,10 +2292,7 @@ export const getLiveActivityFeed = createServerFn({ method: "POST" })
       });
       merged.push({
         id: `act_${act.id}`,
-        time: new Date(act.created_at).toLocaleTimeString("en-IN", {
-          hour: "2-digit",
-          minute: "2-digit",
-        }),
+        time: formatTimeIST(act.created_at),
         employeeName: "Staff",
         actionType,
         actionText: actionLabel,
