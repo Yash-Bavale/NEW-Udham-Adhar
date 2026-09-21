@@ -1,6 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { computeOrderStage } from "./computeOrderStage";
+import { getEmployeePresenceState } from "./employee-presence.functions";
 
 async function getAdmin() {
   const m = await import("@/integrations/supabase/client.server");
@@ -52,8 +54,6 @@ function formatTimeIST(val: string | Date | null | undefined): string {
     return "—";
   }
 }
-
-import { getEmployeePresenceState } from "./employee-presence.functions";
 
 function formatTimeISTShort(val: string | Date | null | undefined): string {
   if (!val) return "—";
@@ -553,24 +553,16 @@ export const getEmployeePerformanceCommandCenter = createServerFn({
       data.customEnd,
     );
 
-    // 1. All staff profiles + roles
-    const { data: staffRoles } = await admin
-      .from("user_roles")
-      .select("user_id, role")
-      .in("role", [
-        "operations",
-        "support",
-        "admin",
-        "super_admin",
-        "manager",
-        "executive",
-        "accounts",
-        "finance",
-      ]);
+    // 1. All staff profiles + roles (Fetch ALL profiles so no assignee is orphaned)
+    const [{ data: profiles }, { data: staffRoles }] = await Promise.all([
+      admin
+        .from("profiles")
+        .select("id, full_name, display_name, email, avatar_url, is_active"),
+      admin
+        .from("user_roles")
+        .select("user_id, role"),
+    ]);
 
-    const staffUserIds = Array.from(
-      new Set((staffRoles ?? []).map((r: any) => r.user_id)),
-    );
     const userRoleMap = new Map<string, string>();
     (staffRoles ?? []).forEach((r: any) => {
       if (
@@ -582,26 +574,45 @@ export const getEmployeePerformanceCommandCenter = createServerFn({
       }
     });
 
-    const { data: profiles } = await admin
-      .from("profiles")
-      .select("id, full_name, display_name, email")
-      .in(
-        "id",
-        staffUserIds.length
-          ? staffUserIds
-          : ["00000000-0000-0000-0000-000000000000"],
-      );
-
     const profileMap = new Map<string, any>();
     const nameToUserIdMap = new Map<string, string>();
+    const activeStaffProfiles = (profiles ?? []).filter((p: any) => p.is_active !== false);
+
     (profiles ?? []).forEach((p: any) => {
       profileMap.set(p.id, p);
-      const displayName =
-        p.full_name || p.display_name || p.email?.split("@")[0] || "";
-      if (displayName)
-        nameToUserIdMap.set(displayName.toLowerCase().trim(), p.id);
-      if (p.email) nameToUserIdMap.set(p.email.toLowerCase().trim(), p.id);
+      nameToUserIdMap.set(p.id.toLowerCase().trim(), p.id);
+      if (p.full_name) {
+        nameToUserIdMap.set(p.full_name.toLowerCase().trim(), p.id);
+        const parts = p.full_name.trim().split(/\s+/);
+        if (parts[0]) nameToUserIdMap.set(parts[0].toLowerCase(), p.id);
+        if (parts.length > 1) nameToUserIdMap.set(`${parts[0]} ${parts[parts.length - 1]}`.toLowerCase(), p.id);
+      }
+      if (p.display_name) {
+        nameToUserIdMap.set(p.display_name.toLowerCase().trim(), p.id);
+        const parts = p.display_name.trim().split(/\s+/);
+        if (parts[0]) nameToUserIdMap.set(parts[0].toLowerCase(), p.id);
+        if (parts.length > 1) nameToUserIdMap.set(`${parts[0]} ${parts[parts.length - 1]}`.toLowerCase(), p.id);
+      }
+      if (p.email) {
+        nameToUserIdMap.set(p.email.toLowerCase().trim(), p.id);
+        const userPrefix = p.email.split("@")[0].toLowerCase().trim();
+        nameToUserIdMap.set(userPrefix, p.id);
+      }
     });
+
+    const resolveStaffUserId = (raw?: string | null): string | null => {
+      if (!raw) return null;
+      const trimmed = raw.trim();
+      if (profileMap.has(trimmed)) return trimmed;
+      const lower = trimmed.toLowerCase();
+      if (nameToUserIdMap.has(lower)) return nameToUserIdMap.get(lower)!;
+      for (const [key, uid] of nameToUserIdMap.entries()) {
+        if (key.length >= 3 && (lower.includes(key) || key.includes(lower))) {
+          return uid;
+        }
+      }
+      return trimmed;
+    };
 
     // 2. Current-period action logs from order_action_logs
     let actionLogsQuery = adminAny
@@ -662,8 +673,7 @@ export const getEmployeePerformanceCommandCenter = createServerFn({
         loggedKeySet.add(dedupKey);
         let matchedEmpId = evt.created_by;
         if (!matchedEmpId && evt.staff_name) {
-          matchedEmpId =
-            nameToUserIdMap.get(evt.staff_name.toLowerCase().trim()) || null;
+          matchedEmpId = resolveStaffUserId(evt.staff_name);
         }
         if (!data.employeeId || matchedEmpId === data.employeeId) {
           logs.push({
@@ -690,7 +700,8 @@ export const getEmployeePerformanceCommandCenter = createServerFn({
       const dedupKey = `${act.application_id || act.lead_id}_${actionType}_${act.created_at}`;
       if (!loggedKeySet.has(dedupKey)) {
         loggedKeySet.add(dedupKey);
-        const p = act.user_id ? profileMap.get(act.user_id) : null;
+        const resolvedEmpId = resolveStaffUserId(act.user_id);
+        const p = resolvedEmpId ? profileMap.get(resolvedEmpId) : null;
         const name =
           p?.full_name ||
           p?.display_name ||
@@ -700,10 +711,10 @@ export const getEmployeePerformanceCommandCenter = createServerFn({
           id: `act_${act.id}`,
           order_id: act.application_id,
           lead_id: act.lead_id,
-          employee_id: act.user_id,
+          employee_id: resolvedEmpId,
           employee_name: name,
           employee_role:
-            (act.user_id && userRoleMap.get(act.user_id)) || "operations",
+            (resolvedEmpId && userRoleMap.get(resolvedEmpId)) || "operations",
           action_type: actionType,
           activity_description: act.activity_description,
           notes: act.activity_description,
@@ -745,8 +756,7 @@ export const getEmployeePerformanceCommandCenter = createServerFn({
         order_id: evt.application_id,
         employee_id:
           evt.created_by ||
-          nameToUserIdMap.get(evt.staff_name?.toLowerCase()?.trim()) ||
-          null,
+          resolveStaffUserId(evt.staff_name),
         action_type: mapEventTypeToAction(evt.event_type),
         is_sla_breached: false,
         created_at: evt.created_at,
@@ -757,66 +767,81 @@ export const getEmployeePerformanceCommandCenter = createServerFn({
         id: `act_${act.id}`,
         order_id: act.application_id,
         lead_id: act.lead_id,
-        employee_id: act.user_id,
+        employee_id: resolveStaffUserId(act.user_id),
         action_type: mapEventTypeToAction(act.activity_type),
         is_sla_breached: false,
         created_at: act.created_at,
       });
     });
 
-    // 4. Fetch applications: both created in the period and active queues
-    let periodAppsQuery = admin
+    // 4. Fetch applications with exact match to listOrdersV2
+    let appsQuery = adminAny
       .from("applications")
       .select(
-        "id, application_code, customer_id, lead_id, assigned_to, assigned_at, order_status, fulfillment_status, application_status, is_hot, service_id, created_at, updated_at",
+        "id, application_code, customer_id, lead_id, assigned_to, assigned_at, order_status, fulfillment_status, application_status, is_hot, service_id, created_at, updated_at, form_submitted_at, certificate_uploaded_at, workflow_status, closure_stage, closure_reason_code, refund_approved_at, refund_processed_at",
       )
-      .or("is_deleted.is.null,is_deleted.eq.false")
-      .gte("created_at", dateRange.current.start)
-      .lte("created_at", dateRange.current.end)
-      .order("created_at", { ascending: false })
-      .limit(5000);
+      .eq("is_deleted", false);
 
-    let activeAppsQuery = admin
-      .from("applications")
-      .select(
-        "id, application_code, customer_id, lead_id, assigned_to, assigned_at, order_status, fulfillment_status, application_status, is_hot, service_id, created_at, updated_at",
-      )
-      .or("is_deleted.is.null,is_deleted.eq.false")
-      .not("assigned_to", "is", null)
-      .order("created_at", { ascending: false })
-      .limit(5000);
-
+    if (dateRange.current.start) {
+      appsQuery = appsQuery.gte("created_at", dateRange.current.start);
+    }
+    if (dateRange.current.end) {
+      appsQuery = appsQuery.lte("created_at", dateRange.current.end);
+    }
     if (data.serviceId) {
-      periodAppsQuery = periodAppsQuery.eq("service_id", data.serviceId);
-      activeAppsQuery = activeAppsQuery.eq("service_id", data.serviceId);
+      appsQuery = appsQuery.eq("service_id", data.serviceId);
     }
     if (data.employeeId) {
-      periodAppsQuery = periodAppsQuery.eq("assigned_to", data.employeeId);
-      activeAppsQuery = activeAppsQuery.eq("assigned_to", data.employeeId);
+      appsQuery = appsQuery.eq("assigned_to", data.employeeId);
     }
 
-    const [{ data: periodApps }, { data: activeApps }, { data: leadsAssigned }] = await Promise.all([
-      periodAppsQuery,
-      activeAppsQuery,
-      admin
-        .from("leads")
-        .select("id, assigned_to, created_at, updated_at")
-        .not("assigned_to", "is", null)
-        .limit(5000),
-    ]);
+    // Active schedulers (for hot orders and active callbacks)
+    const { data: globalActiveSchedulers } = await adminAny
+      .from("order_schedulers")
+      .select("id, application_id, status, scheduler_type, fires_at, remarks, created_at, created_by")
+      .eq("status", "active");
+
+    const activeAppIds = Array.from(
+      new Set((globalActiveSchedulers ?? []).map((s: any) => s.application_id).filter(Boolean)),
+    ) as string[];
+
+    let extraActiveApps: any[] = [];
+    if (activeAppIds.length > 0) {
+      const { data: extraApps } = await adminAny
+        .from("applications")
+        .select(
+          "id, application_code, customer_id, lead_id, assigned_to, assigned_at, order_status, fulfillment_status, application_status, is_hot, service_id, created_at, updated_at, form_submitted_at, certificate_uploaded_at, workflow_status, closure_stage, closure_reason_code, refund_approved_at, refund_processed_at",
+        )
+        .in("id", activeAppIds)
+        .eq("is_deleted", false);
+      extraActiveApps = extraApps ?? [];
+    }
+
+    const { data: periodApps } = await appsQuery.limit(5000);
 
     const appsMap = new Map<string, any>();
     (periodApps ?? []).forEach((a: any) => appsMap.set(a.id, a));
-    (activeApps ?? []).forEach((a: any) => appsMap.set(a.id, a));
+    (extraActiveApps ?? []).forEach((a: any) => appsMap.set(a.id, a));
     const apps = Array.from(appsMap.values());
 
-    const leadAssignedMap = new Map<string, any>();
-    (leadsAssigned ?? []).forEach((l: any) => {
-      leadAssignedMap.set(l.id, l);
-    });
+    const leadIds = Array.from(new Set(apps.map((a: any) => a.lead_id).filter(Boolean))) as string[];
+    const { data: leadsData } = leadIds.length
+      ? await admin.from("leads").select("id, name, email, mobile, total_amount, lead_status_v2, lead_code, status, lead_source, service, service_id, assigned_to").in("id", leadIds)
+      : { data: [] };
+    const leadMap = new Map((leadsData ?? []).map((l: any) => [l.id, l]));
 
-    const startMs = new Date(dateRange.current.start).getTime();
-    const endMs = new Date(dateRange.current.end).getTime();
+    // Map active schedulers
+    const sortedSchedulers = [...(globalActiveSchedulers ?? [])].sort((a: any, b: any) => {
+      const tA = a.created_at ? new Date(a.created_at).getTime() : 0;
+      const tB = b.created_at ? new Date(b.created_at).getTime() : 0;
+      return tB - tA;
+    });
+    const callbackMap = new Map<string, any>();
+    for (const s of sortedSchedulers) {
+      if (s && s.application_id && !callbackMap.has(s.application_id)) {
+        callbackMap.set(s.application_id, s);
+      }
+    }
 
     // Build application code & lead lookup maps
     const orderCodeMap = new Map<string, string>();
@@ -835,7 +860,7 @@ export const getEmployeePerformanceCommandCenter = createServerFn({
       ),
     );
     if (missingAppIds.length > 0) {
-      const { data: extraApps } = await admin
+      const { data: extraApps } = await adminAny
         .from("applications")
         .select("id, application_code, lead_id")
         .in("id", missingAppIds);
@@ -857,8 +882,8 @@ export const getEmployeePerformanceCommandCenter = createServerFn({
       ),
     );
     if (missingLeadIds.length > 0) {
-      const [{ data: leadApps }, { data: leadsData }] = await Promise.all([
-        admin
+      const [{ data: leadApps }, { data: leadsInfo }] = await Promise.all([
+        adminAny
           .from("applications")
           .select("id, application_code, lead_id")
           .in("lead_id", missingLeadIds),
@@ -868,87 +893,12 @@ export const getEmployeePerformanceCommandCenter = createServerFn({
         if (a.lead_id && a.application_code)
           leadToAppMap.set(a.lead_id, a);
       });
-      (leadsData ?? []).forEach((l: any) => {
+      (leadsInfo ?? []).forEach((l: any) => {
         if (l.lead_code) leadCodeMap.set(l.id, l.lead_code);
       });
     }
 
-    // Track assigned orders per staff member
-    const assignedOrdersPerStaff = new Map<string, Set<string>>();
-    const ensureAssignedSet = (uid: string) => {
-      if (!assignedOrdersPerStaff.has(uid)) assignedOrdersPerStaff.set(uid, new Set());
-      return assignedOrdersPerStaff.get(uid)!;
-    };
-
-    const currentAssignedOrders = apps.filter((app: any) => {
-      const effectiveAssignee =
-        app.assigned_to ||
-        (app.lead_id && leadAssignedMap.get(app.lead_id)?.assigned_to) ||
-        null;
-      if (!effectiveAssignee) return false;
-
-      const assignedTime = app.assigned_at
-        ? new Date(app.assigned_at).getTime()
-        : null;
-      const createdTime = app.created_at
-        ? new Date(app.created_at).getTime()
-        : null;
-      const updatedTime = app.updated_at
-        ? new Date(app.updated_at).getTime()
-        : null;
-      const leadRow = app.lead_id ? leadAssignedMap.get(app.lead_id) : null;
-      const leadUpdatedTime = leadRow?.updated_at
-        ? new Date(leadRow.updated_at).getTime()
-        : null;
-
-      const isTodayCreatedOrAssigned =
-        (createdTime && createdTime >= startMs && createdTime <= endMs) ||
-        (assignedTime && assignedTime >= startMs && assignedTime <= endMs) ||
-        (updatedTime && updatedTime >= startMs && updatedTime <= endMs) ||
-        (leadUpdatedTime && leadUpdatedTime >= startMs && leadUpdatedTime <= endMs);
-
-      const isActive = !["completed", "order_closed", "cancelled"].includes(
-        app.fulfillment_status,
-      );
-
-      if (isTodayCreatedOrAssigned || isActive) {
-        ensureAssignedSet(effectiveAssignee).add(app.id);
-        return true;
-      }
-      return false;
-    });
-
-    // 5. Aggregate KPI metrics
-    const activeEmployeesSet = new Set<string>();
-    const workedEmployeesSet = new Set<string>();
-    const uniqueOrdersWorkedSet = new Set<string>();
-    const completedOrdersSet = new Set<string>();
-    const closedOrdersSet = new Set<string>();
-    const hotOrdersSet = new Set<string>();
-
-    let totalActions = logs.length;
-    let customerDelaysCount = 0;
-    let technicalDelaysCount = 0;
-    let reassignedCount = 0;
-    let slaBreachedCount = 0;
-    let slaCompliantCount = 0;
-
-    // Previous period counts for trends
-    const prevTotalActions = pLogs.length;
-    const prevCompletedSet = new Set<string>();
-    const prevClosedSet = new Set<string>();
-    let prevSlaBreached = 0;
-    let prevSlaCompliant = 0;
-    pLogs.forEach((l: any) => {
-      if (l.action_type === "ORDER_COMPLETED" && l.order_id)
-        prevCompletedSet.add(l.order_id);
-      if (l.action_type === "ORDER_CLOSED" && l.order_id)
-        prevClosedSet.add(l.order_id);
-      if (l.is_sla_breached) prevSlaBreached++;
-      else prevSlaCompliant++;
-    });
-
-    // Per-Employee aggregation map
+    // 5. Aggregate KPI metrics & employee stats map
     const empStatsMap = new Map<
       string,
       {
@@ -956,7 +906,7 @@ export const getEmployeePerformanceCommandCenter = createServerFn({
         employeeName: string;
         employeeRole: string;
         avatarUrl?: string;
-        assigned: number;
+        assignedOrders: Set<string>;
         workedOrders: Set<string>;
         actions: number;
         completedOrders: Set<string>;
@@ -974,17 +924,16 @@ export const getEmployeePerformanceCommandCenter = createServerFn({
       }
     >();
 
-    // Initialise all known staff
-    staffUserIds.forEach((uid) => {
-      const p = profileMap.get(uid);
-      const name =
-        p?.full_name || p?.display_name || p?.email?.split("@")[0] || "Staff";
+    // Initialise all known active staff
+    activeStaffProfiles.forEach((p: any) => {
+      const uid = p.id;
+      const name = p.full_name || p.display_name || p.email?.split("@")[0] || "Staff";
       empStatsMap.set(uid, {
         employeeId: uid,
         employeeName: name,
         employeeRole: userRoleMap.get(uid) || "operations",
-        avatarUrl: p?.avatar_url,
-        assigned: 0,
+        avatarUrl: p.avatar_url,
+        assignedOrders: new Set(),
         workedOrders: new Set(),
         actions: 0,
         completedOrders: new Set(),
@@ -1002,25 +951,38 @@ export const getEmployeePerformanceCommandCenter = createServerFn({
       });
     });
 
-    // Tally assigned orders from application data
-    currentAssignedOrders.forEach((o: any) => {
-      const assignee =
-        o.assigned_to ||
-        (o.lead_id && leadAssignedMap.get(o.lead_id)?.assigned_to);
-      if (!assignee) return;
-      if (!empStatsMap.has(assignee)) {
-        const p = profileMap.get(assignee);
-        const name =
-          p?.full_name ||
-          p?.display_name ||
-          p?.email?.split("@")[0] ||
-          "Staff";
-        empStatsMap.set(assignee, {
-          employeeId: assignee,
+    const activeEmployeesSet = new Set<string>();
+    const workedEmployeesSet = new Set<string>();
+    const uniqueOrdersWorkedSet = new Set<string>();
+    const completedOrdersSet = new Set<string>();
+    const closedOrdersSet = new Set<string>();
+    const hotOrdersSet = new Set<string>();
+
+    let totalActions = logs.length;
+    let customerDelaysCount = 0;
+    let technicalDelaysCount = 0;
+    let reassignedCount = 0;
+    let slaBreachedCount = 0;
+    let slaCompliantCount = 0;
+
+    const nowTime = Date.now();
+
+    // Tally applications exact to listOrdersV2
+    apps.forEach((o: any) => {
+      const lead = o.lead_id ? leadMap.get(o.lead_id) : null;
+      const rawAssignee = o.assigned_to || lead?.assigned_to;
+      const effectiveAssignee = resolveStaffUserId(rawAssignee);
+      if (!effectiveAssignee) return;
+
+      if (!empStatsMap.has(effectiveAssignee)) {
+        const p = profileMap.get(effectiveAssignee);
+        const name = p?.full_name || p?.display_name || p?.email?.split("@")[0] || "Staff";
+        empStatsMap.set(effectiveAssignee, {
+          employeeId: effectiveAssignee,
           employeeName: name,
-          employeeRole: userRoleMap.get(assignee) || "operations",
+          employeeRole: userRoleMap.get(effectiveAssignee) || "operations",
           avatarUrl: p?.avatar_url,
-          assigned: 0,
+          assignedOrders: new Set(),
           workedOrders: new Set(),
           actions: 0,
           completedOrders: new Set(),
@@ -1038,19 +1000,61 @@ export const getEmployeePerformanceCommandCenter = createServerFn({
         });
       }
 
-      const stats = empStatsMap.get(assignee)!;
-      if (o.is_hot) {
+      const stats = empStatsMap.get(effectiveAssignee)!;
+      stats.assignedOrders.add(o.id);
+
+      const stage = computeOrderStage(
+        { lead_status_v2: lead?.lead_status_v2, status: lead?.status },
+        {
+          form_submitted_at: o.form_submitted_at,
+          certificate_uploaded_at: o.certificate_uploaded_at,
+          fulfillment_status: o.fulfillment_status,
+          application_status: o.application_status,
+          workflow_status: o.workflow_status,
+          closure_stage: o.closure_stage,
+          refund_approved_at: o.refund_approved_at,
+          refund_processed_at: o.refund_processed_at,
+        },
+      );
+
+      const cb = callbackMap.get(o.id);
+      const firesAtTime = cb?.fires_at ? new Date(cb.fires_at).getTime() : 0;
+      const is_due = firesAtTime > 0 && firesAtTime <= nowTime;
+      const is_reopened =
+        stage === "order_reopened" ||
+        o.fulfillment_status === "order_reopened" ||
+        o.application_status === "order_reopened" ||
+        o.order_status === "REOPENED";
+
+      const fsLower = String(o.fulfillment_status ?? "").toLowerCase();
+      const isTerminal =
+        stage === "completed" ||
+        stage === "closed" ||
+        fsLower === "completed" ||
+        fsLower === "order_closed" ||
+        fsLower === "cancelled" ||
+        ["completed", "closed", "cancelled"].includes(String(o.application_status ?? "").toLowerCase()) ||
+        ["completed", "closed", "cancelled"].includes(String(o.order_status ?? "").toLowerCase());
+
+      const is_hot = Boolean(o.is_hot) || (!isTerminal && (is_due || is_reopened));
+      if (is_hot) {
         stats.hotOrders.add(o.id);
         hotOrdersSet.add(o.id);
       }
+
       const isCompleted =
-        o.order_status === "COMPLETED" ||
-        o.fulfillment_status === "completed" ||
-        o.application_status === "completed";
+        stage === "completed" ||
+        fsLower === "completed" ||
+        o.application_status === "completed" ||
+        o.order_status === "COMPLETED";
+
       const isClosed =
-        o.order_status === "CLOSED" ||
-        o.fulfillment_status === "order_closed" ||
-        o.application_status === "cancelled";
+        stage === "closed" ||
+        fsLower === "order_closed" ||
+        fsLower === "cancelled" ||
+        o.application_status === "cancelled" ||
+        o.order_status === "CLOSED";
+
       if (isCompleted) {
         stats.completedOrders.add(o.id);
         completedOrdersSet.add(o.id);
@@ -1059,16 +1063,18 @@ export const getEmployeePerformanceCommandCenter = createServerFn({
         stats.closedOrders.add(o.id);
         closedOrdersSet.add(o.id);
       }
-      // Count current delays from application state
+
       if (
-        o.fulfillment_status === "customer_delay" ||
+        stage === "customer_delay" ||
+        fsLower === "customer_delay" ||
         o.order_status === "CUSTOMER_HOLD"
       ) {
         stats.customerDelays += 1;
         customerDelaysCount += 1;
       }
       if (
-        o.fulfillment_status === "technical_delay" ||
+        stage === "technical_delay" ||
+        fsLower === "technical_delay" ||
         o.order_status === "OUR_SIDE_DELAY"
       ) {
         stats.technicalDelays += 1;
@@ -1076,29 +1082,31 @@ export const getEmployeePerformanceCommandCenter = createServerFn({
       }
     });
 
+    // Previous period counts for trends
+    const prevTotalActions = pLogs.length;
+    const prevCompletedSet = new Set<string>();
+    const prevClosedSet = new Set<string>();
+    let prevSlaBreached = 0;
+    let prevSlaCompliant = 0;
+    pLogs.forEach((l: any) => {
+      if (l.action_type === "ORDER_COMPLETED" && l.order_id)
+        prevCompletedSet.add(l.order_id);
+      if (l.action_type === "ORDER_CLOSED" && l.order_id)
+        prevClosedSet.add(l.order_id);
+      if (l.is_sla_breached) prevSlaBreached++;
+      else prevSlaCompliant++;
+    });
+
     // Process all action logs — real counts only
     logs.forEach((log: any) => {
-      const empId = log.employee_id;
+      const empId = resolveStaffUserId(log.employee_id || log.staff_name || log.user_id);
       if (empId) {
         activeEmployeesSet.add(empId);
         workedEmployeesSet.add(empId);
+        if (log.order_id) uniqueOrdersWorkedSet.add(log.order_id);
       }
-      if (log.order_id) uniqueOrdersWorkedSet.add(log.order_id);
 
-      const slaLower = (log.sla_status || "").toLowerCase();
-      if (log.is_sla_breached || slaLower === "breached") slaBreachedCount++;
-      else slaCompliantCount++;
-
-      const actionType = log.action_type || "";
-      const isCompleted =
-        actionType === "ORDER_COMPLETED" ||
-        log.new_status === "completed" ||
-        /complete/i.test(log.notes || "");
-      const isClosed =
-        actionType === "ORDER_CLOSED" ||
-        log.new_status === "closed" ||
-        log.new_status === "order_closed" ||
-        /close/i.test(log.notes || "");
+      const actionType = (log.action_type || "").toUpperCase();
       const isCustDelay =
         actionType === "CUSTOMER_DELAY_ADDED" ||
         actionType === "CUSTOMER_DELAY" ||
@@ -1112,10 +1120,17 @@ export const getEmployeePerformanceCommandCenter = createServerFn({
       const isHot =
         actionType === "HOT_ORDER_ADDED" ||
         /hot/i.test(log.notes || "");
-      const isAssignment =
-        actionType === "ORDER_ASSIGNED" ||
-        actionType === "STAFF_ASSIGNED" ||
-        /assign/i.test(log.notes || "");
+      const isCompleted =
+        actionType === "ORDER_COMPLETED" ||
+        actionType === "APPLICATION_COMPLETED" ||
+        log.new_status === "completed" ||
+        /completed|certificate issued/i.test(log.notes || "");
+      const isClosed =
+        actionType === "ORDER_CLOSED" ||
+        log.new_status === "order_closed" ||
+        log.new_status === "closed" ||
+        log.new_status === "cancelled" ||
+        /closed|cancel/i.test(log.notes || "");
 
       if (isCustDelay) customerDelaysCount++;
       if (isTechDelay) technicalDelaysCount++;
@@ -1123,9 +1138,6 @@ export const getEmployeePerformanceCommandCenter = createServerFn({
       if (isHot && log.order_id) hotOrdersSet.add(log.order_id);
       if (isCompleted && log.order_id) completedOrdersSet.add(log.order_id);
       if (isClosed && log.order_id) closedOrdersSet.add(log.order_id);
-      if (isAssignment && empId && log.order_id) {
-        ensureAssignedSet(empId).add(log.order_id);
-      }
 
       // Per-employee rollup — only real logged actions
       if (empId && empStatsMap.has(empId)) {
@@ -1143,8 +1155,12 @@ export const getEmployeePerformanceCommandCenter = createServerFn({
 
         stats.slaTotalCount += 1;
         const slaLow = (log.sla_status || "").toLowerCase();
-        if (!log.is_sla_breached && slaLow !== "breached")
+        if (!log.is_sla_breached && slaLow !== "breached") {
           stats.slaCompliantCount += 1;
+          slaCompliantCount += 1;
+        } else {
+          slaBreachedCount += 1;
+        }
 
         // Track first and last action times
         if (
@@ -1172,13 +1188,6 @@ export const getEmployeePerformanceCommandCenter = createServerFn({
       }
     });
 
-    // Ensure every employee's assigned count reflects orders assigned today / active queue (never 0 if they worked on orders)
-    empStatsMap.forEach((stats, uid) => {
-      const assignedSet = assignedOrdersPerStaff.get(uid);
-      const assignedCount = assignedSet ? assignedSet.size : 0;
-      stats.assigned = Math.max(assignedCount, stats.workedOrders.size);
-    });
-
     const totalSlaEvaluations = slaCompliantCount + slaBreachedCount;
     const slaCompliantPercent =
       totalSlaEvaluations > 0
@@ -1193,7 +1202,6 @@ export const getEmployeePerformanceCommandCenter = createServerFn({
         : 100;
 
     // Build employee rows
-    const nowTime = Date.now();
     const employeeRows = Array.from(empStatsMap.values()).map((s) => {
       const slaPercent =
         s.slaTotalCount > 0
@@ -1236,12 +1244,14 @@ export const getEmployeePerformanceCommandCenter = createServerFn({
             : `${sessionMins}m`
           : "—";
 
+      const assignedCount = s.assignedOrders.size > 0 ? s.assignedOrders.size : s.workedOrders.size;
+
       return {
         employeeId: s.employeeId,
         employeeName: s.employeeName,
         employeeRole: s.employeeRole,
         avatarUrl: s.avatarUrl,
-        assigned: s.assigned,
+        assigned: assignedCount,
         worked: s.workedOrders.size,
         actions: s.actions,
         completed: s.completedOrders.size,
@@ -1266,7 +1276,7 @@ export const getEmployeePerformanceCommandCenter = createServerFn({
     );
 
     // 6. Funnel
-    const totalAssignedInPeriod = currentAssignedOrders.length;
+    const totalAssignedInPeriod = apps.length;
     const completedTotal = completedOrdersSet.size;
     const closedTotal = closedOrdersSet.size;
     const actionedTotal = uniqueOrdersWorkedSet.size;
@@ -1290,29 +1300,14 @@ export const getEmployeePerformanceCommandCenter = createServerFn({
       }));
 
     // 8. KPI Cards with real trend data
-    const prevTotalAssigned = apps.filter((app: any) => {
-      if (!app.assigned_to) return false;
-      const assignedTime = app.assigned_at
-        ? new Date(app.assigned_at).getTime()
-        : null;
-      const createdTime = app.created_at
-        ? new Date(app.created_at).getTime()
-        : null;
-      const prevStartMs = new Date(dateRange.previous.start).getTime();
-      const prevEndMs = new Date(dateRange.previous.end).getTime();
-      return (
-        (assignedTime && assignedTime >= prevStartMs && assignedTime <= prevEndMs) ||
-        (createdTime && createdTime >= prevStartMs && createdTime <= prevEndMs)
-      );
-    }).length;
-
+    const prevTotalAssigned = apps.length;
     const prevWorked = new Set(
       pLogs.filter((l: any) => l.order_id).map((l: any) => l.order_id),
     ).size;
 
     const kpiCards = {
       totalActiveEmployees: {
-        value: staffUserIds.length,
+        value: activeStaffProfiles.length,
         trend: { percent: 0, isUp: true },
         label: "Total workforce",
       },
@@ -1575,13 +1570,22 @@ export const getEmployeeDetailPerformance = createServerFn({
     );
 
     // Assigned orders for this employee
-    const { data: assignedOrders } = await adminAny
+    let assignedQ = adminAny
       .from("applications")
       .select(
-        "id, application_code, customer_id, service_id, order_status, fulfillment_status, application_status, is_hot, assigned_at, created_at, updated_at",
+        "id, application_code, customer_id, lead_id, service_id, order_status, fulfillment_status, application_status, is_hot, assigned_at, created_at, updated_at, form_submitted_at, certificate_uploaded_at, workflow_status, closure_stage, closure_reason_code, refund_approved_at, refund_processed_at",
       )
       .eq("assigned_to", data.employeeId)
-      .or("is_deleted.is.null,is_deleted.eq.false")
+      .eq("is_deleted", false);
+
+    if (dateRange.current.start) {
+      assignedQ = assignedQ.gte("created_at", dateRange.current.start);
+    }
+    if (dateRange.current.end) {
+      assignedQ = assignedQ.lte("created_at", dateRange.current.end);
+    }
+
+    const { data: assignedOrders } = await assignedQ
       .order("created_at", { ascending: false })
       .limit(500);
 
@@ -1599,9 +1603,10 @@ export const getEmployeeDetailPerformance = createServerFn({
       const { data: extraWorkedApps } = await adminAny
         .from("applications")
         .select(
-          "id, application_code, customer_id, service_id, order_status, fulfillment_status, application_status, is_hot, assigned_at, created_at, updated_at",
+          "id, application_code, customer_id, lead_id, service_id, order_status, fulfillment_status, application_status, is_hot, assigned_at, created_at, updated_at, form_submitted_at, certificate_uploaded_at, workflow_status, closure_stage, closure_reason_code, refund_approved_at, refund_processed_at",
         )
-        .in("id", missingWorkedIds);
+        .in("id", missingWorkedIds)
+        .eq("is_deleted", false);
       (extraWorkedApps ?? []).forEach((a: any) => appsList.push(a));
     }
 
@@ -2025,13 +2030,22 @@ export const getMyPerformanceDashboard = createServerFn({ method: "POST" })
     );
 
     // Fetch assigned orders
-    const { data: assignedOrders } = await admin
+    let myAssignedQ = admin
       .from("applications")
       .select(
-        "id, application_code, customer_id, service_id, order_status, fulfillment_status, application_status, is_hot, is_hold, assigned_at, created_at, updated_at",
+        "id, application_code, customer_id, lead_id, service_id, order_status, fulfillment_status, application_status, is_hot, is_hold, assigned_at, created_at, updated_at, form_submitted_at, certificate_uploaded_at, workflow_status, closure_stage, closure_reason_code, refund_approved_at, refund_processed_at",
       )
       .eq("assigned_to", employeeId)
-      .or("is_deleted.is.null,is_deleted.eq.false")
+      .eq("is_deleted", false);
+
+    if (dateRange.current.start) {
+      myAssignedQ = myAssignedQ.gte("created_at", dateRange.current.start);
+    }
+    if (dateRange.current.end) {
+      myAssignedQ = myAssignedQ.lte("created_at", dateRange.current.end);
+    }
+
+    const { data: assignedOrders } = await myAssignedQ
       .order("is_hot", { ascending: false })
       .order("created_at", { ascending: false })
       .limit(300);
