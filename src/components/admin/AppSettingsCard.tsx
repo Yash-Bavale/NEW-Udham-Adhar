@@ -1,6 +1,12 @@
 import { useEffect, useState, useRef } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { getAppSettings, updateCustomerDelayAutocloseMinutes, updateSoundSettings } from "@/lib/settings/app-settings.functions";
+import {
+  getAppSettings,
+  updateCustomerDelayAutocloseMinutes,
+  updateSoundSettings,
+  getGlobalReminderSoundSettings,
+  uploadAlertAudioFile,
+} from "@/lib/settings/app-settings.functions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,7 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Timer, Volume2, VolumeX, Bell, Play, Upload, Music, Check } from "lucide-react";
+import { Timer, Volume2, VolumeX, Bell, Play, Upload, Music, Check, Loader2 } from "lucide-react";
 import { playNotificationSound, type RingtoneTone } from "@/hooks/useNotifications";
 
 function minutesToHHMM(min: number): string {
@@ -26,8 +32,10 @@ function hhmmToMinutes(v: string): number | null {
 
 export function AppSettingsCard() {
   const fetchSettings = useServerFn(getAppSettings);
+  const fetchGlobalSound = useServerFn(getGlobalReminderSoundSettings);
   const saveMinutes = useServerFn(updateCustomerDelayAutocloseMinutes);
   const saveSound = useServerFn(updateSoundSettings);
+  const uploadAudio = useServerFn(uploadAlertAudioFile);
 
   const [value, setValue] = useState("08:00");
   const [leadsSound, setLeadsSound] = useState(() => {
@@ -70,20 +78,45 @@ export function AppSettingsCard() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [savingSound, setSavingSound] = useState(false);
+  const [uploadingLead, setUploadingLead] = useState(false);
+  const [uploadingOrder, setUploadingOrder] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
-    fetchSettings()
-      .then((s) => {
+    Promise.allSettled([fetchSettings(), fetchGlobalSound()])
+      .then(([settingsRes, soundRes]) => {
         if (cancelled) return;
-        setValue(minutesToHHMM(s.customerDelayAutocloseMinutes));
+        if (settingsRes.status === "fulfilled") {
+          setValue(minutesToHHMM(settingsRes.value.customerDelayAutocloseMinutes));
+        }
+        if (soundRes.status === "fulfilled") {
+          const s = soundRes.value;
+          if (s.leadsSoundEnabled !== undefined) setLeadsSound(s.leadsSoundEnabled);
+          if (s.ordersSoundEnabled !== undefined) setOrdersSound(s.ordersSoundEnabled);
+          if (s.leadsRingtone) setLeadsRingtone(s.leadsRingtone as RingtoneTone);
+          if (s.leadsCustomUrl) setLeadsCustomUrl(s.leadsCustomUrl);
+          if (s.leadsCustomName) setLeadFileName(s.leadsCustomName);
+          if (s.ordersRingtone) setOrdersRingtone(s.ordersRingtone as RingtoneTone);
+          if (s.ordersCustomUrl) setOrdersCustomUrl(s.ordersCustomUrl);
+          if (s.ordersCustomName) setOrderFileName(s.ordersCustomName);
+
+          // Sync local storage
+          localStorage.setItem("udyam.sound.leads", String(s.leadsSoundEnabled !== false));
+          localStorage.setItem("udyam.sound.orders", String(s.ordersSoundEnabled !== false));
+          if (s.leadsRingtone) localStorage.setItem("udyam.sound.leads_ringtone", s.leadsRingtone);
+          if (s.leadsCustomUrl) localStorage.setItem("udyam.sound.leads_custom_url", s.leadsCustomUrl);
+          if (s.leadsCustomName) localStorage.setItem("udyam.sound.leads_file_name", s.leadsCustomName);
+          if (s.ordersRingtone) localStorage.setItem("udyam.sound.orders_ringtone", s.ordersRingtone);
+          if (s.ordersCustomUrl) localStorage.setItem("udyam.sound.orders_custom_url", s.ordersCustomUrl);
+          if (s.ordersCustomName) localStorage.setItem("udyam.sound.orders_file_name", s.ordersCustomName);
+        }
       })
       .catch(() => toast.error("Failed to load settings"))
       .finally(() => !cancelled && setLoading(false));
     return () => {
       cancelled = true;
     };
-  }, [fetchSettings]);
+  }, [fetchSettings, fetchGlobalSound]);
 
   async function onSaveMinutes() {
     const mins = hhmmToMinutes(value);
@@ -111,8 +144,10 @@ export function AppSettingsCard() {
           ordersSoundEnabled: ordersSound,
           leadsRingtone,
           leadsCustomUrl,
+          leadsCustomName: leadFileName,
           ordersRingtone,
           ordersCustomUrl,
+          ordersCustomName: orderFileName,
         },
       });
 
@@ -121,10 +156,12 @@ export function AppSettingsCard() {
       localStorage.setItem("udyam.sound.orders", String(ordersSound));
       localStorage.setItem("udyam.sound.leads_ringtone", leadsRingtone);
       localStorage.setItem("udyam.sound.leads_custom_url", leadsCustomUrl);
+      localStorage.setItem("udyam.sound.leads_file_name", leadFileName);
       localStorage.setItem("udyam.sound.orders_ringtone", ordersRingtone);
       localStorage.setItem("udyam.sound.orders_custom_url", ordersCustomUrl);
+      localStorage.setItem("udyam.sound.orders_file_name", orderFileName);
 
-      toast.success("Notification sound & MP3 ringtones saved!");
+      toast.success("Notification sound & MP3 ringtones saved & synced company-wide!");
     } catch (e) {
       toast.error((e as Error).message || "Failed to save sound settings");
     } finally {
@@ -141,19 +178,44 @@ export function AppSettingsCard() {
       return;
     }
 
+    setUploadingLead(true);
     const reader = new FileReader();
-    reader.onload = (evt) => {
+    reader.onload = async (evt) => {
       const dataUrl = evt.target?.result as string;
       if (dataUrl) {
-        setLeadsCustomUrl(dataUrl);
-        setLeadsRingtone("custom");
-        setLeadFileName(file.name);
-        localStorage.setItem("udyam.sound.leads_custom_url", dataUrl);
-        localStorage.setItem("udyam.sound.leads_ringtone", "custom");
-        localStorage.setItem("udyam.sound.leads_file_name", file.name);
-        toast.success(`Uploaded Lead MP3 ringtone: ${file.name}`);
-        playNotificationSound("preview", "custom", dataUrl);
+        try {
+          const res = await uploadAudio({
+            data: {
+              fileName: file.name,
+              base64Data: dataUrl,
+              target: "lead",
+            },
+          });
+          setLeadsCustomUrl(res.url);
+          setLeadsRingtone("custom");
+          setLeadFileName(file.name);
+          localStorage.setItem("udyam.sound.leads_custom_url", res.url);
+          localStorage.setItem("udyam.sound.leads_ringtone", "custom");
+          localStorage.setItem("udyam.sound.leads_file_name", file.name);
+          toast.success(`Uploaded & synced Lead MP3 ringtone: ${file.name}`);
+          playNotificationSound("preview", "custom", res.url);
+        } catch (err: any) {
+          setLeadsCustomUrl(dataUrl);
+          setLeadsRingtone("custom");
+          setLeadFileName(file.name);
+          localStorage.setItem("udyam.sound.leads_custom_url", dataUrl);
+          localStorage.setItem("udyam.sound.leads_ringtone", "custom");
+          localStorage.setItem("udyam.sound.leads_file_name", file.name);
+          toast.success(`Applied Lead MP3 ringtone: ${file.name}`);
+          playNotificationSound("preview", "custom", dataUrl);
+        } finally {
+          setUploadingLead(false);
+        }
       }
+    };
+    reader.onerror = () => {
+      setUploadingLead(false);
+      toast.error("Failed to read audio file");
     };
     reader.readAsDataURL(file);
   };
@@ -167,19 +229,44 @@ export function AppSettingsCard() {
       return;
     }
 
+    setUploadingOrder(true);
     const reader = new FileReader();
-    reader.onload = (evt) => {
+    reader.onload = async (evt) => {
       const dataUrl = evt.target?.result as string;
       if (dataUrl) {
-        setOrdersCustomUrl(dataUrl);
-        setOrdersRingtone("custom");
-        setOrderFileName(file.name);
-        localStorage.setItem("udyam.sound.orders_custom_url", dataUrl);
-        localStorage.setItem("udyam.sound.orders_ringtone", "custom");
-        localStorage.setItem("udyam.sound.orders_file_name", file.name);
-        toast.success(`Uploaded Order MP3 ringtone: ${file.name}`);
-        playNotificationSound("preview", "custom", dataUrl);
+        try {
+          const res = await uploadAudio({
+            data: {
+              fileName: file.name,
+              base64Data: dataUrl,
+              target: "order",
+            },
+          });
+          setOrdersCustomUrl(res.url);
+          setOrdersRingtone("custom");
+          setOrderFileName(file.name);
+          localStorage.setItem("udyam.sound.orders_custom_url", res.url);
+          localStorage.setItem("udyam.sound.orders_ringtone", "custom");
+          localStorage.setItem("udyam.sound.orders_file_name", file.name);
+          toast.success(`Uploaded & synced Order MP3 ringtone: ${file.name}`);
+          playNotificationSound("preview", "custom", res.url);
+        } catch (err: any) {
+          setOrdersCustomUrl(dataUrl);
+          setOrdersRingtone("custom");
+          setOrderFileName(file.name);
+          localStorage.setItem("udyam.sound.orders_custom_url", dataUrl);
+          localStorage.setItem("udyam.sound.orders_ringtone", "custom");
+          localStorage.setItem("udyam.sound.orders_file_name", file.name);
+          toast.success(`Applied Order MP3 ringtone: ${file.name}`);
+          playNotificationSound("preview", "custom", dataUrl);
+        } finally {
+          setUploadingOrder(false);
+        }
       }
+    };
+    reader.onerror = () => {
+      setUploadingOrder(false);
+      toast.error("Failed to read audio file");
     };
     reader.readAsDataURL(file);
   };

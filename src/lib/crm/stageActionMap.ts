@@ -162,6 +162,12 @@ export const STAGE_ACTIONS: Record<OrderStage, StageActionSpec> = {
     primaryKind: "none",
     exceptions: [],
   },
+  order_reopened: {
+    hint: "Order reopened. Review requirements and proceed with fulfillment.",
+    primary: "Move to Verification",
+    primaryKind: "advance_fulfillment",
+    exceptions: ["our_side_delay", "customer_hold", "request_docs", "cancel_refund"],
+  },
 };
 
 

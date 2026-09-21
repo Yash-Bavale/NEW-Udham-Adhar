@@ -5,17 +5,43 @@ import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { Flame, PhoneCall, ArrowRight, X } from "lucide-react";
 import { getDueRemindersSummary } from "@/lib/orders/actions/callback-reminder.functions";
-import { playReminderSound, showDesktopNotification } from "@/lib/audio/reminder-sounds";
+import { getGlobalReminderSoundSettings } from "@/lib/settings/app-settings.functions";
+import { playReminderSound, showDesktopNotification, syncGlobalSoundSettings, preloadAudio } from "@/lib/audio/reminder-sounds";
 import { useRealtimeTable } from "@/hooks/useRealtimeTable";
 
 export function ReminderNotificationManager() {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const getSummaryFn = useServerFn(getDueRemindersSummary);
+  const getSoundSettingsFn = useServerFn(getGlobalReminderSoundSettings);
 
   // Set of notified scheduler IDs in session
   const notifiedIdsRef = useRef<Set<string>>(new Set());
   const scheduledTimeoutsRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+
+  // Fetch and synchronize global audio settings across all employee sessions
+  const { data: globalSound } = useQuery({
+    queryKey: ["global-reminder-sound-settings"],
+    queryFn: () => getSoundSettingsFn(),
+    staleTime: 60_000,
+    refetchInterval: 120_000,
+  });
+
+  useEffect(() => {
+    if (globalSound) {
+      syncGlobalSoundSettings({
+        enabled: globalSound.enabled,
+        tone: globalSound.tone,
+        volume: globalSound.volume,
+        desktopNotifications: globalSound.desktopNotifications,
+        customAudioUrl: globalSound.customAudioUrl,
+        customAudioName: globalSound.customAudioName,
+      });
+      if (globalSound.customAudioUrl) {
+        preloadAudio(globalSound.customAudioUrl);
+      }
+    }
+  }, [globalSound]);
 
   const triggerDueAlert = (reminder: {
     id: string;
@@ -28,8 +54,12 @@ export function ReminderNotificationManager() {
     if (!reminder.id || notifiedIdsRef.current.has(reminder.id)) return;
     notifiedIdsRef.current.add(reminder.id);
 
-    // 1. Play synthesized alert audio
-    playReminderSound();
+    // 1. Play alert audio (custom uploaded audio if set, or configured tone)
+    playReminderSound(
+      globalSound?.tone,
+      globalSound?.volume,
+      globalSound?.customAudioUrl
+    );
 
     // 2. Invalidate order queries so table immediately promotes this order to the top with red HOT badge
     qc.invalidateQueries({ queryKey: ["admin.orders.v2"] });

@@ -1,4 +1,6 @@
 import { useState, useEffect, useRef } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import {
   Volume2,
@@ -10,16 +12,23 @@ import {
   Music,
   Trash2,
   FileAudio,
+  Loader2,
 } from "lucide-react";
 import { SectionCard } from "@/components/admin/ui";
 import {
   getSoundSettings,
   saveSoundSettings,
+  syncGlobalSoundSettings,
   playReminderSound,
   showDesktopNotification,
   type SoundTone,
   type SoundSettings,
 } from "@/lib/audio/reminder-sounds";
+import {
+  getGlobalReminderSoundSettings,
+  saveGlobalReminderSoundSettings,
+  uploadAlertAudioFile,
+} from "@/lib/settings/app-settings.functions";
 
 const BUILTIN_SOUND_OPTIONS: { id: SoundTone; label: string; description: string }[] = [
   { id: "chime", label: "Harmonic Chime (Default)", description: "3-note melodic chime (pleasant & clear)" },
@@ -30,9 +39,36 @@ const BUILTIN_SOUND_OPTIONS: { id: SoundTone; label: string; description: string
 ];
 
 export function ReminderAudioSettingsCard() {
+  const qc = useQueryClient();
+  const fetchGlobalSettingsFn = useServerFn(getGlobalReminderSoundSettings);
+  const saveGlobalSettingsFn = useServerFn(saveGlobalReminderSoundSettings);
+  const uploadAudioFn = useServerFn(uploadAlertAudioFile);
+
   const [settings, setSettings] = useState<SoundSettings>(getSoundSettings);
   const [hasPermission, setHasPermission] = useState<boolean>(false);
+  const [isUploading, setIsUploading] = useState<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Fetch server-persisted settings
+  const { data: serverSettings, isLoading } = useQuery({
+    queryKey: ["global-reminder-sound-settings"],
+    queryFn: () => fetchGlobalSettingsFn(),
+    staleTime: 30_000,
+  });
+
+  useEffect(() => {
+    if (serverSettings) {
+      const merged = syncGlobalSoundSettings({
+        enabled: serverSettings.enabled,
+        tone: serverSettings.tone,
+        volume: serverSettings.volume,
+        desktopNotifications: serverSettings.desktopNotifications,
+        customAudioUrl: serverSettings.customAudioUrl,
+        customAudioName: serverSettings.customAudioName,
+      });
+      setSettings(merged);
+    }
+  }, [serverSettings]);
 
   useEffect(() => {
     if (typeof window !== "undefined" && "Notification" in window) {
@@ -40,14 +76,31 @@ export function ReminderAudioSettingsCard() {
     }
   }, []);
 
-  const update = (partial: Partial<SoundSettings>) => {
+  const update = async (partial: Partial<SoundSettings>) => {
     const updated = saveSoundSettings(partial);
     setSettings(updated);
-    toast.success("Sound settings saved");
+
+    try {
+      await saveGlobalSettingsFn({
+        data: {
+          enabled: updated.enabled,
+          tone: updated.tone,
+          volume: updated.volume,
+          desktopNotifications: updated.desktopNotifications,
+          customAudioUrl: updated.customAudioUrl,
+          customAudioName: updated.customAudioName,
+        },
+      });
+      qc.invalidateQueries({ queryKey: ["global-reminder-sound-settings"] });
+      toast.success("Sound settings saved & synced company-wide");
+    } catch (err) {
+      console.warn("[ReminderAudioSettingsCard] server save warning:", err);
+      toast.success("Sound settings saved locally");
+    }
   };
 
   const handleTest = (tone?: SoundTone) => {
-    playReminderSound(tone ?? settings.tone, settings.volume);
+    playReminderSound(tone ?? settings.tone, settings.volume, settings.customAudioUrl);
     toast.info(`Playing preview for ${tone ?? settings.tone}`);
   };
 
@@ -61,38 +114,68 @@ export function ReminderAudioSettingsCard() {
       return;
     }
 
-    // Limit to 4MB for fast in-memory playback
-    if (file.size > 4 * 1024 * 1024) {
-      toast.error("Audio file size should be less than 4MB");
+    // Limit to 5MB
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Audio file size should be less than 5MB");
       return;
     }
 
+    setIsUploading(true);
     const reader = new FileReader();
-    reader.onload = () => {
+    reader.onload = async () => {
       const dataUrl = reader.result as string;
-      const updated = saveSoundSettings({
-        customAudioUrl: dataUrl,
-        customAudioName: file.name,
-        tone: "custom",
-      });
-      setSettings(updated);
-      toast.success(`Custom audio "${file.name}" uploaded & selected!`);
-      playReminderSound("custom", updated.volume);
+
+      try {
+        // Upload to backend storage so all employee devices receive it
+        const res = await uploadAudioFn({
+          data: {
+            fileName: file.name,
+            base64Data: dataUrl,
+            target: "reminder",
+          },
+        });
+
+        const updated = saveSoundSettings({
+          customAudioUrl: res.url,
+          customAudioName: file.name,
+          tone: "custom",
+        });
+        setSettings(updated);
+        qc.invalidateQueries({ queryKey: ["global-reminder-sound-settings"] });
+        toast.success(`Custom audio "${file.name}" uploaded and synced across all staff!`);
+        playReminderSound("custom", updated.volume, res.url);
+      } catch (err: any) {
+        console.warn("[handleFileUpload] backend upload fallback to dataUrl:", err);
+        // Fallback to dataUrl
+        const updated = saveSoundSettings({
+          customAudioUrl: dataUrl,
+          customAudioName: file.name,
+          tone: "custom",
+        });
+        setSettings(updated);
+        toast.success(`Custom audio "${file.name}" applied!`);
+        playReminderSound("custom", updated.volume, dataUrl);
+      } finally {
+        setIsUploading(false);
+        if (fileInputRef.current) fileInputRef.current.value = "";
+      }
     };
+
     reader.onerror = () => {
+      setIsUploading(false);
       toast.error("Failed to read audio file");
     };
+
     reader.readAsDataURL(file);
   };
 
-  const handleRemoveCustomAudio = (e: React.MouseEvent) => {
+  const handleRemoveCustomAudio = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    const updated = saveSoundSettings({
+    await update({
       customAudioUrl: null,
       customAudioName: null,
       tone: "chime",
     });
-    setSettings(updated);
     toast.info("Custom audio removed. Reset to default Harmonic Chime.");
   };
 
@@ -129,7 +212,7 @@ export function ReminderAudioSettingsCard() {
     >
       <div className="p-5 space-y-6 text-slate-800">
         <div className="text-xs text-slate-600">
-          Configure the sound and screen notifications triggered on employee laptops whenever a customer callback reminder ends and the order transitions into a <b className="text-rose-600">🔥 Hot Order</b>.
+          Configure the sound and screen notifications triggered on employee laptops whenever a customer callback reminder ends and the order transitions into a <b className="text-rose-600">🔥 Hot Order</b>. Uploaded ringtones automatically synchronize across all staff browsers.
         </div>
 
         {/* 1. Tone Selector & Custom Sound Upload */}
@@ -141,10 +224,19 @@ export function ReminderAudioSettingsCard() {
 
             <button
               type="button"
+              disabled={isUploading || isLoading}
               onClick={() => fileInputRef.current?.click()}
-              className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:text-blue-700 bg-blue-50 border border-blue-200 px-2.5 py-1 rounded-lg transition shadow-2xs cursor-pointer"
+              className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:text-blue-700 bg-blue-50 border border-blue-200 px-2.5 py-1 rounded-lg transition shadow-2xs cursor-pointer disabled:opacity-60"
             >
-              <Upload className="size-3.5" /> Upload Custom Audio (.mp3/.wav)
+              {isUploading ? (
+                <>
+                  <Loader2 className="size-3.5 animate-spin text-blue-600" /> Uploading Sound...
+                </>
+              ) : (
+                <>
+                  <Upload className="size-3.5" /> Upload Custom Audio (.mp3/.wav)
+                </>
+              )}
             </button>
             <input
               ref={fileInputRef}
@@ -161,7 +253,7 @@ export function ReminderAudioSettingsCard() {
               <div
                 onClick={() => {
                   update({ tone: "custom" });
-                  playReminderSound("custom", settings.volume);
+                  playReminderSound("custom", settings.volume, settings.customAudioUrl);
                 }}
                 className={`relative flex flex-col justify-between rounded-xl border p-3.5 transition cursor-pointer select-none ${
                   settings.tone === "custom"
@@ -173,12 +265,12 @@ export function ReminderAudioSettingsCard() {
                   <div className="flex items-center justify-between">
                     <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-900 truncate">
                       <Music className="size-3.5 text-emerald-600 shrink-0" />
-                      {settings.customAudioName || "Custom Sound"}
+                      {settings.customAudioName || "Custom Audio Ringtone"}
                     </span>
                     {settings.tone === "custom" && <Check className="size-4 text-emerald-600 shrink-0" />}
                   </div>
                   <p className="text-[11px] text-slate-500 mt-1">
-                    Custom uploaded alert sound file
+                    Company-wide uploaded alert sound file
                   </p>
                 </div>
 
@@ -186,7 +278,7 @@ export function ReminderAudioSettingsCard() {
                   <button
                     type="button"
                     onClick={handleRemoveCustomAudio}
-                    className="inline-flex items-center gap-1 text-[10px] text-rose-600 hover:text-rose-700 font-semibold p-1 hover:bg-rose-50 rounded"
+                    className="inline-flex items-center gap-1 text-[10px] text-rose-600 hover:text-rose-700 font-semibold p-1 hover:bg-rose-50 rounded cursor-pointer"
                     title="Remove custom audio"
                   >
                     <Trash2 className="size-3" /> Remove
@@ -198,7 +290,7 @@ export function ReminderAudioSettingsCard() {
                       e.stopPropagation();
                       handleTest("custom");
                     }}
-                    className="inline-flex items-center gap-1 rounded-md bg-white border border-slate-200 px-2 py-0.5 text-[10px] font-semibold text-slate-700 hover:bg-slate-100 shadow-2xs"
+                    className="inline-flex items-center gap-1 rounded-md bg-white border border-slate-200 px-2 py-0.5 text-[10px] font-semibold text-slate-700 hover:bg-slate-100 shadow-2xs cursor-pointer"
                   >
                     <Play className="size-2.5" /> Play
                   </button>
@@ -241,7 +333,7 @@ export function ReminderAudioSettingsCard() {
                         e.stopPropagation();
                         handleTest(opt.id);
                       }}
-                      className="inline-flex items-center gap-1 rounded-md bg-white border border-slate-200 px-2 py-0.5 text-[10px] font-semibold text-slate-700 hover:bg-slate-100 shadow-2xs"
+                      className="inline-flex items-center gap-1 rounded-md bg-white border border-slate-200 px-2 py-0.5 text-[10px] font-semibold text-slate-700 hover:bg-slate-100 shadow-2xs cursor-pointer"
                     >
                       <Play className="size-2.5" /> Play
                     </button>
@@ -258,7 +350,7 @@ export function ReminderAudioSettingsCard() {
               className="flex items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 bg-slate-50/50 p-3 text-xs text-slate-500 hover:bg-slate-50 hover:border-blue-400 cursor-pointer transition"
             >
               <FileAudio className="size-4 text-slate-400" />
-              <span>Want your own sound? Click here to upload an <b>MP3 / WAV / OGG</b> custom ringtone.</span>
+              <span>Want your own sound? Click here to upload an <b>MP3 / WAV / OGG</b> custom ringtone for all employee laptops.</span>
             </div>
           )}
         </div>

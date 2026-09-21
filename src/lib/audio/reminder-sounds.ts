@@ -23,32 +23,107 @@ export const DEFAULT_SOUND_SETTINGS: SoundSettings = {
   customAudioName: null,
 };
 
+let inMemorySettings: SoundSettings = { ...DEFAULT_SOUND_SETTINGS };
+let preloadedAudio: HTMLAudioElement | null = null;
+let currentPreloadedUrl: string | null = null;
+
+// Audio context singleton
+let globalAudioCtx: AudioContext | null = null;
+
+function getOrCreateAudioContext(): AudioContext | null {
+  if (typeof window === "undefined") return null;
+  const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+  if (!AudioCtx) return null;
+  if (!globalAudioCtx || globalAudioCtx.state === "closed") {
+    globalAudioCtx = new AudioCtx();
+  }
+  if (globalAudioCtx.state === "suspended") {
+    globalAudioCtx.resume().catch(() => {});
+  }
+  return globalAudioCtx;
+}
+
+// Auto-unlock AudioContext and prewarm audio subsystem on first user interaction
+if (typeof window !== "undefined") {
+  const unlockAudio = () => {
+    try {
+      const ctx = getOrCreateAudioContext();
+      if (ctx && ctx.state === "suspended") {
+        ctx.resume().catch(() => {});
+      }
+      if (preloadedAudio) {
+        preloadedAudio.load();
+      }
+    } catch {}
+  };
+  window.addEventListener("pointerdown", unlockAudio, { passive: true });
+  window.addEventListener("keydown", unlockAudio, { passive: true });
+  window.addEventListener("click", unlockAudio, { passive: true });
+}
+
+export function preloadAudio(url: string | null | undefined) {
+  if (typeof window === "undefined" || !url) {
+    preloadedAudio = null;
+    currentPreloadedUrl = null;
+    return;
+  }
+
+  if (currentPreloadedUrl === url && preloadedAudio) {
+    return;
+  }
+
+  try {
+    const audio = new Audio(url);
+    audio.preload = "auto";
+    audio.load();
+    preloadedAudio = audio;
+    currentPreloadedUrl = url;
+  } catch (err) {
+    console.warn("[preloadAudio] failed to preload:", err);
+  }
+}
+
 export function getSoundSettings(): SoundSettings {
   if (typeof window === "undefined") return DEFAULT_SOUND_SETTINGS;
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return DEFAULT_SOUND_SETTINGS;
-    return { ...DEFAULT_SOUND_SETTINGS, ...JSON.parse(raw) };
+    if (raw) {
+      inMemorySettings = { ...DEFAULT_SOUND_SETTINGS, ...JSON.parse(raw) };
+    }
   } catch {
-    return DEFAULT_SOUND_SETTINGS;
+    // fallback
   }
+  return inMemorySettings;
+}
+
+export function syncGlobalSoundSettings(settings: Partial<SoundSettings>): SoundSettings {
+  const current = getSoundSettings();
+  const updated: SoundSettings = { ...current, ...settings };
+  inMemorySettings = updated;
+
+  try {
+    if (typeof window !== "undefined") {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    }
+  } catch (err) {
+    console.warn("[syncGlobalSoundSettings] localStorage sync warn:", err);
+  }
+
+  if (updated.customAudioUrl) {
+    preloadAudio(updated.customAudioUrl);
+  }
+
+  return updated;
 }
 
 export function saveSoundSettings(settings: Partial<SoundSettings>): SoundSettings {
-  const current = getSoundSettings();
-  const updated = { ...current, ...settings };
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-  } catch (err) {
-    console.error("[saveSoundSettings] failed to persist:", err);
-  }
-  return updated;
+  return syncGlobalSoundSettings(settings);
 }
 
 /**
  * Play a sound tone (either custom uploaded audio file or synthesized Web Audio tone).
  */
-export function playReminderSound(toneOverride?: SoundTone, volumeOverride?: number) {
+export function playReminderSound(toneOverride?: SoundTone, volumeOverride?: number, customUrlOverride?: string | null) {
   if (typeof window === "undefined") return;
 
   const settings = getSoundSettings();
@@ -56,24 +131,32 @@ export function playReminderSound(toneOverride?: SoundTone, volumeOverride?: num
 
   const tone = toneOverride ?? settings.tone;
   const volume = volumeOverride !== undefined ? volumeOverride : settings.volume;
+  const customUrl = customUrlOverride !== undefined ? customUrlOverride : settings.customAudioUrl;
+
+  const clampedVolume = Math.max(0, Math.min(1, volume));
 
   // 1. If custom uploaded audio is selected and available
-  if (tone === "custom" && settings.customAudioUrl) {
+  if (tone === "custom" && customUrl) {
     try {
-      const audio = new Audio(settings.customAudioUrl);
-      audio.volume = Math.max(0, Math.min(1, volume));
-      audio.play().catch((err) => {
-        console.warn("[playReminderSound] custom audio failed to play, falling back to chime:", err);
-        playSynthesizedTone("chime", volume);
-      });
+      const audio = new Audio(customUrl);
+      audio.volume = clampedVolume;
+      const playPromise = audio.play();
+      if (playPromise !== undefined) {
+        playPromise.catch((err) => {
+          console.warn("[playReminderSound] custom audio play failed, falling back to chime:", err);
+          playSynthesizedTone("chime", clampedVolume);
+        });
+      }
       return;
     } catch (err) {
       console.warn("[playReminderSound] custom audio error:", err);
+      playSynthesizedTone("chime", clampedVolume);
+      return;
     }
   }
 
   // 2. Otherwise play synthesized tone
-  playSynthesizedTone(tone === "custom" ? "chime" : tone, volume);
+  playSynthesizedTone(tone === "custom" ? "chime" : tone, clampedVolume);
 }
 
 /**
@@ -81,10 +164,9 @@ export function playReminderSound(toneOverride?: SoundTone, volumeOverride?: num
  */
 function playSynthesizedTone(tone: Exclude<SoundTone, "custom">, volume: number) {
   try {
-    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-    if (!AudioCtx) return;
+    const ctx = getOrCreateAudioContext();
+    if (!ctx) return;
 
-    const ctx = new AudioCtx();
     if (ctx.state === "suspended") {
       ctx.resume().catch(() => {});
     }

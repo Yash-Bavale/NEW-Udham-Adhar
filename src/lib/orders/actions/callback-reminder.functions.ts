@@ -123,7 +123,7 @@ export const scheduleOrderCallback = createServerFn({ method: "POST" })
         event_type: "callback_scheduled",
         note: noteText,
         staff_name: staff.staff_name,
-        staff_role: staff.role || "staff",
+        staff_role: staff.staff_role || "staff",
       } as never);
     } catch (e1) {
       console.warn("[scheduleOrderCallback] application_events insert warning:", e1);
@@ -140,9 +140,10 @@ export const scheduleOrderCallback = createServerFn({ method: "POST" })
         customer_visible: false,
         actor_id: context.userId,
         actor_name: staff.staff_name,
+        actor_role: staff.staff_role,
         is_system: false,
         metadata: {
-          scheduler_id: created.id,
+          scheduler_id: scheduler.id,
           reason: data.reason,
           reasonLabel: data.reasonLabel,
           fires_at: firesAtIso,
@@ -164,7 +165,9 @@ export const scheduleOrderCallback = createServerFn({ method: "POST" })
 
     return {
       success: true,
-      scheduler: created,
+      schedulerId: scheduler.id,
+      firesAt: firesAtDate.toISOString(),
+      reasonLabel: data.reasonLabel,
     };
   });
 
@@ -175,6 +178,7 @@ export const cancelOrderCallback = createServerFn({ method: "POST" })
       .object({
         orderId: z.string().uuid(),
         schedulerId: z.string().uuid().optional(),
+        reason: z.string().optional().nullable(),
       })
       .parse(i),
   )
@@ -189,10 +193,11 @@ export const cancelOrderCallback = createServerFn({ method: "POST" })
       .update({
         status: "stopped",
         stopped_at: now,
-        stop_reason: "cancelled_by_staff",
+        stop_reason: data.reason || "cancelled_by_staff",
         stop_triggered_by: context.userId,
       })
       .eq("application_id", data.orderId)
+      .in("scheduler_type", ["our_side_reminder", "callback_reminder"])
       .in("status", ["active", "paused"]);
 
     if (data.schedulerId) {
@@ -206,11 +211,10 @@ export const cancelOrderCallback = createServerFn({ method: "POST" })
       await admin.from("application_events").insert({
         application_id: data.orderId,
         event_type: "callback_cancelled",
-        title: "Callback Reminder Cancelled",
-        description: `Callback cancelled by ${staff.staff_name}`,
-        actor_id: context.userId,
-        actor_name: staff.staff_name,
-      });
+        note: `Callback cancelled by ${staff.staff_name}`,
+        staff_name: staff.staff_name,
+        staff_role: staff.staff_role || "staff",
+      } as never);
     } catch (evtErr) {
       console.warn("[cancelOrderCallback] event log warning:", evtErr);
     }
@@ -258,11 +262,10 @@ export const completeOrderCallback = createServerFn({ method: "POST" })
       await admin.from("application_events").insert({
         application_id: data.orderId,
         event_type: "callback_completed",
-        title: "Callback Completed",
-        description: `Customer callback marked completed by ${staff.staff_name}.${data.callOutcomeNote ? ` Note: ${data.callOutcomeNote}` : ""}`,
-        actor_id: context.userId,
-        actor_name: staff.staff_name,
-      });
+        note: `Customer callback marked completed by ${staff.staff_name}.${data.callOutcomeNote ? ` Note: ${data.callOutcomeNote}` : ""}`,
+        staff_name: staff.staff_name,
+        staff_role: staff.staff_role || "staff",
+      } as never);
     } catch (evtErr) {
       console.warn("[completeOrderCallback] event log warning:", evtErr);
     }

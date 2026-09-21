@@ -772,9 +772,9 @@ export const closeTicketRestartT001 = createServerFn({ method: "POST" })
         staff_name: staffName,
       } as never);
 
-      if (ticket.lead_id) {
+      if ((ticket as any).lead_id) {
         await supabaseAdmin.from("activity_logs").insert({
-          lead_id: ticket.lead_id,
+          lead_id: (ticket as any).lead_id,
           user_id: context.userId,
           activity_type: "order_reopened",
           activity_description: `Order reopened from ticket ${ticket.ticket_number ?? ""}`,
