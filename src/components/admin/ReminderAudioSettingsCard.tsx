@@ -47,13 +47,14 @@ export function ReminderAudioSettingsCard() {
   const [settings, setSettings] = useState<SoundSettings>(getSoundSettings);
   const [hasPermission, setHasPermission] = useState<boolean>(false);
   const [isUploading, setIsUploading] = useState<boolean>(false);
+  const [isSaving, setIsSaving] = useState<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Fetch server-persisted settings
   const { data: serverSettings, isLoading } = useQuery({
     queryKey: ["global-reminder-sound-settings"],
     queryFn: () => fetchGlobalSettingsFn(),
-    staleTime: 30_000,
+    staleTime: 10_000,
   });
 
   useEffect(() => {
@@ -76,6 +77,31 @@ export function ReminderAudioSettingsCard() {
     }
   }, []);
 
+  const handleSave = async (overrideSettings?: SoundSettings) => {
+    const toSave = overrideSettings || settings;
+    setIsSaving(true);
+    try {
+      saveSoundSettings(toSave);
+      await saveGlobalSettingsFn({
+        data: {
+          enabled: toSave.enabled,
+          tone: toSave.tone,
+          volume: toSave.volume,
+          desktopNotifications: toSave.desktopNotifications,
+          customAudioUrl: toSave.customAudioUrl,
+          customAudioName: toSave.customAudioName,
+        },
+      });
+      await qc.invalidateQueries({ queryKey: ["global-reminder-sound-settings"] });
+      toast.success("✅ Sound settings saved & synced across all employees!");
+    } catch (err: any) {
+      console.warn("[ReminderAudioSettingsCard] save error:", err);
+      toast.error(err.message || "Failed to save to server");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const update = async (partial: Partial<SoundSettings>) => {
     const updated = saveSoundSettings(partial);
     setSettings(updated);
@@ -92,10 +118,9 @@ export function ReminderAudioSettingsCard() {
         },
       });
       qc.invalidateQueries({ queryKey: ["global-reminder-sound-settings"] });
-      toast.success("Sound settings saved & synced company-wide");
+      toast.success("Sound settings synced");
     } catch (err) {
       console.warn("[ReminderAudioSettingsCard] server save warning:", err);
-      toast.success("Sound settings saved locally");
     }
   };
 
@@ -203,9 +228,18 @@ export function ReminderAudioSettingsCard() {
           <button
             type="button"
             onClick={() => handleTest()}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-50 border border-indigo-200 px-3 py-1.5 text-xs font-bold text-indigo-700 hover:bg-indigo-100 transition cursor-pointer shadow-2xs"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-slate-50 border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-100 transition cursor-pointer shadow-2xs"
           >
             <Play className="size-3.5" /> Test Sound Alert
+          </button>
+          <button
+            type="button"
+            disabled={isSaving || isUploading}
+            onClick={() => handleSave()}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3.5 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-blue-700 transition cursor-pointer disabled:opacity-60"
+          >
+            {isSaving ? <Loader2 className="size-3.5 animate-spin" /> : <Check className="size-3.5" />}
+            {isSaving ? "Saving..." : "Save Sound Settings"}
           </button>
         </div>
       }
@@ -410,6 +444,22 @@ export function ReminderAudioSettingsCard() {
               Allows the browser to pop up system banner alerts when callbacks are due, even if you are working on another tab or window.
             </p>
           </div>
+        </div>
+
+        {/* 3. Explicit Bottom Action Bar */}
+        <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
+          <div className="text-xs text-slate-500">
+            Current Alert Tone: <b className="text-slate-800 font-semibold">{settings.tone === "custom" ? (settings.customAudioName || "Custom Uploaded Audio") : BUILTIN_SOUND_OPTIONS.find((o) => o.id === settings.tone)?.label || settings.tone}</b>
+          </div>
+          <button
+            type="button"
+            disabled={isSaving || isUploading}
+            onClick={() => handleSave()}
+            className="inline-flex items-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-700 px-5 py-2.5 text-xs font-bold text-white shadow-md transition cursor-pointer disabled:opacity-60"
+          >
+            {isSaving ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}
+            {isSaving ? "Saving Settings..." : "Save Sound Settings for All Employees"}
+          </button>
         </div>
       </div>
     </SectionCard>

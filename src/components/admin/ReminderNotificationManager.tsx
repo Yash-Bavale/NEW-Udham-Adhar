@@ -23,8 +23,8 @@ export function ReminderNotificationManager() {
   const { data: globalSound } = useQuery({
     queryKey: ["global-reminder-sound-settings"],
     queryFn: () => getSoundSettingsFn(),
-    staleTime: 60_000,
-    refetchInterval: 120_000,
+    staleTime: 10_000,
+    refetchInterval: 30_000,
   });
 
   useEffect(() => {

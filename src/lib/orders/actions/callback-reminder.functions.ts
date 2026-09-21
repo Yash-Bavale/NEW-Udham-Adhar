@@ -324,6 +324,17 @@ export const getDueRemindersSummary = createServerFn({ method: "POST" })
     const admin = await getAdmin();
     const nowMs = Date.now();
 
+    // Check caller role
+    const { data: isSuper } = await context.supabase.rpc("has_role", {
+      _user_id: context.userId,
+      _role: "super_admin",
+    });
+    const { data: isAdminRole } = await context.supabase.rpc("has_role", {
+      _user_id: context.userId,
+      _role: "admin",
+    });
+    const isAdmin = !!(isSuper || isAdminRole);
+
     // Fetch all active callback reminders
     const { data: schedulers, error } = await admin
       .from("order_schedulers")
@@ -373,6 +384,7 @@ export const getDueRemindersSummary = createServerFn({ method: "POST" })
         application_id: s.application_id,
         application_code: app?.application_code || "Order",
         assigned_to: app?.assigned_to || null,
+        created_by: s.created_by || null,
         customer_name: lead?.name || "Customer",
         customer_mobile: lead?.mobile || "",
         service_name: lead?.service || "Service",
@@ -383,8 +395,11 @@ export const getDueRemindersSummary = createServerFn({ method: "POST" })
       };
     });
 
-    const dueReminders = mapped.filter((m) => m.isDue);
-    const upcomingReminders = mapped.filter((m) => !m.isDue);
+    const { filterRemindersForEmployee } = await import("@/lib/typesafe.server");
+    const userScopedReminders = await filterRemindersForEmployee(context.userId, isAdmin, mapped);
+
+    const dueReminders = userScopedReminders.filter((m) => m.isDue);
+    const upcomingReminders = userScopedReminders.filter((m) => !m.isDue);
 
     return { dueReminders, upcomingReminders };
   });

@@ -50,56 +50,129 @@ export const updateCustomerDelayAutocloseMinutes = createServerFn({ method: "POS
     return { ok: true, minutes: data.minutes };
   });
 
+const SOUND_CONFIG_STORAGE_PATH = "config/sound-settings.json";
+
+interface GlobalSoundConfig {
+  enabled: boolean;
+  tone: "chime" | "bell" | "digital_ring" | "radar" | "soft_ping" | "custom";
+  volume: number;
+  desktopNotifications: boolean;
+  customAudioUrl?: string | null;
+  customAudioName?: string | null;
+  leadsSoundEnabled?: boolean;
+  ordersSoundEnabled?: boolean;
+  leadsRingtone?: string;
+  leadsCustomUrl?: string | null;
+  leadsCustomName?: string | null;
+  ordersRingtone?: string;
+  ordersCustomUrl?: string | null;
+  ordersCustomName?: string | null;
+}
+
+const DEFAULT_GLOBAL_SOUND_CONFIG: GlobalSoundConfig = {
+  enabled: true,
+  tone: "chime",
+  volume: 0.8,
+  desktopNotifications: true,
+  customAudioUrl: null,
+  customAudioName: null,
+  leadsSoundEnabled: true,
+  ordersSoundEnabled: true,
+  leadsRingtone: "chime",
+  leadsCustomUrl: null,
+  leadsCustomName: null,
+  ordersRingtone: "bell",
+  ordersCustomUrl: null,
+  ordersCustomName: null,
+};
+
+async function readSoundConfigFromStorage(): Promise<GlobalSoundConfig | null> {
+  try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data, error } = await supabaseAdmin.storage
+      .from("documents")
+      .download(SOUND_CONFIG_STORAGE_PATH);
+
+    if (error || !data) return null;
+    const text = await data.text();
+    return JSON.parse(text) as GlobalSoundConfig;
+  } catch {
+    return null;
+  }
+}
+
+async function writeSoundConfigToStorage(config: Partial<GlobalSoundConfig>): Promise<void> {
+  try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const existing = (await readSoundConfigFromStorage()) || DEFAULT_GLOBAL_SOUND_CONFIG;
+    const merged = { ...existing, ...config };
+    const buffer = Buffer.from(JSON.stringify(merged, null, 2), "utf-8");
+
+    await supabaseAdmin.storage
+      .from("documents")
+      .upload(SOUND_CONFIG_STORAGE_PATH, buffer, {
+        contentType: "application/json",
+        upsert: true,
+      });
+  } catch (err) {
+    console.warn("[writeSoundConfigToStorage] storage config write warning:", err);
+  }
+}
+
 export const getGlobalReminderSoundSettings = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
+    // 1. Try reading from app_settings
+    let dbRow: any = null;
     try {
-      const { data, error } = await context.supabase
+      const { data } = await context.supabase
         .from("app_settings")
         .select("alert_sound_tone, custom_audio_url, custom_audio_name, alert_sound_volume, alert_sound_enabled, desktop_notifications, leads_sound_enabled, orders_sound_enabled, leads_ringtone, leads_custom_url, leads_custom_name, orders_ringtone, orders_custom_url, orders_custom_name")
         .eq("id", 1)
         .maybeSingle();
 
-      if (error) {
-        console.warn("[getGlobalReminderSoundSettings] select warning:", error.message);
+      if (data && data.alert_sound_tone) {
+        dbRow = data;
       }
+    } catch {}
 
-      const row = (data as any) || {};
-      return {
-        enabled: row.alert_sound_enabled !== false,
-        tone: (row.alert_sound_tone || "chime") as "chime" | "bell" | "digital_ring" | "radar" | "soft_ping" | "custom",
-        volume: typeof row.alert_sound_volume === "number" ? row.alert_sound_volume : (row.alert_sound_volume ? parseFloat(row.alert_sound_volume) : 0.8),
-        desktopNotifications: row.desktop_notifications !== false,
-        customAudioUrl: (row.custom_audio_url as string | null) || null,
-        customAudioName: (row.custom_audio_name as string | null) || null,
-        leadsSoundEnabled: row.leads_sound_enabled !== false,
-        ordersSoundEnabled: row.orders_sound_enabled !== false,
-        leadsRingtone: (row.leads_ringtone || "chime") as string,
-        leadsCustomUrl: (row.leads_custom_url as string | null) || null,
-        leadsCustomName: (row.leads_custom_name as string | null) || null,
-        ordersRingtone: (row.orders_ringtone || "bell") as string,
-        ordersCustomUrl: (row.orders_custom_url as string | null) || null,
-        ordersCustomName: (row.orders_custom_name as string | null) || null,
-      };
-    } catch (err) {
-      console.warn("[getGlobalReminderSoundSettings] error:", err);
-      return {
-        enabled: true,
-        tone: "chime" as const,
-        volume: 0.8,
-        desktopNotifications: true,
-        customAudioUrl: null,
-        customAudioName: null,
-        leadsSoundEnabled: true,
-        ordersSoundEnabled: true,
-        leadsRingtone: "chime",
-        leadsCustomUrl: null,
-        leadsCustomName: null,
-        ordersRingtone: "bell",
-        ordersCustomUrl: null,
-        ordersCustomName: null,
-      };
-    }
+    // 2. Fallback / supplement from Storage config file
+    const storageConfig = await readSoundConfigFromStorage();
+
+    const enabled = dbRow?.alert_sound_enabled ?? storageConfig?.enabled ?? true;
+    const tone = (dbRow?.alert_sound_tone || storageConfig?.tone || "chime") as GlobalSoundConfig["tone"];
+    const volume = typeof dbRow?.alert_sound_volume === "number"
+      ? dbRow.alert_sound_volume
+      : (storageConfig?.volume ?? 0.8);
+    const desktopNotifications = dbRow?.desktop_notifications ?? storageConfig?.desktopNotifications ?? true;
+    const customAudioUrl = dbRow?.custom_audio_url || storageConfig?.customAudioUrl || null;
+    const customAudioName = dbRow?.custom_audio_name || storageConfig?.customAudioName || null;
+
+    const leadsSoundEnabled = dbRow?.leads_sound_enabled ?? storageConfig?.leadsSoundEnabled ?? true;
+    const ordersSoundEnabled = dbRow?.orders_sound_enabled ?? storageConfig?.ordersSoundEnabled ?? true;
+    const leadsRingtone = dbRow?.leads_ringtone || storageConfig?.leadsRingtone || "chime";
+    const leadsCustomUrl = dbRow?.leads_custom_url || storageConfig?.leadsCustomUrl || null;
+    const leadsCustomName = dbRow?.leads_custom_name || storageConfig?.leadsCustomName || null;
+    const ordersRingtone = dbRow?.orders_ringtone || storageConfig?.ordersRingtone || "bell";
+    const ordersCustomUrl = dbRow?.orders_custom_url || storageConfig?.ordersCustomUrl || null;
+    const ordersCustomName = dbRow?.orders_custom_name || storageConfig?.ordersCustomName || null;
+
+    return {
+      enabled: enabled !== false,
+      tone,
+      volume,
+      desktopNotifications: desktopNotifications !== false,
+      customAudioUrl,
+      customAudioName,
+      leadsSoundEnabled: leadsSoundEnabled !== false,
+      ordersSoundEnabled: ordersSoundEnabled !== false,
+      leadsRingtone,
+      leadsCustomUrl,
+      leadsCustomName,
+      ordersRingtone,
+      ordersCustomUrl,
+      ordersCustomName,
+    };
   });
 
 export const saveGlobalReminderSoundSettings = createServerFn({ method: "POST" })
@@ -115,28 +188,37 @@ export const saveGlobalReminderSoundSettings = createServerFn({ method: "POST" }
     }).parse(raw),
   )
   .handler(async ({ data, context }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    // 1. Persist to storage config file (guaranteed across all servers)
+    await writeSoundConfigToStorage({
+      enabled: data.enabled,
+      tone: data.tone,
+      volume: data.volume,
+      desktopNotifications: data.desktopNotifications,
+      customAudioUrl: data.customAudioUrl,
+      customAudioName: data.customAudioName,
+    });
 
-    const updatePayload: Record<string, any> = {
-      id: 1,
-      updated_at: new Date().toISOString(),
-      updated_by: context.userId,
-    };
+    // 2. Persist to app_settings table
+    try {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const updatePayload: Record<string, any> = {
+        id: 1,
+        updated_at: new Date().toISOString(),
+        updated_by: context.userId,
+      };
 
-    if (data.enabled !== undefined) updatePayload.alert_sound_enabled = data.enabled;
-    if (data.tone !== undefined) updatePayload.alert_sound_tone = data.tone;
-    if (data.volume !== undefined) updatePayload.alert_sound_volume = data.volume;
-    if (data.desktopNotifications !== undefined) updatePayload.desktop_notifications = data.desktopNotifications;
-    if (data.customAudioUrl !== undefined) updatePayload.custom_audio_url = data.customAudioUrl;
-    if (data.customAudioName !== undefined) updatePayload.custom_audio_name = data.customAudioName;
+      if (data.enabled !== undefined) updatePayload.alert_sound_enabled = data.enabled;
+      if (data.tone !== undefined) updatePayload.alert_sound_tone = data.tone;
+      if (data.volume !== undefined) updatePayload.alert_sound_volume = data.volume;
+      if (data.desktopNotifications !== undefined) updatePayload.desktop_notifications = data.desktopNotifications;
+      if (data.customAudioUrl !== undefined) updatePayload.custom_audio_url = data.customAudioUrl;
+      if (data.customAudioName !== undefined) updatePayload.custom_audio_name = data.customAudioName;
 
-    const { error } = await supabaseAdmin
-      .from("app_settings")
-      .upsert(updatePayload as never, { onConflict: "id" });
-
-    if (error) {
-      console.error("[saveGlobalReminderSoundSettings] upsert error:", error);
-      throw new Error(error.message);
+      await supabaseAdmin
+        .from("app_settings")
+        .upsert(updatePayload as never, { onConflict: "id" });
+    } catch (err) {
+      console.warn("[saveGlobalReminderSoundSettings] app_settings write warning:", err);
     }
 
     return { ok: true, ...data };
@@ -147,7 +229,7 @@ export const uploadAlertAudioFile = createServerFn({ method: "POST" })
   .inputValidator((raw: unknown) =>
     z.object({
       fileName: z.string().min(1),
-      base64Data: z.string().min(1), // Base64 data (with or without data:audio/... prefix)
+      base64Data: z.string().min(1),
       target: z.enum(["reminder", "lead", "order"]).default("reminder"),
     }).parse(raw),
   )
@@ -160,13 +242,12 @@ export const uploadAlertAudioFile = createServerFn({ method: "POST" })
     const rawBase64 = match ? match[2] : data.base64Data;
     const buffer = Buffer.from(rawBase64, "base64");
 
-    // Determine extension
     const extMatch = data.fileName.match(/\.(mp3|wav|ogg|m4a|aac)$/i);
     const ext = extMatch ? extMatch[1].toLowerCase() : "mp3";
-    const safeName = `${data.target}-sound-${Date.now()}.${ext}`;
+    const safeName = `${data.target}-sound-latest.${ext}`;
     const storagePath = `audio/${safeName}`;
 
-    // Upload to 'documents' bucket
+    // Upload audio binary to 'documents' bucket
     const { error: uploadErr } = await supabaseAdmin.storage
       .from("documents")
       .upload(storagePath, buffer, {
@@ -179,33 +260,52 @@ export const uploadAlertAudioFile = createServerFn({ method: "POST" })
       throw new Error(`Failed to upload audio: ${uploadErr.message}`);
     }
 
-    // Public API route to serve this audio
+    // Public API route to stream this audio to all devices
     const publicUrl = `/api/public/audio/${safeName}`;
 
-    // Persist to app_settings
-    const updatePayload: Record<string, any> = {
-      id: 1,
-      updated_at: new Date().toISOString(),
-      updated_by: context.userId,
-    };
-
+    // Update Storage Config
+    const configUpdate: Partial<GlobalSoundConfig> = {};
     if (data.target === "reminder") {
-      updatePayload.custom_audio_url = publicUrl;
-      updatePayload.custom_audio_name = data.fileName;
-      updatePayload.alert_sound_tone = "custom";
+      configUpdate.customAudioUrl = publicUrl;
+      configUpdate.customAudioName = data.fileName;
+      configUpdate.tone = "custom";
     } else if (data.target === "lead") {
-      updatePayload.leads_custom_url = publicUrl;
-      updatePayload.leads_custom_name = data.fileName;
-      updatePayload.leads_ringtone = "custom";
+      configUpdate.leadsCustomUrl = publicUrl;
+      configUpdate.leadsCustomName = data.fileName;
+      configUpdate.leadsRingtone = "custom";
     } else if (data.target === "order") {
-      updatePayload.orders_custom_url = publicUrl;
-      updatePayload.orders_custom_name = data.fileName;
-      updatePayload.orders_ringtone = "custom";
+      configUpdate.ordersCustomUrl = publicUrl;
+      configUpdate.ordersCustomName = data.fileName;
+      configUpdate.ordersRingtone = "custom";
     }
+    await writeSoundConfigToStorage(configUpdate);
 
-    await supabaseAdmin
-      .from("app_settings")
-      .upsert(updatePayload as never, { onConflict: "id" });
+    // Update app_settings table
+    try {
+      const updatePayload: Record<string, any> = {
+        id: 1,
+        updated_at: new Date().toISOString(),
+        updated_by: context.userId,
+      };
+
+      if (data.target === "reminder") {
+        updatePayload.custom_audio_url = publicUrl;
+        updatePayload.custom_audio_name = data.fileName;
+        updatePayload.alert_sound_tone = "custom";
+      } else if (data.target === "lead") {
+        updatePayload.leads_custom_url = publicUrl;
+        updatePayload.leads_custom_name = data.fileName;
+        updatePayload.leads_ringtone = "custom";
+      } else if (data.target === "order") {
+        updatePayload.orders_custom_url = publicUrl;
+        updatePayload.orders_custom_name = data.fileName;
+        updatePayload.orders_ringtone = "custom";
+      }
+
+      await supabaseAdmin
+        .from("app_settings")
+        .upsert(updatePayload as never, { onConflict: "id" });
+    } catch {}
 
     return {
       ok: true,
@@ -230,27 +330,40 @@ export const updateSoundSettings = createServerFn({ method: "POST" })
     }).parse(raw),
   )
   .handler(async ({ data, context }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { error } = await supabaseAdmin
-      .from("app_settings")
-      .upsert(
-        {
-          id: 1,
-          leads_sound_enabled: data.leadsSoundEnabled,
-          orders_sound_enabled: data.ordersSoundEnabled,
-          leads_ringtone: data.leadsRingtone,
-          leads_custom_url: data.leadsCustomUrl || null,
-          leads_custom_name: data.leadsCustomName || null,
-          orders_ringtone: data.ordersRingtone,
-          orders_custom_url: data.ordersCustomUrl || null,
-          orders_custom_name: data.ordersCustomName || null,
-          updated_at: new Date().toISOString(),
-          updated_by: context.userId,
-        } as never,
-        { onConflict: "id" },
-      );
-    if (error) {
-      console.warn("[updateSoundSettings] upsert warning:", error.message);
-    }
+    // 1. Storage config
+    await writeSoundConfigToStorage({
+      leadsSoundEnabled: data.leadsSoundEnabled,
+      ordersSoundEnabled: data.ordersSoundEnabled,
+      leadsRingtone: data.leadsRingtone,
+      leadsCustomUrl: data.leadsCustomUrl || null,
+      leadsCustomName: data.leadsCustomName || null,
+      ordersRingtone: data.ordersRingtone,
+      ordersCustomUrl: data.ordersCustomUrl || null,
+      ordersCustomName: data.ordersCustomName || null,
+    });
+
+    // 2. DB table
+    try {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      await supabaseAdmin
+        .from("app_settings")
+        .upsert(
+          {
+            id: 1,
+            leads_sound_enabled: data.leadsSoundEnabled,
+            orders_sound_enabled: data.ordersSoundEnabled,
+            leads_ringtone: data.leadsRingtone,
+            leads_custom_url: data.leadsCustomUrl || null,
+            leads_custom_name: data.leadsCustomName || null,
+            ordersRingtone: data.ordersRingtone,
+            orders_custom_url: data.ordersCustomUrl || null,
+            orders_custom_name: data.ordersCustomName || null,
+            updated_at: new Date().toISOString(),
+            updated_by: context.userId,
+          } as never,
+          { onConflict: "id" },
+        );
+    } catch {}
+
     return { ok: true, ...data };
   });

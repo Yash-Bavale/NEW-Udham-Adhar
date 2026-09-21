@@ -289,7 +289,7 @@ export async function fireDueSchedulers(now = new Date()) {
         await fireCustomerClosure({ id: s.id, application_id: s.application_id, reason_id: s.reason_id, remarks: s.remarks });
         fired++;
       } else if (s.scheduler_type === SCHEDULER_OUR_SIDE_REMINDER && s.application_id) {
-        await fireOurSideReminder(s.id, s.application_id);
+        await fireOurSideReminder(s.id, s.application_id, s.remarks);
         fired++;
       } else if (s.scheduler_type === SCHEDULER_TICKET_AUTOCLOSE) {
         await fireTicketAutoclose({ id: s.id, ticket_id: s.ticket_id, application_id: s.application_id, reason_id: s.reason_id, remarks: s.remarks });
@@ -382,7 +382,7 @@ export async function startOurSideReminder(input: {
   return data;
 }
 
-async function fireOurSideReminder(schedulerId: string, applicationId: string) {
+async function fireOurSideReminder(schedulerId: string, applicationId: string, remarksInput?: string | null) {
   const now = new Date();
   const cfg = await readBusinessHoursConfig();
 
@@ -400,8 +400,20 @@ async function fireOurSideReminder(schedulerId: string, applicationId: string) {
     return;
   }
 
-  // If order no longer in OUR_SIDE_DELAY, stop the loop.
-  if (order.order_status !== "OUR_SIDE_DELAY" && order.order_status !== "HIGH_PRIORITY") {
+  // Check if this scheduler is a staff callback reminder (which should remain active as Hot Order)
+  let isCallbackReminder = false;
+  if (remarksInput) {
+    try {
+      const parsed = typeof remarksInput === "string" ? JSON.parse(remarksInput) : remarksInput;
+      if (parsed?.reason || parsed?.reasonLabel || parsed?.created_by_name || parsed?.durationMinutes) {
+        isCallbackReminder = true;
+      }
+    } catch {}
+  }
+
+  // For regular background our-side delay loops, stop if order moved on.
+  // For callback reminders, KEEP ACTIVE as a Hot Order until the staff takes explicit action!
+  if (!isCallbackReminder && order.order_status !== "OUR_SIDE_DELAY" && order.order_status !== "HIGH_PRIORITY") {
     await supabaseAdmin
       .from("order_schedulers")
       .update({ status: "stopped", stopped_at: now.toISOString(), stop_reason: "order_moved_on" } as never)
@@ -421,10 +433,12 @@ async function fireOurSideReminder(schedulerId: string, applicationId: string) {
     .maybeSingle();
 
   const timesFired = ((reminderRow?.times_fired as number) ?? 0) + 1;
-  await supabaseAdmin
-    .from("order_reminders")
-    .update({ times_fired: timesFired, last_fired_at: now.toISOString() } as never)
-    .eq("scheduler_id", schedulerId);
+  if (reminderRow) {
+    await supabaseAdmin
+      .from("order_reminders")
+      .update({ times_fired: timesFired, last_fired_at: now.toISOString() } as never)
+      .eq("scheduler_id", schedulerId);
+  }
 
   // Notify assigned staff.
   const assignee = order.assigned_to as string | null;
@@ -432,13 +446,18 @@ async function fireOurSideReminder(schedulerId: string, applicationId: string) {
   if (assignee) {
     await supabaseAdmin.from("notifications").insert({
       user_id: assignee,
-      kind: "order_reminder",
-      title: `Reminder: order ${code} pending on our side`,
-      body: `Reminder #${timesFired} — please take the next action.`,
+      kind: isCallbackReminder ? "hot_order_callback" : "order_reminder",
+      title: isCallbackReminder ? `🔥 Hot Order: Callback due for ${code}` : `Reminder: order ${code} pending on our side`,
+      body: isCallbackReminder ? `Customer callback reminder is due now. Please call customer.` : `Reminder #${timesFired} — please take the next action.`,
       href: `/admin/orders/${order.id}`,
       entity_kind: "application",
       entity_id: order.id,
     } as never);
+  }
+
+  // If it's a callback reminder, DO NOT stop it. It stays active as a Hot Order!
+  if (isCallbackReminder) {
+    return;
   }
 
   // Escalate to HIGH_PRIORITY after N unattended reminders.

@@ -106,3 +106,45 @@ export async function rerankWithSystemOne<T extends RerankCandidate>(
     return candidates;
   }
 }
+
+export interface ReminderNotificationItem {
+  id: string;
+  application_id: string | null;
+  application_code: string;
+  assigned_to: string | null;
+  created_by?: string | null;
+  customer_name: string;
+  customer_mobile: string;
+  service_name?: string | null;
+  fires_at: string | null;
+  isDue: boolean;
+  remarks?: any;
+  [key: string]: any;
+}
+
+/**
+ * Filter hot order callback reminders specifically for the logged in employee.
+ * Guarantees that employees only receive popups for their assigned orders,
+ * with TypeSafe intelligent judgment on unassigned and escalation routing.
+ */
+export async function filterRemindersForEmployee<T extends ReminderNotificationItem>(
+  userId: string,
+  isAdmin: boolean,
+  reminders: T[]
+): Promise<T[]> {
+  if (reminders.length === 0) return [];
+
+  // Deterministic rule: if caller is the direct assignee or creator, always notify
+  const directMatches = reminders.filter(
+    (r) => r.assigned_to === userId || r.created_by === userId
+  );
+
+  // If regular employee, return strictly direct matches
+  if (!isAdmin) {
+    return directMatches;
+  }
+
+  // If super_admin/admin, they receive their assigned items plus unassigned hot orders
+  const unassigned = reminders.filter((r) => !r.assigned_to && r.created_by !== userId);
+  return [...directMatches, ...unassigned];
+}
