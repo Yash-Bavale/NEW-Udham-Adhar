@@ -763,6 +763,36 @@ export const closeTicketRestartT001 = createServerFn({ method: "POST" })
         .maybeSingle();
       const staffName = (staffProf as any)?.display_name || (staffProf as any)?.email || "Staff";
 
+      // Stop any prior open schedulers
+      await supabaseAdmin
+        .from("order_schedulers")
+        .update({
+          status: "stopped",
+          stopped_at: now,
+          stop_reason: "order_reopened_from_ticket",
+          stop_triggered_by: context.userId,
+        })
+        .eq("application_id", ticket.application_id)
+        .in("status", ["active", "paused"]);
+
+      // Insert immediate active hot scheduler
+      await supabaseAdmin.from("order_schedulers").insert({
+        application_id: ticket.application_id,
+        scheduler_type: "our_side_reminder",
+        status: "active",
+        started_at: now,
+        fires_at: now,
+        remarks: JSON.stringify({
+          reason: "order_reopened",
+          reasonLabel: `Order Reopened from Ticket #${ticket.ticket_number ?? ""} - Urgent Action Required`,
+          note: `Order reopened from ticket ${ticket.ticket_number ?? ""}`,
+          durationMinutes: 0,
+          created_by_name: staffName,
+          created_at: now,
+        }),
+        created_by: context.userId,
+      });
+
       await supabaseAdmin.from("application_events").insert({
         application_id: ticket.application_id,
         event_type: "status_change",
@@ -781,7 +811,7 @@ export const closeTicketRestartT001 = createServerFn({ method: "POST" })
         } as never);
       }
     } catch (evtErr) {
-      console.warn("[restartOrderFromTicket] timeline log warning:", evtErr);
+      console.warn("[restartOrderFromTicket] timeline/scheduler log warning:", evtErr);
     }
 
     return result as { ok: true; applicationId: string; cancelledCustomerDelayTimers: number };

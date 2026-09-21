@@ -6,7 +6,7 @@ import {
   ArrowLeft, Copy, Phone, Mail, User2,
   FileText, Workflow, Activity, LifeBuoy, ExternalLink, BadgeDollarSign,
   ShieldAlert, ShieldOff, Clock, AlertTriangle, XCircle, CheckCircle2, RotateCcw,
-  Link2, Send, Loader2,
+  Link2, Send, Loader2, VolumeX,
 } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -30,6 +30,7 @@ import { handleGovtRejected } from "@/lib/orders/actions/close-actions.functions
 import { markConsultationCompleted } from "@/lib/orders/actions/consultation.functions";
 import { listCloseReasons } from "@/lib/orders/actions/reasons.functions";
 import { updateFulfillmentStatus, resendServiceChangeEmail } from "@/lib/crm/orders-v2.functions";
+import { silentCloseOrder } from "@/lib/crm/workflow-closure.functions";
 
 import {
   deriveJourneyLiveState, derivePhase, PHASE_ENABLED_BUTTONS,
@@ -98,6 +99,7 @@ export function WorkspaceShell(p: Props) {
     | { kind: "customer_delay" }
     | { kind: "technical_delay" }
     | { kind: "force_close" }
+    | { kind: "silent_close" }
     | { kind: "govt_rejected" }
     | { kind: "complete_with_cert" }
   >(null);
@@ -621,8 +623,15 @@ export function WorkspaceShell(p: Props) {
         <CloseOrderDialog
           applicationId={application.id}
           open={dialog?.kind === "force_close"}
+          adminOverride={adminOverride}
           onClose={() => { setDialog(null); invalidate(); }}
         />
+        {dialog?.kind === "silent_close" && (
+          <SilentCloseInline
+            applicationId={application.id}
+            onClose={() => { setDialog(null); invalidate(); }}
+          />
+        )}
         {dialog?.kind === "govt_rejected" && (
           <GovtRejectedInline
             orderId={application.id}
@@ -719,9 +728,23 @@ export function WorkspaceShell(p: Props) {
                 </div>
 
                 {adminOverride && (
-                  <div className="rounded-lg border border-orange-200 bg-orange-50/70 px-3 py-1.5 text-[11px] text-orange-800 flex items-center gap-1.5">
-                    <ShieldAlert className="size-3.5 shrink-0" />
-                    <span><strong>Admin override active:</strong> Actions B01 – B08 unlocked regardless of current stage.</span>
+                  <div className="rounded-lg border border-orange-200 bg-orange-50/70 px-3 py-1.5 text-[11px] text-orange-800 flex items-center justify-between gap-2 flex-wrap">
+                    <div className="flex items-center gap-1.5">
+                      <ShieldAlert className="size-3.5 shrink-0" />
+                      <span><strong>Admin override active:</strong> Actions B01 – B08 unlocked regardless of current stage.</span>
+                    </div>
+                    {isAdmin && (
+                      <button
+                        type="button"
+                        onClick={() => setDialog({ kind: "silent_close" })}
+                        disabled={closed}
+                        className="inline-flex items-center gap-1 rounded bg-slate-900 px-2 py-1 text-[10px] font-bold text-amber-400 hover:bg-black border border-slate-700 transition disabled:opacity-40 cursor-pointer shadow-xs"
+                        title="Close order silently with no customer email (Admin Override only)"
+                      >
+                        <VolumeX className="size-3 text-amber-400" />
+                        Silent Close (No Email)
+                      </button>
+                    )}
                   </div>
                 )}
 
@@ -1218,6 +1241,85 @@ function GovtRejectedInline({ orderId, onClose }: { orderId: string; onClose: ()
           <button onClick={submit} disabled={busy || !reasonId}
             className="rounded-md bg-rose-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-rose-700 disabled:opacity-50">
             Send E008 & Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─── Inline Silent Close (Admin Override) dialog ─── */
+
+function SilentCloseInline({ applicationId, onClose }: { applicationId: string; onClose: () => void }) {
+  const [reasonText, setReasonText] = useState("");
+  const fnSilent = useServerFn(silentCloseOrder);
+  const [busy, setBusy] = useState(false);
+
+  const submit = async () => {
+    setBusy(true);
+    try {
+      await fnSilent({
+        data: {
+          applicationId,
+          reasonCode: "ADMIN_SILENT_CLOSE",
+          reasonLabel: "Silent Close (Admin Override)",
+          notes: reasonText.trim() || undefined,
+        },
+      });
+      toast.success("Order closed silently — no customer email sent");
+      onClose();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Silent close failed");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4">
+      <div className="w-full max-w-lg rounded-xl border border-slate-700 bg-slate-900 text-white p-5 shadow-2xl space-y-4">
+        <div className="flex items-center gap-2.5">
+          <div className="flex size-9 items-center justify-center rounded-lg bg-amber-500/20 text-amber-400 border border-amber-500/30">
+            <VolumeX className="size-4.5" />
+          </div>
+          <div>
+            <div className="font-bold text-sm text-white">Silent Close Order (Admin Override)</div>
+            <div className="text-xs text-slate-400">Close immediately without sending any customer email</div>
+          </div>
+        </div>
+
+        <div className="rounded-lg bg-amber-500/10 border border-amber-500/20 p-3 text-xs text-amber-300">
+          ⚠️ <b>No Customer Email:</b> This will transition the order to Closed, cancel all active reminders and hot order alerts, and update the status without sending any emails or notifications to the customer.
+        </div>
+
+        <div className="space-y-1.5">
+          <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Internal Remarks / Reason (Optional)</label>
+          <textarea
+            value={reasonText}
+            onChange={(e) => setReasonText(e.target.value)}
+            placeholder="e.g. Offline resolved / test order / client requested silent closure"
+            rows={3}
+            className="w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-400"
+          />
+        </div>
+
+        <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={busy}
+            className="rounded-md border border-slate-700 bg-slate-800 px-3.5 py-1.5 text-xs font-semibold text-slate-300 hover:bg-slate-700 hover:text-white transition cursor-pointer"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={submit}
+            disabled={busy}
+            className="inline-flex items-center gap-1.5 rounded-md bg-amber-600 px-4 py-1.5 text-xs font-bold text-white hover:bg-amber-500 transition disabled:opacity-50 shadow-md cursor-pointer"
+          >
+            {busy ? <Loader2 className="size-3.5 animate-spin" /> : <VolumeX className="size-3.5" />}
+            Confirm Silent Close
           </button>
         </div>
       </div>

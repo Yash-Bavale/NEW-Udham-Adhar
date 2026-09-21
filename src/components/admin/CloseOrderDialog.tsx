@@ -1,23 +1,29 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Loader2, X, ShieldAlert, Search, FileText, AlertTriangle, CheckCircle2, Mail, HelpCircle } from "lucide-react";
+import { Loader2, X, ShieldAlert, Search, FileText, AlertTriangle, CheckCircle2, Mail, HelpCircle, VolumeX } from "lucide-react";
 import { closeOrder } from "@/lib/crm/workflow-closure.functions";
 import { listCloseReasons, type OrderCloseReason } from "@/lib/orders/actions/reasons.functions";
 import { listClosureReasons } from "@/lib/crm/workflow.functions";
+import { useRole } from "@/hooks/useRole";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 export function CloseOrderDialog({
   applicationId,
   open,
+  adminOverride = false,
   onClose,
 }: {
   applicationId: string;
   open: boolean;
+  adminOverride?: boolean;
   onClose: () => void;
 }) {
   const qc = useQueryClient();
+  const role = useRole();
+  const isAdmin = role.hasAny(["super_admin", "admin"]);
+  const [isSilent, setIsSilent] = useState<boolean>(false);
   const fnStandardReasons = useServerFn(listCloseReasons);
   const fnWfReasons = useServerFn(listClosureReasons);
   const fnClose = useServerFn(closeOrder);
@@ -116,6 +122,7 @@ export function CloseOrderDialog({
           reasonCode: selectedReason.code,
           reasonLabel: selectedReason.label,
           notes: notes.trim() || undefined,
+          silent: isSilent,
         },
       });
 
@@ -305,16 +312,50 @@ export function CloseOrderDialog({
             />
           </div>
 
-          {/* Warning Banner */}
-          <div className="flex items-start gap-2.5 rounded-xl bg-amber-50 p-3 border border-amber-200/80 text-xs text-amber-900">
-            <AlertTriangle className="size-4 text-amber-600 shrink-0 mt-0.5" />
-            <div>
-              <p className="font-bold">Important Notice:</p>
-              <p className="text-[11px] text-amber-800/90 leading-tight mt-0.5">
-                Force closing this order will set its status to <b>CLOSED</b>, immediately cancel all running timers, and queue the <b>E010 Closure Notice</b> email to the customer.
-              </p>
+          {/* Admin Override Silent Mode Option */}
+          {isAdmin && adminOverride && (
+            <div className="rounded-xl border border-amber-300 bg-amber-50/80 p-3 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <VolumeX className="size-4 text-amber-700 shrink-0" />
+                <div>
+                  <div className="text-xs font-bold text-amber-900">Silent Close Mode (No Email)</div>
+                  <div className="text-[11px] text-amber-800">Do not send E010 closure confirmation email to customer.</div>
+                </div>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={isSilent}
+                  onChange={(e) => setIsSilent(e.target.checked)}
+                  className="sr-only peer"
+                />
+                <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-600"></div>
+              </label>
             </div>
-          </div>
+          )}
+
+          {/* Warning Banner */}
+          {isSilent ? (
+            <div className="flex items-start gap-2.5 rounded-xl bg-slate-900 p-3 border border-slate-700 text-xs text-slate-200">
+              <VolumeX className="size-4 text-amber-400 shrink-0 mt-0.5" />
+              <div>
+                <p className="font-bold text-white">Silent Closure Active:</p>
+                <p className="text-[11px] text-slate-300 leading-tight mt-0.5">
+                  This order will be closed silently on the system. <b>No email or notification</b> will be sent to the customer.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-start gap-2.5 rounded-xl bg-amber-50 p-3 border border-amber-200/80 text-xs text-amber-900">
+              <AlertTriangle className="size-4 text-amber-600 shrink-0 mt-0.5" />
+              <div>
+                <p className="font-bold">Important Notice:</p>
+                <p className="text-[11px] text-amber-800/90 leading-tight mt-0.5">
+                  Force closing this order will set its status to <b>CLOSED</b>, immediately cancel all running timers, and queue the <b>E010 Closure Notice</b> email to the customer.
+                </p>
+              </div>
+            </div>
+          )}
 
         </div>
 
@@ -331,10 +372,17 @@ export function CloseOrderDialog({
             type="button"
             onClick={() => mut.mutate()}
             disabled={mut.isPending || !selectedCode}
-            className="inline-flex items-center gap-2 rounded-xl bg-rose-600 px-5 py-2 text-xs font-bold text-white shadow-md hover:bg-rose-700 disabled:opacity-50 cursor-pointer transition select-none"
+            className={cn(
+              "inline-flex items-center gap-2 rounded-xl px-5 py-2 text-xs font-bold text-white shadow-md disabled:opacity-50 cursor-pointer transition select-none",
+              isSilent ? "bg-amber-600 hover:bg-amber-700" : "bg-rose-600 hover:bg-rose-700"
+            )}
           >
             {mut.isPending && <Loader2 className="size-3.5 animate-spin" />}
-            {mut.isPending ? "Force Closing…" : "Confirm Force Close Order (B10)"}
+            {mut.isPending
+              ? "Closing…"
+              : isSilent
+                ? "Confirm Silent Close (No Email)"
+                : "Confirm Force Close Order (B10)"}
           </button>
         </div>
 

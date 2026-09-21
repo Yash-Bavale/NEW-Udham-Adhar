@@ -937,10 +937,10 @@ export const reopenOrder = createServerFn({ method: "POST" })
       .from("applications")
       .update({
         order_status: "FORM_RECEIVED",
-        fulfillment_status: "form_submitted",
+        fulfillment_status: "order_reopened",
         workflow_status: null,
         closure_stage: "none",
-        application_status: "form_submitted",
+        application_status: "order_reopened",
         closure_reason_id: null,
         closure_remarks: null,
         closure_next_at: null,
@@ -957,6 +957,48 @@ export const reopenOrder = createServerFn({ method: "POST" })
       .eq("id", data.orderId);
 
     if (upErr) throw new Error(`Failed to update application status: ${upErr.message}`);
+
+    // Immediately schedule an active Hot Order reminder so the reopened order appears on top and triggers alert instantly
+    try {
+      const { data: staffProf } = await supabaseAdmin
+        .from("profiles")
+        .select("display_name, email")
+        .eq("id", context.userId)
+        .maybeSingle();
+      const staffName = (staffProf as any)?.display_name || (staffProf as any)?.email || "Staff";
+
+      // Stop any prior open schedulers to satisfy one_open_scheduler_per_order
+      await supabaseAdmin
+        .from("order_schedulers")
+        .update({
+          status: "stopped",
+          stopped_at: now,
+          stop_reason: "order_reopened",
+          stop_triggered_by: context.userId,
+        })
+        .eq("application_id", data.orderId)
+        .in("status", ["active", "paused"]);
+
+      // Insert immediate active hot scheduler
+      await supabaseAdmin.from("order_schedulers").insert({
+        application_id: data.orderId,
+        scheduler_type: "our_side_reminder",
+        status: "active",
+        started_at: now,
+        fires_at: now,
+        remarks: JSON.stringify({
+          reason: "order_reopened",
+          reasonLabel: "Order Reopened - Urgent Action Required",
+          note: data.remarks || "Order reopened for processing",
+          durationMinutes: 0,
+          created_by_name: staffName,
+          created_at: now,
+        }),
+        created_by: context.userId,
+      });
+    } catch (schedErr) {
+      console.warn("[reopenOrder] hot order scheduler insert warning:", schedErr);
+    }
 
     if (app?.lead_id) {
       const [{ data: lead }, { data: paidPayment }] = await Promise.all([

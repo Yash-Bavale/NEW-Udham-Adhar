@@ -776,8 +776,13 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       }
       const firesAtTime = cb?.fires_at ? new Date(cb.fires_at).getTime() : 0;
       const is_due = firesAtTime > 0 && firesAtTime <= now;
-      const is_hot = is_due;
-      const is_callback_scheduled = !!cb;
+      const is_reopened =
+        stage === "order_reopened" ||
+        a.fulfillment_status === "order_reopened" ||
+        (a as any).application_status === "order_reopened" ||
+        (a as any).order_status === "REOPENED";
+      const is_hot = is_due || is_reopened;
+      const is_callback_scheduled = !!cb || is_reopened;
       const callback_reminder = cb
         ? {
             id: cb.id,

@@ -30,10 +30,15 @@ export const closeOrder = createServerFn({ method: "POST" })
       reasonCode: z.string().min(1).max(64),
       reasonLabel: z.string().min(1).max(160),
       notes: z.string().max(4000).optional(),
+      silent: z.boolean().optional().default(false),
     }).parse(d),
   )
   .handler(async ({ data, context }) => {
-    await assertRole(context.supabase, [...STAFF]);
+    if (data.silent) {
+      await assertRole(context.supabase, [...ADMIN_ONLY]);
+    } else {
+      await assertRole(context.supabase, [...STAFF]);
+    }
     const admin = await getAdmin();
     const name = await actorName(context.supabase, context.userId);
 
@@ -44,109 +49,150 @@ export const closeOrder = createServerFn({ method: "POST" })
       .maybeSingle();
     if (!app) throw new Error("Application not found");
 
-    // Cancel reminders
+    // Cancel reminders & stop all schedulers so hot orders stop
     await admin
       .from("workflow_reminders")
       .update({ status: "cancelled" } as never)
       .eq("application_id", app.id)
       .eq("status", "pending");
 
+    try {
+      const { cancelAllForOrder } = await import("@/lib/scheduling/schedulers.server");
+      await cancelAllForOrder(app.id, data.silent ? "silent_admin_close" : "order_closed");
+    } catch (schedErr) {
+      console.warn("[closeOrder] scheduler cancel warning:", schedErr);
+    }
+
     const closedAt = new Date().toISOString();
     await admin
       .from("applications")
-      .update({ workflow_status: "closed", workflow_closed_at: closedAt, fulfillment_status: "order_closed" } as never)
+      .update({
+        workflow_status: "closed",
+        workflow_closed_at: closedAt,
+        fulfillment_status: "order_closed",
+        application_status: "closed",
+        order_status: "CLOSED",
+      } as never)
       .eq("id", app.id);
 
     await admin.from("workflow_events").insert({
       application_id: app.id,
       lead_id: app.lead_id,
-      event_type: "order_closed",
-      title: `Order closed — ${data.reasonLabel}`,
+      event_type: data.silent ? "silent_order_closed" : "order_closed",
+      title: data.silent
+        ? `Order closed silently — ${data.reasonLabel}`
+        : `Order closed — ${data.reasonLabel}`,
       description: data.notes ?? null,
-      customer_visible: true,
+      customer_visible: !data.silent,
       actor_id: context.userId,
       actor_name: name,
       is_system: false,
-      metadata: { reason_code: data.reasonCode, reason_label: data.reasonLabel, notes: data.notes ?? null },
+      metadata: { reason_code: data.reasonCode, reason_label: data.reasonLabel, notes: data.notes ?? null, silent: data.silent },
     } as never);
 
-    // Send closure confirmation email with the actual reason and remarks.
-    try {
-      const { data: lead } = await admin
-        .from("leads")
-        .select("name, email, mobile, service")
-        .eq("id", app.lead_id!)
-        .maybeSingle();
-      const { data: latestInvoice } = await admin
-        .from("invoices")
-        .select("invoice_number")
-        .eq("application_id", app.id)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (lead?.email) {
-        const { enqueueFromTemplateInternal } = await import("@/lib/emails/emails.server");
-        const { SUPPORT_EMAIL, COMPANY_NAME } = await import("@/lib/brand");
-        const istFmt = (iso: string) =>
-          new Date(iso).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium", timeStyle: "short" });
-
-        // Load standard reply / description for closure reason
-        const { data: closureReasonRow } = await admin
-          .from("workflow_closure_reasons")
-          .select("description, label")
-          .eq("code", data.reasonCode)
+    // Send closure confirmation email ONLY if not in silent mode
+    if (!data.silent) {
+      try {
+        const { data: lead } = await admin
+          .from("leads")
+          .select("name, email, mobile, service")
+          .eq("id", app.lead_id!)
           .maybeSingle();
-        let defaultClosureReply = closureReasonRow?.description;
-        if (!defaultClosureReply) {
-          const { STANDARD_CLOSE_REASONS } = await import("@/lib/orders/actions/reasons.functions");
-          const std = STANDARD_CLOSE_REASONS.find(
-            (r) => r.id === data.reasonCode || `R${r.number}` === data.reasonCode || r.label.toLowerCase() === data.reasonLabel.toLowerCase()
-          );
-          defaultClosureReply = std?.standard_reply || null;
-        }
-        const closeRemarks = (data.notes && data.notes.trim()) ? data.notes.trim() : (defaultClosureReply || data.reasonLabel || "—");
+        const { data: latestInvoice } = await admin
+          .from("invoices")
+          .select("invoice_number")
+          .eq("application_id", app.id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (lead?.email) {
+          const { enqueueFromTemplateInternal } = await import("@/lib/emails/emails.server");
+          const { SUPPORT_EMAIL, COMPANY_NAME } = await import("@/lib/brand");
+          const istFmt = (iso: string) =>
+            new Date(iso).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium", timeStyle: "short" });
 
-        await enqueueFromTemplateInternal(
-          "order_closure_confirmation",
-          lead.email,
-          {
-            customer_name: lead.name ?? "Customer",
-            customer_email: lead.email ?? "",
-            customer_mobile: (lead as any).mobile ?? "—",
-            order_id: app.application_code ?? "",
-            order_number: app.application_code ?? "",
-            service_name: lead.service ?? "—",
-            invoice_number: latestInvoice?.invoice_number ?? "—",
-            order_created_at: app.created_at ? istFmt(app.created_at as string) : "—",
-            closure_date: istFmt(closedAt),
-            closure_reason: data.reasonLabel,
-            reason: data.reasonLabel,
-            reason_block: defaultClosureReply || data.reasonLabel,
-            employee_remarks: closeRemarks,
-            additional_remarks: closeRemarks,
-            remarks: closeRemarks,
-            date: new Date().toLocaleDateString("en-IN"),
-            company_name: COMPANY_NAME,
-            support_email: SUPPORT_EMAIL,
-          },
-          { toName: lead.name ?? undefined, leadId: app.lead_id ?? undefined, applicationId: app.id, trigger: "manual" },
-        );
+          // Load standard reply / description for closure reason
+          const { data: closureReasonRow } = await admin
+            .from("workflow_closure_reasons")
+            .select("description, label")
+            .eq("code", data.reasonCode)
+            .maybeSingle();
+          let defaultClosureReply = closureReasonRow?.description;
+          if (!defaultClosureReply) {
+            const { STANDARD_CLOSE_REASONS } = await import("@/lib/orders/actions/reasons.functions");
+            const std = STANDARD_CLOSE_REASONS.find(
+              (r) => r.id === data.reasonCode || `R${r.number}` === data.reasonCode || r.label.toLowerCase() === data.reasonLabel.toLowerCase()
+            );
+            defaultClosureReply = std?.standard_reply || null;
+          }
+          const closeRemarks = (data.notes && data.notes.trim()) ? data.notes.trim() : (defaultClosureReply || data.reasonLabel || "—");
+
+          await enqueueFromTemplateInternal(
+            "order_closure_confirmation",
+            lead.email,
+            {
+              customer_name: lead.name ?? "Customer",
+              customer_email: lead.email ?? "",
+              customer_mobile: (lead as any).mobile ?? "—",
+              order_id: app.application_code ?? "",
+              order_number: app.application_code ?? "",
+              service_name: lead.service ?? "—",
+              invoice_number: latestInvoice?.invoice_number ?? "—",
+              order_created_at: app.created_at ? istFmt(app.created_at as string) : "—",
+              closure_date: istFmt(closedAt),
+              closure_reason: data.reasonLabel,
+              reason: data.reasonLabel,
+              reason_block: defaultClosureReply || data.reasonLabel,
+              employee_remarks: closeRemarks,
+              additional_remarks: closeRemarks,
+              remarks: closeRemarks,
+              date: new Date().toLocaleDateString("en-IN"),
+              company_name: COMPANY_NAME,
+              support_email: SUPPORT_EMAIL,
+            },
+            { toName: lead.name ?? undefined, leadId: app.lead_id ?? undefined, applicationId: app.id, trigger: "manual" },
+          );
+        }
+      } catch (e) {
+        console.error("[closeOrder] closure email failed", e);
       }
-    } catch (e) {
-      console.error("[closeOrder] closure email failed", e);
     }
 
     await writeAudit({
       supabase: context.supabase,
       entityType: "application",
       entityId: app.id,
-      action: "workflow_close_order",
+      action: data.silent ? "workflow_silent_close_order" : "workflow_close_order",
       oldValue: { workflow_status: app.workflow_status },
-      newValue: { workflow_status: "closed", reason: data.reasonCode, notes: data.notes ?? null },
+      newValue: { workflow_status: "closed", reason: data.reasonCode, notes: data.notes ?? null, silent: data.silent },
       actorId: context.userId,
     });
 
-    return { ok: true };
+    return { ok: true, silent: data.silent };
+  });
+
+// ───────── Silent Close Order (Admin Override Only) ─────────
+
+export const silentCloseOrder = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) =>
+    z.object({
+      applicationId: z.string().uuid(),
+      reasonCode: z.string().optional().default("ADMIN_SILENT_CLOSE"),
+      reasonLabel: z.string().optional().default("Silent Close (Admin Override)"),
+      notes: z.string().max(4000).optional(),
+    }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    return closeOrder({
+      data: {
+        applicationId: data.applicationId,
+        reasonCode: data.reasonCode,
+        reasonLabel: data.reasonLabel,
+        notes: data.notes,
+        silent: true,
+      },
+    });
   });
 
 // ───────── Refund Requests ─────────
