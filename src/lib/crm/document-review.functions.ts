@@ -89,7 +89,7 @@ export const approveDocument = createServerFn({ method: "POST" })
     const user = await assertRole(context.supabase, ["super_admin", "admin", "operations"]);
     const { data: prev } = await (await getAdmin())
       .from("documents")
-      .select("status")
+      .select("status, application_id, doc_type")
       .eq("id", data.documentId)
       .single();
     const { error } = await (await getAdmin())
@@ -111,6 +111,23 @@ export const approveDocument = createServerFn({ method: "POST" })
       newValue: { status: "approved", comment: data.comment },
       actorId: user.id,
     });
+
+    if (prev?.application_id) {
+      try {
+        const { logEmployeeOrderAction } = await import("@/lib/orders/order-action-logger.server");
+        await logEmployeeOrderAction({
+          orderId: prev.application_id,
+          employeeId: user.id,
+          actionType: "DOCUMENT_REVIEWED",
+          notes: `Document approved: ${prev.doc_type || "document"}`,
+          source: "employee",
+          supabase: await getAdmin(),
+        });
+      } catch (auditErr) {
+        console.warn("[approveDocument] audit log error:", auditErr);
+      }
+    }
+
     return { ok: true };
   });
 
@@ -121,6 +138,11 @@ export const rejectDocument = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const user = await assertRole(context.supabase, ["super_admin", "admin", "operations"]);
+    const { data: prev } = await (await getAdmin())
+      .from("documents")
+      .select("status, application_id, doc_type")
+      .eq("id", data.documentId)
+      .single();
     const { error } = await (await getAdmin())
       .from("documents")
       .update({
@@ -139,6 +161,23 @@ export const rejectDocument = createServerFn({ method: "POST" })
       newValue: { reason: data.reason },
       actorId: user.id,
     });
+
+    if (prev?.application_id) {
+      try {
+        const { logEmployeeOrderAction } = await import("@/lib/orders/order-action-logger.server");
+        await logEmployeeOrderAction({
+          orderId: prev.application_id,
+          employeeId: user.id,
+          actionType: "DOCUMENT_REQUESTED",
+          notes: `Document rejected (${prev.doc_type || "document"}): ${data.reason}`,
+          source: "employee",
+          supabase: await getAdmin(),
+        });
+      } catch (auditErr) {
+        console.warn("[rejectDocument] audit log error:", auditErr);
+      }
+    }
+
     return { ok: true };
   });
 

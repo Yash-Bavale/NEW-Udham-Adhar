@@ -350,6 +350,21 @@ export const replyToTicket = createServerFn({ method: "POST" })
       } catch (e) {
         console.error("[workflow] TicketClosed dispatch failed", e);
       }
+
+      // Record in immutable employee action audit log
+      try {
+        const { logEmployeeOrderAction } = await import("@/lib/orders/order-action-logger.server");
+        await logEmployeeOrderAction({
+          orderId: ticket.application_id,
+          employeeId: context.userId,
+          actionType: "TICKET_REPLIED",
+          notes: `Replied to ticket #${ticket.ticket_number || ticket.id.slice(0, 8)}`,
+          source: "employee",
+          supabase: admin,
+        });
+      } catch (auditErr) {
+        console.warn("[replyToTicket] order action audit log error:", auditErr);
+      }
     }
 
     // Try to send the reply email. If the customer has no email on file we

@@ -90,6 +90,24 @@ export const closeOrder = createServerFn({ method: "POST" })
       metadata: { reason_code: data.reasonCode, reason_label: data.reasonLabel, notes: data.notes ?? null, silent: data.silent },
     } as never);
 
+    // Record in immutable employee action audit log
+    try {
+      const { logEmployeeOrderAction } = await import("@/lib/orders/order-action-logger.server");
+      await logEmployeeOrderAction({
+        orderId: app.id,
+        employeeId: context.userId,
+        employeeName: name,
+        actionType: "ORDER_CLOSED",
+        previousStatus: app.workflow_status,
+        newStatus: "closed",
+        notes: `Order closed: ${data.reasonLabel}${data.notes ? ` - ${data.notes}` : ""}`,
+        source: data.silent ? "admin" : "employee",
+        supabase: admin,
+      });
+    } catch (auditErr) {
+      console.warn("[closeOrder] audit log error:", auditErr);
+    }
+
     // Send closure confirmation email ONLY if not in silent mode
     if (!data.silent) {
       try {

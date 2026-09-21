@@ -73,6 +73,20 @@ export async function autoAssignLeadOrOrder(opts: {
         .update({ assigned_to: staffUserId, assigned_at: nowIso, auto_assigned: true, updated_at: nowIso } as never)
         .eq("id", opts.applicationId)
         .is("assigned_to", null);
+
+      try {
+        const { logEmployeeOrderAction } = await import("@/lib/orders/order-action-logger.server");
+        await logEmployeeOrderAction({
+          orderId: opts.applicationId,
+          employeeId: staffUserId,
+          actionType: "ORDER_ASSIGNED",
+          notes: "Auto-assigned via round-robin pool",
+          source: "system",
+          supabase: supabaseAdmin,
+        });
+      } catch (logErr) {
+        console.warn("[autoAssignLeadOrOrder] Audit log warning:", logErr);
+      }
     } else if (opts.leadId) {
       await supabaseAdmin
         .from("leads")

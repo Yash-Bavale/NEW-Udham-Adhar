@@ -1,5 +1,4 @@
-import { createServerClient } from '@supabase/ssr';
-import type { Database } from '@/types/database.types';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 export type ActionType =
   | 'ORDER_ASSIGNED'
@@ -49,7 +48,7 @@ export interface LogActionParams {
   notes?: string | null;
   source?: 'employee' | 'admin' | 'super_admin' | 'system' | 'customer';
   customMetadata?: Record<string, any>;
-  supabase?: any;
+  supabase?: SupabaseClient | any;
 }
 
 /**
@@ -71,8 +70,13 @@ function getIstString(date: Date): string {
 /**
  * Centralized audit logger for employee actions on orders.
  * Computes latency intervals and SLA adherence automatically.
+ *
+ * NOTE: Uses the 'applications' table (not 'orders') — this is the correct
+ * table name for this CRM.
  */
-export async function logEmployeeOrderAction(params: LogActionParams): Promise<{ success: boolean; actionId?: string; error?: string }> {
+export async function logEmployeeOrderAction(
+  params: LogActionParams,
+): Promise<{ success: boolean; actionId?: string; error?: string }> {
   try {
     const {
       orderId,
@@ -107,14 +111,16 @@ export async function logEmployeeOrderAction(params: LogActionParams): Promise<{
     const nowIso = now.toISOString();
     const nowIst = getIstString(now);
 
-    // 1. Fetch the order metadata for assignment timestamp and SLA references
+    // 1. Fetch the order metadata from the CORRECT 'applications' table
     const { data: order } = await client
-      .from('orders')
-      .select('id, assigned_to, assigned_at, created_at, is_hot, status, stage, customer_id, lead_id')
+      .from('applications')
+      .select(
+        'id, application_code, assigned_to, assigned_at, created_at, is_hot, order_status, fulfillment_status, application_status, customer_id, lead_id',
+      )
       .eq('id', orderId)
       .maybeSingle();
 
-    // 2. Fetch the most recent prior action on this order to calculate time spent since previous action
+    // 2. Fetch the most recent prior action on this order to calculate time since previous action
     const { data: lastAction } = await client
       .from('order_action_logs')
       .select('created_at')
@@ -135,53 +141,72 @@ export async function logEmployeeOrderAction(params: LogActionParams): Promise<{
       timeSpentSincePreviousActionMs = Math.max(0, now.getTime() - prevActionTime);
     }
 
-    // 3. Compute SLA Status
-    // First-Action / Response SLA: 2 hours (7200000 ms) from assignment
-    // Hot Order Action SLA: 30 minutes (1800000 ms)
-    // General Completion SLA: 24 hours (86400000 ms)
-    let slaStatus: 'COMPLIANT' | 'AT_RISK' | 'BREACHED' = 'COMPLIANT';
+    // 3. Compute SLA Status (lowercase to match DB CHECK constraint)
+    // Hot Order Action SLA: 30 minutes (1_800_000 ms)
+    // First-Action SLA: 2 hours (7_200_000 ms) from assignment
+    // General Completion SLA: 24 hours (86_400_000 ms)
+    let slaStatus: 'compliant' | 'at_risk' | 'breached' = 'compliant';
     let isSlaBreached = false;
 
     if (order?.is_hot) {
       if (timeSpentSinceAssignmentMs !== null) {
-        if (timeSpentSinceAssignmentMs > 1800000) { // > 30 mins
-          slaStatus = 'BREACHED';
+        if (timeSpentSinceAssignmentMs > 1_800_000) {
+          // > 30 mins
+          slaStatus = 'breached';
           isSlaBreached = true;
-        } else if (timeSpentSinceAssignmentMs > 1200000) { // > 20 mins
-          slaStatus = 'AT_RISK';
+        } else if (timeSpentSinceAssignmentMs > 1_200_000) {
+          // > 20 mins
+          slaStatus = 'at_risk';
         }
       }
     } else if (actionType === 'ORDER_COMPLETED' || actionType === 'ORDER_CLOSED') {
-      if (timeSpentSinceAssignmentMs !== null && timeSpentSinceAssignmentMs > 86400000) {
-        slaStatus = 'BREACHED';
+      if (timeSpentSinceAssignmentMs !== null && timeSpentSinceAssignmentMs > 86_400_000) {
+        slaStatus = 'breached';
         isSlaBreached = true;
       }
     } else {
       if (timeSpentSinceAssignmentMs !== null) {
-        if (timeSpentSinceAssignmentMs > 7200000) { // > 2 hours
-          slaStatus = 'BREACHED';
+        if (timeSpentSinceAssignmentMs > 7_200_000) {
+          // > 2 hours
+          slaStatus = 'breached';
           isSlaBreached = true;
-        } else if (timeSpentSinceAssignmentMs > 5400000) { // > 1.5 hours
-          slaStatus = 'AT_RISK';
+        } else if (timeSpentSinceAssignmentMs > 5_400_000) {
+          // > 1.5 hours
+          slaStatus = 'at_risk';
         }
       }
     }
 
-    // 4. Resolve Employee Name if missing but employeeId provided
+    // 4. Resolve Employee Name / Role if not provided
     let finalEmpName = employeeName;
     let finalEmpRole = employeeRole;
     if (employeeId && (!finalEmpName || !finalEmpRole)) {
       const { data: profile } = await client
         .from('profiles')
-        .select('id, full_name, email, role')
+        .select('id, full_name, display_name, email')
         .eq('id', employeeId)
         .maybeSingle();
 
       if (profile) {
-        finalEmpName = finalEmpName || profile.full_name || profile.email || 'Employee';
-        finalEmpRole = finalEmpRole || profile.role || 'employee';
+        finalEmpName =
+          finalEmpName || profile.full_name || profile.display_name || profile.email || 'Employee';
       }
     }
+
+    // Also resolve role from user_roles if missing
+    if (employeeId && !finalEmpRole) {
+      const { data: roleRow } = await client
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', employeeId)
+        .limit(1)
+        .maybeSingle();
+      finalEmpRole = roleRow?.role || 'employee';
+    }
+
+    // Normalize source — 'super_admin' is not a valid source value in DB
+    const normalizedSource: 'employee' | 'admin' | 'system' | 'customer' =
+      source === 'super_admin' ? 'admin' : (source as any) || 'employee';
 
     // 5. Insert into order_action_logs
     const insertPayload = {
@@ -193,9 +218,9 @@ export async function logEmployeeOrderAction(params: LogActionParams): Promise<{
       employee_role: finalEmpRole || 'system',
       action_type: actionType,
       previous_status: previousStatus || null,
-      new_status: newStatus || order?.status || null,
+      new_status: newStatus || order?.order_status || order?.fulfillment_status || null,
       previous_stage: previousStage || null,
-      new_stage: newStage || order?.stage || null,
+      new_stage: newStage || order?.fulfillment_status || null,
       timestamp: nowIso,
       created_at_ist: nowIst,
       time_spent_since_assignment_ms: timeSpentSinceAssignmentMs,
@@ -203,8 +228,7 @@ export async function logEmployeeOrderAction(params: LogActionParams): Promise<{
       sla_status: slaStatus,
       is_sla_breached: isSlaBreached,
       notes: notes || null,
-      source: source,
-      metadata: customMetadata,
+      source: normalizedSource,
       created_at: nowIso,
     };
 
