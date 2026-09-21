@@ -281,7 +281,7 @@ async function transition(
   supabase: any,
   orderId: string,
   newStatus: string,
-  extras: { reasonId?: string | null; remarks?: string | null; force?: boolean } = {},
+  extras: { reasonId?: string | null; remarks?: string | null; force?: boolean; employeeId?: string; actionType?: string } = {},
 ) {
   const { data, error } = await supabase.rpc("transition_order_status", {
     _order_id: orderId,
@@ -291,6 +291,38 @@ async function transition(
     _force: extras.force ?? false,
   });
   if (error) throw new Error(error.message);
+
+  // Immutable audit log
+  try {
+    const { logEmployeeOrderAction } = await import("@/lib/orders/order-action-logger.server");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    
+    let actionType: any = extras.actionType || "STATUS_CHANGED";
+    if (!extras.actionType) {
+      if (newStatus === "CUSTOMER_HOLD") actionType = "CUSTOMER_DELAY_ADDED";
+      else if (newStatus === "OUR_SIDE_DELAY" || newStatus === "TECHNICAL_HOLD_EXTERNAL" || newStatus === "TECHNICAL_HOLD_INTERNAL") actionType = "TECHNICAL_DELAY_ADDED";
+      else if (newStatus === "IN_PROCESSING") actionType = "PROCESSING_STARTED";
+      else if (newStatus === "SUBMITTED_TO_GOVT") actionType = "PROCESSING_STARTED";
+      else if (newStatus === "CERTIFICATE_ISSUED") actionType = "CERTIFICATE_GENERATED";
+      else if (newStatus === "COMPLETED") actionType = "ORDER_COMPLETED";
+      else if (newStatus === "CLOSED") actionType = "ORDER_CLOSED";
+      else if (newStatus === "WAITING_FOR_CLIENT_RESPONSE" || newStatus === "FORM_PENDING") actionType = "FORM_REQUESTED";
+      else if (newStatus === "FORM_RECEIVED" || newStatus === "INFO_RECEIVED") actionType = "FORM_REVIEWED";
+    }
+
+    await logEmployeeOrderAction({
+      orderId,
+      employeeId: extras.employeeId,
+      actionType,
+      newStatus,
+      notes: extras.remarks ?? null,
+      source: "employee",
+      supabase: supabaseAdmin,
+    });
+  } catch (err) {
+    console.warn("[transition] audit log skipped:", err);
+  }
+
   return data;
 }
 

@@ -63,7 +63,7 @@ const NAV: NavGroup[] = [
 
       { to: "/admin/activity", label: "Activity", icon: Activity, requireAnyRole: ADMIN_ROLES },
       { to: "/admin/notifications", label: "Notifications", icon: Bell },
-      { to: "/admin/my-performance", label: "My Performance", icon: BarChart3, requireAnyRole: ADMIN_ROLES },
+      { to: "/admin/my-performance", label: "My Performance", icon: BarChart3, requireAnyRole: OPS_ROLES },
     ],
   },
   {

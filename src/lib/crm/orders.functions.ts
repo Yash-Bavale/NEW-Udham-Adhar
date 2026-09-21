@@ -344,6 +344,21 @@ export const bulkAssignOrders = createServerFn({ method: "POST" })
       } catch (notifErr) {
         console.warn("[bulkAssignOrders] Failed to emit notification:", notifErr);
       }
+
+      try {
+        const { logEmployeeOrderAction } = await import("@/lib/orders/order-action-logger.server");
+        for (const appId of data.applicationIds) {
+          await logEmployeeOrderAction({
+            orderId: appId,
+            employeeId: data.assignedTo,
+            actionType: "ORDER_ASSIGNED",
+            source: "admin",
+            supabase: admin,
+          });
+        }
+      } catch (auditErr) {
+        console.warn("[bulkAssignOrders] Action log warning:", auditErr);
+      }
     }
 
     return { ok: true, count: data.applicationIds.length };

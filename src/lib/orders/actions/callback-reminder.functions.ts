@@ -163,6 +163,22 @@ export const scheduleOrderCallback = createServerFn({ method: "POST" })
       console.warn("[scheduleOrderCallback] workflow_events insert warning:", e2);
     }
 
+    try {
+      const { logEmployeeOrderAction } = await import("@/lib/orders/order-action-logger.server");
+      await logEmployeeOrderAction({
+        orderId: data.orderId,
+        employeeId: context.userId,
+        employeeName: staff.staff_name,
+        employeeRole: staff.staff_role,
+        actionType: "CALLBACK_SCHEDULED",
+        notes: `Callback scheduled for ${istFormattedTime} · Reason: ${data.reasonLabel}${data.note ? ` (${data.note})` : ""}`,
+        source: "employee",
+        supabase: admin,
+      });
+    } catch (auditErr) {
+      console.warn("[scheduleOrderCallback] order_action_logs warning:", auditErr);
+    }
+
     return {
       success: true,
       schedulerId: created.id,
@@ -268,6 +284,22 @@ export const completeOrderCallback = createServerFn({ method: "POST" })
       } as never);
     } catch (evtErr) {
       console.warn("[completeOrderCallback] event log warning:", evtErr);
+    }
+
+    try {
+      const { logEmployeeOrderAction } = await import("@/lib/orders/order-action-logger.server");
+      await logEmployeeOrderAction({
+        orderId: data.orderId,
+        employeeId: context.userId,
+        employeeName: staff.staff_name,
+        employeeRole: staff.staff_role,
+        actionType: "CUSTOMER_CONTACTED",
+        notes: `Callback completed by ${staff.staff_name}.${data.callOutcomeNote ? ` Outcome: ${data.callOutcomeNote}` : ""}`,
+        source: "employee",
+        supabase: admin,
+      });
+    } catch (auditErr) {
+      console.warn("[completeOrderCallback] order_action_logs warning:", auditErr);
     }
 
     return { success: true };
