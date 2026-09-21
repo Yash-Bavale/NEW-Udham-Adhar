@@ -57,7 +57,7 @@ const COMPLETED_FS = new Set<string>([
   "consultation_completed", "order_completed", "completed",
 ]);
 const EXCEPTION_STAGES: OrderStage[] = ["refund_requested", "refunded", "uninterested"];
-const NEEDS_ACTION_STAGES: OrderStage[] = ["lead_received", "payment_done", "form_submitted"];
+const NEEDS_ACTION_STAGES: OrderStage[] = ["lead_received", "payment_done", "form_submitted", "order_reopened"];
 
 function bucketOfRow(row: { fulfillment_status?: string | null; stage: OrderStage; is_hot?: boolean }): Exclude<Bucket, "all" | "reminders" | "hot_orders"> {
   const fs = row.fulfillment_status ?? "";
@@ -89,6 +89,7 @@ const STAGE_FILTER_OPTIONS: Array<{ id: string; label: string; tone: string }> =
   { id: "all", label: "All Stages", tone: "slate" },
   { id: "payment_done", label: "Payment Done", tone: "emerald" },
   { id: "form_not_submitted", label: "Form Not Submitted", tone: "amber" },
+  { id: "order_reopened", label: "Order Reopened", tone: "violet" },
   { id: "form_submitted", label: "Form Submitted", tone: "indigo" },
   { id: "technical_delay", label: "Technical Delay", tone: "sky" },
   { id: "customer_delay", label: "Customer Delay", tone: "amber" },
@@ -597,6 +598,7 @@ return (
             <SelectGroup>
               <SelectLabel className="text-[10px] font-bold uppercase tracking-wider text-slate-400 px-2 py-1">In Progress</SelectLabel>
               <SelectItem value="order_received">Order Received</SelectItem>
+              <SelectItem value="order_reopened">Order Reopened</SelectItem>
               <SelectItem value="form_submitted">Form Submitted</SelectItem>
               <SelectItem value="technical_delay">Technical Delay</SelectItem>
               <SelectItem value="customer_delay">Customer Delay</SelectItem>

@@ -732,11 +732,11 @@ export const closeTicketRestartT001 = createServerFn({ method: "POST" })
     const { error: upErr } = await supabaseAdmin
       .from("applications")
       .update({
-        order_status: "FORM_RECEIVED",
-        fulfillment_status: "form_submitted",
+        order_status: "REOPENED",
+        fulfillment_status: "order_reopened",
         workflow_status: null,
         closure_stage: "none",
-        application_status: "form_submitted",
+        application_status: "order_reopened",
         closure_reason_id: null,
         closure_remarks: null,
         closure_next_at: null,
@@ -753,6 +753,36 @@ export const closeTicketRestartT001 = createServerFn({ method: "POST" })
       .eq("id", ticket.application_id);
 
     if (upErr) throw new Error(`Failed to update application status: ${upErr.message}`);
+
+    // Log to application_events & activity_logs so the timeline reflects the reopening
+    try {
+      const { data: staffProf } = await supabaseAdmin
+        .from("profiles")
+        .select("display_name, email")
+        .eq("id", context.userId)
+        .maybeSingle();
+      const staffName = (staffProf as any)?.display_name || (staffProf as any)?.email || "Staff";
+
+      await supabaseAdmin.from("application_events").insert({
+        application_id: ticket.application_id,
+        event_type: "status_change",
+        old_value: "closed",
+        new_value: "order_reopened",
+        note: `Order reopened from support ticket ${ticket.ticket_number ?? ""}`,
+        staff_name: staffName,
+      } as never);
+
+      if (ticket.lead_id) {
+        await supabaseAdmin.from("activity_logs").insert({
+          lead_id: ticket.lead_id,
+          user_id: context.userId,
+          activity_type: "order_reopened",
+          activity_description: `Order reopened from ticket ${ticket.ticket_number ?? ""}`,
+        } as never);
+      }
+    } catch (evtErr) {
+      console.warn("[restartOrderFromTicket] timeline log warning:", evtErr);
+    }
 
     return result as { ok: true; applicationId: string; cancelledCustomerDelayTimers: number };
   });

@@ -362,7 +362,7 @@ const COMPLETED_FS = new Set<string>([
   "consultation_completed", "order_completed", "completed",
 ]);
 const EXCEPTION_STAGES: OrderStage[] = ["refund_requested", "refunded", "uninterested"];
-const NEEDS_ACTION_STAGES: OrderStage[] = ["lead_received", "payment_done", "form_submitted"];
+const NEEDS_ACTION_STAGES: OrderStage[] = ["lead_received", "payment_done", "form_submitted", "order_reopened"];
 
 export function bucketOfRow(row: { fulfillment_status?: string | null; stage: OrderStage; is_hot?: boolean }): Exclude<Bucket, "all" | "reminders" | "hot_orders"> {
   const fs = row.fulfillment_status ?? "";

@@ -114,15 +114,34 @@ export const scheduleOrderCallback = createServerFn({ method: "POST" })
       throw new Error(`Failed to schedule callback: ${error.message}`);
     }
 
-    // 3. Log event in application_events if table exists
+    // 3. Log event in application_events, workflow_events, and activity_logs
+    const istFormattedTime = firesAtDate.toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: true }) + " IST";
+    const noteText = `Callback scheduled for ${istFormattedTime} · Reason: ${data.reasonLabel}${data.note ? ` (${data.note})` : ""}`;
+
     try {
       await admin.from("application_events").insert({
         application_id: data.orderId,
         event_type: "callback_scheduled",
+        note: noteText,
+        staff_name: staff.staff_name,
+        staff_role: staff.role || "staff",
+      } as never);
+    } catch (e1) {
+      console.warn("[scheduleOrderCallback] application_events insert warning:", e1);
+    }
+
+    try {
+      const { data: appRow } = await admin.from("applications").select("lead_id").eq("id", data.orderId).maybeSingle();
+      await admin.from("workflow_events").insert({
+        application_id: data.orderId,
+        lead_id: appRow?.lead_id ?? null,
+        event_type: "callback_scheduled",
         title: `Callback Scheduled: ${data.reasonLabel}`,
-        description: `Callback reminder set for ${firesAtDate.toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}. Note: ${data.note || "None"}`,
+        description: `Scheduled for ${istFormattedTime}. ${data.note ? `Note: ${data.note}` : ""}`,
+        customer_visible: false,
         actor_id: context.userId,
         actor_name: staff.staff_name,
+        is_system: false,
         metadata: {
           scheduler_id: created.id,
           reason: data.reason,
@@ -130,10 +149,18 @@ export const scheduleOrderCallback = createServerFn({ method: "POST" })
           fires_at: firesAtIso,
           note: data.note,
         },
-      });
-    } catch (evtErr) {
-      // Non-fatal if application_events has specific constraints
-      console.warn("[scheduleOrderCallback] event log warning:", evtErr);
+      } as never);
+
+      if (appRow?.lead_id) {
+        await admin.from("activity_logs").insert({
+          lead_id: appRow.lead_id,
+          user_id: context.userId,
+          activity_type: "callback_scheduled",
+          activity_description: `Callback scheduled for ${istFormattedTime}: ${data.reasonLabel}`,
+        } as never);
+      }
+    } catch (e2) {
+      console.warn("[scheduleOrderCallback] workflow_events insert warning:", e2);
     }
 
     return {

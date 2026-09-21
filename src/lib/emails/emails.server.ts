@@ -493,7 +493,7 @@ export async function enqueueFromTemplateInternal(
   code: string,
   toEmail: string,
   rawVariables: Record<string, unknown>,
-  opts?: { toName?: string; leadId?: string; applicationId?: string; delaySeconds?: number; attachments?: EmailAttachment[]; requireImmediateSuccess?: boolean; trigger?: "auto" | "manual"; inReplyTo?: string | null; references?: string | null; threadSubject?: string | null },
+  opts?: { toName?: string; leadId?: string; applicationId?: string; delaySeconds?: number; attachments?: EmailAttachment[]; requireImmediateSuccess?: boolean; trigger?: "auto" | "manual"; allowDuplicate?: boolean; inReplyTo?: string | null; references?: string | null; threadSubject?: string | null },
 ) {
   const resolved = resolveTemplateCode(code);
   if (resolved.drop) {
@@ -554,6 +554,8 @@ export async function enqueueFromTemplateInternal(
       .replace(/\{\{invoice_download_url\}\}/gi, "");
   }
 
+  const allowDuplicate = opts?.allowDuplicate ?? (trigger === "manual");
+
   return enqueueEmailInternal({
     templateCode: effectiveCode,
     toEmail,
@@ -567,6 +569,7 @@ export async function enqueueFromTemplateInternal(
     delaySeconds: opts?.delaySeconds,
     attachments: opts?.attachments,
     requireImmediateSuccess: opts?.requireImmediateSuccess,
+    allowDuplicate,
   });
 }
 

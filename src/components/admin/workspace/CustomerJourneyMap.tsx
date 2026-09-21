@@ -687,19 +687,7 @@ export function CustomerJourneyMap(p: Props) {
           </div>
         )}
 
-        {(view.hasEngine && view.nextTimer && !closed) || closureArmed || closed ? (
-          <div className="mt-3 flex flex-wrap items-center gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[11px] text-slate-600">
-            {view.hasEngine && view.nextTimer && !closed && (
-              <span><Clock className="mr-1 inline size-3" />Next auto-step: <b>{view.nextTimer.kind}</b> · {relativeIST(view.nextTimer.firesAt)}</span>
-            )}
-            {closureArmed && p.closureStage && (
-              <span><AlertTriangle className="mr-1 inline size-3 text-amber-600" />Closure armed: <b>{p.closureStage}</b>{p.closureNextAt ? <> · fires {relativeIST(p.closureNextAt)}</> : null}</span>
-            )}
-            {closed && (
-              <span><XCircle className="mr-1 inline size-3 text-rose-600" />Order closed{p.closureReasonLabel ? <> · <b>{p.closureReasonLabel}</b></> : null}</span>
-            )}
-          </div>
-        ) : null}
+
       </section>
 
       {/* Dialogs */}

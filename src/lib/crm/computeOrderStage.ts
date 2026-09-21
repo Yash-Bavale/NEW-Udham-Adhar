@@ -12,6 +12,7 @@ export type OrderStage =
   | "payment_pending"
   | "payment_done"
   | "form_not_submitted"
+  | "order_reopened"
   | "customer_delay"
   | "technical_delay"
   | "consultation_pending"
@@ -124,6 +125,7 @@ export function computeOrderStage(
 
   if (fs === "customer_delay" || ws === "waiting_for_customer" || ws === "waiting_for_documents" || ws === "customer_non_responsive" || ws === "customer_delay") return "customer_delay";
   if (fs === "technical_delay" || fs === "technical_hold" || ws === "government_portal_pending" || ws === "technical_hold" || ws === "external_dependency") return "technical_delay";
+  if (fs === "order_reopened" || application.application_status === "order_reopened" || (application as any).order_status === "REOPENED") return "order_reopened";
 
   if (fs === "consultation_completed") return "consultation_completed";
 
@@ -146,6 +148,7 @@ export const STAGE_META: Record<
   payment_pending:   { label: "Payment Pending",    short: "Payment",    order: 1, tone: "amber",   side: "customer" },
   payment_done:      { label: "Payment Done",       short: "Paid",       order: 2, tone: "emerald", side: "customer" },
   form_not_submitted: { label: "Form Not Submitted", short: "Form Pending", order: 3, tone: "amber", side: "customer" },
+  order_reopened:    { label: "Order Reopened",     short: "Reopened",   order: 4, tone: "violet",  side: "employee" },
   customer_delay:    { label: "Customer Delay",     short: "Delay",      order: 4, tone: "amber",   side: "customer" },
   technical_delay:   { label: "Technical Delay",    short: "Tech Delay", order: 4, tone: "sky",     side: "employee" },
   consultation_pending: { label: "Consultation Pending", short: "Consult", order: 3, tone: "amber", side: "employee" },
@@ -181,6 +184,7 @@ export const STAGE_BADGE_CLASS: Record<OrderStage, string> = {
   payment_pending:   "bg-amber-100 text-amber-900 border-amber-200",
   payment_done:      "bg-emerald-100 text-emerald-800 border-emerald-200",
   form_not_submitted: "bg-amber-100 text-amber-900 border-amber-200",
+  order_reopened:    "bg-violet-100 text-violet-800 border-violet-200",
   customer_delay:    "bg-amber-100 text-amber-900 border-amber-200",
   technical_delay:   "bg-sky-100 text-sky-800 border-sky-200",
   consultation_pending: "bg-amber-100 text-amber-900 border-amber-200",

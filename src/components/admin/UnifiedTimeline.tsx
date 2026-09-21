@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import {
   Activity, CreditCard, FileText, Mail, MessageSquare, GitCommit, Upload, FileCheck2, UserCog,
-  Cog, AlarmClock,
+  Cog, AlarmClock, PhoneCall,
 } from "lucide-react";
 import { formatIST } from "@/lib/datetime";
 import { useOrderWorkflow } from "@/hooks/useOrderWorkflow";
@@ -161,6 +161,9 @@ export function UnifiedTimeline({ events, payments, documents, emailLogs, create
         icon = Upload; tone = "violet"; title = "Document uploaded";
       } else if (e.event_type === "form_submitted") {
         icon = FileText; tone = "emerald"; title = "Form submitted";
+      } else if (e.event_type === "callback_scheduled") {
+        icon = PhoneCall; tone = "violet"; title = "Callback scheduled";
+        detail = <span className="whitespace-pre-wrap text-[11px] font-medium text-slate-700">{e.note}</span>;
       }
 
       if (e.note && !detail) detail = <span className="whitespace-pre-wrap text-[11px]">{e.note}</span>;
@@ -183,7 +186,10 @@ export function UnifiedTimeline({ events, payments, documents, emailLogs, create
       let icon: typeof Activity = Cog;
       let tone: Item["tone"] = "violet";
       let title: React.ReactNode = w.title ?? type.replaceAll("_", " ");
-      if (type === "FormTimeout5m" || type === "FormTimeout8h" || type === "ClosureTimerFired" || type === "ReminderFired") {
+      if (type === "callback_scheduled") {
+        icon = PhoneCall; tone = "violet";
+        title = w.title || "Callback scheduled";
+      } else if (type === "FormTimeout5m" || type === "FormTimeout8h" || type === "ClosureTimerFired" || type === "ReminderFired") {
         icon = AlarmClock; tone = "amber";
         const kind = type === "ClosureTimerFired" ? "closure" : type === "ReminderFired" ? "reminder" : "incomplete_form";
         title = <>Timer fired · <span className="font-mono text-[11px]">{TIMER_LABEL[kind] ?? kind}</span></>;

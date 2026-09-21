@@ -289,7 +289,7 @@ export const setExternalDelay = createServerFn({ method: "POST" })
           const { enqueueFromTemplateInternal } = await import("@/lib/emails/emails.server");
           const { SUPPORT_EMAIL, COMPANY_NAME } = await import("@/lib/brand");
           await enqueueFromTemplateInternal(
-            customerTplCode,
+            customerTplCode || "bhs_e003_customer_delay",
             lead.email,
             {
               customer_name: lead.name ?? "Customer",
@@ -313,10 +313,16 @@ export const setExternalDelay = createServerFn({ method: "POST" })
               support_email: SUPPORT_EMAIL,
               customer_note: (data.customerNote && data.customerNote.trim()) || reasonBlock || "",
             },
-            { toName: lead.name ?? undefined, leadId: app.lead_id ?? undefined, applicationId: app.id, trigger: "manual" },
+            {
+              toName: lead.name ?? undefined,
+              leadId: app.lead_id ?? undefined,
+              applicationId: app.id,
+              trigger: "manual",
+              allowDuplicate: true,
+            },
           );
         } catch (e) {
-          console.error("[workflow] customer-side delay email failed", e);
+          console.error("[workflow] customer-side delay email failed:", e);
         }
       }
 
