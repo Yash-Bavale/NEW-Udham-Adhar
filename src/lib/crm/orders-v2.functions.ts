@@ -637,13 +637,50 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       extraActiveApps = extraApps ?? [];
     }
 
+    // Helper to check if an application strictly matches the user's active dimensional filters
+    const matchesActiveFilters = (a: any) => {
+      // 1. Employee / Assignee filter
+      if (!isAdmin) {
+        if (a.assigned_to !== context.userId) return false;
+      } else if (data.assignedTo && data.assignedTo !== "all" && data.assignedTo.trim() !== "") {
+        if (data.assignedTo === "unassigned") {
+          if (a.assigned_to !== null && a.assigned_to !== undefined) return false;
+        } else {
+          if (a.assigned_to !== data.assignedTo) return false;
+        }
+      }
+
+      // 2. Service filter
+      if (data.serviceId && data.serviceId !== "all" && data.serviceId.trim() !== "") {
+        if (a.service_id !== data.serviceId) return false;
+      }
+
+      // 3. Search query filter
+      if (data.search && data.search.trim()) {
+        const term = data.search.trim().toLowerCase();
+        const codeMatches = (a.application_code || "").toLowerCase().includes(term);
+        const leadMatches = matchingLeadIds && a.lead_id && matchingLeadIds.includes(a.lead_id);
+        if (!codeMatches && !leadMatches) return false;
+      }
+
+      // 4. Fulfillment status filter
+      if (data.fulfillmentStatus && data.fulfillmentStatus !== "all" && data.fulfillmentStatus.trim() !== "") {
+        if (a.fulfillment_status !== data.fulfillmentStatus) return false;
+      }
+
+      return true;
+    };
+
     const appMapById = new Map<string, any>();
     for (const a of (apps ?? [])) {
-      appMapById.set(a.id, a);
+      if (matchesActiveFilters(a)) {
+        appMapById.set(a.id, a);
+      }
     }
     for (const a of extraActiveApps) {
-      if (!isAdmin && a.assigned_to !== context.userId) continue;
-      appMapById.set(a.id, a);
+      if (matchesActiveFilters(a)) {
+        appMapById.set(a.id, a);
+      }
     }
     const appList = Array.from(appMapById.values());
 
