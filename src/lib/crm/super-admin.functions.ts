@@ -476,10 +476,10 @@ export const getDashboardKpis = createServerFn({ method: "POST" })
         // Graceful Fallback if RPC not yet deployed
         const [paidRows, prevPaidRows] = await Promise.all([
           fetchRowsPaged<{ amount: number; base_amount: number | null; gst_amount: number | null; gateway_name: string | null }>(
-            (from, to) => admin.from("payments").select("amount, base_amount, gst_amount, gateway_name").eq("status", "paid").gte("created_at", startIso).lt("created_at", endIso).range(from, to)
+            (from, to) => admin.from("payments").select("amount, base_amount, gst_amount, gateway_name").in("status", ["paid", "success", "successful", "captured"]).gte("created_at", startIso).lt("created_at", endIso).range(from, to)
           ),
           fetchRowsPaged<{ amount: number }>(
-            (from, to) => admin.from("payments").select("amount").eq("status", "paid").gte("created_at", prevStartIso).lt("created_at", prevEndIso).range(from, to)
+            (from, to) => admin.from("payments").select("amount").in("status", ["paid", "success", "successful", "captured"]).gte("created_at", prevStartIso).lt("created_at", prevEndIso).range(from, to)
           ),
         ]);
         const prevTotal = prevPaidRows.reduce((s, r) => s + Number(r.amount ?? 0), 0);
