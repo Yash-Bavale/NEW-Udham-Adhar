@@ -226,7 +226,7 @@ async function ensurePaidOrdersIntegrated(admin: any) {
             .from("payments")
             .select("id")
             .eq("lead_id", l.id)
-            .in("status", ["paid", "success", "successful", "captured"])
+            .eq("status", "paid")
             .order("created_at", { ascending: false })
             .limit(1)
             .maybeSingle();
@@ -236,6 +236,33 @@ async function ensurePaidOrdersIntegrated(admin: any) {
               await finalizePaidPayment(p.id, { source: "reconcile" });
             } catch (err) {
               console.error(`[self-heal] finalizePaidPayment failed for lead ${l.id}:`, err);
+            }
+          } else {
+            // If no payment row exists, create the application row directly.
+            const { data: createdApp, error: createAppError } = await admin
+              .from("applications")
+              .insert({
+                lead_id: l.id,
+                customer_id: l.customer_id ?? null,
+                service_id: l.service_id ?? null,
+                // Paid orders rotate independently from leads. Leaving this
+                // empty lets the order assignment trigger choose the next
+                // employee instead of copying the lead owner.
+                assigned_to: null,
+                website_id: l.website_id ?? null,
+                application_status: "payment_received",
+                fulfillment_status: "order_received",
+              })
+              .select("id")
+              .maybeSingle();
+
+            if (createdApp?.id) {
+              await admin
+                .from("payments")
+                .update({ application_id: createdApp.id, status: "paid" })
+                .eq("lead_id", l.id);
+            } else if (createAppError?.code !== "23505") {
+              console.error(`[self-heal] order create failed for lead ${l.id}:`, createAppError);
             }
           }
         }
