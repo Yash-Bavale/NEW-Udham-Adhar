@@ -143,7 +143,7 @@ export const scheduleOrderCallback = createServerFn({ method: "POST" })
         actor_role: staff.staff_role,
         is_system: false,
         metadata: {
-          scheduler_id: scheduler.id,
+          scheduler_id: created.id,
           reason: data.reason,
           reasonLabel: data.reasonLabel,
           fires_at: firesAtIso,
@@ -165,7 +165,7 @@ export const scheduleOrderCallback = createServerFn({ method: "POST" })
 
     return {
       success: true,
-      schedulerId: scheduler.id,
+      schedulerId: created.id,
       firesAt: firesAtDate.toISOString(),
       reasonLabel: data.reasonLabel,
     };

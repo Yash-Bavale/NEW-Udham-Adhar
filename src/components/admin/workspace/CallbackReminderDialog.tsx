@@ -97,6 +97,7 @@ export function CallbackReminderDialog({
 
   const orderCode = propOrderCode || orderDetail?.application?.application_code || "Order";
   const customerName = propCustomerName || orderDetail?.customer?.name || orderDetail?.lead?.name || "Customer";
+  const customerMobile = propCustomerMobile || (orderDetail as any)?.customer?.primary_mobile || (orderDetail as any)?.lead?.mobile || "";
   const staffName = propAssignedName || (orderDetail as any)?.assignedStaff?.display_name || (orderDetail as any)?.assignedStaff?.email || "Assigned Executive";
 
   const [selectedOutcome, setSelectedOutcome] = useState<string>("call_back_later");

@@ -2,10 +2,10 @@ import { createFileRoute } from "@tanstack/react-router";
 
 const BUCKET = "documents";
 
-export const Route = createFileRoute("/api/public/audio/$")({
+export const Route = (createFileRoute as any)("/api/public/audio/$")({
   server: {
     handlers: {
-      GET: async ({ params }) => {
+      GET: async ({ params }: { params: any }) => {
         const splat = String((params as { _splat?: string })._splat || "").trim();
         if (!splat || splat.includes("..")) {
           return new Response("Not found", { status: 404 });
