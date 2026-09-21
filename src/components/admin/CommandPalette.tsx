@@ -113,9 +113,14 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
 
 function KindIcon({ kind }: { kind: SearchHit["kind"] }) {
   const map = {
-    customer: Users, lead: Users, application: FileText,
-    invoice: Receipt, certificate: Award, complaint: MessageSquareWarning,
+    customer: Users,
+    lead: Users,
+    application: FileText,
+    invoice: Receipt,
+    certificate: Award,
+    complaint: MessageSquareWarning,
+    ticket: Mail,
   } as const;
-  const Icon = map[kind];
+  const Icon = (map as Record<string, any>)[kind] || FileText;
   return <Icon className="size-4" />;
 }
