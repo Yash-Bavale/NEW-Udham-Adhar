@@ -44,6 +44,18 @@ export const markConsultationCompleted = createServerFn({ method: "POST" })
         .update({ fulfillment_status: "consultation_completed" } as never)
         .eq("id", data.orderId);
       if (upErr) throw new Error(upErr.message);
+
+      // Stop any active callback reminder schedulers for this completed order
+      await supabaseAdmin
+        .from("order_schedulers")
+        .update({
+          status: "stopped",
+          stopped_at: new Date().toISOString(),
+          stop_reason: "consultation_completed",
+          stop_triggered_by: context.userId,
+        })
+        .eq("application_id", data.orderId)
+        .in("status", ["active", "paused"]);
     }
 
     // Resolve customer + service + executive + lead (lead is fallback for email/name/mobile).

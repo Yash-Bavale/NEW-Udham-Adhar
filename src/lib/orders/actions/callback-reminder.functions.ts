@@ -280,15 +280,22 @@ export const getActiveOrderCallback = createServerFn({ method: "POST" })
     await assertStaff(context.supabase);
     const admin = await getAdmin();
 
-    const { data: row, error } = await admin
-      .from("order_schedulers")
-      .select("id, application_id, status, fires_at, remarks, created_at, created_by")
-      .eq("application_id", data.orderId)
-      .in("scheduler_type", ["our_side_reminder", "callback_reminder"])
-      .eq("status", "active")
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    const [{ data: row, error }, { data: app }] = await Promise.all([
+      admin
+        .from("order_schedulers")
+        .select("id, application_id, status, fires_at, remarks, created_at, created_by")
+        .eq("application_id", data.orderId)
+        .in("scheduler_type", ["our_side_reminder", "callback_reminder"])
+        .eq("status", "active")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      admin
+        .from("applications")
+        .select("fulfillment_status, application_status, order_status, workflow_status")
+        .eq("id", data.orderId)
+        .maybeSingle(),
+    ]);
 
     if (error) {
       console.error("[getActiveOrderCallback] error:", error);
@@ -296,6 +303,30 @@ export const getActiveOrderCallback = createServerFn({ method: "POST" })
     }
 
     if (!row) return null;
+
+    const fs = String(app?.fulfillment_status ?? "").toLowerCase();
+    const os = String(app?.order_status ?? "").toLowerCase();
+    const as = String(app?.application_status ?? "").toLowerCase();
+    const ws = String(app?.workflow_status ?? "").toLowerCase();
+    const isTerminal =
+      ["completed", "order_completed", "consultation_completed", "order_closed", "cancelled", "application_rejected"].includes(fs) ||
+      ["completed", "closed", "cancelled"].includes(os) ||
+      ["completed", "closed", "cancelled"].includes(as) ||
+      ["completed", "closed", "cancelled"].includes(ws);
+
+    if (isTerminal) {
+      // Auto-heal: stop lingering scheduler for completed or closed orders
+      await admin
+        .from("order_schedulers")
+        .update({
+          status: "stopped",
+          stopped_at: new Date().toISOString(),
+          stop_reason: fs.includes("complete") ? "order_completed" : "order_closed",
+        })
+        .eq("application_id", data.orderId)
+        .eq("status", "active");
+      return null;
+    }
 
     let parsedRemarks: CallbackRemarks | null = null;
     if (row.remarks) {
@@ -351,7 +382,7 @@ export const getDueRemindersSummary = createServerFn({ method: "POST" })
     const appIds = Array.from(new Set(schedulers.map((s) => s.application_id).filter(Boolean))) as string[];
     const { data: apps } = await admin
       .from("applications")
-      .select("id, application_code, lead_id, customer_id, assigned_to")
+      .select("id, application_code, lead_id, customer_id, assigned_to, fulfillment_status, order_status, application_status, workflow_status")
       .in("id", appIds);
 
     const leadIds = Array.from(new Set((apps ?? []).map((a) => a.lead_id).filter(Boolean))) as string[];
@@ -363,7 +394,43 @@ export const getDueRemindersSummary = createServerFn({ method: "POST" })
     const appMap = new Map((apps ?? []).map((a) => [a.id, a]));
     const leadMap = new Map((leads ?? []).map((l) => [l.id, l]));
 
-    const mapped = schedulers.map((s) => {
+    // Auto-heal and filter out any schedulers whose orders are completed or closed
+    const nonTerminalSchedulers: typeof schedulers = [];
+    const lingeringTerminalAppIds: string[] = [];
+
+    for (const s of schedulers) {
+      const app = s.application_id ? appMap.get(s.application_id) : null;
+      if (!app) continue;
+      const fs = String(app.fulfillment_status ?? "").toLowerCase();
+      const os = String(app.order_status ?? "").toLowerCase();
+      const as = String(app.application_status ?? "").toLowerCase();
+      const ws = String(app.workflow_status ?? "").toLowerCase();
+      const isTerminal =
+        ["completed", "order_completed", "consultation_completed", "order_closed", "cancelled", "application_rejected"].includes(fs) ||
+        ["completed", "closed", "cancelled"].includes(os) ||
+        ["completed", "closed", "cancelled"].includes(as) ||
+        ["completed", "closed", "cancelled"].includes(ws);
+
+      if (isTerminal) {
+        if (s.application_id) lingeringTerminalAppIds.push(s.application_id);
+      } else {
+        nonTerminalSchedulers.push(s);
+      }
+    }
+
+    if (lingeringTerminalAppIds.length > 0) {
+      await admin
+        .from("order_schedulers")
+        .update({
+          status: "stopped",
+          stopped_at: new Date().toISOString(),
+          stop_reason: "order_completed_or_closed",
+        })
+        .in("application_id", lingeringTerminalAppIds)
+        .eq("status", "active");
+    }
+
+    const mapped = nonTerminalSchedulers.map((s) => {
       const app = s.application_id ? appMap.get(s.application_id) : null;
       const lead = app?.lead_id ? leadMap.get(app.lead_id) : null;
 

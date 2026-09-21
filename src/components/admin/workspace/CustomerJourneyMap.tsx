@@ -230,6 +230,7 @@ export function CustomerJourneyMap(p: Props) {
     queryFn: () => getActiveCallbackFn({ data: { orderId: p.applicationId } }),
     staleTime: 10_000,
   });
+  const activeCallback = activeCallbackQ.data;
   const role = useRole();
   const isAdmin = role.hasAny(["super_admin", "admin"]);
 
@@ -649,27 +650,31 @@ export function CustomerJourneyMap(p: Props) {
           <button
             type="button"
             onClick={() => setDialog({ kind: "callback_reminder" })}
-            disabled={closed}
+            disabled={closed || completed}
             className={cn(
               "inline-flex items-center gap-1.5 rounded-md px-3.5 py-1.5 text-xs font-bold text-white shadow-xs transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed select-none",
-              activeCallback?.isDue
+              activeCallback?.isDue && !closed && !completed
                 ? "bg-rose-600 hover:bg-rose-700 animate-pulse ring-2 ring-rose-400"
-                : activeCallback
+                : activeCallback && !closed && !completed
                   ? "bg-indigo-600 hover:bg-indigo-700"
                   : "bg-blue-600 hover:bg-blue-700"
             )}
-            title="Set customer callback reminder (order becomes Hot Order when reminder ends)"
+            title={
+              closed || completed
+                ? "Callback reminder is inactive on completed/closed orders"
+                : "Set customer callback reminder (order becomes Hot Order when reminder ends)"
+            }
           >
-            {activeCallback?.isDue ? <Flame className="size-3.5" /> : <PhoneCall className="size-3.5" />}
-            {activeCallback?.isDue
+            {activeCallback?.isDue && !closed && !completed ? <Flame className="size-3.5" /> : <PhoneCall className="size-3.5" />}
+            {activeCallback?.isDue && !closed && !completed
               ? "Call Due Now (HOT ORDER)"
-              : activeCallback
+              : activeCallback && !closed && !completed
                 ? "Callback Scheduled"
                 : "Call Back / Reminder"}
           </button>
         </div>
 
-        {activeCallback && !closed && (
+        {activeCallback && !closed && !completed && (
           <div className={cn(
             "mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3.5 py-2 text-xs",
             activeCallback.isDue

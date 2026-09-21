@@ -125,13 +125,13 @@ export const getGlobalReminderSoundSettings = createServerFn({ method: "GET" })
     // 1. Try reading from app_settings
     let dbRow: any = null;
     try {
-      const { data } = await context.supabase
+      const { data } = await (context.supabase as any)
         .from("app_settings")
         .select("alert_sound_tone, custom_audio_url, custom_audio_name, alert_sound_volume, alert_sound_enabled, desktop_notifications, leads_sound_enabled, orders_sound_enabled, leads_ringtone, leads_custom_url, leads_custom_name, orders_ringtone, orders_custom_url, orders_custom_name")
         .eq("id", 1)
         .maybeSingle();
 
-      if (data && data.alert_sound_tone) {
+      if (data && (data as any).alert_sound_tone) {
         dbRow = data;
       }
     } catch {}

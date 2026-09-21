@@ -818,9 +818,20 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         a.fulfillment_status === "order_reopened" ||
         (a as any).application_status === "order_reopened" ||
         (a as any).order_status === "REOPENED";
-      const is_hot = is_due || is_reopened;
-      const is_callback_scheduled = !!cb || is_reopened;
-      const callback_reminder = cb
+
+      const fsLower = String(a.fulfillment_status ?? "").toLowerCase();
+      const isTerminal =
+        stage === "completed" ||
+        stage === "closed" ||
+        CLOSED_FS.has(fsLower) ||
+        COMPLETED_FS.has(fsLower) ||
+        ["completed", "closed", "cancelled"].includes(String(a.application_status ?? "").toLowerCase()) ||
+        ["completed", "closed", "cancelled"].includes(String((a as any).order_status ?? "").toLowerCase()) ||
+        ["completed", "closed", "cancelled"].includes(String((a as any).workflow_status ?? "").toLowerCase());
+
+      const is_hot = !isTerminal && (is_due || is_reopened);
+      const is_callback_scheduled = !isTerminal && (!!cb || is_reopened);
+      const callback_reminder = !isTerminal && cb
         ? {
             id: cb.id,
             fires_at: cb.fires_at,
@@ -1484,6 +1495,18 @@ export const updateFulfillmentStatus = createServerFn({ method: "POST" })
           documents_deleted_reason: "completed",
         } as never)
         .eq("id", data.orderId);
+
+      // Stop any active callback reminder schedulers for this completed order
+      await admin
+        .from("order_schedulers")
+        .update({
+          status: "stopped",
+          stopped_at: now,
+          stop_reason: "order_completed",
+          stop_triggered_by: context.userId,
+        })
+        .eq("application_id", data.orderId)
+        .in("status", ["active", "paused"]);
 
       if (certificateId) {
         await admin
