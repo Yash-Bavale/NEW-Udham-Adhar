@@ -91,7 +91,7 @@ export async function startCustomerClosureScheduler(input: {
   await supabaseAdmin
     .from("order_schedulers")
     .update({
-      status: "cancelled",
+      status: "stopped",
       stopped_at: now.toISOString(),
       stop_reason: "superseded",
       stop_triggered_by: "system",
@@ -186,7 +186,7 @@ export async function cancelScheduler(schedulerId: string, reason: string, trigg
   const { error } = await supabaseAdmin
     .from("order_schedulers")
     .update({
-      status: "cancelled",
+      status: "stopped",
       stopped_at: now.toISOString(),
       stop_reason: reason,
       stop_triggered_by: triggeredBy,
@@ -204,7 +204,7 @@ export async function cancelAllForOrder(applicationId: string, reason = "order_s
   const { error } = await supabaseAdmin
     .from("order_schedulers")
     .update({
-      status: "cancelled",
+      status: "stopped",
       stopped_at: now.toISOString(),
       stop_reason: reason,
       stop_triggered_by: "system",
@@ -232,7 +232,7 @@ export async function resolveCustomerDelay(
   const { data: cancelled } = await supabaseAdmin
     .from("order_schedulers")
     .update({
-      status: "cancelled",
+      status: "stopped",
       stopped_at: now,
       stop_reason: reason,
       stop_triggered_by: "system",
@@ -339,7 +339,7 @@ export async function startOurSideReminder(input: {
   await supabaseAdmin
     .from("order_schedulers")
     .update({
-      status: "cancelled",
+      status: "stopped",
       stopped_at: now.toISOString(),
       stop_reason: "superseded",
       stop_triggered_by: "system",
@@ -629,7 +629,7 @@ export async function startTicketAutocloseScheduler(input: {
   await supabaseAdmin
     .from("order_schedulers")
     .update({
-      status: "cancelled",
+      status: "stopped",
       stopped_at: now.toISOString(),
       stop_reason: "superseded",
       stop_triggered_by: "system",
@@ -680,7 +680,7 @@ export async function cancelTicketAutocloseByTicket(ticketId: string, reason = "
   await supabaseAdmin
     .from("order_schedulers")
     .update({
-      status: "cancelled",
+      status: "stopped",
       stopped_at: now.toISOString(),
       stop_reason: reason,
       stop_triggered_by: "system",
@@ -698,7 +698,7 @@ export async function cancelTicketAutocloseForOrder(applicationId: string, reaso
   await supabaseAdmin
     .from("order_schedulers")
     .update({
-      status: "cancelled",
+      status: "stopped",
       stopped_at: now.toISOString(),
       stop_reason: reason,
       stop_triggered_by: "system",
@@ -817,7 +817,7 @@ export async function startFeedbackFollowupScheduler(input: {
   await supabaseAdmin
     .from("order_schedulers")
     .update({
-      status: "cancelled",
+      status: "stopped",
       stopped_at: now.toISOString(),
       stop_reason: "superseded",
       stop_triggered_by: "system",

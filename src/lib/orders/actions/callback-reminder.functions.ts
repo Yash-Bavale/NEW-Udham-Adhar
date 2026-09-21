@@ -81,18 +81,17 @@ export const scheduleOrderCallback = createServerFn({ method: "POST" })
       created_at: now.toISOString(),
     };
 
-    // 1. Cancel any active callback reminder on this order first
+    // 1. Stop any active or paused scheduler on this order first to ensure one_open_scheduler_per_order is never violated
     await admin
       .from("order_schedulers")
       .update({
-        status: "cancelled",
+        status: "stopped",
         stopped_at: now.toISOString(),
         stop_reason: "rescheduled_new_callback",
         stop_triggered_by: context.userId,
       })
       .eq("application_id", data.orderId)
-      .in("scheduler_type", ["our_side_reminder", "callback_reminder"])
-      .eq("status", "active");
+      .in("status", ["active", "paused"]);
 
     // 2. Insert new callback reminder
     const { data: created, error } = await admin
@@ -188,14 +187,13 @@ export const cancelOrderCallback = createServerFn({ method: "POST" })
     let query = admin
       .from("order_schedulers")
       .update({
-        status: "cancelled",
+        status: "stopped",
         stopped_at: now,
         stop_reason: "cancelled_by_staff",
         stop_triggered_by: context.userId,
       })
       .eq("application_id", data.orderId)
-      .in("scheduler_type", ["our_side_reminder", "callback_reminder"])
-      .eq("status", "active");
+      .in("status", ["active", "paused"]);
 
     if (data.schedulerId) {
       query = query.eq("id", data.schedulerId);

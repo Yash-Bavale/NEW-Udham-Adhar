@@ -611,8 +611,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
     // Fetch all active callback schedulers globally so hot orders and active reminders are NEVER filtered out
     const { data: globalActiveSchedulers } = await admin
       .from("order_schedulers")
-      .select("id, application_id, status, fires_at, remarks, created_at, created_by")
-      .in("scheduler_type", ["our_side_reminder", "callback_reminder"])
+      .select("id, application_id, status, scheduler_type, fires_at, remarks, created_at, created_by")
       .eq("status", "active")
       .order("created_at", { ascending: false });
 
