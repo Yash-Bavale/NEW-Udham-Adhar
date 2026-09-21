@@ -960,6 +960,110 @@ export const confirmTicketAttachment = createServerFn({ method: "POST" })
     return { filePath: data.filePath, fileName: data.fileName, url: signedUrl };
   });
 
+// ─────────────────────── Make Order Hot Priority from Ticket ───────────────────────
+
+export const makeOrderHotFromTicket = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        ticketId: z.string().uuid().optional(),
+        orderId: z.string().uuid().optional(),
+        note: z.string().max(1000).optional(),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    const admin = await getAdmin();
+    let targetOrderId = data.orderId;
+    let ticketNumber = "";
+
+    if (data.ticketId) {
+      const ticket = await loadTicket(data.ticketId);
+      if (!targetOrderId && ticket.application_id) {
+        targetOrderId = ticket.application_id;
+      }
+      ticketNumber = ticket.ticket_number ?? "";
+    }
+
+    if (!targetOrderId) {
+      throw new Error("No linked order found for this ticket.");
+    }
+
+    const { data: staffProf } = await admin
+      .from("profiles")
+      .select("display_name, email")
+      .eq("id", context.userId)
+      .maybeSingle();
+    const staffName = (staffProf as any)?.display_name || (staffProf as any)?.email || "Staff";
+    const now = new Date().toISOString();
+
+    // 1. Stop any prior open schedulers to satisfy one_open_scheduler_per_order
+    await admin
+      .from("order_schedulers")
+      .update({
+        status: "stopped",
+        stopped_at: now,
+        stop_reason: "ticket_hot_priority_override",
+        stop_triggered_by: context.userId,
+      })
+      .eq("application_id", targetOrderId)
+      .in("status", ["active", "paused"]);
+
+    // 2. Insert immediate active hot scheduler (fires_at = now)
+    const reasonLabel = ticketNumber
+      ? `Hot Priority from Ticket #${ticketNumber}`
+      : "Escalated to Hot Priority";
+
+    const { data: created, error } = await admin
+      .from("order_schedulers")
+      .insert({
+        application_id: targetOrderId,
+        scheduler_type: "our_side_reminder",
+        status: "active",
+        started_at: now,
+        fires_at: now,
+        remarks: JSON.stringify({
+          reason: "ticket_hot_priority",
+          reasonLabel,
+          note: data.note || (ticketNumber ? `Order marked Hot Priority from support ticket #${ticketNumber}` : "Escalated to hot priority"),
+          durationMinutes: 0,
+          created_by_name: staffName,
+          created_at: now,
+        }),
+        created_by: context.userId,
+      })
+      .select("id, application_id, status, fires_at, remarks, created_at")
+      .single();
+
+    if (error) {
+      console.error("[makeOrderHotFromTicket] insert error:", error);
+      throw new Error(`Failed to set hot priority: ${error.message}`);
+    }
+
+    // 3. Log event in application_events and activity_logs
+    try {
+      await admin.from("application_events").insert({
+        application_id: targetOrderId,
+        event_type: "hot_priority_escalated",
+        note: `Order escalated to Hot Priority from Ticket #${ticketNumber || ""}`,
+        staff_name: staffName,
+      } as never);
+
+      if (data.ticketId) {
+        await admin.from("activity_logs").insert({
+          user_id: context.userId,
+          activity_type: "ticket_order_hot_escalated",
+          activity_description: `Linked order was marked on HOT PRIORITY by ${staffName}`,
+        } as never);
+      }
+    } catch (e) {
+      console.warn("[makeOrderHotFromTicket] audit logging warning:", e);
+    }
+
+    return { ok: true, scheduler: created };
+  });
+
 
 
 

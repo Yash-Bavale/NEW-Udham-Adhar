@@ -12,7 +12,7 @@ import {
   MapPin, ShieldAlert, FileText, ChevronLeft, ChevronRight, Plus, Download,
   Bold, Italic, Underline, Strikethrough, List, ListOrdered, Quote,
   AlignLeft, AlignCenter, AlignRight, Image as ImageIcon, Search, Tag,
-  ChevronRight as ChevronRightIcon, RefreshCw
+  ChevronRight as ChevronRightIcon, RefreshCw, Flame
 } from "lucide-react";
 import { getTicketWorkspace } from "@/lib/crm/ticket-workspace.functions";
 import {
@@ -23,6 +23,7 @@ import {
   closeTicketNormalT001, closeTicketRestartT001,
   closeTicketConsultationT001, closeTicketReplyReasonT002,
   getTicketAttachmentUploadUrl, confirmTicketAttachment,
+  makeOrderHotFromTicket,
 } from "@/lib/tickets/ticket-actions.functions";
 import { listCannedResponses } from "@/lib/tickets/canned-responses.functions";
 import { listEmailTemplates } from "@/lib/emails/emails.functions";
@@ -171,6 +172,7 @@ function TicketWorkspace() {
   const adjacentFn = useServerFn(getAdjacentTickets);
   const getDocUrlFn = useServerFn(getOrderDocumentSignedUrl);
   const reopenOrderFn = useServerFn(reopenOrder);
+  const makeHotOrderFn = useServerFn(makeOrderHotFromTicket);
   const getAttachmentUploadUrlFn = useServerFn(getTicketAttachmentUploadUrl);
   const confirmAttachmentFn = useServerFn(confirmTicketAttachment);
 
@@ -582,6 +584,18 @@ function TicketWorkspace() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const doMakeHotOrder = useMutation({
+    mutationFn: (orderId?: string) =>
+      makeHotOrderFn({ data: { ticketId, orderId } }),
+    onSuccess: () => {
+      toast.success("🔥 Order prioritized as Hot Order! Alert ringing on server.");
+      invalidate();
+      qc.invalidateQueries({ queryKey: ["admin.orders.v2"] });
+      qc.invalidateQueries({ queryKey: ["due-reminders-summary"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   // execCommand-based rich text formatting for contenteditable
   const execFmt = (command: string, value?: string) => {
     composerRef.current?.focus();
@@ -771,6 +785,22 @@ function TicketWorkspace() {
                 <Send className="size-3.5 text-rose-600" />
                 Reply &amp; Close (TB02)
               </button>
+
+              {Boolean(app.id) && (
+                <button
+                  onClick={() => doMakeHotOrder.mutate(app.id)}
+                  disabled={doMakeHotOrder.isPending}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-rose-500/80 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-2xs shrink-0 cursor-pointer"
+                  title="Immediately escalate this linked order to Hot Priority (sounds alarm & moves to top)"
+                >
+                  {doMakeHotOrder.isPending ? (
+                    <Loader2 className="size-3.5 animate-spin" />
+                  ) : (
+                    <Flame className="size-3.5 text-amber-300 fill-amber-300" />
+                  )}
+                  Make Hot Order 🔥
+                </button>
+              )}
 
               {canReopenOrder && (
                 <button
@@ -1437,6 +1467,25 @@ function TicketWorkspace() {
                 <span>{ticket.executive_name || "Unassigned"}</span>
               </span>
             </div>
+
+            {Boolean(app.id) && (
+              <div className="pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => doMakeHotOrder.mutate(app.id)}
+                  disabled={doMakeHotOrder.isPending}
+                  className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-700 hover:to-amber-700 text-white text-xs font-bold transition-all shadow-2xs disabled:opacity-50 cursor-pointer"
+                  title="Directly escalate this linked order to Hot Priority"
+                >
+                  {doMakeHotOrder.isPending ? (
+                    <Loader2 className="size-3.5 animate-spin" />
+                  ) : (
+                    <Flame className="size-3.5 text-amber-200 fill-amber-200" />
+                  )}
+                  Escalate to Hot Priority
+                </button>
+              </div>
+            )}
           </div>
         </div>
 

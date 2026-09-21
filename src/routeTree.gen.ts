@@ -131,6 +131,7 @@ import { Route as AdminServicesFormsServiceCodeRouteImport } from './routes/admi
 import { Route as AdminSupportTicketsIndexRouteImport } from './routes/admin.support.tickets.index'
 import { Route as AdminSupportTicketsTicketIdRouteImport } from './routes/admin.support.tickets.$ticketId'
 import { Route as ApiPublicAdminRegenerateInvoicesRouteImport } from './routes/api/public/admin/regenerate-invoices'
+import { Route as ApiPublicAudioSplatRouteImport } from './routes/api/public/audio.$'
 import { Route as ApiPublicCronComplaintsSlaRouteImport } from './routes/api/public/cron/complaints-sla'
 import { Route as ApiPublicCronDailyDigestRouteImport } from './routes/api/public/cron/daily-digest'
 import { Route as ApiPublicCronOnboardingRemindersRouteImport } from './routes/api/public/cron/onboarding-reminders'
@@ -782,6 +783,11 @@ const ApiPublicAdminRegenerateInvoicesRoute =
     path: '/api/public/admin/regenerate-invoices',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicAudioSplatRoute = ApiPublicAudioSplatRouteImport.update({
+  id: '/api/public/audio/$',
+  path: '/api/public/audio/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicCronComplaintsSlaRoute =
   ApiPublicCronComplaintsSlaRouteImport.update({
     id: '/api/public/cron/complaints-sla',
@@ -1021,6 +1027,7 @@ export interface FileRoutesByFullPath {
   '/admin/services/forms/$serviceCode': typeof AdminServicesFormsServiceCodeRoute
   '/admin/support/tickets/$ticketId': typeof AdminSupportTicketsTicketIdRoute
   '/api/public/admin/regenerate-invoices': typeof ApiPublicAdminRegenerateInvoicesRoute
+  '/api/public/audio/$': typeof ApiPublicAudioSplatRoute
   '/api/public/cron/complaints-sla': typeof ApiPublicCronComplaintsSlaRoute
   '/api/public/cron/daily-digest': typeof ApiPublicCronDailyDigestRoute
   '/api/public/cron/onboarding-reminders': typeof ApiPublicCronOnboardingRemindersRoute
@@ -1160,6 +1167,7 @@ export interface FileRoutesByTo {
   '/admin/services/forms/$serviceCode': typeof AdminServicesFormsServiceCodeRoute
   '/admin/support/tickets/$ticketId': typeof AdminSupportTicketsTicketIdRoute
   '/api/public/admin/regenerate-invoices': typeof ApiPublicAdminRegenerateInvoicesRoute
+  '/api/public/audio/$': typeof ApiPublicAudioSplatRoute
   '/api/public/cron/complaints-sla': typeof ApiPublicCronComplaintsSlaRoute
   '/api/public/cron/daily-digest': typeof ApiPublicCronDailyDigestRoute
   '/api/public/cron/onboarding-reminders': typeof ApiPublicCronOnboardingRemindersRoute
@@ -1305,6 +1313,7 @@ export interface FileRoutesById {
   '/admin/services/forms/$serviceCode': typeof AdminServicesFormsServiceCodeRoute
   '/admin/support/tickets/$ticketId': typeof AdminSupportTicketsTicketIdRoute
   '/api/public/admin/regenerate-invoices': typeof ApiPublicAdminRegenerateInvoicesRoute
+  '/api/public/audio/$': typeof ApiPublicAudioSplatRoute
   '/api/public/cron/complaints-sla': typeof ApiPublicCronComplaintsSlaRoute
   '/api/public/cron/daily-digest': typeof ApiPublicCronDailyDigestRoute
   '/api/public/cron/onboarding-reminders': typeof ApiPublicCronOnboardingRemindersRoute
@@ -1451,6 +1460,7 @@ export interface FileRouteTypes {
     | '/admin/services/forms/$serviceCode'
     | '/admin/support/tickets/$ticketId'
     | '/api/public/admin/regenerate-invoices'
+    | '/api/public/audio/$'
     | '/api/public/cron/complaints-sla'
     | '/api/public/cron/daily-digest'
     | '/api/public/cron/onboarding-reminders'
@@ -1590,6 +1600,7 @@ export interface FileRouteTypes {
     | '/admin/services/forms/$serviceCode'
     | '/admin/support/tickets/$ticketId'
     | '/api/public/admin/regenerate-invoices'
+    | '/api/public/audio/$'
     | '/api/public/cron/complaints-sla'
     | '/api/public/cron/daily-digest'
     | '/api/public/cron/onboarding-reminders'
@@ -1734,6 +1745,7 @@ export interface FileRouteTypes {
     | '/admin/services/forms/$serviceCode'
     | '/admin/support/tickets/$ticketId'
     | '/api/public/admin/regenerate-invoices'
+    | '/api/public/audio/$'
     | '/api/public/cron/complaints-sla'
     | '/api/public/cron/daily-digest'
     | '/api/public/cron/onboarding-reminders'
@@ -1820,6 +1832,7 @@ export interface RootRouteChildren {
   OnboardingLeadCodeDoneRoute: typeof OnboardingLeadCodeDoneRoute
   OnboardingLeadCodeIndexRoute: typeof OnboardingLeadCodeIndexRoute
   ApiPublicAdminRegenerateInvoicesRoute: typeof ApiPublicAdminRegenerateInvoicesRoute
+  ApiPublicAudioSplatRoute: typeof ApiPublicAudioSplatRoute
   ApiPublicCronComplaintsSlaRoute: typeof ApiPublicCronComplaintsSlaRoute
   ApiPublicCronDailyDigestRoute: typeof ApiPublicCronDailyDigestRoute
   ApiPublicCronOnboardingRemindersRoute: typeof ApiPublicCronOnboardingRemindersRoute
@@ -2698,6 +2711,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicAdminRegenerateInvoicesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/audio/$': {
+      id: '/api/public/audio/$'
+      path: '/api/public/audio/$'
+      fullPath: '/api/public/audio/$'
+      preLoaderRoute: typeof ApiPublicAudioSplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/cron/complaints-sla': {
       id: '/api/public/cron/complaints-sla'
       path: '/api/public/cron/complaints-sla'
@@ -3121,6 +3141,7 @@ const rootRouteChildren: RootRouteChildren = {
   OnboardingLeadCodeDoneRoute: OnboardingLeadCodeDoneRoute,
   OnboardingLeadCodeIndexRoute: OnboardingLeadCodeIndexRoute,
   ApiPublicAdminRegenerateInvoicesRoute: ApiPublicAdminRegenerateInvoicesRoute,
+  ApiPublicAudioSplatRoute: ApiPublicAudioSplatRoute,
   ApiPublicCronComplaintsSlaRoute: ApiPublicCronComplaintsSlaRoute,
   ApiPublicCronDailyDigestRoute: ApiPublicCronDailyDigestRoute,
   ApiPublicCronOnboardingRemindersRoute: ApiPublicCronOnboardingRemindersRoute,
