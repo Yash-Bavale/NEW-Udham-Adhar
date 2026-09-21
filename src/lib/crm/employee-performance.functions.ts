@@ -1575,7 +1575,7 @@ export const getEmployeeDetailPerformance = createServerFn({
     );
 
     // Assigned orders for this employee
-    const { data: assignedOrders } = await admin
+    const { data: assignedOrders } = await adminAny
       .from("applications")
       .select(
         "id, application_code, customer_id, service_id, order_status, fulfillment_status, application_status, is_hot, assigned_at, created_at, updated_at",
@@ -1585,8 +1585,8 @@ export const getEmployeeDetailPerformance = createServerFn({
       .order("created_at", { ascending: false })
       .limit(500);
 
-    const assignedApps = assignedOrders ?? [];
-    const appsList = [...assignedApps];
+    const assignedApps: any[] = assignedOrders ?? [];
+    const appsList: any[] = [...assignedApps];
 
     // Also include any orders worked by this employee in the period
     const workedOrderIds = Array.from(
@@ -1596,7 +1596,7 @@ export const getEmployeeDetailPerformance = createServerFn({
       (id) => !appsList.some((a: any) => a.id === id),
     );
     if (missingWorkedIds.length > 0) {
-      const { data: extraWorkedApps } = await admin
+      const { data: extraWorkedApps } = await adminAny
         .from("applications")
         .select(
           "id, application_code, customer_id, service_id, order_status, fulfillment_status, application_status, is_hot, assigned_at, created_at, updated_at",
@@ -1824,7 +1824,7 @@ export const getEmployeeDetailPerformance = createServerFn({
 
     // Live presence state & shift
     const presenceState = getEmployeePresenceState(data.employeeId);
-    const liveSession = presenceState.session;
+    const liveSession: any = presenceState.session;
     const shift = presenceState.shift;
 
     const activeMins = liveSession?.activeDurationMinutes ?? (allLogs.length > 0 ? Math.min(480, Math.round(allLogs.length * 4.5)) : 0);
@@ -1863,7 +1863,7 @@ export const getEmployeeDetailPerformance = createServerFn({
         lastActive: lastActiveAgoText,
         currentModule: liveSession?.currentModule || (allLogs[0]?.lead_id ? "Leads" : "Orders"),
         currentOrderId: liveSession?.currentOrderId || (allLogs[0]?.order_id || null),
-        currentOrderCode: liveSession?.currentOrderCode || (allLogs[0]?.order_id ? orderCodeMap.get(allLogs[0].order_id) : null) || (appsList[0]?.application_code || "—"),
+        currentOrderCode: liveSession?.currentOrderCode || (allLogs[0]?.order_id ? orderCodeMap.get(allLogs[0].order_id) : null) || ((appsList[0] as any)?.application_code || "—"),
         presenceStatus,
         shiftName: shift.name,
         shiftCode: shift.code,

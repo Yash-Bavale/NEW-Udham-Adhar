@@ -158,7 +158,7 @@ export const recordEmployeeHeartbeat = createServerFn({ method: "POST" })
       const [{ data: profile }, { data: userRole }] = await Promise.all([
         admin
           .from("profiles")
-          .select("id, full_name, display_name, email, avatar_url")
+          .select("id, full_name, display_name, email")
           .eq("id", userId)
           .maybeSingle(),
         admin
@@ -185,7 +185,7 @@ export const recordEmployeeHeartbeat = createServerFn({ method: "POST" })
         employeeId: userId,
         employeeName: name,
         employeeRole: userRole?.role || "operations",
-        avatarUrl: profile?.avatar_url,
+        avatarUrl: null,
         loginTime: nowIso,
         lastHeartbeat: nowIso,
         lastActivityAt: nowIso,
@@ -275,7 +275,7 @@ export const getActiveEmployeeSessions = createServerFn({ method: "POST" })
 
     const { data: profiles } = await admin
       .from("profiles")
-      .select("id, full_name, display_name, email, avatar_url")
+      .select("id, full_name, display_name, email")
       .in(
         "id",
         staffUserIds.length
