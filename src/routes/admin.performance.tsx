@@ -1478,7 +1478,7 @@ function EmployeeSessionAuditView({
               Daily Operational Ledger &amp; Work Metrics
             </h2>
             <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold">
-              Today • Shift Alpha
+              Today • {(data as any)?.session?.shiftName || "Shift Alpha"}
             </span>
           </div>
           <p className="text-[11px] text-slate-500 flex items-center gap-1">
@@ -1496,12 +1496,12 @@ function EmployeeSessionAuditView({
             </div>
             <div className="my-2">
               <span className="text-2xl font-bold tracking-tight text-slate-900">
-                {(emp as any)?.sessionLabel || "4h 12m"}
+                {(data as any)?.session?.activeDuration || "4h 12m"}
               </span>
             </div>
             <div className="flex items-center gap-1 text-emerald-700 text-[11px] font-semibold">
               <CheckCircle2 className="h-3 w-3" />
-              <span>92.6% of shift window</span>
+              <span>Shift Window {(data as any)?.session?.shiftWindow || "09:00 — 18:00 IST"}</span>
             </div>
           </div>
 
@@ -1513,7 +1513,7 @@ function EmployeeSessionAuditView({
             </div>
             <div className="my-2">
               <span className="text-2xl font-bold tracking-tight text-slate-900">
-                18m
+                {(data as any)?.session?.idleDuration || "18m"}
               </span>
             </div>
             <span className="text-[11px] text-slate-400">
@@ -1529,7 +1529,7 @@ function EmployeeSessionAuditView({
             </div>
             <div className="my-2">
               <span className="text-2xl font-bold tracking-tight text-slate-900">
-                02m
+                {(data as any)?.session?.awayDuration || "02m"}
               </span>
             </div>
             <span className="text-[11px] text-emerald-600 font-medium">
@@ -1545,12 +1545,12 @@ function EmployeeSessionAuditView({
             </div>
             <div className="my-2">
               <span className="text-2xl font-bold tracking-tight text-blue-600">
-                {kpiCards?.totalActionsLogged?.value || 47}
+                {kpiCards?.actions ?? 0}
               </span>
             </div>
             <div className="flex items-center gap-1 text-blue-600 text-[11px] font-semibold">
               <Sparkles className="h-3 w-3" />
-              <span>+14% vs pod avg (41)</span>
+              <span>Verified mutations</span>
             </div>
           </div>
 
@@ -1562,14 +1562,19 @@ function EmployeeSessionAuditView({
             </div>
             <div className="my-2 flex items-baseline gap-2">
               <span className="text-2xl font-bold tracking-tight text-slate-900">
-                {kpiCards?.ordersWorkedToday?.value || 18}
+                {kpiCards?.worked ?? 0}
               </span>
               <span className="text-xs text-slate-500">
-                ({kpiCards?.ordersCompletedToday?.value || 8} Completed)
+                ({kpiCards?.completed ?? 0} Completed)
               </span>
             </div>
             <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
-              <div className="bg-blue-600 h-full rounded-full" style={{ width: "72%" }} />
+              <div
+                className="bg-blue-600 h-full rounded-full transition-all"
+                style={{
+                  width: `${kpiCards?.worked ? Math.min(100, Math.round(((kpiCards?.completed || 0) / kpiCards.worked) * 100)) : 0}%`,
+                }}
+              />
             </div>
           </div>
 
@@ -1581,9 +1586,11 @@ function EmployeeSessionAuditView({
             </div>
             <div className="my-2 flex items-baseline gap-1">
               <span className="text-2xl font-bold tracking-tight text-emerald-600">
-                96.2%
+                {kpiCards?.slaCompliance ?? 100}%
               </span>
-              <span className="text-[10px] text-slate-400 font-medium">0 Breaches</span>
+              <span className="text-[10px] text-slate-400 font-medium">
+                {kpiCards?.slaBreaches ?? 0} Breaches
+              </span>
             </div>
             <span className="text-[11px] text-emerald-700 font-semibold">
               Gold Pod Standard
@@ -1601,7 +1608,7 @@ function EmployeeSessionAuditView({
                 Continuous Telemetry Timeline
               </h3>
               <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-600 text-xs font-semibold">
-                09:00 — 15:00 IST
+                {(data as any)?.session?.shiftWindow || "09:00 — 18:00 IST"}
               </span>
             </div>
             <span className="text-xs text-slate-500">
@@ -1613,15 +1620,21 @@ function EmployeeSessionAuditView({
           <div className="flex items-center gap-4 text-xs font-medium">
             <span className="flex items-center gap-1.5">
               <span className="w-3 h-3 rounded bg-emerald-500 inline-block" />
-              <span className="text-slate-800">Active CRM (3h 47m)</span>
+              <span className="text-slate-800">
+                Active CRM ({(data as any)?.session?.activeDuration || "0h 0m"})
+              </span>
             </span>
             <span className="flex items-center gap-1.5">
-              <span className="w-3 h-3 rounded bg-amber-200 inline-block" />
-              <span className="text-slate-800">Idle (15m)</span>
+              <span className="w-3 h-3 rounded bg-amber-400 inline-block" />
+              <span className="text-slate-800">
+                Idle ({(data as any)?.session?.idleDuration || "0m"})
+              </span>
             </span>
             <span className="flex items-center gap-1.5">
               <span className="w-3 h-3 rounded bg-amber-600 inline-block" />
-              <span className="text-slate-800">Away / Lunch (32m)</span>
+              <span className="text-slate-800">
+                Away / Lunch ({(data as any)?.session?.awayDuration || "0m"})
+              </span>
             </span>
           </div>
         </div>
@@ -1629,113 +1642,73 @@ function EmployeeSessionAuditView({
         {/* Multi-segment continuous bar */}
         <div className="flex flex-col gap-2 pt-1">
           <div className="w-full h-8 bg-slate-100 rounded-lg p-1 flex items-stretch gap-1 overflow-hidden shadow-inner">
-            <div
-              className="h-full bg-emerald-600 rounded flex items-center justify-center text-white text-[10px] tracking-wider font-bold transition hover:opacity-90 cursor-help"
-              style={{ width: "28%" }}
-              title="09:12 – 10:48: Active CRM Work (96 mins)"
-            >
-              96m ACTIVE
-            </div>
-            <div
-              className="h-full bg-amber-200 rounded flex items-center justify-center text-amber-900 text-[10px] font-bold transition hover:opacity-90 cursor-help"
-              style={{ width: "3.5%" }}
-              title="10:48 – 10:57: Idle (9 mins)"
-            >
-              9m
-            </div>
-            <div
-              className="h-full bg-emerald-600 rounded flex items-center justify-center text-white text-[10px] font-bold transition hover:opacity-90 cursor-help"
-              style={{ width: "15%" }}
-              title="10:57 – 11:45: Active CRM Work (48 mins)"
-            >
-              48m
-            </div>
-            <div
-              className="h-full bg-amber-200 rounded flex items-center justify-center text-amber-900 text-[10px] font-bold transition hover:opacity-90 cursor-help"
-              style={{ width: "2.5%" }}
-              title="11:45 – 11:51: Idle (6 mins)"
-            >
-              6m
-            </div>
-            <div
-              className="h-full bg-emerald-600 rounded flex items-center justify-center text-white text-[10px] font-bold transition hover:opacity-90 cursor-help"
-              style={{ width: "12%" }}
-              title="11:51 – 12:30: Active CRM Work (39 mins)"
-            >
-              39m
-            </div>
-            <div
-              className="h-full bg-amber-600 rounded flex items-center justify-center text-white text-[10px] font-bold transition hover:opacity-90 cursor-help"
-              style={{ width: "11%" }}
-              title="12:30 – 13:02: Away (32 mins - CRM tab hidden / lunch)"
-            >
-              32m AWAY
-            </div>
-            <div
-              className="h-full bg-emerald-600 rounded flex items-center justify-center text-white text-[10px] font-bold transition hover:opacity-90 cursor-help relative"
-              style={{ width: "28%" }}
-              title="13:02 – 14:26: Active CRM Work (84 mins)"
-            >
-              <span>84m ACTIVE NOW</span>
-              <span className="absolute right-1 w-2 h-2 rounded-full bg-white animate-ping" />
-            </div>
+            {((data as any)?.session?.sessionSegments ?? []).length > 0 ? (
+              ((data as any)?.session?.sessionSegments ?? []).map((seg: any) => (
+                <div
+                  key={seg.id}
+                  className="h-full rounded flex items-center justify-center text-white text-[10px] tracking-wider font-bold transition hover:opacity-90 cursor-help relative overflow-hidden px-1 truncate"
+                  style={{
+                    width: `${seg.percent}%`,
+                    backgroundColor:
+                      seg.color ||
+                      (seg.type === "active"
+                        ? "#059669"
+                        : seg.type === "idle"
+                        ? "#f59e0b"
+                        : seg.type === "away"
+                        ? "#d97706"
+                        : "#94a3b8"),
+                  }}
+                  title={`${seg.startTime} – ${seg.endTime}: ${seg.label} (${seg.durationMins}m)`}
+                >
+                  <span className="truncate">{seg.label}</span>
+                  {seg.label?.includes("NOW") && (
+                    <span className="absolute right-1 w-2 h-2 rounded-full bg-white animate-ping" />
+                  )}
+                </div>
+              ))
+            ) : (
+              <div className="h-full w-full bg-slate-300 rounded flex items-center justify-center text-slate-600 text-xs font-semibold">
+                No active session telemetry logged today
+              </div>
+            )}
           </div>
 
           {/* Time axis scale */}
           <div className="flex justify-between items-center text-slate-400 text-[11px] px-1">
             <span>09:00 IST</span>
-            <span>10:00</span>
             <span>11:00</span>
-            <span>12:00</span>
             <span>13:00 (Lunch)</span>
-            <span>14:00</span>
-            <span className="font-semibold text-blue-600">14:26 (Now)</span>
             <span>15:00</span>
+            <span>17:00</span>
+            <span className="font-semibold text-blue-600">Now ({new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: false })})</span>
           </div>
         </div>
 
-        {/* 8 Stepper event cards below bar */}
+        {/* Dynamic Stepper event cards below bar */}
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-2 pt-1">
-          <div className="p-2 rounded-lg bg-slate-50 border border-slate-100 flex flex-col">
-            <span className="text-[10px] text-slate-400">09:12 IST</span>
-            <span className="text-xs font-semibold text-slate-900">Login Initialized</span>
-            <span className="text-[10px] text-emerald-600">Desk #104 Auth</span>
-          </div>
-          <div className="p-2 rounded-lg bg-slate-50 border border-slate-100 flex flex-col">
-            <span className="text-[10px] text-slate-400">09:12 – 10:48</span>
-            <span className="text-xs font-semibold text-emerald-600">Active CRM</span>
-            <span className="text-[10px] text-slate-500">96m • 14 Leads</span>
-          </div>
-          <div className="p-2 rounded-lg bg-slate-50 border border-slate-100 flex flex-col">
-            <span className="text-[10px] text-slate-400">10:48 – 10:57</span>
-            <span className="text-xs font-semibold text-amber-600">Idle Gap</span>
-            <span className="text-[10px] text-slate-500">9m Standup</span>
-          </div>
-          <div className="p-2 rounded-lg bg-slate-50 border border-slate-100 flex flex-col">
-            <span className="text-[10px] text-slate-400">10:57 – 11:45</span>
-            <span className="text-xs font-semibold text-emerald-600">Active Orders</span>
-            <span className="text-[10px] text-slate-500">48m • 3 Processed</span>
-          </div>
-          <div className="p-2 rounded-lg bg-slate-50 border border-slate-100 flex flex-col">
-            <span className="text-[10px] text-slate-400">11:45 – 11:51</span>
-            <span className="text-xs font-semibold text-amber-600">Idle Gap</span>
-            <span className="text-[10px] text-slate-500">6m Rest</span>
-          </div>
-          <div className="p-2 rounded-lg bg-slate-50 border border-slate-100 flex flex-col">
-            <span className="text-[10px] text-slate-400">11:51 – 12:30</span>
-            <span className="text-xs font-semibold text-emerald-600">Tickets &amp; Calls</span>
-            <span className="text-[10px] text-slate-500">39m • 4 Queries</span>
-          </div>
-          <div className="p-2 rounded-lg bg-slate-50 border border-slate-100 flex flex-col">
-            <span className="text-[10px] text-slate-400">12:30 – 13:02</span>
-            <span className="text-xs font-semibold text-amber-600">Lunch Break</span>
-            <span className="text-[10px] text-slate-500">32m Tab Hidden</span>
-          </div>
-          <div className="p-2 rounded-lg bg-blue-50 border border-blue-200 flex flex-col">
-            <span className="text-[10px] text-blue-600 font-semibold">13:02 – Present</span>
-            <span className="text-xs font-semibold text-emerald-600">Active Orders</span>
-            <span className="text-[10px] text-slate-900 font-medium">84m Live Stream</span>
-          </div>
+          {((data as any)?.session?.stepperEvents ?? []).map((step: any, idx: number) => (
+            <div
+              key={idx}
+              className={`p-2 rounded-lg border flex flex-col justify-between ${
+                step.type === "active"
+                  ? "bg-emerald-50/60 border-emerald-200"
+                  : step.type === "idle"
+                  ? "bg-amber-50/60 border-amber-200"
+                  : step.type === "away"
+                  ? "bg-orange-50/60 border-orange-200"
+                  : "bg-slate-50 border-slate-100"
+              }`}
+            >
+              <span className="text-[10px] text-slate-400 font-mono">{step.time}</span>
+              <span className="text-xs font-semibold text-slate-900 truncate" title={step.title}>
+                {step.title}
+              </span>
+              <span className="text-[10px] text-slate-500 truncate" title={step.desc}>
+                {step.desc}
+              </span>
+            </div>
+          ))}
         </div>
       </div>
 

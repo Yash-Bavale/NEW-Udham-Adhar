@@ -34,8 +34,14 @@ export const Route = createFileRoute("/admin")({
   ),
 });
 
+import { useEmployeePresence } from "@/hooks/useEmployeePresence";
+
 function AdminLayout() {
   const [email, setEmail] = useState<string>();
+  
+  // Background presence and heartbeat tracking
+  useEmployeePresence();
+
   useEffect(() => {
     void import("@/integrations/supabase/client").then(({ supabase }) =>
       supabase.auth.getUser().then(({ data }) => setEmail(data.user?.email ?? undefined)),

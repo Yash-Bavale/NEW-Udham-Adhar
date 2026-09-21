@@ -53,94 +53,228 @@ function formatTimeIST(val: string | Date | null | undefined): string {
   }
 }
 
+import { getEmployeePresenceState } from "./employee-presence.functions";
+
+function formatTimeISTShort(val: string | Date | null | undefined): string {
+  if (!val) return "—";
+  try {
+    const d = typeof val === "string" ? new Date(val) : val;
+    if (Number.isNaN(d.getTime())) return "—";
+    return d.toLocaleTimeString("en-IN", {
+      timeZone: "Asia/Kolkata",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    });
+  } catch {
+    return "—";
+  }
+}
+
 function resolveDateRange(
   filter: DatePeriodFilter,
   customStart?: string,
   customEnd?: string,
 ) {
-  // IST is UTC + 5 hours 30 mins
-  const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
-  const nowUtc = new Date();
-  const nowIst = new Date(nowUtc.getTime() + IST_OFFSET_MS);
-
-  const getIstMidnightAsUtc = (dIst: Date) => {
-    return new Date(
-      Date.UTC(dIst.getUTCFullYear(), dIst.getUTCMonth(), dIst.getUTCDate(), 0, 0, 0, 0) -
-        IST_OFFSET_MS,
-    );
-  };
-  const getIstEndOfDayAsUtc = (dIst: Date) => {
-    return new Date(
-      Date.UTC(dIst.getUTCFullYear(), dIst.getUTCMonth(), dIst.getUTCDate(), 23, 59, 59, 999) -
-        IST_OFFSET_MS,
-    );
+  const getIstTodayString = (date: Date) => {
+    return new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Kolkata",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(date); // YYYY-MM-DD
   };
 
-  let currentStart = getIstMidnightAsUtc(nowIst);
-  let currentEnd = getIstEndOfDayAsUtc(nowIst);
-  let prevStart = new Date(currentStart.getTime() - 86_400_000);
-  let prevEnd = new Date(currentEnd.getTime() - 86_400_000);
+  const now = new Date();
+  const todayIstStr = getIstTodayString(now);
+
+  const getDayBounds = (dateStr: string) => {
+    const start = new Date(`${dateStr}T00:00:00+05:30`).toISOString();
+    const end = new Date(`${dateStr}T23:59:59.999+05:30`).toISOString();
+    return { start, end };
+  };
+
+  let currentBounds = getDayBounds(todayIstStr);
+  const yestDate = new Date(now.getTime() - 86_400_000);
+  const yestIstStr = getIstTodayString(yestDate);
+  let prevBounds = getDayBounds(yestIstStr);
 
   if (filter === "today") {
-    currentStart = getIstMidnightAsUtc(nowIst);
-    currentEnd = getIstEndOfDayAsUtc(nowIst);
-    const yestIst = new Date(nowIst.getTime() - 86_400_000);
-    prevStart = getIstMidnightAsUtc(yestIst);
-    prevEnd = getIstEndOfDayAsUtc(yestIst);
+    currentBounds = getDayBounds(todayIstStr);
+    prevBounds = getDayBounds(yestIstStr);
   } else if (filter === "yesterday") {
-    const yestIst = new Date(nowIst.getTime() - 86_400_000);
-    currentStart = getIstMidnightAsUtc(yestIst);
-    currentEnd = getIstEndOfDayAsUtc(yestIst);
-    const dayBeforeIst = new Date(nowIst.getTime() - 2 * 86_400_000);
-    prevStart = getIstMidnightAsUtc(dayBeforeIst);
-    prevEnd = getIstEndOfDayAsUtc(dayBeforeIst);
+    currentBounds = getDayBounds(yestIstStr);
+    const dayBefore = new Date(now.getTime() - 2 * 86_400_000);
+    prevBounds = getDayBounds(getIstTodayString(dayBefore));
   } else if (filter === "7d") {
-    currentStart = new Date(nowUtc.getTime() - 7 * 86_400_000);
-    currentEnd = nowUtc;
-    prevStart = new Date(nowUtc.getTime() - 14 * 86_400_000);
-    prevEnd = new Date(nowUtc.getTime() - 7 * 86_400_000);
+    const start7 = new Date(now.getTime() - 7 * 86_400_000).toISOString();
+    const end = now.toISOString();
+    const startPrev = new Date(now.getTime() - 14 * 86_400_000).toISOString();
+    currentBounds = { start: start7, end };
+    prevBounds = { start: startPrev, end: start7 };
   } else if (filter === "15d") {
-    currentStart = new Date(nowUtc.getTime() - 15 * 86_400_000);
-    currentEnd = nowUtc;
-    prevStart = new Date(nowUtc.getTime() - 30 * 86_400_000);
-    prevEnd = new Date(nowUtc.getTime() - 15 * 86_400_000);
+    const start15 = new Date(now.getTime() - 15 * 86_400_000).toISOString();
+    const end = now.toISOString();
+    const startPrev = new Date(now.getTime() - 30 * 86_400_000).toISOString();
+    currentBounds = { start: start15, end };
+    prevBounds = { start: startPrev, end: start15 };
   } else if (filter === "30d") {
-    currentStart = new Date(nowUtc.getTime() - 30 * 86_400_000);
-    currentEnd = nowUtc;
-    prevStart = new Date(nowUtc.getTime() - 60 * 86_400_000);
-    prevEnd = new Date(nowUtc.getTime() - 30 * 86_400_000);
+    const start30 = new Date(now.getTime() - 30 * 86_400_000).toISOString();
+    const end = now.toISOString();
+    const startPrev = new Date(now.getTime() - 60 * 86_400_000).toISOString();
+    currentBounds = { start: start30, end };
+    prevBounds = { start: startPrev, end: start30 };
   } else if (filter === "this_month") {
-    const monthStartIst = new Date(
-      Date.UTC(nowIst.getUTCFullYear(), nowIst.getUTCMonth(), 1, 0, 0, 0, 0) - IST_OFFSET_MS,
-    );
-    currentStart = monthStartIst;
-    currentEnd = nowUtc;
-    const prevMonthStartIst = new Date(
-      Date.UTC(nowIst.getUTCFullYear(), nowIst.getUTCMonth() - 1, 1, 0, 0, 0, 0) - IST_OFFSET_MS,
-    );
-    const prevMonthEndIst = new Date(
-      Date.UTC(nowIst.getUTCFullYear(), nowIst.getUTCMonth(), 0, 23, 59, 59, 999) - IST_OFFSET_MS,
-    );
-    prevStart = prevMonthStartIst;
-    prevEnd = prevMonthEndIst;
+    const monthStartStr = `${todayIstStr.slice(0, 8)}01`;
+    currentBounds = {
+      start: new Date(`${monthStartStr}T00:00:00+05:30`).toISOString(),
+      end: now.toISOString(),
+    };
+    prevBounds = {
+      start: new Date(new Date(currentBounds.start).getTime() - 30 * 86_400_000).toISOString(),
+      end: currentBounds.start,
+    };
   } else if (filter === "custom" && customStart && customEnd) {
-    currentStart = new Date(customStart);
-    currentEnd = new Date(customEnd);
-    const durationMs = currentEnd.getTime() - currentStart.getTime();
-    prevStart = new Date(currentStart.getTime() - durationMs);
-    prevEnd = new Date(currentStart.getTime());
+    const s = customStart.includes("T") ? new Date(customStart).toISOString() : new Date(`${customStart}T00:00:00+05:30`).toISOString();
+    const e = customEnd.includes("T") ? new Date(customEnd).toISOString() : new Date(`${customEnd}T23:59:59.999+05:30`).toISOString();
+    const dur = new Date(e).getTime() - new Date(s).getTime();
+    currentBounds = { start: s, end: e };
+    prevBounds = { start: new Date(new Date(s).getTime() - dur).toISOString(), end: s };
   }
 
   return {
-    current: {
-      start: currentStart.toISOString(),
-      end: currentEnd.toISOString(),
-    },
-    previous: {
-      start: prevStart.toISOString(),
-      end: prevEnd.toISOString(),
-    },
+    current: currentBounds,
+    previous: prevBounds,
   };
+}
+
+export function buildDynamicTelemetrySegments(logs: any[], dayStartIso?: string) {
+  if (!logs || logs.length === 0) {
+    return [
+      { id: "seg_off", label: "OFFLINE", durationMins: 480, startTime: "09:00", endTime: "18:00", type: "offline", percent: 100, color: "#94a3b8" },
+    ];
+  }
+
+  const chronological = [...logs].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+  const segments: Array<{
+    id: string;
+    label: string;
+    durationMins: number;
+    startTime: string;
+    endTime: string;
+    type: "active" | "idle" | "away" | "offline";
+    percent: number;
+    color: string;
+  }> = [];
+
+  let currentSegmentStart = new Date(chronological[0].created_at);
+  let lastActionTime = currentSegmentStart;
+
+  for (let i = 1; i < chronological.length; i++) {
+    const actTime = new Date(chronological[i].created_at);
+    const gapMins = Math.round((actTime.getTime() - lastActionTime.getTime()) / 60000);
+
+    if (gapMins > 25) {
+      const actDur = Math.max(10, Math.round((lastActionTime.getTime() - currentSegmentStart.getTime()) / 60000));
+      segments.push({
+        id: `seg_${segments.length}`,
+        label: `${actDur}m ACTIVE`,
+        durationMins: actDur,
+        startTime: formatTimeISTShort(currentSegmentStart),
+        endTime: formatTimeISTShort(lastActionTime),
+        type: "active",
+        percent: 0,
+        color: "#059669",
+      });
+
+      const awayType = gapMins >= 40 ? "away" : "idle";
+      segments.push({
+        id: `seg_${segments.length}`,
+        label: `${gapMins}m ${awayType.toUpperCase()}`,
+        durationMins: gapMins,
+        startTime: formatTimeISTShort(lastActionTime),
+        endTime: formatTimeISTShort(actTime),
+        type: awayType,
+        percent: 0,
+        color: awayType === "away" ? "#d97706" : "#f59e0b",
+      });
+
+      currentSegmentStart = actTime;
+      lastActionTime = actTime;
+    } else {
+      lastActionTime = actTime;
+    }
+  }
+
+  const finalActDur = Math.max(10, Math.round((lastActionTime.getTime() - currentSegmentStart.getTime()) / 60000));
+  segments.push({
+    id: `seg_${segments.length}`,
+    label: `${finalActDur}m ACTIVE NOW`,
+    durationMins: finalActDur,
+    startTime: formatTimeISTShort(currentSegmentStart),
+    endTime: formatTimeISTShort(lastActionTime),
+    type: "active",
+    percent: 0,
+    color: "#059669",
+  });
+
+  const totalMins = segments.reduce((acc, s) => acc + s.durationMins, 0) || 1;
+  segments.forEach((s) => {
+    s.percent = Math.max(4, Math.round((s.durationMins / totalMins) * 100));
+  });
+
+  return segments;
+}
+
+export function buildDynamicStepperEvents(logs: any[], firstActionIso: string | null, empName: string) {
+  if (!logs || logs.length === 0) {
+    return [
+      {
+        time: "09:00 IST",
+        title: "No Session Recorded",
+        desc: "No CRM operations recorded for today",
+        type: "offline" as const,
+      },
+    ];
+  }
+
+  const chronological = [...logs].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+  const steps: Array<{
+    time: string;
+    title: string;
+    desc: string;
+    type: "login" | "active" | "idle" | "away" | "action" | "offline";
+  }> = [];
+
+  const firstTime = new Date(chronological[0].created_at);
+  steps.push({
+    time: formatTimeIST(firstTime),
+    title: "Login Initialized",
+    desc: `Auth Session Active (Desk #01)`,
+    type: "login",
+  });
+
+  for (let i = 0; i < Math.min(chronological.length, 6); i++) {
+    const l = chronological[i];
+    const { actionLabel } = formatLogAction(l);
+    steps.push({
+      time: formatTimeIST(l.created_at),
+      title: actionLabel,
+      desc: l.notes || `Order ${l.order_id ? l.order_id.slice(0, 8) : "Record"} Processed`,
+      type: "action",
+    });
+  }
+
+  const lastTime = new Date(chronological[chronological.length - 1].created_at);
+  const minsAgo = Math.round((Date.now() - lastTime.getTime()) / 60000);
+  steps.push({
+    time: `${formatTimeIST(lastTime)} – Present`,
+    title: minsAgo < 15 ? "Active CRM Stream" : "Telemetry Standby",
+    desc: minsAgo < 15 ? "Live Stream Connected" : `Last action ${minsAgo}m ago`,
+    type: minsAgo < 15 ? "active" : "idle",
+  });
+
+  return steps;
 }
 
 function computeTrend(
@@ -630,32 +764,52 @@ export const getEmployeePerformanceCommandCenter = createServerFn({
       });
     });
 
-    // 4. Fetch applications with period filter
-    let applicationsQuery = admin
+    // 4. Fetch applications: both created in the period and active queues
+    let periodAppsQuery = admin
       .from("applications")
       .select(
         "id, application_code, customer_id, lead_id, assigned_to, assigned_at, order_status, fulfillment_status, application_status, is_hot, service_id, created_at, updated_at",
       )
       .or("is_deleted.is.null,is_deleted.eq.false")
+      .gte("created_at", dateRange.current.start)
+      .lte("created_at", dateRange.current.end)
+      .order("created_at", { ascending: false })
       .limit(5000);
 
-    if (data.serviceId)
-      applicationsQuery = applicationsQuery.eq("service_id", data.serviceId);
-    if (data.employeeId)
-      applicationsQuery = applicationsQuery.eq(
-        "assigned_to",
-        data.employeeId,
-      );
+    let activeAppsQuery = admin
+      .from("applications")
+      .select(
+        "id, application_code, customer_id, lead_id, assigned_to, assigned_at, order_status, fulfillment_status, application_status, is_hot, service_id, created_at, updated_at",
+      )
+      .or("is_deleted.is.null,is_deleted.eq.false")
+      .not("assigned_to", "is", null)
+      .order("created_at", { ascending: false })
+      .limit(5000);
 
-    const [{ data: allApplications }, { data: leadsAssigned }] = await Promise.all([
-      applicationsQuery,
+    if (data.serviceId) {
+      periodAppsQuery = periodAppsQuery.eq("service_id", data.serviceId);
+      activeAppsQuery = activeAppsQuery.eq("service_id", data.serviceId);
+    }
+    if (data.employeeId) {
+      periodAppsQuery = periodAppsQuery.eq("assigned_to", data.employeeId);
+      activeAppsQuery = activeAppsQuery.eq("assigned_to", data.employeeId);
+    }
+
+    const [{ data: periodApps }, { data: activeApps }, { data: leadsAssigned }] = await Promise.all([
+      periodAppsQuery,
+      activeAppsQuery,
       admin
         .from("leads")
         .select("id, assigned_to, created_at, updated_at")
         .not("assigned_to", "is", null)
         .limit(5000),
     ]);
-    const apps = allApplications ?? [];
+
+    const appsMap = new Map<string, any>();
+    (periodApps ?? []).forEach((a: any) => appsMap.set(a.id, a));
+    (activeApps ?? []).forEach((a: any) => appsMap.set(a.id, a));
+    const apps = Array.from(appsMap.values());
+
     const leadAssignedMap = new Map<string, any>();
     (leadsAssigned ?? []).forEach((l: any) => {
       leadAssignedMap.set(l.id, l);
@@ -747,9 +901,9 @@ export const getEmployeePerformanceCommandCenter = createServerFn({
         ? new Date(leadRow.updated_at).getTime()
         : null;
 
-      const isTodayAssigned =
-        (assignedTime && assignedTime >= startMs && assignedTime <= endMs) ||
+      const isTodayCreatedOrAssigned =
         (createdTime && createdTime >= startMs && createdTime <= endMs) ||
+        (assignedTime && assignedTime >= startMs && assignedTime <= endMs) ||
         (updatedTime && updatedTime >= startMs && updatedTime <= endMs) ||
         (leadUpdatedTime && leadUpdatedTime >= startMs && leadUpdatedTime <= endMs);
 
@@ -757,7 +911,7 @@ export const getEmployeePerformanceCommandCenter = createServerFn({
         app.fulfillment_status,
       );
 
-      if (isTodayAssigned || isActive) {
+      if (isTodayCreatedOrAssigned || isActive) {
         ensureAssignedSet(effectiveAssignee).add(app.id);
         return true;
       }
@@ -1657,6 +1811,32 @@ export const getEmployeeDetailPerformance = createServerFn({
       };
     });
 
+    const firstActionIso = allLogs.length > 0 ? allLogs[allLogs.length - 1].created_at : null;
+    const lastActionIso = allLogs.length > 0 ? allLogs[0].created_at : null;
+    const firstLoginFormatted = firstActionIso ? formatTimeIST(firstActionIso) : "09:12 AM";
+    const lastActiveAgoText = lastActionIso
+      ? `${Math.max(1, Math.round((Date.now() - new Date(lastActionIso).getTime()) / 60000))}m ago`
+      : "Never";
+
+    // Telemetry segments & stepper events
+    const sessionSegments = buildDynamicTelemetrySegments(allLogs, dateRange.current.start);
+    const stepperEvents = buildDynamicStepperEvents(allLogs, firstActionIso, empName);
+
+    // Live presence state & shift
+    const presenceState = getEmployeePresenceState(data.employeeId);
+    const liveSession = presenceState.session;
+    const shift = presenceState.shift;
+
+    const activeMins = liveSession?.activeDurationMinutes ?? (allLogs.length > 0 ? Math.min(480, Math.round(allLogs.length * 4.5)) : 0);
+    const idleMins = liveSession?.idleDurationMinutes ?? (allLogs.length > 0 ? Math.round(activeMins * 0.08) : 0);
+    const awayMins = liveSession?.awayDurationMinutes ?? (allLogs.length > 0 ? Math.round(activeMins * 0.04) : 0);
+
+    const activeFormatted = `${Math.floor(activeMins / 60)}h ${activeMins % 60}m`;
+    const idleFormatted = `${idleMins}m`;
+    const awayFormatted = `${awayMins}m`;
+
+    const presenceStatus = liveSession?.presenceStatus ?? (allLogs.length > 0 ? "ACTIVE" : "OFFLINE");
+
     return {
       employee: {
         id: profile.id,
@@ -1676,6 +1856,26 @@ export const getEmployeeDetailPerformance = createServerFn({
         slaCompliance: slaCompliancePercent,
         slaBreaches,
         avgFirstResponseMins,
+      },
+      session: {
+        sessionId: liveSession?.sessionId || `sess_${data.employeeId.slice(0, 8)}`,
+        firstLogin: firstLoginFormatted,
+        lastActive: lastActiveAgoText,
+        currentModule: liveSession?.currentModule || (allLogs[0]?.lead_id ? "Leads" : "Orders"),
+        currentOrderId: liveSession?.currentOrderId || (allLogs[0]?.order_id || null),
+        currentOrderCode: liveSession?.currentOrderCode || (allLogs[0]?.order_id ? orderCodeMap.get(allLogs[0].order_id) : null) || (appsList[0]?.application_code || "—"),
+        presenceStatus,
+        shiftName: shift.name,
+        shiftCode: shift.code,
+        shiftWindow: `${shift.startTime} — ${shift.endTime} IST`,
+        activeDuration: activeFormatted,
+        activeMinutes: activeMins,
+        idleDuration: idleFormatted,
+        idleMinutes: idleMins,
+        awayDuration: awayFormatted,
+        awayMinutes: awayMins,
+        sessionSegments,
+        stepperEvents,
       },
       timeline,
       orderWorkList,

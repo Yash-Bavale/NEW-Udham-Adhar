@@ -7,15 +7,21 @@ import { AutomationRulesTab } from "@/components/admin/AutomationRulesTab";
 import { BusinessHoursTab } from "@/components/admin/BusinessHoursTab";
 import { SUPPORT_EMAIL, COMPANY_NAME, SITE_NAME, BASE_URL } from "@/lib/brand";
 
+import { ShiftsAndPresenceTab } from "@/components/admin/ShiftsAndPresenceTab";
+import { ActiveSessionsTab } from "@/components/admin/ActiveSessionsTab";
+import { CalendarRange, Laptop } from "lucide-react";
+
 export const Route = createFileRoute("/admin/settings")({
   head: () => ({ meta: [{ title: "Settings — Udyam Ops OS" }, { name: "robots", content: "noindex,nofollow" }] }),
   component: SettingsPage,
 });
 
-type Tab = "company" | "hours" | "statuses" | "notifications" | "gateways" | "workflow" | "reasons" | "automation" | "templates";
+type Tab = "company" | "shifts" | "sessions" | "hours" | "statuses" | "notifications" | "gateways" | "workflow" | "reasons" | "automation" | "templates";
 
 const TABS: { id: Tab; label: string; icon: typeof Building2 }[] = [
   { id: "company", label: "Company Info", icon: Building2 },
+  { id: "shifts", label: "Shifts & Presence", icon: CalendarRange },
+  { id: "sessions", label: "Active Sessions", icon: Laptop },
   { id: "hours", label: "Business Hours", icon: Clock },
   { id: "statuses", label: "Status Master", icon: ListChecks },
   { id: "templates", label: "Email Templates", icon: Mail },
@@ -46,7 +52,7 @@ function SettingsPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-medium tracking-tight" style={{ color: "var(--admin-fg)" }}>Settings</h1>
-        <p className="text-sm" style={{ color: "var(--admin-fg-muted)" }}>Configure company info, statuses, and automation.</p>
+        <p className="text-sm" style={{ color: "var(--admin-fg-muted)" }}>Configure company info, shifts, sessions, statuses, and automation.</p>
       </div>
 
       <div className="flex gap-1 border-b flex-wrap" style={{ borderColor: "var(--admin-border)" }}>
@@ -72,6 +78,8 @@ function SettingsPage() {
       </div>
 
       {tab === "company" && <CompanyTab />}
+      {tab === "shifts" && <ShiftsAndPresenceTab />}
+      {tab === "sessions" && <ActiveSessionsTab />}
       {tab === "hours" && <BusinessHoursTab />}
       {tab === "statuses" && <StatusesTab />}
       {tab === "templates" && <TemplatesTab />}
