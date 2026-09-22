@@ -334,7 +334,9 @@ function SupportTicketsOperationsPage() {
     let effectiveStatuses: TicketStatus[] | undefined = undefined;
     let effectiveRespState: ResponseState = "all";
 
-    if (bucket === "open") {
+    if (bucket === "all") {
+      effectiveStatuses = ["open", "in_progress", "waiting_customer"];
+    } else if (bucket === "open") {
       effectiveStatuses = ["open", "in_progress", "waiting_customer"];
     } else if (bucket === "closed") {
       effectiveStatuses = ["resolved", "closed"];
@@ -514,8 +516,9 @@ function SupportTicketsOperationsPage() {
       <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2.5 pt-1">
         {BUCKETS.map((b) => {
           const active = bucket === b.id;
-          let count = statsData?.total ?? 0;
-          if (b.id === "new") count = statsData?.new ?? 0;
+          let count = statsData?.open ?? 0;
+          if (b.id === "all") count = statsData?.open ?? 0;
+          else if (b.id === "new") count = statsData?.new ?? 0;
           else if (b.id === "unread") count = statsData?.unread ?? 0;
           else if (b.id === "awaiting_action") count = statsData?.awaiting_action ?? 0;
           else if (b.id === "awaiting_customer") count = statsData?.awaiting_customer ?? 0;

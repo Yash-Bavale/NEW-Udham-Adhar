@@ -238,18 +238,30 @@ function TicketWorkspace() {
     }
   }, [ticketId]);
 
-  const invalidate = () =>
+  const invalidate = () => {
     qc.invalidateQueries({ queryKey: ["support-workspace", ticketId] });
+    qc.invalidateQueries({ queryKey: ["support-tickets-ops"] });
+    qc.invalidateQueries({ queryKey: ["support-ticket-stats"] });
+    refetch();
+  };
+
+  const setLocalTicketStatus = (newStatus: TicketStatus) => {
+    qc.setQueryData(["support-workspace", ticketId], (old: any) => {
+      if (!old?.ticket) return old;
+      return {
+        ...old,
+        ticket: {
+          ...old.ticket,
+          status: newStatus,
+        },
+      };
+    });
+  };
 
   // Realtime
   useRealtimeTable("ticket_replies", invalidate, { filter: `ticket_id=eq.${ticketId}` });
   const appId = data?.ticket?.application_id ?? null;
   useRealtimeTable("email_logs", invalidate, appId ? { filter: `application_id=eq.${appId}` } : undefined);
-
-  // Local tags state
-  const [customTags, setCustomTags] = useState<string[]>([]);
-  const [addTagOpen, setAddTagOpen] = useState(false);
-  const [newTagInput, setNewTagInput] = useState("");
 
   // Modals & popups
   const [restartConfirm, setRestartConfirm] = useState(false);
@@ -510,24 +522,35 @@ function TicketWorkspace() {
         }
       }
 
+      const shouldClose = composeTab === "reply" ? (opts?.closeAfter !== false) : false;
+
       return replyFn({
         data: {
           ticketId,
           message: finalMessage,
           isInternal: composeTab === "note",
+          closeTicket: shouldClose,
           armAutoclose: false,
           cc: (opts && "cc" in opts && opts.cc) ? opts.cc : (ccInput.trim() || undefined),
           bcc: (opts && "bcc" in opts && opts.bcc) ? opts.bcc : (bccInput.trim() || undefined),
         },
       });
     },
+    onMutate: () => {
+      if (composeTab === "reply") {
+        setLocalTicketStatus("closed");
+      }
+    },
     onSuccess: async (r: any) => {
+      if (composeTab === "reply") {
+        setLocalTicketStatus("closed");
+      }
       if (composeTab === "note") {
         toast.success("Internal note added");
       } else if (r?.emailed === false) {
-        toast.warning(`Reply saved and ticket closed: ${r.reason ?? "unknown"}`);
+        toast.warning(`Reply saved: ${r.reason ?? "unknown"}`);
       } else {
-        toast.success("Reply sent & ticket closed in CRM");
+        toast.success("Reply sent & ticket closed");
       }
 
       setBody("");
@@ -545,8 +568,11 @@ function TicketWorkspace() {
 
   const changeStatus = useMutation({
     mutationFn: (status: TicketStatus) => updateFn({ data: { id: ticketId, status } }),
+    onMutate: (newStatus) => {
+      setLocalTicketStatus(newStatus);
+    },
     onSuccess: () => { toast.success("Status updated"); invalidate(); },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => { toast.error(e.message); invalidate(); },
   });
 
   const changePriority = useMutation({
@@ -564,28 +590,40 @@ function TicketWorkspace() {
 
   const doCloseNormal = useMutation({
     mutationFn: () => closeNormal({ data: { ticketId } }),
+    onMutate: () => {
+      setLocalTicketStatus("closed");
+    },
     onSuccess: () => { toast.success("Ticket closed"); invalidate(); },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => { toast.error(e.message); invalidate(); },
   });
 
   const doCloseRestart = useMutation({
     mutationFn: () => closeRestart({ data: { ticketId } }),
+    onMutate: () => {
+      setLocalTicketStatus("closed");
+    },
     onSuccess: () => { toast.success("Order restarted & ticket closed"); invalidate(); },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => { toast.error(e.message); invalidate(); },
   });
 
   const doCloseConsult = useMutation({
     mutationFn: (remarks?: string) =>
       closeConsult({ data: { ticketId, remarks: remarks || undefined } }),
+    onMutate: () => {
+      setLocalTicketStatus("closed");
+    },
     onSuccess: () => { toast.success("TB01 Consultation completed — ticket closed"); invalidate(); },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => { toast.error(e.message); invalidate(); },
   });
 
   const doCloseReply = useMutation({
     mutationFn: (v: { reasonId: string | null; reasonLabel: string; replyBody: string }) =>
       closeReply({ data: { ticketId, reasonId: v.reasonId, reasonLabel: v.reasonLabel, replyBody: v.replyBody } }),
+    onMutate: () => {
+      setLocalTicketStatus("waiting_customer");
+    },
     onSuccess: () => { toast.success("TB02 sent — 24h auto-close armed"); invalidate(); },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => { toast.error(e.message); invalidate(); },
   });
 
   const doReopenOrder = useMutation({
@@ -828,108 +866,6 @@ function TicketWorkspace() {
           {/* Row 2: Subject / Subtitle */}
           <div className="mt-1 text-xs font-semibold text-slate-700 truncate">
             {ticket.subject ? `Re: ${ticket.subject}` : "(no subject)"}
-          </div>
-
-          {/* Row 3: Badges Row (Customer Delay, Status, Priority, Assignee, Add Tag) matching Image 2 */}
-          <div className="mt-2 flex items-center gap-2 flex-wrap">
-            {/* Customer Delay badge */}
-            {(app.fulfillment_status === "customer_delay" || ticket.status === "waiting_customer") && (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#fffbe6] text-[#b45309] border border-[#fde68a] font-semibold text-[11px] shrink-0 shadow-2xs">
-                <span className="size-1.5 rounded-full bg-[#f59e0b]" /> Customer Delay
-              </span>
-            )}
-
-            {/* Status Badge */}
-            <div className="shrink-0">
-              <StatusDropdownBadge
-                status={ticket.status as TicketStatus}
-                onChange={(s) => changeStatus.mutate(s)}
-              />
-            </div>
-
-            {/* Priority Badge */}
-            <div className="shrink-0">
-              <PriorityDropdownBadge
-                priority={(ticket.priority as TicketPriority) ?? "medium"}
-                onChange={(p) => changePriority.mutate(p)}
-              />
-            </div>
-
-            {/* Assignee Badge */}
-            <div className="shrink-0">
-              <AssigneeDropdownBadge
-                currentId={ticket.assigned_to}
-                currentName={ticket.assigned_name}
-                staff={staffList}
-                onPick={(id) => changeAssignee.mutate(id)}
-              />
-            </div>
-
-            {/* Custom Tags */}
-            {customTags.map((tag, idx) => (
-              <span
-                key={idx}
-                className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 text-[11px] font-medium shrink-0"
-              >
-                {tag}
-                <button
-                  onClick={() => setCustomTags((prev) => prev.filter((_, i) => i !== idx))}
-                  className="hover:text-blue-900"
-                >
-                  <X className="size-3" />
-                </button>
-              </span>
-            ))}
-
-            {/* + Add Tag */}
-            <div className="relative shrink-0">
-              <button
-                onClick={() => setAddTagOpen((v) => !v)}
-                className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full border border-slate-300 border-dashed bg-white text-slate-600 hover:text-slate-900 hover:bg-slate-50 text-[11px] font-medium transition-colors"
-              >
-                <Plus className="size-3" /> Add Tag
-              </button>
-              {addTagOpen && (
-                <div className="absolute left-0 mt-1 w-48 bg-white border border-slate-200 rounded-lg p-2 shadow-lg z-30">
-                  <div className="text-[11px] font-bold text-slate-500 mb-1">Enter tag:</div>
-                  <input
-                    type="text"
-                    value={newTagInput}
-                    onChange={(e) => setNewTagInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && newTagInput.trim()) {
-                        setCustomTags((prev) => [...prev, newTagInput.trim()]);
-                        setNewTagInput("");
-                        setAddTagOpen(false);
-                      }
-                    }}
-                    placeholder="e.g. VIP, Urgent Followup"
-                    className="w-full text-xs px-2 py-1 border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                    autoFocus
-                  />
-                  <div className="flex justify-end gap-1 mt-2">
-                    <button
-                      onClick={() => setAddTagOpen(false)}
-                      className="px-2 py-0.5 text-[11px] text-slate-500 hover:bg-slate-100 rounded"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={() => {
-                        if (newTagInput.trim()) {
-                          setCustomTags((prev) => [...prev, newTagInput.trim()]);
-                          setNewTagInput("");
-                          setAddTagOpen(false);
-                        }
-                      }}
-                      className="px-2 py-0.5 text-[11px] bg-blue-600 text-white rounded font-medium"
-                    >
-                      Add
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
           </div>
         </div>
 
@@ -1512,13 +1448,6 @@ function TicketWorkspace() {
             </div>
 
             <div className="flex items-center justify-between gap-2 py-0.5">
-              <span className="text-slate-500 text-[11px]">Order Status</span>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200 uppercase">
-                {app.order_status || "CUSTOMER_HOLD"}
-              </span>
-            </div>
-
-            <div className="flex items-center justify-between gap-2 py-0.5">
               <span className="text-slate-500 text-[11px]">Order Assignee</span>
               <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 text-slate-700 border border-slate-200 flex items-center gap-1">
                 <User className="size-2.5 text-slate-400" />
@@ -1535,25 +1464,6 @@ function TicketWorkspace() {
                 <span className="text-[10px] font-semibold text-rose-600 bg-rose-100/80 px-1.5 py-0.5 rounded uppercase tracking-wider">
                   Needs Action
                 </span>
-              </div>
-            )}
-
-            {Boolean(app.id) && (
-              <div className="pt-2 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => doMakeHotOrder.mutate(app.id)}
-                  disabled={doMakeHotOrder.isPending}
-                  className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-700 hover:to-amber-700 text-white text-xs font-bold transition-all shadow-2xs disabled:opacity-50 cursor-pointer"
-                  title="Directly escalate this open order to Hot Priority in CRM"
-                >
-                  {doMakeHotOrder.isPending ? (
-                    <Loader2 className="size-3.5 animate-spin" />
-                  ) : (
-                    <Flame className="size-3.5 text-amber-200 fill-amber-200" />
-                  )}
-                  {app.is_hot ? "Re-trigger Hot Priority Alert" : "Escalate to Hot Priority"}
-                </button>
               </div>
             )}
           </div>

@@ -684,7 +684,7 @@ export function decodeEntities(input: string | null | undefined): string {
  * and resolve it to an application_id / lead_id / customer_id triple.
  */
 async function matchBySubjectCode(subject: string | null | undefined): Promise<
-  { applicationId: string; leadId: string | null; customerId: string | null } | null
+  { applicationId: string | null; leadId: string | null; customerId: string | null } | null
 > {
   if (!subject) return null;
   const normalized = normalizeSubject(subject);

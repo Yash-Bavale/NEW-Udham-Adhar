@@ -283,6 +283,7 @@ const ReplyInput = z.object({
   ticketId: z.string().uuid(),
   message: z.string().min(1),
   isInternal: z.boolean().optional(),
+  closeTicket: z.boolean().optional().default(true),
   armAutoclose: z.boolean().default(true),
   cc: z.string().optional(),
   bcc: z.string().optional(),
@@ -314,17 +315,42 @@ export const replyToTicket = createServerFn({ method: "POST" })
       return { ok: true, emailed: false, reason: "internal_note" };
     }
 
-    // Normal employee reply -> Set status to waiting_customer (do NOT close)
+    const willClose = data.closeTicket !== false;
     const patch: Record<string, unknown> = {
-      status: "waiting_customer",
+      status: willClose ? "closed" : "waiting_customer",
+      resolved_at: willClose ? now : null,
+      resolved_by: willClose ? context.userId : null,
+      closed_at: willClose ? now : null,
       updated_at: now,
       last_staff_message_at: now,
     };
     if (!ticket.first_response_at) patch.first_response_at = now;
     await admin.from("support_tickets").update(patch as never).eq("id", ticket.id);
 
-    // Arm auto-close scheduler if requested
-    if (data.armAutoclose) {
+    if (willClose) {
+      try {
+        const { cancelTicketAutocloseByTicket } = await import("@/lib/scheduling/schedulers.server");
+        await cancelTicketAutocloseByTicket(ticket.id, "closed_on_reply");
+      } catch { /* non-fatal */ }
+
+      if (ticket.application_id) {
+        try {
+          const { dispatchEvent } = await import("@/lib/workflow/engine.server");
+          await dispatchEvent(
+            {
+              type: "TicketClosed",
+              applicationId: ticket.application_id,
+              ticketId: ticket.id,
+              outcome: "cooperating",
+              actorId: context.userId,
+            },
+            context.userId,
+          );
+        } catch (e) {
+          console.error("[workflow] TicketClosed dispatch failed", e);
+        }
+      }
+    } else if (data.armAutoclose) {
       try {
         const { startTicketAutocloseScheduler } = await import("@/lib/scheduling/schedulers.server");
         await startTicketAutocloseScheduler({
@@ -345,7 +371,7 @@ export const replyToTicket = createServerFn({ method: "POST" })
           orderId: ticket.application_id,
           employeeId: context.userId,
           actionType: "TICKET_REPLIED",
-          notes: `Replied to ticket #${ticket.ticket_number || ticket.id.slice(0, 8)}`,
+          notes: `${willClose ? "Replied & closed" : "Replied to"} ticket #${ticket.ticket_number || ticket.id.slice(0, 8)}`,
           source: "employee",
           supabase: admin,
         });

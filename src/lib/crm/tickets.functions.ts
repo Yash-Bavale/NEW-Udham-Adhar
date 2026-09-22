@@ -153,8 +153,6 @@ export const listTickets = createServerFn({ method: "POST" })
     // Response State Filter (Direct DB conditions)
     if (data.responseState === "closed") {
       q = q.in("status", ["resolved", "closed"]);
-    } else if (data.responseState === "open") {
-      q = q.not("status", "in", '("resolved","closed")');
     } else if (data.responseState === "new") {
       q = q.is("first_response_at", null).not("status", "in", '("resolved","closed")');
     } else if (data.responseState === "awaiting_customer") {
