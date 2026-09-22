@@ -367,3 +367,84 @@ export const updateSoundSettings = createServerFn({ method: "POST" })
 
     return { ok: true, ...data };
   });
+
+const CALLBACK_PRESETS_STORAGE_PATH = "config/callback-presets.json";
+
+export interface CallbackReminderPresetConfig {
+  quickMinutes: number;
+  recommendedHours: number;
+  eveningHours: number;
+  laterTodayHours: number;
+  tomorrowDefaultTime: string; // "HH:MM" e.g. "10:30"
+}
+
+export const DEFAULT_CALLBACK_PRESET_CONFIG: CallbackReminderPresetConfig = {
+  quickMinutes: 60,
+  recommendedHours: 2,
+  eveningHours: 3,
+  laterTodayHours: 4,
+  tomorrowDefaultTime: "10:30",
+};
+
+async function readCallbackPresetsFromStorage(): Promise<CallbackReminderPresetConfig | null> {
+  try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data, error } = await supabaseAdmin.storage
+      .from("documents")
+      .download(CALLBACK_PRESETS_STORAGE_PATH);
+
+    if (error || !data) return null;
+    const text = await data.text();
+    return JSON.parse(text) as CallbackReminderPresetConfig;
+  } catch {
+    return null;
+  }
+}
+
+async function writeCallbackPresetsToStorage(config: Partial<CallbackReminderPresetConfig>): Promise<void> {
+  try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const existing = (await readCallbackPresetsFromStorage()) || DEFAULT_CALLBACK_PRESET_CONFIG;
+    const merged = { ...existing, ...config };
+    const buffer = Buffer.from(JSON.stringify(merged, null, 2), "utf-8");
+
+    await supabaseAdmin.storage
+      .from("documents")
+      .upload(CALLBACK_PRESETS_STORAGE_PATH, buffer, {
+        contentType: "application/json",
+        upsert: true,
+      });
+  } catch (err) {
+    console.warn("[writeCallbackPresetsToStorage] storage config write warning:", err);
+  }
+}
+
+export const getCallbackReminderPresetSettings = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async () => {
+    const storageConfig = await readCallbackPresetsFromStorage();
+    return {
+      quickMinutes: storageConfig?.quickMinutes ?? DEFAULT_CALLBACK_PRESET_CONFIG.quickMinutes,
+      recommendedHours: storageConfig?.recommendedHours ?? DEFAULT_CALLBACK_PRESET_CONFIG.recommendedHours,
+      eveningHours: storageConfig?.eveningHours ?? DEFAULT_CALLBACK_PRESET_CONFIG.eveningHours,
+      laterTodayHours: storageConfig?.laterTodayHours ?? DEFAULT_CALLBACK_PRESET_CONFIG.laterTodayHours,
+      tomorrowDefaultTime: storageConfig?.tomorrowDefaultTime ?? DEFAULT_CALLBACK_PRESET_CONFIG.tomorrowDefaultTime,
+    };
+  });
+
+export const saveCallbackReminderPresetSettings = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((raw: unknown) =>
+    z.object({
+      quickMinutes: z.number().min(1).max(1440),
+      recommendedHours: z.number().min(0.1).max(72),
+      eveningHours: z.number().min(0.1).max(72),
+      laterTodayHours: z.number().min(0.1).max(72),
+      tomorrowDefaultTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/),
+    }).parse(raw),
+  )
+  .handler(async ({ data }) => {
+    await writeCallbackPresetsToStorage(data);
+    return { ok: true, ...data };
+  });
+

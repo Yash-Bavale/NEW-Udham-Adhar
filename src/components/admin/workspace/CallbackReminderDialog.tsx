@@ -17,6 +17,10 @@ import {
   getActiveOrderCallback,
 } from "@/lib/orders/actions/callback-reminder.functions";
 import { getOrderDetailV2 } from "@/lib/crm/orders-v2.functions";
+import {
+  getCallbackReminderPresetSettings,
+  DEFAULT_CALLBACK_PRESET_CONFIG,
+} from "@/lib/settings/app-settings.functions";
 
 interface Props {
   orderId: string;
@@ -79,6 +83,20 @@ export function CallbackReminderDialog({
   const cancelFn = useServerFn(cancelOrderCallback);
   const completeFn = useServerFn(completeOrderCallback);
   const getDetailFn = useServerFn(getOrderDetailV2);
+  const getPresetsFn = useServerFn(getCallbackReminderPresetSettings);
+
+  // Fetch presets configured by Admin
+  const { data: presetConfig } = useQuery({
+    queryKey: ["callback-reminder-presets"],
+    queryFn: () => getPresetsFn(),
+    staleTime: 60_000,
+  });
+
+  const quickMinutes = presetConfig?.quickMinutes ?? DEFAULT_CALLBACK_PRESET_CONFIG.quickMinutes;
+  const recommendedHours = presetConfig?.recommendedHours ?? DEFAULT_CALLBACK_PRESET_CONFIG.recommendedHours;
+  const eveningHours = presetConfig?.eveningHours ?? DEFAULT_CALLBACK_PRESET_CONFIG.eveningHours;
+  const laterTodayHours = presetConfig?.laterTodayHours ?? DEFAULT_CALLBACK_PRESET_CONFIG.laterTodayHours;
+  const tomorrowDefaultTime = presetConfig?.tomorrowDefaultTime ?? DEFAULT_CALLBACK_PRESET_CONFIG.tomorrowDefaultTime;
 
   // Fetch active callback
   const { data: activeCallback } = useQuery({
@@ -101,10 +119,10 @@ export function CallbackReminderDialog({
   const staffName = propAssignedName || (orderDetail as any)?.assignedStaff?.display_name || (orderDetail as any)?.assignedStaff?.email || "Assigned Executive";
 
   const [selectedOutcome, setSelectedOutcome] = useState<string>("call_back_later");
-  const [durationPreset, setDurationPreset] = useState<string>("2h"); // '60m' | '2h' | '3h' | '4h' | 'tomorrow' | 'custom'
+  const [durationPreset, setDurationPreset] = useState<string>("recommended"); // 'quick' | 'recommended' | 'evening' | 'later_today' | 'tomorrow' | 'custom'
   const [customDate, setCustomDate] = useState<Date>(() => new Date(Date.now() + 120 * 60_000));
 
-  const [note, setNote] = useState<string>("Customer answered and requested callback after 2 hours. Will keep Aadhaar OTP ready for verification.");
+  const [note, setNote] = useState<string>("Customer answered and requested callback. Will keep Aadhaar OTP ready for verification.");
   const [completeNote, setCompleteNote] = useState<string>("");
 
   // Automated trigger toggles
@@ -112,27 +130,29 @@ export function CallbackReminderDialog({
   const [desktopAlert, setDesktopAlert] = useState(true);
   const [whatsappReminder, setWhatsappReminder] = useState(true);
 
-  // Calculate target date
+  // Calculate target date dynamically from settings
   const targetDate = useMemo(() => {
     const now = new Date();
-    if (durationPreset === "60m") {
-      return new Date(now.getTime() + 60 * 60_000);
-    } else if (durationPreset === "2h") {
-      return new Date(now.getTime() + 120 * 60_000);
-    } else if (durationPreset === "3h") {
-      return new Date(now.getTime() + 180 * 60_000);
-    } else if (durationPreset === "4h") {
-      return new Date(now.getTime() + 240 * 60_000);
+    if (durationPreset === "quick") {
+      return new Date(now.getTime() + quickMinutes * 60_000);
+    } else if (durationPreset === "recommended") {
+      return new Date(now.getTime() + Math.round(recommendedHours * 60) * 60_000);
+    } else if (durationPreset === "evening") {
+      return new Date(now.getTime() + Math.round(eveningHours * 60) * 60_000);
+    } else if (durationPreset === "later_today") {
+      return new Date(now.getTime() + Math.round(laterTodayHours * 60) * 60_000);
     } else if (durationPreset === "tomorrow") {
       const t = new Date(now);
       t.setDate(t.getDate() + 1);
-      t.setHours(10, 30, 0, 0);
+      const [h, m] = (tomorrowDefaultTime || "10:30").split(":").map(Number);
+      t.setHours(isNaN(h) ? 10 : h, isNaN(m) ? 30 : m, 0, 0);
       return t;
     } else if (durationPreset === "custom") {
       return customDate;
     }
-    return new Date(now.getTime() + 120 * 60_000);
-  }, [durationPreset, customDate]);
+    return new Date(now.getTime() + Math.round(recommendedHours * 60) * 60_000);
+  }, [durationPreset, customDate, quickMinutes, recommendedHours, eveningHours, laterTodayHours, tomorrowDefaultTime]);
+
 
   // When outcome changes, update default note if user hasn't heavily modified it
   const handleSelectOutcome = (outcomeId: string) => {
@@ -388,78 +408,78 @@ export function CallbackReminderDialog({
             </div>
 
             <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
-              {/* Quick +60 Mins */}
+              {/* Quick Preset */}
               <button
                 type="button"
-                onClick={() => setDurationPreset("60m")}
+                onClick={() => setDurationPreset("quick")}
                 className={cn(
                   "px-2 py-1.5 rounded-lg text-center transition-colors border select-none cursor-pointer",
-                  durationPreset === "60m"
+                  durationPreset === "quick"
                     ? "bg-blue-600 text-white border-blue-600 shadow-xs font-bold"
                     : "bg-white hover:bg-slate-50 text-slate-800 border-slate-200"
                 )}
               >
-                <div className={cn("text-[10px] uppercase font-semibold", durationPreset === "60m" ? "text-blue-100" : "text-slate-400")}>
+                <div className={cn("text-[10px] uppercase font-semibold", durationPreset === "quick" ? "text-blue-100" : "text-slate-400")}>
                   Quick
                 </div>
-                <div className="text-xs font-bold">+60 Mins</div>
+                <div className="text-xs font-bold">+{quickMinutes} Mins</div>
               </button>
 
-              {/* Recommended 2 Hours */}
+              {/* Recommended Preset */}
               <button
                 type="button"
-                onClick={() => setDurationPreset("2h")}
+                onClick={() => setDurationPreset("recommended")}
                 className={cn(
                   "px-2 py-1.5 rounded-lg text-center transition-colors border select-none cursor-pointer",
-                  durationPreset === "2h"
+                  durationPreset === "recommended"
                     ? "bg-blue-600 text-white border-blue-600 shadow-xs font-bold"
                     : "bg-white hover:bg-slate-50 text-slate-800 border-slate-200"
                 )}
               >
-                <div className={cn("text-[10px] uppercase font-semibold", durationPreset === "2h" ? "text-blue-100" : "text-blue-600 font-bold")}>
+                <div className={cn("text-[10px] uppercase font-semibold", durationPreset === "recommended" ? "text-blue-100" : "text-blue-600 font-bold")}>
                   Recommended
                 </div>
                 <div className="text-xs font-bold flex items-center justify-center gap-1">
-                  2 Hours
-                  {durationPreset === "2h" && <Check className="size-3" />}
+                  {recommendedHours} {recommendedHours === 1 ? "Hour" : "Hours"}
+                  {durationPreset === "recommended" && <Check className="size-3" />}
                 </div>
               </button>
 
-              {/* Evening 3 Hours */}
+              {/* Evening Preset */}
               <button
                 type="button"
-                onClick={() => setDurationPreset("3h")}
+                onClick={() => setDurationPreset("evening")}
                 className={cn(
                   "px-2 py-1.5 rounded-lg text-center transition-colors border select-none cursor-pointer",
-                  durationPreset === "3h"
+                  durationPreset === "evening"
                     ? "bg-blue-600 text-white border-blue-600 shadow-xs font-bold"
                     : "bg-white hover:bg-slate-50 text-slate-800 border-slate-200"
                 )}
               >
-                <div className={cn("text-[10px] uppercase font-semibold", durationPreset === "3h" ? "text-blue-100" : "text-slate-400")}>
+                <div className={cn("text-[10px] uppercase font-semibold", durationPreset === "evening" ? "text-blue-100" : "text-slate-400")}>
                   Evening
                 </div>
-                <div className="text-xs font-bold">3 Hours</div>
+                <div className="text-xs font-bold">{eveningHours} {eveningHours === 1 ? "Hour" : "Hours"}</div>
               </button>
 
-              {/* Later Today 4 Hours */}
+              {/* Later Today Preset */}
               <button
                 type="button"
-                onClick={() => setDurationPreset("4h")}
+                onClick={() => setDurationPreset("later_today")}
                 className={cn(
                   "px-2 py-1.5 rounded-lg text-center transition-colors border select-none cursor-pointer",
-                  durationPreset === "4h"
+                  durationPreset === "later_today"
                     ? "bg-blue-600 text-white border-blue-600 shadow-xs font-bold"
                     : "bg-white hover:bg-slate-50 text-slate-800 border-slate-200"
                 )}
               >
-                <div className={cn("text-[10px] uppercase font-semibold", durationPreset === "4h" ? "text-blue-100" : "text-slate-400")}>
+                <div className={cn("text-[10px] uppercase font-semibold", durationPreset === "later_today" ? "text-blue-100" : "text-slate-400")}>
                   Later Today
                 </div>
-                <div className="text-xs font-bold">4 Hours</div>
+                <div className="text-xs font-bold">{laterTodayHours} {laterTodayHours === 1 ? "Hour" : "Hours"}</div>
               </button>
 
-              {/* Tomorrow 10:30 AM */}
+              {/* Tomorrow Default Time */}
               <button
                 type="button"
                 onClick={() => setDurationPreset("tomorrow")}
@@ -473,7 +493,7 @@ export function CallbackReminderDialog({
                 <div className={cn("text-[10px] uppercase font-semibold", durationPreset === "tomorrow" ? "text-blue-100" : "text-slate-400")}>
                   Tomorrow
                 </div>
-                <div className="text-xs font-bold">10:30 AM</div>
+                <div className="text-xs font-bold">{tomorrowDefaultTime || "10:30"}</div>
               </button>
 
               {/* Custom */}
@@ -491,6 +511,7 @@ export function CallbackReminderDialog({
                 <div className="text-xs font-bold">Custom</div>
               </button>
             </div>
+
 
             {durationPreset === "custom" && (
               <div className="pt-2 animate-in fade-in duration-150">

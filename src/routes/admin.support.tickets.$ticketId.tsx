@@ -12,7 +12,7 @@ import {
   MapPin, ShieldAlert, FileText, ChevronLeft, ChevronRight, Plus, Download,
   Bold, Italic, Underline, Strikethrough, List, ListOrdered, Quote,
   AlignLeft, AlignCenter, AlignRight, Image as ImageIcon, Search, Tag,
-  ChevronRight as ChevronRightIcon, RefreshCw, Flame
+  ChevronRight as ChevronRightIcon, RefreshCw, Flame, Reply
 } from "lucide-react";
 import { getTicketWorkspace } from "@/lib/crm/ticket-workspace.functions";
 import {
@@ -264,6 +264,7 @@ function TicketWorkspace() {
   const [sidebarDrawerOpen, setSidebarDrawerOpen] = useState(false);
 
   // Composer state
+  const [isComposerOpen, setIsComposerOpen] = useState(false);
   const [composeTab, setComposeTab] = useState<"reply" | "note">("reply");
   const [body, setBody] = useState("");
   const [showCc, setShowCc] = useState(false);
@@ -278,6 +279,14 @@ function TicketWorkspace() {
   const attachmentInputRef = useRef<HTMLInputElement | null>(null);
   const threadRef = useRef<HTMLDivElement | null>(null);
   const [showScrollBottom, setShowScrollBottom] = useState(false);
+
+  const openComposer = (tab: "reply" | "note" = "reply") => {
+    setComposeTab(tab);
+    setIsComposerOpen(true);
+    setTimeout(() => {
+      composerRef.current?.focus();
+    }, 50);
+  };
 
   const handleAttachmentSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? []);
@@ -528,6 +537,7 @@ function TicketWorkspace() {
       setBccInput("");
       setShowCc(false);
       setShowBcc(false);
+      setIsComposerOpen(false);
       invalidate();
     },
     onError: (e: Error) => toast.error(e.message),
@@ -962,6 +972,7 @@ function TicketWorkspace() {
                       customerName={cust.name}
                       customerEmail={ticket.ticket_email ?? cust.primary_email}
                       onDownloadDoc={handleDownloadDoc}
+                      onReply={() => openComposer("reply")}
                     />
                   ))}
                 </div>
@@ -979,322 +990,369 @@ function TicketWorkspace() {
             </button>
           )}
 
-          {/* ── 3. Sticky Bottom Reply Composer matching Screenshot ─────────────── */}
-          <div className="bg-white border-t border-slate-200 shrink-0">
-            {/* Tab Header Row: Reply | Internal Note + Recipient chip + Cc / Bcc */}
-            <div className="flex items-center justify-between border-b border-slate-200 px-3 py-1 flex-wrap gap-1.5">
-              {/* Left Tabs */}
-              <div className="flex items-center">
+          {/* ── 3. Sticky Bottom Reply Composer ─────────────── */}
+          {!isComposerOpen ? (
+            <div className="bg-white border-t border-slate-200 px-4 py-2.5 flex items-center justify-between gap-3 shrink-0 shadow-xs">
+              <button
+                type="button"
+                onClick={() => openComposer("reply")}
+                className="flex-1 flex items-center gap-2.5 px-3.5 py-2 rounded-lg bg-slate-50 hover:bg-slate-100/90 border border-slate-200 text-slate-500 text-xs font-medium cursor-pointer transition text-left select-none"
+              >
+                <Reply className="size-4 text-blue-600 shrink-0" />
+                <span className="truncate">
+                  Click here to reply to <strong className="text-slate-800 font-semibold">{customerEmailAddress || cust?.name || "Customer"}</strong>…
+                </span>
+              </button>
+
+              <div className="flex items-center gap-2 shrink-0">
                 <button
-                  onClick={() => setComposeTab("reply")}
-                  className={`px-3 py-1.5 text-xs font-bold transition-all relative ${
-                    composeTab === "reply"
-                      ? "text-blue-600 border-b-2 border-blue-600"
-                      : "text-slate-500 hover:text-slate-800"
-                  }`}
+                  type="button"
+                  onClick={() => openComposer("reply")}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition shadow-xs cursor-pointer select-none"
                 >
-                  Reply
+                  <Reply className="size-3.5" /> Reply
                 </button>
                 <button
-                  onClick={() => setComposeTab("note")}
-                  className={`px-3 py-1.5 text-xs font-bold transition-all relative ${
-                    composeTab === "note"
-                      ? "text-amber-700 border-b-2 border-amber-500"
-                      : "text-slate-500 hover:text-slate-800"
-                  }`}
+                  type="button"
+                  onClick={() => openComposer("note")}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 text-xs font-bold transition shadow-xs cursor-pointer select-none"
                 >
-                  Internal Note
+                  <StickyNote className="size-3.5 text-amber-700" /> Internal Note
                 </button>
               </div>
+            </div>
+          ) : (
+            <div className="bg-white border-t border-slate-200 shrink-0 animate-in slide-in-from-bottom-2 duration-150">
+              {/* Tab Header Row: Reply | Internal Note + Recipient chip + Cc / Bcc + Minimize */}
+              <div className="flex items-center justify-between border-b border-slate-200 px-3 py-1 flex-wrap gap-1.5">
+                {/* Left Tabs */}
+                <div className="flex items-center">
+                  <button
+                    onClick={() => setComposeTab("reply")}
+                    className={`px-3 py-1.5 text-xs font-bold transition-all relative ${
+                      composeTab === "reply"
+                        ? "text-blue-600 border-b-2 border-blue-600"
+                        : "text-slate-500 hover:text-slate-800"
+                    }`}
+                  >
+                    Reply
+                  </button>
+                  <button
+                    onClick={() => setComposeTab("note")}
+                    className={`px-3 py-1.5 text-xs font-bold transition-all relative ${
+                      composeTab === "note"
+                        ? "text-amber-700 border-b-2 border-amber-500"
+                        : "text-slate-500 hover:text-slate-800"
+                    }`}
+                  >
+                    Internal Note
+                  </button>
+                </div>
 
-              {/* Right: To Recipient Chip + Cc / Bcc matching Screenshot */}
-              {composeTab === "reply" && (
-                <div className="flex items-center gap-2 text-xs">
-                  <span className="text-slate-500 font-medium">To:</span>
-                  <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-slate-100 border border-slate-200 text-slate-700 font-mono text-xs">
-                    <span>{customerEmailAddress}</span>
+                {/* Right: To Recipient Chip + Cc / Bcc + Minimize button */}
+                <div className="flex items-center gap-2 text-xs flex-wrap">
+                  {composeTab === "reply" && (
+                    <>
+                      <span className="text-slate-500 font-medium">To:</span>
+                      <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-slate-100 border border-slate-200 text-slate-700 font-mono text-xs">
+                        <span>{customerEmailAddress}</span>
+                        <button
+                          type="button"
+                          onClick={() => toast.info(`Recipient email is bound to ticket (${customerEmailAddress})`)}
+                          className="text-slate-400 hover:text-slate-600"
+                        >
+                          <X className="size-3" />
+                        </button>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => setShowCc((v) => !v)}
+                        className={`px-1.5 py-0.5 rounded text-xs font-semibold transition-colors ${
+                          showCc || ccInput.trim()
+                            ? "bg-slate-200 text-slate-900"
+                            : "text-slate-500 hover:text-slate-900"
+                        }`}
+                      >
+                        Cc
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowBcc((v) => !v)}
+                        className={`px-1.5 py-0.5 rounded text-xs font-semibold transition-colors ${
+                          showBcc || bccInput.trim()
+                            ? "bg-slate-200 text-slate-900"
+                            : "text-slate-500 hover:text-slate-900"
+                        }`}
+                      >
+                        Bcc
+                      </button>
+                    </>
+                  )}
+
+                  <div className="h-4 w-px bg-slate-200 mx-1 hidden sm:block" />
+
+                  <button
+                    type="button"
+                    onClick={() => setIsComposerOpen(false)}
+                    className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-semibold text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors cursor-pointer select-none"
+                    title="Minimize Reply Window"
+                  >
+                    <ChevronDown className="size-3.5" />
+                    <span>Minimize</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Formatting Toolbar — real execCommand WYSIWYG buttons */}
+              <div className="flex items-center gap-1 px-3 py-1 bg-white border-b border-slate-200 flex-wrap text-slate-600">
+                <button type="button" onMouseDown={(e) => { e.preventDefault(); execFmt("bold"); }} className="p-1 rounded hover:bg-slate-100 text-slate-700 font-bold" title="Bold"><Bold className="size-3.5" /></button>
+                <button type="button" onMouseDown={(e) => { e.preventDefault(); execFmt("italic"); }} className="p-1 rounded hover:bg-slate-100 text-slate-700 italic" title="Italic"><Italic className="size-3.5" /></button>
+                <button type="button" onMouseDown={(e) => { e.preventDefault(); execFmt("underline"); }} className="p-1 rounded hover:bg-slate-100 text-slate-700 underline" title="Underline"><Underline className="size-3.5" /></button>
+                <button type="button" onMouseDown={(e) => { e.preventDefault(); execFmt("strikeThrough"); }} className="p-1 rounded hover:bg-slate-100 text-slate-700 line-through" title="Strikethrough"><Strikethrough className="size-3.5" /></button>
+
+                <div className="h-3 w-px bg-slate-300 mx-1" />
+
+                <button type="button" onMouseDown={(e) => { e.preventDefault(); execFmt("insertUnorderedList"); }} className="p-1 rounded hover:bg-slate-100 text-slate-700" title="Bullet list"><List className="size-3.5" /></button>
+                <button type="button" onMouseDown={(e) => { e.preventDefault(); execFmt("insertOrderedList"); }} className="p-1 rounded hover:bg-slate-100 text-slate-700" title="Numbered list"><ListOrdered className="size-3.5" /></button>
+                <button type="button" onMouseDown={(e) => { e.preventDefault(); execFmt("formatBlock", "blockquote"); }} className="p-1 rounded hover:bg-slate-100 text-slate-700" title="Quote"><Quote className="size-3.5" /></button>
+
+                <div className="h-3 w-px bg-slate-300 mx-1" />
+
+                <button
+                  type="button"
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    const url = window.prompt("Enter link URL:");
+                    if (url) execFmt("createLink", url);
+                  }}
+                  className="p-1 rounded hover:bg-slate-100 text-slate-700" title="Insert link"
+                >
+                  <Link2 className="size-3.5" />
+                </button>
+
+                {/* Image: file upload → base64 inline */}
+                <button
+                  type="button"
+                  onMouseDown={(e) => { e.preventDefault(); imageInputRef.current?.click(); }}
+                  className="p-1 rounded hover:bg-slate-100 text-slate-700" title="Insert image"
+                >
+                  <ImageIcon className="size-3.5" />
+                </button>
+                <input
+                  ref={imageInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    if (file.size > 2 * 1024 * 1024) { toast.error("Image must be under 2MB"); return; }
+                    const reader = new FileReader();
+                    reader.onload = (ev) => {
+                      const src = ev.target?.result as string;
+                      composerRef.current?.focus();
+                      document.execCommand("insertHTML", false, `<img src="${src}" style="max-width:100%;height:auto;border-radius:4px;margin:4px 0" />`);
+                      if (composerRef.current) setBody(composerRef.current.innerHTML);
+                    };
+                    reader.readAsDataURL(file);
+                    e.target.value = "";
+                  }}
+                />
+              </div>
+
+              {/* Optional Cc input row */}
+              {composeTab === "reply" && showCc && (
+                <div className="flex items-center gap-2 px-4 py-1.5 border-b border-slate-100 bg-slate-50 text-xs">
+                  <span className="font-semibold text-slate-500 w-9 shrink-0">Cc:</span>
+                  <input
+                    type="text"
+                    value={ccInput}
+                    onChange={(e) => setCcInput(e.target.value)}
+                    placeholder="Enter CC email addresses (comma separated)..."
+                    className="flex-1 bg-transparent border-none text-xs text-slate-800 focus:outline-none placeholder:text-slate-400"
+                    autoFocus
+                  />
+                  <button
+                    type="button"
+                    onClick={() => { setShowCc(false); setCcInput(""); }}
+                    className="text-slate-400 hover:text-slate-600 p-0.5"
+                    title="Clear Cc"
+                  >
+                    <X className="size-3.5" />
+                  </button>
+                </div>
+              )}
+
+              {/* Optional Bcc input row */}
+              {composeTab === "reply" && showBcc && (
+                <div className="flex items-center gap-2 px-4 py-1.5 border-b border-slate-100 bg-slate-50 text-xs">
+                  <span className="font-semibold text-slate-500 w-9 shrink-0">Bcc:</span>
+                  <input
+                    type="text"
+                    value={bccInput}
+                    onChange={(e) => setBccInput(e.target.value)}
+                    placeholder="Enter BCC email addresses (comma separated)..."
+                    className="flex-1 bg-transparent border-none text-xs text-slate-800 focus:outline-none placeholder:text-slate-400"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => { setShowBcc(false); setBccInput(""); }}
+                    className="text-slate-400 hover:text-slate-600 p-0.5"
+                    title="Clear Bcc"
+                  >
+                    <X className="size-3.5" />
+                  </button>
+                </div>
+              )}
+
+              {/* Composer — contenteditable WYSIWYG div */}
+              <div className="p-3">
+                <div
+                  ref={composerRef}
+                  contentEditable
+                  suppressContentEditableWarning
+                  onInput={() => {
+                    if (composerRef.current) setBody(composerRef.current.innerHTML);
+                  }}
+                  onKeyDown={(e) => {
+                    if ((e.ctrlKey || e.metaKey) && e.key === "Enter" && body.trim()) {
+                      sendReply.mutate({});
+                    }
+                  }}
+                  data-placeholder={
+                    composeTab === "note"
+                      ? "Add an internal note (only visible to staff members)…"
+                      : "Type your reply here…"
+                  }
+                  className={`w-full min-h-[72px] max-h-48 overflow-y-auto text-xs px-3 py-2 rounded-lg border focus:outline-none focus:ring-1 transition-all [&:empty]:before:content-[attr(data-placeholder)] [&:empty]:before:text-slate-400 ${
+                    composeTab === "note"
+                      ? "bg-amber-50/40 border-amber-200 focus:ring-amber-400 text-amber-950"
+                      : "bg-white border-slate-200 focus:ring-blue-500 text-slate-800"
+                  }`}
+                  style={{ lineHeight: "1.5", fontFamily: "inherit" }}
+                />
+
+                {/* Attached files pills display */}
+                {attachedFiles.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-2 pt-2 border-t border-slate-100">
+                    {attachedFiles.map((att) => (
+                      <div
+                        key={att.id}
+                        className="inline-flex items-center gap-2 px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200 text-xs text-slate-700 shadow-2xs"
+                      >
+                        <Paperclip className="size-3.5 text-slate-500" />
+                        <span className="font-medium truncate max-w-[160px]" title={att.name}>
+                          {att.name}
+                        </span>
+                        <span className="text-[10px] text-slate-400">({formatBytes(att.size)})</span>
+                        <button
+                          type="button"
+                          onClick={() => removeAttachment(att.id)}
+                          className="text-slate-400 hover:text-slate-700 p-0.5"
+                          title="Remove file"
+                        >
+                          <X className="size-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Bottom Quick Tools & Action Bar matching screenshot */}
+                <div className="mt-2 flex items-center justify-between gap-2 flex-wrap">
+                  {/* Left quick insert buttons */}
+                  <div className="flex items-center gap-1.5 flex-wrap">
                     <button
                       type="button"
-                      onClick={() => toast.info(`Recipient email is bound to ticket (${customerEmailAddress})`)}
-                      className="text-slate-400 hover:text-slate-600"
+                      onClick={() => attachmentInputRef.current?.click()}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-[11px] font-semibold shadow-2xs transition-colors cursor-pointer"
                     >
-                      <X className="size-3" />
+                      <Paperclip className="size-3 text-slate-500" /> Attach File
+                    </button>
+
+                    <input
+                      ref={attachmentInputRef}
+                      type="file"
+                      multiple
+                      accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.zip"
+                      className="hidden"
+                      onChange={handleAttachmentSelect}
+                    />
+
+                    <button
+                      type="button"
+                      onClick={() => setTemplatesModalOpen(true)}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-[11px] font-semibold shadow-2xs transition-colors cursor-pointer"
+                    >
+                      <FileText className="size-3 text-slate-500" /> Templates
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={insertOrderDetails}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-[11px] font-semibold shadow-2xs transition-colors cursor-pointer"
+                    >
+                      <Package className="size-3 text-slate-500" /> Insert Order Details
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setCannedModalOpen(true)}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-[11px] font-semibold shadow-2xs transition-colors cursor-pointer"
+                    >
+                      <Sparkles className="size-3 text-slate-500" /> Canned Responses
                     </button>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => setShowCc((v) => !v)}
-                    className={`px-1.5 py-0.5 rounded text-xs font-semibold transition-colors ${
-                      showCc || ccInput.trim()
-                        ? "bg-slate-200 text-slate-900"
-                        : "text-slate-500 hover:text-slate-900"
-                    }`}
-                  >
-                    Cc
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowBcc((v) => !v)}
-                    className={`px-1.5 py-0.5 rounded text-xs font-semibold transition-colors ${
-                      showBcc || bccInput.trim()
-                        ? "bg-slate-200 text-slate-900"
-                        : "text-slate-500 hover:text-slate-900"
-                    }`}
-                  >
-                    Bcc
-                  </button>
-                </div>
-              )}
-            </div>
+                  {/* Right Send button */}
+                  <div className="flex items-center gap-2">
+                    <label className="inline-flex items-center gap-1.5 text-xs text-slate-600 font-medium cursor-pointer select-none mr-1.5">
+                      <input
+                        type="checkbox"
+                        checked={sendCopy}
+                        onChange={(e) => setSendCopy(e.target.checked)}
+                        className="rounded border-slate-300 text-blue-600 focus:ring-0"
+                      />
+                      <span>Send me a copy</span>
+                    </label>
 
-            {/* Formatting Toolbar — real execCommand WYSIWYG buttons */}
-            <div className="flex items-center gap-1 px-3 py-1 bg-white border-b border-slate-200 flex-wrap text-slate-600">
-              <button type="button" onMouseDown={(e) => { e.preventDefault(); execFmt("bold"); }} className="p-1 rounded hover:bg-slate-100 text-slate-700 font-bold" title="Bold"><Bold className="size-3.5" /></button>
-              <button type="button" onMouseDown={(e) => { e.preventDefault(); execFmt("italic"); }} className="p-1 rounded hover:bg-slate-100 text-slate-700 italic" title="Italic"><Italic className="size-3.5" /></button>
-              <button type="button" onMouseDown={(e) => { e.preventDefault(); execFmt("underline"); }} className="p-1 rounded hover:bg-slate-100 text-slate-700 underline" title="Underline"><Underline className="size-3.5" /></button>
-              <button type="button" onMouseDown={(e) => { e.preventDefault(); execFmt("strikeThrough"); }} className="p-1 rounded hover:bg-slate-100 text-slate-700 line-through" title="Strikethrough"><Strikethrough className="size-3.5" /></button>
-
-              <div className="h-3 w-px bg-slate-300 mx-1" />
-
-              <button type="button" onMouseDown={(e) => { e.preventDefault(); execFmt("insertUnorderedList"); }} className="p-1 rounded hover:bg-slate-100 text-slate-700" title="Bullet list"><List className="size-3.5" /></button>
-              <button type="button" onMouseDown={(e) => { e.preventDefault(); execFmt("insertOrderedList"); }} className="p-1 rounded hover:bg-slate-100 text-slate-700" title="Numbered list"><ListOrdered className="size-3.5" /></button>
-              <button type="button" onMouseDown={(e) => { e.preventDefault(); execFmt("formatBlock", "blockquote"); }} className="p-1 rounded hover:bg-slate-100 text-slate-700" title="Quote"><Quote className="size-3.5" /></button>
-
-              <div className="h-3 w-px bg-slate-300 mx-1" />
-
-              <button
-                type="button"
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  const url = window.prompt("Enter link URL:");
-                  if (url) execFmt("createLink", url);
-                }}
-                className="p-1 rounded hover:bg-slate-100 text-slate-700" title="Insert link"
-              >
-                <Link2 className="size-3.5" />
-              </button>
-
-              {/* Image: file upload → base64 inline */}
-              <button
-                type="button"
-                onMouseDown={(e) => { e.preventDefault(); imageInputRef.current?.click(); }}
-                className="p-1 rounded hover:bg-slate-100 text-slate-700" title="Insert image"
-              >
-                <ImageIcon className="size-3.5" />
-              </button>
-              <input
-                ref={imageInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (!file) return;
-                  if (file.size > 2 * 1024 * 1024) { toast.error("Image must be under 2MB"); return; }
-                  const reader = new FileReader();
-                  reader.onload = (ev) => {
-                    const src = ev.target?.result as string;
-                    composerRef.current?.focus();
-                    document.execCommand("insertHTML", false, `<img src="${src}" style="max-width:100%;height:auto;border-radius:4px;margin:4px 0" />`);
-                    if (composerRef.current) setBody(composerRef.current.innerHTML);
-                  };
-                  reader.readAsDataURL(file);
-                  e.target.value = "";
-                }}
-              />
-            </div>
-
-            {/* Optional Cc input row */}
-            {composeTab === "reply" && showCc && (
-              <div className="flex items-center gap-2 px-4 py-1.5 border-b border-slate-100 bg-slate-50 text-xs">
-                <span className="font-semibold text-slate-500 w-9 shrink-0">Cc:</span>
-                <input
-                  type="text"
-                  value={ccInput}
-                  onChange={(e) => setCcInput(e.target.value)}
-                  placeholder="Enter CC email addresses (comma separated)..."
-                  className="flex-1 bg-transparent border-none text-xs text-slate-800 focus:outline-none placeholder:text-slate-400"
-                  autoFocus
-                />
-                <button
-                  type="button"
-                  onClick={() => { setShowCc(false); setCcInput(""); }}
-                  className="text-slate-400 hover:text-slate-600 p-0.5"
-                  title="Clear Cc"
-                >
-                  <X className="size-3.5" />
-                </button>
-              </div>
-            )}
-
-            {/* Optional Bcc input row */}
-            {composeTab === "reply" && showBcc && (
-              <div className="flex items-center gap-2 px-4 py-1.5 border-b border-slate-100 bg-slate-50 text-xs">
-                <span className="font-semibold text-slate-500 w-9 shrink-0">Bcc:</span>
-                <input
-                  type="text"
-                  value={bccInput}
-                  onChange={(e) => setBccInput(e.target.value)}
-                  placeholder="Enter BCC email addresses (comma separated)..."
-                  className="flex-1 bg-transparent border-none text-xs text-slate-800 focus:outline-none placeholder:text-slate-400"
-                />
-                <button
-                  type="button"
-                  onClick={() => { setShowBcc(false); setBccInput(""); }}
-                  className="text-slate-400 hover:text-slate-600 p-0.5"
-                  title="Clear Bcc"
-                >
-                  <X className="size-3.5" />
-                </button>
-              </div>
-            )}
-
-            {/* Composer — contenteditable WYSIWYG div */}
-            <div className="p-3">
-              <div
-                ref={composerRef}
-                contentEditable
-                suppressContentEditableWarning
-                onInput={() => {
-                  if (composerRef.current) setBody(composerRef.current.innerHTML);
-                }}
-                onKeyDown={(e) => {
-                  if ((e.ctrlKey || e.metaKey) && e.key === "Enter" && body.trim()) {
-                    sendReply.mutate({});
-                  }
-                }}
-                data-placeholder={
-                  composeTab === "note"
-                    ? "Add an internal note (only visible to staff members)…"
-                    : "Type your reply here…"
-                }
-                className={`w-full min-h-[72px] max-h-48 overflow-y-auto text-xs px-3 py-2 rounded-lg border focus:outline-none focus:ring-1 transition-all [&:empty]:before:content-[attr(data-placeholder)] [&:empty]:before:text-slate-400 ${
-                  composeTab === "note"
-                    ? "bg-amber-50/40 border-amber-200 focus:ring-amber-400 text-amber-950"
-                    : "bg-white border-slate-200 focus:ring-blue-500 text-slate-800"
-                }`}
-                style={{ lineHeight: "1.5", fontFamily: "inherit" }}
-              />
-
-              {/* Attached files pills display */}
-              {attachedFiles.length > 0 && (
-                <div className="flex flex-wrap gap-2 mt-2 pt-2 border-t border-slate-100">
-                  {attachedFiles.map((att) => (
-                    <div
-                      key={att.id}
-                      className="inline-flex items-center gap-2 px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200 text-xs text-slate-700 shadow-2xs"
-                    >
-                      <Paperclip className="size-3.5 text-slate-500" />
-                      <span className="font-medium truncate max-w-[160px]" title={att.name}>
-                        {att.name}
-                      </span>
-                      <span className="text-[10px] text-slate-400">({formatBytes(att.size)})</span>
+                    {composeTab === "reply" ? (
                       <button
                         type="button"
-                        onClick={() => removeAttachment(att.id)}
-                        className="text-slate-400 hover:text-slate-700 p-0.5"
-                        title="Remove file"
+                        onClick={() => sendReply.mutate({})}
+                        disabled={!body.replace(/<[^>]*>/g, "").trim() || sendReply.isPending}
+                        className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg border border-emerald-500 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-2xs shrink-0 cursor-pointer"
+                        title="Sends reply email to customer and instantly closes ticket in CRM"
                       >
-                        <X className="size-3" />
+                        {sendReply.isPending ? (
+                          <Loader2 className="size-3.5 animate-spin" />
+                        ) : (
+                          <CheckCircle2 className="size-3.5 text-white" />
+                        )}
+                        <span>Send &amp; Close Ticket</span>
                       </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* Bottom Quick Tools & Action Bar matching screenshot */}
-              <div className="mt-2 flex items-center justify-between gap-2 flex-wrap">
-                {/* Left quick insert buttons */}
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <button
-                    type="button"
-                    onClick={() => attachmentInputRef.current?.click()}
-                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-[11px] font-semibold shadow-2xs transition-colors"
-                  >
-                    <Paperclip className="size-3 text-slate-500" /> Attach File
-                  </button>
-
-                  <input
-                    ref={attachmentInputRef}
-                    type="file"
-                    multiple
-                    accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.zip"
-                    className="hidden"
-                    onChange={handleAttachmentSelect}
-                  />
-
-                  <button
-                    type="button"
-                    onClick={() => setTemplatesModalOpen(true)}
-                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-[11px] font-semibold shadow-2xs transition-colors"
-                  >
-                    <FileText className="size-3 text-slate-500" /> Templates
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={insertOrderDetails}
-                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-[11px] font-semibold shadow-2xs transition-colors"
-                  >
-                    <Package className="size-3 text-slate-500" /> Insert Order Details
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setCannedModalOpen(true)}
-                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-[11px] font-semibold shadow-2xs transition-colors"
-                  >
-                    <Sparkles className="size-3 text-slate-500" /> Canned Responses
-                  </button>
-                </div>
-
-                {/* Right Send button */}
-                <div className="flex items-center gap-2">
-                  <label className="inline-flex items-center gap-1.5 text-xs text-slate-600 font-medium cursor-pointer select-none mr-1.5">
-                    <input
-                      type="checkbox"
-                      checked={sendCopy}
-                      onChange={(e) => setSendCopy(e.target.checked)}
-                      className="rounded border-slate-300 text-blue-600 focus:ring-0"
-                    />
-                    <span>Send me a copy</span>
-                  </label>
-
-                  {composeTab === "reply" ? (
-                    <button
-                      type="button"
-                      onClick={() => sendReply.mutate({})}
-                      disabled={!body.replace(/<[^>]*>/g, "").trim() || sendReply.isPending}
-                      className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg border border-emerald-500 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-2xs shrink-0"
-                      title="Sends reply email to customer and instantly closes ticket in CRM"
-                    >
-                      {sendReply.isPending ? (
-                        <Loader2 className="size-3.5 animate-spin" />
-                      ) : (
-                        <CheckCircle2 className="size-3.5 text-white" />
-                      )}
-                      <span>Send &amp; Close Ticket</span>
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => sendReply.mutate({})}
-                      disabled={!body.replace(/<[^>]*>/g, "").trim() || sendReply.isPending}
-                      className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-2xs shrink-0"
-                    >
-                      {sendReply.isPending ? (
-                        <Loader2 className="size-3.5 animate-spin" />
-                      ) : (
-                        <Send className="size-3.5" />
-                      )}
-                      <span>Add Note</span>
-                    </button>
-                  )}
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => sendReply.mutate({})}
+                        disabled={!body.replace(/<[^>]*>/g, "").trim() || sendReply.isPending}
+                        className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-2xs shrink-0 cursor-pointer"
+                      >
+                        {sendReply.isPending ? (
+                          <Loader2 className="size-3.5 animate-spin" />
+                        ) : (
+                          <Send className="size-3.5" />
+                        )}
+                        <span>Add Note</span>
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
+          )}
+
         </div>
       </div>
 
@@ -1468,6 +1526,18 @@ function TicketWorkspace() {
               </span>
             </div>
 
+            {Boolean(app.is_hot) && (
+              <div className="flex items-center justify-between gap-2 py-1.5 px-2.5 rounded-lg bg-rose-50 border border-rose-200">
+                <span className="text-rose-700 text-[11px] font-bold flex items-center gap-1.5">
+                  <Flame className="size-3.5 text-rose-600 fill-rose-600 animate-pulse shrink-0" />
+                  🔥 Hot Priority Active
+                </span>
+                <span className="text-[10px] font-semibold text-rose-600 bg-rose-100/80 px-1.5 py-0.5 rounded uppercase tracking-wider">
+                  Needs Action
+                </span>
+              </div>
+            )}
+
             {Boolean(app.id) && (
               <div className="pt-2 border-t border-slate-100">
                 <button
@@ -1475,14 +1545,14 @@ function TicketWorkspace() {
                   onClick={() => doMakeHotOrder.mutate(app.id)}
                   disabled={doMakeHotOrder.isPending}
                   className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-700 hover:to-amber-700 text-white text-xs font-bold transition-all shadow-2xs disabled:opacity-50 cursor-pointer"
-                  title="Directly escalate this linked order to Hot Priority"
+                  title="Directly escalate this open order to Hot Priority in CRM"
                 >
                   {doMakeHotOrder.isPending ? (
                     <Loader2 className="size-3.5 animate-spin" />
                   ) : (
                     <Flame className="size-3.5 text-amber-200 fill-amber-200" />
                   )}
-                  Escalate to Hot Priority
+                  {app.is_hot ? "Re-trigger Hot Priority Alert" : "Escalate to Hot Priority"}
                 </button>
               </div>
             )}
@@ -1760,11 +1830,13 @@ function MessageCard({
   customerName,
   customerEmail,
   onDownloadDoc,
+  onReply,
 }: {
   msg: Msg;
   customerName?: string | null;
   customerEmail?: string | null;
   onDownloadDoc: (doc: any) => void;
+  onReply?: () => void;
 }) {
   const [showRawText, setShowRawText] = useState(false);
   // Default compact view so messages open cleanly and agent reads fresh reply first
@@ -1836,6 +1908,17 @@ function MessageCard({
               <span className="text-slate-400 text-xs font-medium" title={ist(msg.created_at)}>
                 {formatTimeOnly(msg.created_at)}
               </span>
+              {onReply && (
+                <button
+                  type="button"
+                  onClick={onReply}
+                  className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-700 hover:text-blue-900 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-2 py-0.5 rounded-md transition-colors cursor-pointer shadow-2xs select-none"
+                  title="Reply to this message"
+                >
+                  <Reply className="size-3 text-blue-600" />
+                  <span>Reply</span>
+                </button>
+              )}
               <button className="text-slate-400 hover:text-slate-600 p-1">
                 <MoreHorizontal className="size-4" />
               </button>
@@ -1857,53 +1940,55 @@ function MessageCard({
                 {rawContent}
               </div>
             ) : (
-              <div className="relative">
-                <div
-                  className={`text-sm text-slate-800 leading-relaxed font-normal overflow-x-auto [&_table]:w-full [&_table]:border-collapse [&_td]:p-2 [&_th]:p-2 [&_img]:max-w-full [&_a]:text-blue-600 [&_a]:underline font-sans ${
-                    hasLongBody && !isExpanded ? "max-h-56 overflow-hidden" : ""
-                  }`}
-                >
-                  {parsed.isHtml ? (
-                    <div>
-                      <div
-                        dangerouslySetInnerHTML={{
-                          __html: DOMPurify.sanitize(parsed.content, {
-                            WHOLE_DOCUMENT: false,
-                            ADD_ATTR: ["target", "style", "class"],
-                          }),
-                        }}
-                      />
-                      {isExpanded && parsed.quotedContent && (
+              <div>
+                <div className="relative">
+                  <div
+                    className={`text-sm text-slate-800 leading-relaxed font-normal overflow-x-auto [&_table]:w-full [&_table]:border-collapse [&_td]:p-2 [&_th]:p-2 [&_img]:max-w-full [&_a]:text-blue-600 [&_a]:underline font-sans ${
+                      hasLongBody && !isExpanded ? "max-h-56 overflow-hidden" : ""
+                    }`}
+                  >
+                    {parsed.isHtml ? (
+                      <div>
                         <div
-                          className="mt-3 pt-3 border-t border-slate-200 text-slate-600"
                           dangerouslySetInnerHTML={{
-                            __html: DOMPurify.sanitize(parsed.quotedContent, {
+                            __html: DOMPurify.sanitize(parsed.content, {
                               WHOLE_DOCUMENT: false,
                               ADD_ATTR: ["target", "style", "class"],
                             }),
                           }}
                         />
-                      )}
-                    </div>
-                  ) : (
-                    <div className="whitespace-pre-wrap">
-                      {isExpanded && parsed.quotedContent
-                        ? `${parsed.content}\n\n${parsed.quotedContent}`
-                        : parsed.content || rawContent || "(no content)"}
-                    </div>
+                        {isExpanded && parsed.quotedContent && (
+                          <div
+                            className="mt-3 pt-3 border-t border-slate-200 text-slate-600"
+                            dangerouslySetInnerHTML={{
+                              __html: DOMPurify.sanitize(parsed.quotedContent, {
+                                WHOLE_DOCUMENT: false,
+                                ADD_ATTR: ["target", "style", "class"],
+                              }),
+                            }}
+                          />
+                        )}
+                      </div>
+                    ) : (
+                      <div className="whitespace-pre-wrap">
+                        {isExpanded && parsed.quotedContent
+                          ? `${parsed.content}\n\n${parsed.quotedContent}`
+                          : parsed.content || rawContent || "(no content)"}
+                      </div>
+                    )}
+                  </div>
+
+                  {hasLongBody && !isExpanded && (
+                    <div className="absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-white via-white/85 to-transparent pointer-events-none" />
                   )}
                 </div>
 
-                {hasLongBody && !isExpanded && (
-                  <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-white via-white/80 to-transparent pointer-events-none" />
-                )}
-
                 {hasLongBody && (
-                  <div className="pt-2 flex items-center justify-between border-t border-slate-100 mt-1">
+                  <div className="pt-2 flex items-center justify-between border-t border-slate-100 mt-2 z-10 relative">
                     <button
                       type="button"
                       onClick={() => setIsExpanded((v) => !v)}
-                      className="text-xs font-bold text-blue-700 hover:text-blue-900 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg px-3 py-1.5 transition-colors inline-flex items-center gap-1.5 shadow-2xs"
+                      className="text-xs font-bold text-blue-700 hover:text-blue-900 bg-blue-100 hover:bg-blue-200 border border-blue-300 rounded-lg px-3.5 py-1.5 transition-colors inline-flex items-center gap-1.5 shadow-xs cursor-pointer select-none"
                     >
                       {isExpanded ? (
                         <>Show less <ChevronUp className="size-3.5" /></>
@@ -1915,7 +2000,7 @@ function MessageCard({
                     <button
                       type="button"
                       onClick={() => setShowRawText((v) => !v)}
-                      className="text-[11px] font-medium text-slate-400 hover:text-slate-700 transition-colors ml-auto"
+                      className="text-[11px] font-semibold text-slate-500 hover:text-slate-800 transition-colors ml-auto cursor-pointer select-none"
                       title="Toggle raw original email text"
                     >
                       {showRawText ? "Show Formatted" : "Raw Text"}
@@ -1939,11 +2024,11 @@ function MessageCard({
                           PDF
                         </div>
                         <div className="min-w-0">
-                          <div className="text-xs font-semibold text-slate-800 truncate" title={doc.file_name}>
-                            {doc.file_name}
+                          <div className="text-xs font-medium text-slate-800 truncate" title={doc.file_name || doc.document_type}>
+                            {doc.file_name || doc.document_type || "document.pdf"}
                           </div>
                           <div className="text-[10px] text-slate-400">
-                            {formatBytes(doc.size_bytes)}
+                            {formatBytes(doc.file_size_bytes || doc.file_size || 150000)}
                           </div>
                         </div>
                       </div>
@@ -1951,7 +2036,7 @@ function MessageCard({
                       <button
                         type="button"
                         onClick={() => onDownloadDoc(doc)}
-                        className="p-1 rounded hover:bg-slate-100 text-slate-600 transition-colors shrink-0"
+                        className="p-1 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors shrink-0"
                         title="Download attachment"
                       >
                         <Download className="size-3.5" />
@@ -1967,28 +2052,29 @@ function MessageCard({
     );
   }
 
-  // 3. Business Outbound Message Card (RIGHT ALIGNED)
-  const isLongHtml = parsed.isHtml && (parsed.content.length > 300 || parsed.hasQuoted || Boolean((msg as any).body_html));
+  // 3. Outbound Staff/System Reply Card (RIGHT ALIGNED)
+  const isHtml = parsed.isHtml || Boolean((msg as any).body_html);
+  const isLongHtml = Boolean(
+    (parsed.content && parsed.content.length > 300) ||
+    parsed.hasQuoted ||
+    parsed.quotedContent ||
+    ((msg as any).body_html && (msg as any).body_html.length > 300)
+  );
 
   return (
     <div className="w-full flex justify-end">
-      <div className="w-full max-w-[92%] sm:max-w-[88%] lg:max-w-[84%] ml-auto bg-white rounded-xl shadow-2xs border border-slate-200/90 overflow-hidden">
-        {/* Header Bar matching Screenshot 2 & 3 */}
-        <div className="px-3 py-2 flex items-center justify-between flex-wrap gap-1.5 border-b border-slate-100/80 bg-white">
+      <div className="w-full max-w-[92%] sm:max-w-[88%] lg:max-w-[84%] ml-auto bg-[#f8fafc] rounded-xl shadow-2xs border border-slate-200/90 overflow-hidden">
+        {/* Header Bar matching Screenshot */}
+        <div className="px-3 py-2 flex items-center justify-between flex-wrap gap-1.5 border-b border-slate-200/70 bg-white">
           <div className="flex items-center gap-2 min-w-0">
-            <div className="size-7 rounded-full bg-[#0f172a] text-white flex items-center justify-center text-[10px] font-bold shrink-0 shadow-2xs">
-              BHS
+            <div className="size-7 rounded-full bg-[#3b82f6] text-white flex items-center justify-center text-[10px] font-bold shrink-0 shadow-2xs">
+              BH
             </div>
             <div className="min-w-0">
-              <div className="flex items-center gap-1.5 flex-wrap">
-                <span className="font-bold text-slate-900 text-xs sm:text-sm truncate">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-bold text-slate-900 text-xs truncate">
                   {msg.author_name || "Business Help Services"}
                 </span>
-                {msg.template_hint && (
-                  <span className="text-[10px] font-bold font-mono bg-[#e0f2fe] text-[#0369a1] border border-sky-200 px-1.5 py-0.2 rounded">
-                    {msg.template_hint}
-                  </span>
-                )}
                 <span className="text-[10px] font-bold uppercase bg-[#eff6ff] text-[#2563eb] border border-blue-200 px-1.5 py-0.2 rounded">
                   Email
                 </span>
@@ -2021,32 +2107,34 @@ function MessageCard({
           )}
 
           {parsed.isHtml ? (
-            <div className="relative">
-              <div
-                className={`text-sm text-slate-800 leading-relaxed font-normal overflow-x-auto [&_table]:w-full [&_table]:border-collapse [&_td]:p-2 [&_th]:p-2 [&_img]:max-w-full [&_a]:text-blue-600 [&_a]:underline font-sans ${
-                  isLongHtml && !isExpanded ? "max-h-56 overflow-hidden" : ""
-                }`}
-                dangerouslySetInnerHTML={{
-                  __html: DOMPurify.sanitize(
-                    isExpanded && parsed.quotedContent
-                      ? `${parsed.content}<div class="mt-3 pt-3 border-t border-slate-200">${parsed.quotedContent}</div>`
-                      : parsed.content,
-                    {
-                      WHOLE_DOCUMENT: false,
-                      ADD_ATTR: ["target", "style", "class"],
-                    }
-                  ),
-                }}
-              />
-              {isLongHtml && !isExpanded && (
-                <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-white via-white/80 to-transparent pointer-events-none" />
-              )}
+            <div>
+              <div className="relative">
+                <div
+                  className={`text-sm text-slate-800 leading-relaxed font-normal overflow-x-auto [&_table]:w-full [&_table]:border-collapse [&_td]:p-2 [&_th]:p-2 [&_img]:max-w-full [&_a]:text-blue-600 [&_a]:underline font-sans ${
+                    isLongHtml && !isExpanded ? "max-h-56 overflow-hidden" : ""
+                  }`}
+                  dangerouslySetInnerHTML={{
+                    __html: DOMPurify.sanitize(
+                      isExpanded && parsed.quotedContent
+                        ? `${parsed.content}<div class="mt-3 pt-3 border-t border-slate-200">${parsed.quotedContent}</div>`
+                        : parsed.content,
+                      {
+                        WHOLE_DOCUMENT: false,
+                        ADD_ATTR: ["target", "style", "class"],
+                      }
+                    ),
+                  }}
+                />
+                {isLongHtml && !isExpanded && (
+                  <div className="absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-white via-white/85 to-transparent pointer-events-none" />
+                )}
+              </div>
               {isLongHtml && (
-                <div className="pt-2 flex justify-start border-t border-slate-100 mt-1">
+                <div className="pt-2 flex justify-start border-t border-slate-100 mt-2 z-10 relative">
                   <button
                     type="button"
                     onClick={() => setIsExpanded((v) => !v)}
-                    className="text-xs font-bold text-blue-700 hover:text-blue-900 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg px-3 py-1.5 transition-colors inline-flex items-center gap-1.5 shadow-2xs"
+                    className="text-xs font-bold text-blue-700 hover:text-blue-900 bg-blue-100 hover:bg-blue-200 border border-blue-300 rounded-lg px-3.5 py-1.5 transition-colors inline-flex items-center gap-1.5 shadow-xs cursor-pointer select-none"
                   >
                     {isExpanded ? (
                       <>Show less <ChevronUp className="size-3.5" /></>

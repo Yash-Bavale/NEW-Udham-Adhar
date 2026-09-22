@@ -992,11 +992,32 @@ export const makeOrderHotFromTicket = createServerFn({ method: "POST" })
     const admin = await getAdmin();
     let targetOrderId = data.orderId;
     let ticketNumber = "";
+    const now = new Date().toISOString();
 
     if (data.ticketId) {
       const ticket = await loadTicket(data.ticketId);
       if (!targetOrderId && ticket.application_id) {
         targetOrderId = ticket.application_id;
+      }
+      if (!targetOrderId && ticket.customer_id) {
+        // Fallback: look up latest open/active application for this customer
+        const { data: latestApp } = await admin
+          .from("applications")
+          .select("id, application_code")
+          .eq("customer_id", ticket.customer_id)
+          .eq("is_deleted", false)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (latestApp?.id) {
+          targetOrderId = latestApp.id;
+          // Also link to ticket for future lookups
+          await admin
+            .from("support_tickets")
+            .update({ application_id: targetOrderId, updated_at: now })
+            .eq("id", data.ticketId);
+        }
       }
       ticketNumber = ticket.ticket_number ?? "";
     }
@@ -1011,9 +1032,17 @@ export const makeOrderHotFromTicket = createServerFn({ method: "POST" })
       .eq("id", context.userId)
       .maybeSingle();
     const staffName = (staffProf as any)?.display_name || (staffProf as any)?.email || "Staff";
-    const now = new Date().toISOString();
 
-    // 1. Stop any prior open schedulers to satisfy one_open_scheduler_per_order
+    // 1. Update applications table to mark is_hot = true
+    await admin
+      .from("applications")
+      .update({
+        is_hot: true,
+        updated_at: now,
+      })
+      .eq("id", targetOrderId);
+
+    // 2. Stop any prior open schedulers to satisfy one_open_scheduler_per_order
     await admin
       .from("order_schedulers")
       .update({
@@ -1025,7 +1054,7 @@ export const makeOrderHotFromTicket = createServerFn({ method: "POST" })
       .eq("application_id", targetOrderId)
       .in("status", ["active", "paused"]);
 
-    // 2. Insert immediate active hot scheduler (fires_at = now)
+    // 3. Insert immediate active hot scheduler (fires_at = now)
     const reasonLabel = ticketNumber
       ? `Hot Priority from Ticket #${ticketNumber}`
       : "Escalated to Hot Priority";
@@ -1056,7 +1085,7 @@ export const makeOrderHotFromTicket = createServerFn({ method: "POST" })
       throw new Error(`Failed to set hot priority: ${error.message}`);
     }
 
-    // 3. Log event in application_events and activity_logs
+    // 4. Log event in application_events and activity_logs
     try {
       await admin.from("application_events").insert({
         application_id: targetOrderId,

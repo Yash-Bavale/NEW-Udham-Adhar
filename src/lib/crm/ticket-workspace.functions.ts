@@ -19,7 +19,7 @@ export const getTicketWorkspace = createServerFn({ method: "POST" })
     const { data: ticket, error } = await admin
       .from("support_tickets")
       .select(
-        "id, ticket_number, subject, description, status, priority, assigned_to, resolved_at, resolved_by, closed_at, first_response_at, last_customer_message_at, last_staff_message_at, ticket_email, source, created_at, updated_at, customer_id, application_id, service_id, customers(id, name, primary_email, primary_mobile, state, language, created_at, lifetime_value, total_applications, completed_applications), applications(id, application_code, order_status, fulfillment_status, assigned_to, created_at, service_id, services(service_name)), services(service_name)"
+        "id, ticket_number, subject, description, status, priority, assigned_to, resolved_at, resolved_by, closed_at, first_response_at, last_customer_message_at, last_staff_message_at, ticket_email, source, created_at, updated_at, customer_id, application_id, service_id, customers(id, name, primary_email, primary_mobile, state, language, created_at, lifetime_value, total_applications, completed_applications), applications(id, application_code, order_status, fulfillment_status, assigned_to, is_hot, created_at, service_id, services(service_name)), services(service_name)"
       )
       .eq("id", data.ticketId)
       .maybeSingle();
@@ -28,7 +28,25 @@ export const getTicketWorkspace = createServerFn({ method: "POST" })
 
     const t = ticket as any;
     const customerId = t.customer_id as string | null;
-    const applicationId = t.application_id as string | null;
+    let applicationId = t.application_id as string | null;
+    let resolvedApplication = t.applications;
+
+    if (!applicationId && customerId) {
+      const { data: latestApp } = await admin
+        .from("applications")
+        .select(
+          "id, application_code, order_status, fulfillment_status, assigned_to, is_hot, created_at, service_id, services(service_name)"
+        )
+        .eq("customer_id", customerId)
+        .eq("is_deleted", false)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (latestApp) {
+        resolvedApplication = latestApp;
+        applicationId = latestApp.id;
+      }
+    }
 
     // Fire the remaining queries in parallel.
     const [
@@ -117,7 +135,7 @@ export const getTicketWorkspace = createServerFn({ method: "POST" })
     const ids = new Set<string>();
     if (t.assigned_to) ids.add(t.assigned_to);
     if (t.resolved_by) ids.add(t.resolved_by);
-    if (t.applications?.assigned_to) ids.add(t.applications.assigned_to);
+    if (resolvedApplication?.assigned_to) ids.add(resolvedApplication.assigned_to);
     (repliesRes.data ?? []).forEach((r: any) => r.created_by && ids.add(r.created_by));
     (eventsRes.data ?? []).forEach((r: any) => r.created_by && ids.add(r.created_by));
     (docsRes.data ?? []).forEach((r: any) => r.verified_by && ids.add(r.verified_by));
@@ -212,10 +230,12 @@ export const getTicketWorkspace = createServerFn({ method: "POST" })
     return {
       ticket: {
         ...t,
+        application_id: applicationId,
+        applications: resolvedApplication,
         assigned_name: t.assigned_to ? nameMap.get(t.assigned_to) ?? null : null,
         resolved_name: t.resolved_by ? nameMap.get(t.resolved_by) ?? null : null,
-        executive_name: t.applications?.assigned_to
-          ? nameMap.get(t.applications.assigned_to) ?? null
+        executive_name: resolvedApplication?.assigned_to
+          ? nameMap.get(resolvedApplication.assigned_to) ?? null
           : null,
       },
       replies,

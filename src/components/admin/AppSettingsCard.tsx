@@ -6,6 +6,10 @@ import {
   updateSoundSettings,
   getGlobalReminderSoundSettings,
   uploadAlertAudioFile,
+  getCallbackReminderPresetSettings,
+  saveCallbackReminderPresetSettings,
+  type CallbackReminderPresetConfig,
+  DEFAULT_CALLBACK_PRESET_CONFIG,
 } from "@/lib/settings/app-settings.functions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,7 +18,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Timer, Volume2, VolumeX, Bell, Play, Upload, Music, Check, Loader2 } from "lucide-react";
+import { Timer, Volume2, VolumeX, Bell, Play, Upload, Music, Check, Loader2, Clock, Calendar, Zap, Sparkles } from "lucide-react";
 import { playNotificationSound, type RingtoneTone } from "@/hooks/useNotifications";
 
 function minutesToHHMM(min: number): string {
@@ -33,11 +37,16 @@ function hhmmToMinutes(v: string): number | null {
 export function AppSettingsCard() {
   const fetchSettings = useServerFn(getAppSettings);
   const fetchGlobalSound = useServerFn(getGlobalReminderSoundSettings);
+  const fetchPresetsFn = useServerFn(getCallbackReminderPresetSettings);
   const saveMinutes = useServerFn(updateCustomerDelayAutocloseMinutes);
   const saveSound = useServerFn(updateSoundSettings);
+  const savePresetsFn = useServerFn(saveCallbackReminderPresetSettings);
   const uploadAudio = useServerFn(uploadAlertAudioFile);
 
   const [value, setValue] = useState("08:00");
+  const [callbackPresets, setCallbackPresets] = useState<CallbackReminderPresetConfig>(DEFAULT_CALLBACK_PRESET_CONFIG);
+  const [savingPresets, setSavingPresets] = useState(false);
+
   const [leadsSound, setLeadsSound] = useState(() => {
     if (typeof window === "undefined") return true;
     return localStorage.getItem("udyam.sound.leads") !== "false";
@@ -83,11 +92,14 @@ export function AppSettingsCard() {
 
   useEffect(() => {
     let cancelled = false;
-    Promise.allSettled([fetchSettings(), fetchGlobalSound()])
-      .then(([settingsRes, soundRes]) => {
+    Promise.allSettled([fetchSettings(), fetchGlobalSound(), fetchPresetsFn()])
+      .then(([settingsRes, soundRes, presetsRes]) => {
         if (cancelled) return;
         if (settingsRes.status === "fulfilled") {
           setValue(minutesToHHMM(settingsRes.value.customerDelayAutocloseMinutes));
+        }
+        if (presetsRes.status === "fulfilled") {
+          setCallbackPresets(presetsRes.value);
         }
         if (soundRes.status === "fulfilled") {
           const s = soundRes.value;
@@ -116,7 +128,19 @@ export function AppSettingsCard() {
     return () => {
       cancelled = true;
     };
-  }, [fetchSettings, fetchGlobalSound]);
+  }, [fetchSettings, fetchGlobalSound, fetchPresetsFn]);
+
+  async function onSaveCallbackPresets() {
+    setSavingPresets(true);
+    try {
+      await savePresetsFn({ data: callbackPresets });
+      toast.success("✅ Callback reminder duration presets saved & synced company-wide!");
+    } catch (e) {
+      toast.error((e as Error).message || "Failed to save callback presets");
+    } finally {
+      setSavingPresets(false);
+    }
+  }
 
   async function onSaveMinutes() {
     const mins = hhmmToMinutes(value);
@@ -466,6 +490,215 @@ export function AppSettingsCard() {
         </CardContent>
       </Card>
 
+      {/* Customer Callback & Reminder Duration Presets Card */}
+      <Card className="border border-slate-200 shadow-sm">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2 text-base text-slate-900 font-bold">
+              <Clock className="h-5 w-5 text-blue-600" />
+              Customer Callback Reminder Duration Presets
+            </CardTitle>
+            <Button
+              type="button"
+              onClick={onSaveCallbackPresets}
+              disabled={loading || savingPresets}
+              className="gap-1.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs shadow-xs"
+            >
+              {savingPresets ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> Saving…
+                </>
+              ) : (
+                <>
+                  <Check className="h-3.5 w-3.5" /> Save Callback Presets
+                </>
+              )}
+            </Button>
+          </div>
+          <p className="text-xs text-slate-500 mt-1">
+            Configure the default time options (Minutes &amp; Hours) displayed in the &ldquo;Schedule Customer Callback &amp; Reminder&rdquo; popup dialog across all employee workspaces.
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+            {/* Quick Preset (Minutes) */}
+            <div className="space-y-1.5 p-3 rounded-xl bg-slate-50 border border-slate-200">
+              <Label className="text-xs font-bold text-slate-800 flex items-center justify-between">
+                <span>Slot 1: Quick</span>
+                <span className="text-[10px] text-blue-600 font-mono font-bold">Minutes</span>
+              </Label>
+              <div className="flex items-center gap-1.5">
+                <Input
+                  type="number"
+                  min={1}
+                  max={1440}
+                  value={callbackPresets.quickMinutes}
+                  onChange={(e) =>
+                    setCallbackPresets((prev) => ({
+                      ...prev,
+                      quickMinutes: Math.max(1, Number(e.target.value) || 1),
+                    }))
+                  }
+                  disabled={loading}
+                  className="bg-white font-mono text-xs"
+                />
+                <span className="text-xs font-semibold text-slate-500">Mins</span>
+              </div>
+              <p className="text-[11px] text-slate-500">
+                Button label: <strong className="text-slate-800">+{callbackPresets.quickMinutes} Mins</strong>
+              </p>
+            </div>
+
+            {/* Recommended Preset (Hours) */}
+            <div className="space-y-1.5 p-3 rounded-xl bg-blue-50/50 border border-blue-200">
+              <Label className="text-xs font-bold text-blue-950 flex items-center justify-between">
+                <span>Slot 2: Recommended</span>
+                <span className="text-[10px] text-blue-700 font-mono font-bold">Hours</span>
+              </Label>
+              <div className="flex items-center gap-1.5">
+                <Input
+                  type="number"
+                  min={0.1}
+                  step={0.5}
+                  max={72}
+                  value={callbackPresets.recommendedHours}
+                  onChange={(e) =>
+                    setCallbackPresets((prev) => ({
+                      ...prev,
+                      recommendedHours: Math.max(0.1, Number(e.target.value) || 1),
+                    }))
+                  }
+                  disabled={loading}
+                  className="bg-white font-mono text-xs"
+                />
+                <span className="text-xs font-semibold text-slate-500">Hours</span>
+              </div>
+              <p className="text-[11px] text-slate-500">
+                Button label: <strong className="text-slate-800">{callbackPresets.recommendedHours} {callbackPresets.recommendedHours === 1 ? "Hour" : "Hours"}</strong>
+              </p>
+            </div>
+
+            {/* Evening Preset (Hours) */}
+            <div className="space-y-1.5 p-3 rounded-xl bg-slate-50 border border-slate-200">
+              <Label className="text-xs font-bold text-slate-800 flex items-center justify-between">
+                <span>Slot 3: Evening</span>
+                <span className="text-[10px] text-blue-600 font-mono font-bold">Hours</span>
+              </Label>
+              <div className="flex items-center gap-1.5">
+                <Input
+                  type="number"
+                  min={0.1}
+                  step={0.5}
+                  max={72}
+                  value={callbackPresets.eveningHours}
+                  onChange={(e) =>
+                    setCallbackPresets((prev) => ({
+                      ...prev,
+                      eveningHours: Math.max(0.1, Number(e.target.value) || 1),
+                    }))
+                  }
+                  disabled={loading}
+                  className="bg-white font-mono text-xs"
+                />
+                <span className="text-xs font-semibold text-slate-500">Hours</span>
+              </div>
+              <p className="text-[11px] text-slate-500">
+                Button label: <strong className="text-slate-800">{callbackPresets.eveningHours} {callbackPresets.eveningHours === 1 ? "Hour" : "Hours"}</strong>
+              </p>
+            </div>
+
+            {/* Later Today Preset (Hours) */}
+            <div className="space-y-1.5 p-3 rounded-xl bg-slate-50 border border-slate-200">
+              <Label className="text-xs font-bold text-slate-800 flex items-center justify-between">
+                <span>Slot 4: Later Today</span>
+                <span className="text-[10px] text-blue-600 font-mono font-bold">Hours</span>
+              </Label>
+              <div className="flex items-center gap-1.5">
+                <Input
+                  type="number"
+                  min={0.1}
+                  step={0.5}
+                  max={72}
+                  value={callbackPresets.laterTodayHours}
+                  onChange={(e) =>
+                    setCallbackPresets((prev) => ({
+                      ...prev,
+                      laterTodayHours: Math.max(0.1, Number(e.target.value) || 1),
+                    }))
+                  }
+                  disabled={loading}
+                  className="bg-white font-mono text-xs"
+                />
+                <span className="text-xs font-semibold text-slate-500">Hours</span>
+              </div>
+              <p className="text-[11px] text-slate-500">
+                Button label: <strong className="text-slate-800">{callbackPresets.laterTodayHours} {callbackPresets.laterTodayHours === 1 ? "Hour" : "Hours"}</strong>
+              </p>
+            </div>
+
+            {/* Tomorrow Default Time */}
+            <div className="space-y-1.5 p-3 rounded-xl bg-slate-50 border border-slate-200">
+              <Label className="text-xs font-bold text-slate-800 flex items-center justify-between">
+                <span>Slot 5: Tomorrow</span>
+                <span className="text-[10px] text-blue-600 font-mono font-bold">HH:MM</span>
+              </Label>
+              <Input
+                type="time"
+                value={callbackPresets.tomorrowDefaultTime}
+                onChange={(e) =>
+                  setCallbackPresets((prev) => ({
+                    ...prev,
+                    tomorrowDefaultTime: e.target.value || "10:30",
+                  }))
+                }
+                disabled={loading}
+                className="bg-white font-mono text-xs"
+              />
+              <p className="text-[11px] text-slate-500">
+                Trigger time: <strong className="text-slate-800">{callbackPresets.tomorrowDefaultTime} Tomorrow</strong>
+              </p>
+            </div>
+          </div>
+
+          {/* Live Preview Bar */}
+          <div className="p-3 bg-slate-900 rounded-xl text-white space-y-2">
+            <div className="flex items-center justify-between text-xs font-semibold text-slate-300">
+              <span className="flex items-center gap-1.5">
+                <Sparkles className="size-3.5 text-teal-400" />
+                Live Preview of Dialog Buttons (Section 2)
+              </span>
+              <span className="text-[11px] text-slate-400">Preview only</span>
+            </div>
+            <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
+              <div className="p-2 rounded-lg bg-slate-800 text-center border border-slate-700">
+                <div className="text-[9px] uppercase font-semibold text-slate-400">Quick</div>
+                <div className="text-xs font-bold text-white">+{callbackPresets.quickMinutes} Mins</div>
+              </div>
+              <div className="p-2 rounded-lg bg-blue-600 text-center border border-blue-500 text-white font-bold">
+                <div className="text-[9px] uppercase font-semibold text-blue-100">Recommended</div>
+                <div className="text-xs font-bold">{callbackPresets.recommendedHours} {callbackPresets.recommendedHours === 1 ? "Hour" : "Hours"}</div>
+              </div>
+              <div className="p-2 rounded-lg bg-slate-800 text-center border border-slate-700">
+                <div className="text-[9px] uppercase font-semibold text-slate-400">Evening</div>
+                <div className="text-xs font-bold text-white">{callbackPresets.eveningHours} {callbackPresets.eveningHours === 1 ? "Hour" : "Hours"}</div>
+              </div>
+              <div className="p-2 rounded-lg bg-slate-800 text-center border border-slate-700">
+                <div className="text-[9px] uppercase font-semibold text-slate-400">Later Today</div>
+                <div className="text-xs font-bold text-white">{callbackPresets.laterTodayHours} {callbackPresets.laterTodayHours === 1 ? "Hour" : "Hours"}</div>
+              </div>
+              <div className="p-2 rounded-lg bg-slate-800 text-center border border-slate-700">
+                <div className="text-[9px] uppercase font-semibold text-slate-400">Tomorrow</div>
+                <div className="text-xs font-bold text-white">{callbackPresets.tomorrowDefaultTime}</div>
+              </div>
+              <div className="p-2 rounded-lg bg-slate-800 text-center border border-slate-700 flex flex-col items-center justify-center">
+                <Calendar className="size-3 text-slate-400 mb-0.5" />
+                <div className="text-xs font-bold text-white">Custom</div>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Auto-close Timers Card */}
       <Card>
         <CardHeader>
@@ -499,3 +732,4 @@ export function AppSettingsCard() {
     </div>
   );
 }
+

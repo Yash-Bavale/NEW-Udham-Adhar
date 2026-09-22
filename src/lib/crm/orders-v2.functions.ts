@@ -567,7 +567,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       let query = admin
         .from("applications")
         .select(
-          "id, application_code, fulfillment_status, application_status, created_at, assigned_to, lead_id, customer_id, service_id, form_submitted_at, certificate_uploaded_at, workflow_status, closure_stage, closure_reason_code, refund_approved_at, refund_processed_at",
+          "id, application_code, fulfillment_status, application_status, is_hot, created_at, assigned_to, lead_id, customer_id, service_id, form_submitted_at, certificate_uploaded_at, workflow_status, closure_stage, closure_reason_code, refund_approved_at, refund_processed_at",
           { count: "exact" },
         )
         .eq("is_deleted", false);
@@ -630,7 +630,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       const { data: extraApps } = await admin
         .from("applications")
         .select(
-          "id, application_code, fulfillment_status, application_status, created_at, assigned_to, lead_id, customer_id, service_id, form_submitted_at, certificate_uploaded_at, workflow_status, closure_stage, closure_reason_code, refund_approved_at, refund_processed_at"
+          "id, application_code, fulfillment_status, application_status, is_hot, created_at, assigned_to, lead_id, customer_id, service_id, form_submitted_at, certificate_uploaded_at, workflow_status, closure_stage, closure_reason_code, refund_approved_at, refund_processed_at"
         )
         .in("id", activeAppIds)
         .eq("is_deleted", false);
@@ -829,7 +829,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         ["completed", "closed", "cancelled"].includes(String((a as any).order_status ?? "").toLowerCase()) ||
         ["completed", "closed", "cancelled"].includes(String((a as any).workflow_status ?? "").toLowerCase());
 
-      const is_hot = !isTerminal && (is_due || is_reopened);
+      const is_hot = !isTerminal && (Boolean(a.is_hot) || is_due || is_reopened);
       const is_callback_scheduled = !isTerminal && (!!cb || is_reopened);
       const callback_reminder = !isTerminal && cb
         ? {
