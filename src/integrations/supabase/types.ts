@@ -312,6 +312,7 @@ export type Database = {
           govt_portals_selected: Json | null
           id: string
           is_deleted: boolean | null
+          is_hot: boolean
           lead_id: string
           order_status: Database["public"]["Enums"]["order_status_enum"]
           priority: string | null
@@ -372,6 +373,7 @@ export type Database = {
           govt_portals_selected?: Json | null
           id?: string
           is_deleted?: boolean | null
+          is_hot?: boolean
           lead_id: string
           order_status?: Database["public"]["Enums"]["order_status_enum"]
           priority?: string | null
@@ -434,6 +436,7 @@ export type Database = {
           govt_portals_selected?: Json | null
           id?: string
           is_deleted?: boolean | null
+          is_hot?: boolean
           lead_id?: string
           order_status?: Database["public"]["Enums"]["order_status_enum"]
           priority?: string | null
@@ -4618,6 +4621,7 @@ export type Database = {
           govt_portals_selected: Json | null
           id: string
           is_deleted: boolean | null
+          is_hot: boolean
           lead_id: string
           order_status: Database["public"]["Enums"]["order_status_enum"]
           priority: string | null
