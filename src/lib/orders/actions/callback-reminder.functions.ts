@@ -34,6 +34,7 @@ export interface CallbackRemarks {
   reasonLabel: string;
   note?: string | null;
   durationMinutes?: number | null;
+  channel?: "call" | "email" | string | null;
   created_by_name?: string;
   created_at?: string;
 }
@@ -49,6 +50,7 @@ export const scheduleOrderCallback = createServerFn({ method: "POST" })
         durationMinutes: z.number().min(1).optional(),
         customFiresAt: z.string().optional(),
         note: z.string().optional().nullable(),
+        channel: z.enum(["call", "email"]).optional().default("call"),
       })
       .parse(i),
   )
@@ -77,6 +79,7 @@ export const scheduleOrderCallback = createServerFn({ method: "POST" })
       reasonLabel: data.reasonLabel,
       note: data.note?.trim() || null,
       durationMinutes: data.durationMinutes ?? null,
+      channel: data.channel ?? "call",
       created_by_name: staff.staff_name,
       created_at: now.toISOString(),
     };

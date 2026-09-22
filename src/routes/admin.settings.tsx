@@ -1,28 +1,27 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { Building2, ListChecks, Bell, CreditCard, Workflow, BookOpen, Zap, Mail, Clock } from "lucide-react";
+import { Building2, ListChecks, Bell, CreditCard, Workflow, BookOpen, Zap, Mail, Clock, Timer, CalendarRange, Laptop } from "lucide-react";
 import { SectionCard } from "@/components/admin/ui";
 import { ReasonLibraryTab } from "@/components/admin/ReasonLibraryTab";
 import { AutomationRulesTab } from "@/components/admin/AutomationRulesTab";
 import { BusinessHoursTab } from "@/components/admin/BusinessHoursTab";
 import { SUPPORT_EMAIL, COMPANY_NAME, SITE_NAME, BASE_URL } from "@/lib/brand";
-
 import { ShiftsAndPresenceTab } from "@/components/admin/ShiftsAndPresenceTab";
 import { ActiveSessionsTab } from "@/components/admin/ActiveSessionsTab";
-import { CalendarRange, Laptop } from "lucide-react";
 
 export const Route = createFileRoute("/admin/settings")({
   head: () => ({ meta: [{ title: "Settings — Udyam Ops OS" }, { name: "robots", content: "noindex,nofollow" }] }),
   component: SettingsPage,
 });
 
-type Tab = "company" | "shifts" | "sessions" | "hours" | "statuses" | "notifications" | "gateways" | "workflow" | "reasons" | "automation" | "templates";
+type Tab = "company" | "shifts" | "sessions" | "hours" | "callback_presets" | "statuses" | "notifications" | "gateways" | "workflow" | "reasons" | "automation" | "templates";
 
 const TABS: { id: Tab; label: string; icon: typeof Building2 }[] = [
   { id: "company", label: "Company Info", icon: Building2 },
   { id: "shifts", label: "Shifts & Presence", icon: CalendarRange },
   { id: "sessions", label: "Active Sessions", icon: Laptop },
   { id: "hours", label: "Business Hours", icon: Clock },
+  { id: "callback_presets", label: "Callback Presets & Timers", icon: Timer },
   { id: "statuses", label: "Status Master", icon: ListChecks },
   { id: "templates", label: "Email Templates", icon: Mail },
   { id: "reasons", label: "Reason Library", icon: BookOpen },
@@ -81,6 +80,7 @@ function SettingsPage() {
       {tab === "shifts" && <ShiftsAndPresenceTab />}
       {tab === "sessions" && <ActiveSessionsTab />}
       {tab === "hours" && <BusinessHoursTab />}
+      {tab === "callback_presets" && <AppSettingsCard />}
       {tab === "statuses" && <StatusesTab />}
       {tab === "templates" && <TemplatesTab />}
       {tab === "reasons" && <ReasonLibraryTab />}

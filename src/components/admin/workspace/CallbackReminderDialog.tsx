@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import {
   Clock, X, Check, Flame, BellRing, MessageSquare,
   Briefcase, FileText, CheckCircle2, Calendar, Zap,
-  PhoneOff, PhoneCall, ShieldCheck
+  PhoneOff, PhoneCall, ShieldCheck, Mail
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatIST } from "@/lib/datetime";
@@ -28,6 +28,7 @@ interface Props {
   customerName?: string;
   customerMobile?: string;
   assignedName?: string;
+  initialChannel?: "call" | "email";
   onClose: () => void;
 }
 
@@ -74,6 +75,7 @@ export function CallbackReminderDialog({
   customerName: propCustomerName,
   customerMobile: propCustomerMobile,
   assignedName: propAssignedName,
+  initialChannel = "call",
   onClose,
 }: Props) {
   const qc = useQueryClient();
@@ -121,6 +123,7 @@ export function CallbackReminderDialog({
   const [selectedOutcome, setSelectedOutcome] = useState<string>("call_back_later");
   const [durationPreset, setDurationPreset] = useState<string>("recommended"); // 'quick' | 'recommended' | 'evening' | 'later_today' | 'tomorrow' | 'custom'
   const [customDate, setCustomDate] = useState<Date>(() => new Date(Date.now() + 120 * 60_000));
+  const [channel, setChannel] = useState<"call" | "email">(initialChannel);
 
   const [note, setNote] = useState<string>("Customer answered and requested callback. Will keep Aadhaar OTP ready for verification.");
   const [completeNote, setCompleteNote] = useState<string>("");
@@ -177,6 +180,7 @@ export function CallbackReminderDialog({
           reasonLabel: outcomeObj.label,
           customFiresAt: targetDate.toISOString(),
           note: note.trim() || null,
+          channel,
         },
       });
     },
@@ -280,8 +284,8 @@ export function CallbackReminderDialog({
                 ? "border-rose-300 bg-rose-50 text-rose-950"
                 : "border-indigo-200 bg-indigo-50/80 text-indigo-950"
             )}>
-              <div className="space-y-0.5">
-                <div className="flex items-center gap-2">
+              <div className="space-y-1">
+                <div className="flex flex-wrap items-center gap-2">
                   {activeCallback.isDue ? (
                     <span className="inline-flex items-center gap-1 rounded bg-rose-600 px-2 py-0.5 text-[10px] font-black uppercase text-white shadow-xs">
                       <Flame className="size-3" /> Call Due Now (HOT ORDER)
@@ -291,12 +295,21 @@ export function CallbackReminderDialog({
                       <Clock className="size-3" /> Scheduled Reminder Active
                     </span>
                   )}
-                  <span className="text-xs font-semibold text-slate-700">
+                  <span className="text-sm font-bold text-slate-900">
                     Due: {formatIST(activeCallback.fires_at)}
                   </span>
+                  {activeCallback.parsedRemarks?.channel === "email" ? (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-purple-100 text-purple-900 border border-purple-300 text-xs font-bold shadow-2xs">
+                      <Mail className="size-3.5 text-purple-700" /> Check Email
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-amber-100 text-amber-900 border border-amber-300 text-xs font-bold shadow-2xs">
+                      <PhoneCall className="size-3.5 text-amber-700" /> Check Call
+                    </span>
+                  )}
                 </div>
-                <p className="text-xs text-slate-600">
-                  <b>Reason:</b> {activeCallback.parsedRemarks?.reasonLabel || "Follow-up"}
+                <p className="text-sm text-slate-800">
+                  <strong className="font-bold text-slate-900">Reason:</strong> {activeCallback.parsedRemarks?.reasonLabel || "Follow-up"}
                   {activeCallback.parsedRemarks?.note ? ` — "${activeCallback.parsedRemarks.note}"` : null}
                 </p>
               </div>
@@ -584,74 +597,160 @@ export function CallbackReminderDialog({
             </div>
           </div>
 
-          {/* Section 4: Automated System Triggers */}
-          <div className="rounded-xl bg-slate-50 border border-slate-200 p-3">
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-1.5">
-                <Zap className="size-4 text-blue-600" />
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-900">
-                  Automated System Triggers
+          {/* Section 4: Channel & Automated System Triggers */}
+          <div className="rounded-xl bg-slate-50 border border-slate-200 p-3 space-y-3">
+            {/* 4A: Follow-up Channel Reference (Call vs Email) */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-900 flex items-center gap-1.5">
+                  <span className="w-5 h-5 rounded-full bg-slate-200 text-slate-800 flex items-center justify-center text-[11px] font-bold">
+                    4
+                  </span>
+                  Follow-up Mode / Channel Reference
+                </label>
+                <span className="text-[11px] font-semibold text-slate-500">
+                  Select whether to check Call or Email history
                 </span>
               </div>
-              <span className="text-[11px] text-slate-500">
-                {[hotOrderSurge, desktopAlert, whatsappReminder].filter(Boolean).length} triggers active
-              </span>
+
+              <div className="grid grid-cols-2 gap-2">
+                {/* Call Option */}
+                <label
+                  className={cn(
+                    "flex items-center gap-2.5 p-2.5 rounded-lg border transition-all cursor-pointer select-none",
+                    channel === "call"
+                      ? "bg-amber-50/80 border-amber-300 ring-1 ring-amber-400/50 shadow-xs"
+                      : "bg-white border-slate-200 hover:bg-slate-50/80"
+                  )}
+                >
+                  <input
+                    type="radio"
+                    name="callback_channel"
+                    value="call"
+                    checked={channel === "call"}
+                    onChange={() => setChannel("call")}
+                    className="w-4 h-4 rounded-full accent-amber-600 cursor-pointer"
+                  />
+                  <div className="p-1.5 rounded-md bg-amber-100 text-amber-800">
+                    <PhoneCall className="size-4" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-xs font-bold text-slate-900 flex items-center gap-1">
+                      Call <span className="text-[10px] font-semibold text-amber-700 font-mono">(Check Call)</span>
+                    </div>
+                    <div className="text-[10px] text-slate-500 truncate">
+                      Employee will check phone call history
+                    </div>
+                  </div>
+                  {channel === "call" && (
+                    <CheckCircle2 className="size-4 text-amber-600 shrink-0" />
+                  )}
+                </label>
+
+                {/* Email Option */}
+                <label
+                  className={cn(
+                    "flex items-center gap-2.5 p-2.5 rounded-lg border transition-all cursor-pointer select-none",
+                    channel === "email"
+                      ? "bg-purple-50/80 border-purple-300 ring-1 ring-purple-400/50 shadow-xs"
+                      : "bg-white border-slate-200 hover:bg-slate-50/80"
+                  )}
+                >
+                  <input
+                    type="radio"
+                    name="callback_channel"
+                    value="email"
+                    checked={channel === "email"}
+                    onChange={() => setChannel("email")}
+                    className="w-4 h-4 rounded-full accent-purple-600 cursor-pointer"
+                  />
+                  <div className="p-1.5 rounded-md bg-purple-100 text-purple-800">
+                    <Mail className="size-4" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-xs font-bold text-slate-900 flex items-center gap-1">
+                      Email <span className="text-[10px] font-semibold text-purple-700 font-mono">(Check Email)</span>
+                    </div>
+                    <div className="text-[10px] text-slate-500 truncate">
+                      Employee will check email thread history
+                    </div>
+                  </div>
+                  {channel === "email" && (
+                    <CheckCircle2 className="size-4 text-purple-600 shrink-0" />
+                  )}
+                </label>
+              </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-              {/* Trigger 1: Hot Order Surge */}
-              <label className="flex items-center gap-2 p-2.5 rounded-lg bg-white border border-slate-200 cursor-pointer hover:bg-slate-50/80 transition-colors select-none">
-                <input
-                  type="checkbox"
-                  checked={hotOrderSurge}
-                  onChange={(e) => setHotOrderSurge(e.target.checked)}
-                  className="w-4 h-4 rounded accent-rose-600"
-                />
-                <div className="min-w-0 flex-1">
-                  <div className="text-xs font-bold text-slate-900 truncate">
-                    🔥 Hot Order Surge
-                  </div>
-                  <div className="text-[10px] text-slate-500 truncate">
-                    Top list at {formatIST(targetDate.toISOString(), { timeOnly: true })} IST
-                  </div>
+            {/* 4B: Automated System Triggers */}
+            <div className="pt-2 border-t border-slate-200/80 space-y-1.5">
+              <div className="flex items-center justify-between mb-1">
+                <div className="flex items-center gap-1.5">
+                  <Zap className="size-3.5 text-blue-600" />
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-700">
+                    Automated System Triggers
+                  </span>
                 </div>
-              </label>
+                <span className="text-[10px] text-slate-500">
+                  {[hotOrderSurge, desktopAlert, whatsappReminder].filter(Boolean).length} active
+                </span>
+              </div>
 
-              {/* Trigger 2: Desktop Alert + Audio */}
-              <label className="flex items-center gap-2 p-2.5 rounded-lg bg-white border border-slate-200 cursor-pointer hover:bg-slate-50/80 transition-colors select-none">
-                <input
-                  type="checkbox"
-                  checked={desktopAlert}
-                  onChange={(e) => setDesktopAlert(e.target.checked)}
-                  className="w-4 h-4 rounded accent-blue-600"
-                />
-                <div className="min-w-0 flex-1">
-                  <div className="text-xs font-bold text-slate-900 truncate">
-                    🔔 Desktop Alert + Audio
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                {/* Trigger 1: Hot Order Surge */}
+                <label className="flex items-center gap-2 p-2 rounded-lg bg-white border border-slate-200 cursor-pointer hover:bg-slate-50/80 transition-colors select-none">
+                  <input
+                    type="checkbox"
+                    checked={hotOrderSurge}
+                    onChange={(e) => setHotOrderSurge(e.target.checked)}
+                    className="w-3.5 h-3.5 rounded accent-rose-600"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="text-xs font-bold text-slate-900 truncate">
+                      🔥 Hot Order Surge
+                    </div>
+                    <div className="text-[10px] text-slate-500 truncate">
+                      Top list at {formatIST(targetDate.toISOString(), { timeOnly: true })} IST
+                    </div>
                   </div>
-                  <div className="text-[10px] text-slate-500 truncate">
-                    Instant popup &amp; sound tone
-                  </div>
-                </div>
-              </label>
+                </label>
 
-              {/* Trigger 3: WhatsApp Reminder */}
-              <label className="flex items-center gap-2 p-2.5 rounded-lg bg-white border border-slate-200 cursor-pointer hover:bg-slate-50/80 transition-colors select-none">
-                <input
-                  type="checkbox"
-                  checked={whatsappReminder}
-                  onChange={(e) => setWhatsappReminder(e.target.checked)}
-                  className="w-4 h-4 rounded accent-emerald-600"
-                />
-                <div className="min-w-0 flex-1">
-                  <div className="text-xs font-bold text-slate-900 truncate">
-                    💬 WhatsApp Reminder
+                {/* Trigger 2: Desktop Alert + Audio */}
+                <label className="flex items-center gap-2 p-2 rounded-lg bg-white border border-slate-200 cursor-pointer hover:bg-slate-50/80 transition-colors select-none">
+                  <input
+                    type="checkbox"
+                    checked={desktopAlert}
+                    onChange={(e) => setDesktopAlert(e.target.checked)}
+                    className="w-3.5 h-3.5 rounded accent-blue-600"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="text-xs font-bold text-slate-900 truncate">
+                      🔔 Desktop Alert + Audio
+                    </div>
+                    <div className="text-[10px] text-slate-500 truncate">
+                      Instant popup &amp; tone
+                    </div>
                   </div>
-                  <div className="text-[10px] text-slate-500 truncate">
-                    Auto-SMS to customer
+                </label>
+
+                {/* Trigger 3: WhatsApp Reminder */}
+                <label className="flex items-center gap-2 p-2 rounded-lg bg-white border border-slate-200 cursor-pointer hover:bg-slate-50/80 transition-colors select-none">
+                  <input
+                    type="checkbox"
+                    checked={whatsappReminder}
+                    onChange={(e) => setWhatsappReminder(e.target.checked)}
+                    className="w-3.5 h-3.5 rounded accent-emerald-600"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="text-xs font-bold text-slate-900 truncate">
+                      💬 WhatsApp Reminder
+                    </div>
+                    <div className="text-[10px] text-slate-500 truncate">
+                      Auto-SMS to customer
+                    </div>
                   </div>
-                </div>
-              </label>
+                </label>
+              </div>
             </div>
           </div>
         </div>

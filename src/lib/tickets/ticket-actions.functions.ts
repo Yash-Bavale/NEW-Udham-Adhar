@@ -802,6 +802,7 @@ export const closeTicketRestartT001 = createServerFn({ method: "POST" })
           reasonLabel: `Order Reopened from Ticket #${ticket.ticket_number ?? ""} - Urgent Action Required`,
           note: `Order reopened from ticket ${ticket.ticket_number ?? ""}`,
           durationMinutes: 0,
+          channel: (ticket as any)?.channel === "call" ? "call" : "email",
           created_by_name: staffName,
           created_at: now,
         }),
