@@ -36,7 +36,9 @@ function AdminLoginPage() {
   const [error, setError] = useState<string | null>(null);
 
   const goAfterAuth = () => {
-    const target = safeNext(next);
+    const stored = safeNext(sessionStorage.getItem("admin_login_next"));
+    sessionStorage.removeItem("admin_login_next");
+    const target = safeNext(next) || stored;
     window.location.href = target || "/admin";
   };
 
