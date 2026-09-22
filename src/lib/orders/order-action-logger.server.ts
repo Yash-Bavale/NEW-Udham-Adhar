@@ -245,6 +245,31 @@ export async function logEmployeeOrderAction(
       return { success: false, error: insertErr.message };
     }
 
+    // Also append to immutable employee_activity_log if an employee is involved
+    const effectiveEmpId = employeeId || order?.assigned_to;
+    if (effectiveEmpId) {
+      try {
+        await client.from('employee_activity_log').insert({
+          employee_id: effectiveEmpId,
+          auth_user_id: effectiveEmpId,
+          action_type: actionType,
+          order_id: orderId,
+          previous_status: previousStatus || null,
+          new_status: newStatus || order?.order_status || null,
+          previous_stage: previousStage || null,
+          new_stage: newStage || order?.fulfillment_status || null,
+          metadata: {
+            notes: notes || null,
+            slaStatus,
+            source: normalizedSource,
+            ...customMetadata,
+          },
+        });
+      } catch {
+        // Non-blocking best-effort activity audit
+      }
+    }
+
     return { success: true, actionId: inserted?.id };
   } catch (err: any) {
     console.error('[logEmployeeOrderAction] Unexpected error:', err);

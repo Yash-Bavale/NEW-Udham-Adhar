@@ -1,18 +1,29 @@
 import { useEffect, useRef } from "react";
-import { recordEmployeeHeartbeat } from "@/lib/crm/employee-presence.functions";
+import { recordHeartbeat } from "@/lib/crm/employee-sessions.functions";
 import { useRouterState } from "@tanstack/react-router";
 
-function getBrowserInfo(): { browser: string; os: string; deviceType: string } {
+function getBrowserInfo(): { browser: string; browserVersion?: string; os: string; deviceType: string } {
   if (typeof window === "undefined" || typeof navigator === "undefined") {
     return { browser: "Chrome", os: "Windows", deviceType: "Desktop" };
   }
 
   const ua = navigator.userAgent;
   let browser = "Chrome";
-  if (ua.includes("Firefox/")) browser = "Firefox";
-  else if (ua.includes("Edg/")) browser = "Edge";
-  else if (ua.includes("Safari/") && !ua.includes("Chrome")) browser = "Safari";
-  else if (ua.includes("Chrome/")) browser = "Chrome";
+  let browserVersion: string | undefined;
+
+  if (ua.includes("Firefox/")) {
+    browser = "Firefox";
+    browserVersion = ua.split("Firefox/")[1]?.split(" ")[0];
+  } else if (ua.includes("Edg/")) {
+    browser = "Edge";
+    browserVersion = ua.split("Edg/")[1]?.split(" ")[0];
+  } else if (ua.includes("Safari/") && !ua.includes("Chrome")) {
+    browser = "Safari";
+    browserVersion = ua.split("Version/")[1]?.split(" ")[0];
+  } else if (ua.includes("Chrome/")) {
+    browser = "Chrome";
+    browserVersion = ua.split("Chrome/")[1]?.split(" ")[0];
+  }
 
   let os = "Windows";
   if (ua.includes("Mac OS")) os = "macOS";
@@ -23,10 +34,10 @@ function getBrowserInfo(): { browser: string; os: string; deviceType: string } {
   let deviceType = "Desktop";
   if (/Mobi|Android|iPhone|iPad/i.test(ua)) deviceType = "Mobile";
 
-  return { browser, os, deviceType };
+  return { browser, browserVersion, os, deviceType };
 }
 
-function getOrCreateSessionId(): string {
+export function getOrCreateSessionId(): string {
   if (typeof window === "undefined") return "sess_default";
   try {
     let sid = window.sessionStorage.getItem("crm_employee_session_id");
@@ -59,9 +70,9 @@ export function useEmployeePresence(options?: {
     if (typeof window === "undefined") return;
 
     const sessionId = getOrCreateSessionId();
-    const { browser, os, deviceType } = getBrowserInfo();
+    const { browser, browserVersion, os, deviceType } = getBrowserInfo();
 
-    // Reset activity timer on CRM user interaction
+    // Reset activity timer on user interaction
     const handleUserActivity = () => {
       lastActivityRef.current = Date.now();
       if (document.visibilityState === "visible") {
@@ -83,7 +94,7 @@ export function useEmployeePresence(options?: {
     window.addEventListener("click", handleUserActivity, { passive: true });
     document.addEventListener("visibilitychange", handleVisibilityChange);
 
-    // 1-second ticker for precise duration accumulation
+    // 1-second ticker for accumulation
     const ticker = setInterval(() => {
       const now = Date.now();
       const inactiveMs = now - lastActivityRef.current;
@@ -91,8 +102,8 @@ export function useEmployeePresence(options?: {
       if (document.visibilityState === "hidden") {
         statusRef.current = "AWAY";
         awaySecondsRef.current += 1;
-      } else if (inactiveMs > 5 * 60 * 1000) {
-        // > 5 minutes without interaction -> IDLE
+      } else if (inactiveMs > 10 * 60 * 1000) {
+        // > 10 minutes without interaction -> IDLE
         statusRef.current = "IDLE";
         idleSecondsRef.current += 1;
       } else {
@@ -101,7 +112,7 @@ export function useEmployeePresence(options?: {
       }
     }, 1000);
 
-    // Heartbeat every 30 seconds
+    // Heartbeat every 60 seconds
     const sendHeartbeat = async () => {
       const activeDelta = activeSecondsRef.current;
       const idleDelta = idleSecondsRef.current;
@@ -112,12 +123,20 @@ export function useEmployeePresence(options?: {
       awaySecondsRef.current = 0;
 
       try {
-        const res = await recordEmployeeHeartbeat({
+        const res = await recordHeartbeat({
           data: {
             sessionId,
             presenceStatus: statusRef.current,
             currentPage: currentPath,
-            currentModule: options?.currentModule || (currentPath.includes("order") ? "Orders" : currentPath.includes("support") || currentPath.includes("ticket") ? "Support" : "CRM"),
+            currentModule:
+              options?.currentModule ||
+              (currentPath.includes("order")
+                ? "Orders"
+                : currentPath.includes("support") || currentPath.includes("ticket")
+                ? "Support"
+                : currentPath.includes("lead")
+                ? "Leads"
+                : "General"),
             currentOrderId: options?.currentOrderId ?? null,
             currentOrderCode: options?.currentOrderCode ?? null,
             lastActionText: options?.lastActionText ?? null,
@@ -125,26 +144,26 @@ export function useEmployeePresence(options?: {
             idleSecondsDelta: idleDelta,
             awaySecondsDelta: awayDelta,
             browser,
+            browserVersion,
             os,
             deviceType,
-            ipAddress: "103.21.58.92",
           },
         });
 
         if (res && res.terminated) {
-          alert("Your active session has been terminated by an administrator.");
+          alert(res.logout_reason || "Your active session has been terminated by an administrator.");
           const { supabase } = await import("@/integrations/supabase/client");
           await supabase.auth.signOut();
           window.location.href = "/admin-login";
         }
-      } catch (err) {
+      } catch {
         // Non-blocking telemetry error
       }
     };
 
     // Initial heartbeat
     void sendHeartbeat();
-    const heartbeatTimer = setInterval(sendHeartbeat, 30_000);
+    const heartbeatTimer = setInterval(sendHeartbeat, 60_000);
 
     return () => {
       clearInterval(ticker);

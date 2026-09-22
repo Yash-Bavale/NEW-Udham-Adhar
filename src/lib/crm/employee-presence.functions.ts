@@ -4,7 +4,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 async function getAdmin() {
   const m = await import("@/integrations/supabase/client.server");
-  return m.supabaseAdmin;
+  return m.supabaseAdmin as any;
 }
 
 async function verifyAdminOrSuperAdmin(supabase: any, userId?: string) {
@@ -21,7 +21,7 @@ async function verifyAdminOrSuperAdmin(supabase: any, userId?: string) {
 }
 
 /* -------------------------------------------------------------------------- */
-/*  TYPES & IN-MEMORY PRESENCE STORE                                          */
+/*  TYPES                                                                     */
 /* -------------------------------------------------------------------------- */
 
 export interface EmployeeSessionRecord {
@@ -69,9 +69,6 @@ export interface PresenceThresholds {
   heartbeatIntervalSeconds: number;// 30
   sessionTimeoutHours: number;     // 9
 }
-
-// In-memory active presence registry
-const activeSessionsMap = new Map<string, EmployeeSessionRecord>();
 
 // Default shifts
 let defaultShiftsConfig: WorkShift[] = [
@@ -121,7 +118,7 @@ let presenceThresholdsConfig: PresenceThresholds = {
 };
 
 /* -------------------------------------------------------------------------- */
-/*  1. RECORD HEARTBEAT                                                       */
+/*  1. RECORD HEARTBEAT (Database backed)                                     */
 /* -------------------------------------------------------------------------- */
 
 export const recordEmployeeHeartbeat = createServerFn({ method: "POST" })
@@ -133,12 +130,12 @@ export const recordEmployeeHeartbeat = createServerFn({ method: "POST" })
         presenceStatus: z.enum(["ACTIVE", "IDLE", "AWAY", "OFFLINE"]),
         currentPage: z.string().default("/admin"),
         currentModule: z.string().default("General"),
-        currentOrderId: z.string().nullable().optional(),
+        currentOrderId: z.string().uuid().nullable().optional(),
         currentOrderCode: z.string().nullable().optional(),
         lastActionText: z.string().nullable().optional(),
-        activeSecondsDelta: z.number().nonnegative().default(0),
-        idleSecondsDelta: z.number().nonnegative().default(0),
-        awaySecondsDelta: z.number().nonnegative().default(0),
+        activeSecondsDelta: z.number().int().nonnegative().default(0),
+        idleSecondsDelta: z.number().int().nonnegative().default(0),
+        awaySecondsDelta: z.number().int().nonnegative().default(0),
         browser: z.string().default("Chrome"),
         os: z.string().default("Windows"),
         deviceType: z.string().default("Desktop"),
@@ -147,110 +144,52 @@ export const recordEmployeeHeartbeat = createServerFn({ method: "POST" })
       .parse(i),
   )
   .handler(async ({ data, context }) => {
-    const userId = context.userId;
-    const nowIso = new Date().toISOString();
     const admin = await getAdmin();
+    const { data: res } = await admin.rpc("record_employee_heartbeat_v2", {
+      p_session_id: data.sessionId,
+      p_presence_status: data.presenceStatus,
+      p_current_page: data.currentPage,
+      p_current_module: data.currentModule,
+      p_current_order_id: data.currentOrderId ?? null,
+      p_current_order_code: data.currentOrderCode ?? null,
+      p_last_action_text: data.lastActionText ?? null,
+      p_active_seconds_delta: data.activeSecondsDelta,
+      p_idle_seconds_delta: data.idleSecondsDelta,
+      p_away_seconds_delta: data.awaySecondsDelta,
+      p_browser: data.browser,
+      p_os: data.os,
+      p_device_type: data.deviceType,
+      p_ip_address: data.ipAddress,
+    });
 
-    let session = activeSessionsMap.get(data.sessionId);
-
-    if (!session) {
-      // Look up employee profile
-      const [{ data: profile }, { data: userRole }] = await Promise.all([
-        admin
-          .from("profiles")
-          .select("id, full_name, display_name, email")
-          .eq("id", userId)
-          .maybeSingle(),
-        admin
-          .from("user_roles")
-          .select("role")
-          .eq("user_id", userId)
-          .limit(1)
-          .maybeSingle(),
-      ]);
-
-      const name =
-        profile?.full_name ||
-        profile?.display_name ||
-        profile?.email?.split("@")[0] ||
-        "Staff";
-
-      // Match shift
-      const assignedShift = defaultShiftsConfig.find(
-        (s) => s.assignedUsers.includes(userId) || s.isDefault,
-      );
-
-      session = {
-        sessionId: data.sessionId,
-        employeeId: userId,
-        employeeName: name,
-        employeeRole: userRole?.role || "operations",
-        avatarUrl: null,
-        loginTime: nowIso,
-        lastHeartbeat: nowIso,
-        lastActivityAt: nowIso,
-        activeDurationMinutes: Math.round(data.activeSecondsDelta / 60),
-        idleDurationMinutes: Math.round(data.idleSecondsDelta / 60),
-        awayDurationMinutes: Math.round(data.awaySecondsDelta / 60),
-        presenceStatus: data.presenceStatus,
-        currentPage: data.currentPage,
-        currentModule: data.currentModule,
-        currentOrderId: data.currentOrderId ?? null,
-        currentOrderCode: data.currentOrderCode ?? null,
-        lastActionText: data.lastActionText || "Connected to CRM",
-        browser: data.browser,
-        os: data.os,
-        deviceType: data.deviceType,
-        ipAddress: data.ipAddress,
-        shiftId: assignedShift?.id || "shift_alpha",
-        terminated: false,
-      };
-
-      activeSessionsMap.set(data.sessionId, session);
-    } else {
-      // Check if session was terminated remotely
-      if (session.terminated) {
-        return { ok: false, terminated: true, message: "Session was terminated by administrator." };
-      }
-
-      session.lastHeartbeat = nowIso;
-      session.presenceStatus = data.presenceStatus;
-      session.currentPage = data.currentPage;
-      session.currentModule = data.currentModule;
-      if (data.currentOrderId) session.currentOrderId = data.currentOrderId;
-      if (data.currentOrderCode) session.currentOrderCode = data.currentOrderCode;
-      if (data.lastActionText) session.lastActionText = data.lastActionText;
-
-      if (data.presenceStatus === "ACTIVE") {
-        session.lastActivityAt = nowIso;
-      }
-
-      session.activeDurationMinutes += Math.round(data.activeSecondsDelta / 60);
-      session.idleDurationMinutes += Math.round(data.idleSecondsDelta / 60);
-      session.awayDurationMinutes += Math.round(data.awaySecondsDelta / 60);
-      session.browser = data.browser;
-      session.os = data.os;
-      session.deviceType = data.deviceType;
-      session.ipAddress = data.ipAddress;
-    }
+    const typedRes = res as any;
 
     return {
-      ok: true,
-      terminated: false,
-      activeMinutes: session.activeDurationMinutes,
-      idleMinutes: session.idleDurationMinutes,
-      awayMinutes: session.awayDurationMinutes,
-      presenceStatus: session.presenceStatus,
+      ok: typedRes?.ok ?? true,
+      terminated: typedRes?.terminated ?? false,
+      activeMinutes: Math.round((typedRes?.active_seconds || 0) / 60),
+      idleMinutes: Math.round((typedRes?.idle_seconds || 0) / 60),
+      awayMinutes: Math.round((typedRes?.away_seconds || 0) / 60),
+      presenceStatus: (typedRes?.status?.toUpperCase() as any) || data.presenceStatus,
     };
   });
 
 /* -------------------------------------------------------------------------- */
-/*  2. GET ACTIVE SESSIONS (Admin / Superadmin)                                */
+/*  2. GET ACTIVE SESSIONS (Admin / Superadmin, DB-backed)                     */
 /* -------------------------------------------------------------------------- */
+
+export interface GetActiveEmployeeSessionsResult {
+  sessions: EmployeeSessionRecord[];
+  totalCount: number;
+  activeCount: number;
+  idleCount: number;
+  awayCount: number;
+  offlineCount: number;
+}
 
 export const getActiveEmployeeSessions = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
+  .handler(async ({ context }): Promise<GetActiveEmployeeSessionsResult> => {
     await verifyAdminOrSuperAdmin(context.supabase, context.userId);
     const admin = await getAdmin();
     const nowTime = Date.now();
@@ -270,85 +209,92 @@ export const getActiveEmployeeSessions = createServerFn({ method: "POST" })
       ]);
 
     const staffUserIds = Array.from(
-      new Set((staffRoles ?? []).map((r: any) => r.user_id)),
-    );
+      new Set((staffRoles ?? []).map((r: any) => String(r.user_id))),
+    ) as string[];
 
-    const { data: profiles } = await admin
-      .from("profiles")
-      .select("id, full_name, display_name, email")
-      .in(
-        "id",
-        staffUserIds.length
-          ? staffUserIds
-          : ["00000000-0000-0000-0000-000000000000"],
-      );
+    const [{ data: profiles }, { data: dbSessions }] = await Promise.all([
+      admin
+        .from("profiles")
+        .select("id, full_name, display_name, email, is_active")
+        .in(
+          "id",
+          staffUserIds.length
+            ? staffUserIds
+            : ["00000000-0000-0000-0000-000000000000"],
+        ),
+      admin
+        .from("employee_sessions")
+        .select("*")
+        .order("last_heartbeat_at", { ascending: false })
+        .limit(200),
+    ]);
 
     const profileMap = new Map<string, any>();
-    (profiles ?? []).forEach((p: any) => profileMap.set(p.id, p));
+    (profiles ?? []).forEach((p: any) => profileMap.set(String(p.id), p));
 
     const roleMap = new Map<string, string>();
-    (staffRoles ?? []).forEach((r: any) => roleMap.set(r.user_id, r.role));
+    (staffRoles ?? []).forEach((r: any) => roleMap.set(String(r.user_id), r.role));
 
-    // Consolidate in-memory sessions & active staff
-    const sessionsList: EmployeeSessionRecord[] = [];
-    const activeStaffSet = new Set<string>();
-
-    activeSessionsMap.forEach((session) => {
-      // If no heartbeat for > 5 minutes, mark OFFLINE
-      const diffMs = nowTime - new Date(session.lastHeartbeat).getTime();
-      if (diffMs > 5 * 60 * 1000) {
-        session.presenceStatus = "OFFLINE";
-      } else if (diffMs > presenceThresholdsConfig.awayThresholdMins * 60 * 1000) {
-        session.presenceStatus = "AWAY";
-      } else if (diffMs > presenceThresholdsConfig.idleThresholdMins * 60 * 1000) {
-        session.presenceStatus = "IDLE";
-      }
-
-      if (!session.terminated) {
-        sessionsList.push(session);
-        activeStaffSet.add(session.employeeId);
+    // Map latest active session by employee
+    const latestSessionByEmp = new Map<string, any>();
+    (dbSessions ?? []).forEach((s: any) => {
+      if (!latestSessionByEmp.has(String(s.employee_id))) {
+        latestSessionByEmp.set(String(s.employee_id), s);
       }
     });
 
-    // For any registered staff not currently in memory sessions, show placeholder record
-    staffUserIds.forEach((uid) => {
-      if (!activeStaffSet.has(uid)) {
-        const p = profileMap.get(uid);
-        const name =
-          p?.full_name ||
-          p?.display_name ||
-          p?.email?.split("@")[0] ||
-          "Staff";
-        const assignedShift = defaultShiftsConfig.find(
-          (s) => s.assignedUsers.includes(uid) || s.isDefault,
-        );
+    const sessionsList: EmployeeSessionRecord[] = staffUserIds.map((uid) => {
+      const p = profileMap.get(uid);
+      const s = latestSessionByEmp.get(uid);
+      const name =
+        p?.full_name ||
+        p?.display_name ||
+        p?.email?.split("@")[0] ||
+        "Staff";
 
-        sessionsList.push({
-          sessionId: `sess_${uid.slice(0, 8)}`,
-          employeeId: uid,
-          employeeName: name,
-          employeeRole: roleMap.get(uid) || "operations",
-          avatarUrl: p?.avatar_url,
-          loginTime: new Date(nowTime - 7 * 3600 * 1000).toISOString(),
-          lastHeartbeat: new Date(nowTime - 3600 * 1000).toISOString(),
-          lastActivityAt: new Date(nowTime - 3600 * 1000).toISOString(),
-          activeDurationMinutes: 180,
-          idleDurationMinutes: 15,
-          awayDurationMinutes: 5,
-          presenceStatus: "OFFLINE",
-          currentPage: "/admin/orders",
-          currentModule: "Orders",
-          currentOrderId: null,
-          currentOrderCode: null,
-          lastActionText: "No active session",
-          browser: "Chrome 128",
-          os: "Windows 11",
-          deviceType: "Desktop",
-          ipAddress: "103.21.58.92",
-          shiftId: assignedShift?.id || "shift_alpha",
-          terminated: false,
-        });
+      const assignedShift = defaultShiftsConfig.find(
+        (sh) => sh.assignedUsers.includes(uid) || sh.isDefault,
+      );
+
+      let status: "ACTIVE" | "IDLE" | "AWAY" | "OFFLINE" = "OFFLINE";
+      if (s && s.is_active && s.status !== "force_logged_out" && s.status !== "logged_out") {
+        const diffMs = nowTime - new Date(s.last_heartbeat_at).getTime();
+        if (diffMs > 5 * 60 * 1000) {
+          status = "OFFLINE";
+        } else if (diffMs > 15 * 60 * 1000 || s.status === "away") {
+          status = "AWAY";
+        } else if (diffMs > 5 * 60 * 1000 || s.status === "idle") {
+          status = "IDLE";
+        } else {
+          status = "ACTIVE";
+        }
       }
+
+      return {
+        sessionId: s?.session_id ? String(s.session_id) : `sess_${uid.slice(0, 8)}`,
+        employeeId: uid,
+        employeeName: name,
+        employeeRole: roleMap.get(uid) || "operations",
+        avatarUrl: null,
+        loginTime: s?.login_at ? String(s.login_at) : new Date().toISOString(),
+        lastHeartbeat: s?.last_heartbeat_at ? String(s.last_heartbeat_at) : new Date().toISOString(),
+        lastActivityAt: s?.last_activity_at ? String(s.last_activity_at) : new Date().toISOString(),
+        activeDurationMinutes: Math.round(((s?.active_seconds as number) || 0) / 60),
+        idleDurationMinutes: Math.round(((s?.idle_seconds as number) || 0) / 60),
+        awayDurationMinutes: Math.round(((s?.away_seconds as number) || 0) / 60),
+        presenceStatus: status,
+        currentPage: s?.current_page ? String(s.current_page) : "/admin",
+        currentModule: s?.current_module ? String(s.current_module) : "General",
+        currentOrderId: s?.current_order_id ? String(s.current_order_id) : null,
+        currentOrderCode: s?.current_order_code ? String(s.current_order_code) : null,
+        lastActionText: s?.last_action_text ? String(s.last_action_text) : (status === "ACTIVE" ? "Connected to CRM" : "No active session"),
+        browser: s?.browser ? String(s.browser) : "Chrome",
+        os: s?.operating_system ? String(s.operating_system) : "Windows",
+        deviceType: s?.device_type ? String(s.device_type) : "Desktop",
+        ipAddress: s?.ip_address ? String(s.ip_address) : "103.21.58.92",
+        shiftId: assignedShift?.id || "shift_alpha",
+        terminated: s?.status === "force_logged_out" || s?.is_active === false,
+      };
     });
 
     return {
@@ -362,7 +308,7 @@ export const getActiveEmployeeSessions = createServerFn({ method: "POST" })
   });
 
 /* -------------------------------------------------------------------------- */
-/*  3. TERMINATE SESSION (Force Logout)                                       */
+/*  3. TERMINATE SESSION (Force Logout, DB backed)                             */
 /* -------------------------------------------------------------------------- */
 
 export const terminateEmployeeSession = createServerFn({ method: "POST" })
@@ -377,20 +323,17 @@ export const terminateEmployeeSession = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await verifyAdminOrSuperAdmin(context.supabase, context.userId);
+    const admin = await getAdmin();
 
-    const session = activeSessionsMap.get(data.sessionId);
-    if (session) {
-      session.terminated = true;
-      session.presenceStatus = "OFFLINE";
-    }
-
-    // Also invalidate any sessions for this employee
     if (data.employeeId) {
-      activeSessionsMap.forEach((s) => {
-        if (s.employeeId === data.employeeId) {
-          s.terminated = true;
-          s.presenceStatus = "OFFLINE";
-        }
+      await admin.rpc("admin_force_logout_all_sessions", {
+        p_employee_id: data.employeeId,
+        p_reason: "Terminated by administrator",
+      });
+    } else {
+      await admin.rpc("admin_force_logout_session", {
+        p_session_id: data.sessionId,
+        p_reason: "Terminated by administrator",
       });
     }
 
@@ -420,8 +363,8 @@ export const getShiftSettings = createServerFn({ method: "POST" })
       ]);
 
     const staffUserIds = Array.from(
-      new Set((staffRoles ?? []).map((r: any) => r.user_id)),
-    );
+      new Set((staffRoles ?? []).map((r: any) => String(r.user_id))),
+    ) as string[];
 
     const { data: profiles } = await admin
       .from("profiles")
@@ -482,19 +425,12 @@ export const saveShiftSettings = createServerFn({ method: "POST" })
   });
 
 export function getEmployeePresenceState(employeeId: string) {
-  let matchedSession: EmployeeSessionRecord | null = null;
-  activeSessionsMap.forEach((s) => {
-    if (s.employeeId === employeeId && !s.terminated) {
-      matchedSession = s;
-    }
-  });
-
   const assignedShift = defaultShiftsConfig.find(
-    (s) => s.assignedUsers.includes(employeeId) || (s.id === matchedSession?.shiftId) || s.isDefault,
+    (s) => s.assignedUsers.includes(employeeId) || s.isDefault,
   );
 
   return {
-    session: matchedSession,
+    session: null,
     shift: assignedShift || defaultShiftsConfig[0],
     thresholds: presenceThresholdsConfig,
   };

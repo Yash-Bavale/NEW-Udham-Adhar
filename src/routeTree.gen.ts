@@ -85,6 +85,7 @@ import { Route as AdminReportsRouteImport } from './routes/admin.reports'
 import { Route as AdminReviewRouteImport } from './routes/admin.review'
 import { Route as AdminSeoRouteImport } from './routes/admin.seo'
 import { Route as AdminServicesRouteImport } from './routes/admin.services'
+import { Route as AdminSessionsRouteImport } from './routes/admin.sessions'
 import { Route as AdminSettingsRouteImport } from './routes/admin.settings'
 import { Route as AdminSubmissionsRouteImport } from './routes/admin.submissions'
 import { Route as AdminSuperRouteImport } from './routes/admin.super'
@@ -541,6 +542,11 @@ const AdminServicesRoute = AdminServicesRouteImport.update({
   path: '/services',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminSessionsRoute = AdminSessionsRouteImport.update({
+  id: '/sessions',
+  path: '/sessions',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminSettingsRoute = AdminSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
@@ -981,6 +987,7 @@ export interface FileRoutesByFullPath {
   '/admin/review': typeof AdminReviewRoute
   '/admin/seo': typeof AdminSeoRoute
   '/admin/services': typeof AdminServicesRouteWithChildren
+  '/admin/sessions': typeof AdminSessionsRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/submissions': typeof AdminSubmissionsRouteWithChildren
   '/admin/super': typeof AdminSuperRoute
@@ -1122,6 +1129,7 @@ export interface FileRoutesByTo {
   '/admin/reports': typeof AdminReportsRoute
   '/admin/review': typeof AdminReviewRoute
   '/admin/seo': typeof AdminSeoRoute
+  '/admin/sessions': typeof AdminSessionsRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/submissions': typeof AdminSubmissionsRouteWithChildren
   '/admin/super': typeof AdminSuperRoute
@@ -1267,6 +1275,7 @@ export interface FileRoutesById {
   '/admin/review': typeof AdminReviewRoute
   '/admin/seo': typeof AdminSeoRoute
   '/admin/services': typeof AdminServicesRouteWithChildren
+  '/admin/sessions': typeof AdminSessionsRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/submissions': typeof AdminSubmissionsRouteWithChildren
   '/admin/super': typeof AdminSuperRoute
@@ -1414,6 +1423,7 @@ export interface FileRouteTypes {
     | '/admin/review'
     | '/admin/seo'
     | '/admin/services'
+    | '/admin/sessions'
     | '/admin/settings'
     | '/admin/submissions'
     | '/admin/super'
@@ -1555,6 +1565,7 @@ export interface FileRouteTypes {
     | '/admin/reports'
     | '/admin/review'
     | '/admin/seo'
+    | '/admin/sessions'
     | '/admin/settings'
     | '/admin/submissions'
     | '/admin/super'
@@ -1699,6 +1710,7 @@ export interface FileRouteTypes {
     | '/admin/review'
     | '/admin/seo'
     | '/admin/services'
+    | '/admin/sessions'
     | '/admin/settings'
     | '/admin/submissions'
     | '/admin/super'
@@ -2389,6 +2401,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminServicesRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/sessions': {
+      id: '/admin/sessions'
+      path: '/sessions'
+      fullPath: '/admin/sessions'
+      preLoaderRoute: typeof AdminSessionsRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/settings': {
       id: '/admin/settings'
       path: '/settings'
@@ -3011,6 +3030,7 @@ interface AdminRouteChildren {
   AdminReviewRoute: typeof AdminReviewRoute
   AdminSeoRoute: typeof AdminSeoRoute
   AdminServicesRoute: typeof AdminServicesRouteWithChildren
+  AdminSessionsRoute: typeof AdminSessionsRoute
   AdminSettingsRoute: typeof AdminSettingsRoute
   AdminSubmissionsRoute: typeof AdminSubmissionsRouteWithChildren
   AdminSuperRoute: typeof AdminSuperRoute
@@ -3059,6 +3079,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminReviewRoute: AdminReviewRoute,
   AdminSeoRoute: AdminSeoRoute,
   AdminServicesRoute: AdminServicesRouteWithChildren,
+  AdminSessionsRoute: AdminSessionsRoute,
   AdminSettingsRoute: AdminSettingsRoute,
   AdminSubmissionsRoute: AdminSubmissionsRouteWithChildren,
   AdminSuperRoute: AdminSuperRoute,
