@@ -2,7 +2,6 @@ import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { logLoginAttempt, verifyGoogleStaffAccess } from "@/lib/crm/employee-sessions.functions";
-import { lovable } from "@/integrations/lovable/index";
 import { getOrCreateSessionId } from "@/hooks/useEmployeePresence";
 
 /** Only allow same-origin relative paths as a post-login redirect target. */
@@ -134,13 +133,14 @@ function AdminLoginPage() {
       // Preserve any intended destination across the OAuth round-trip.
       const target = safeNext(next);
       if (target) sessionStorage.setItem("admin_login_next", target);
-      const result = await lovable.auth.signInWithOAuth("google", {
-        redirect_uri: `${window.location.origin}/admin-login`,
-        extraParams: { prompt: "select_account" },
+      const { error: oauthErr } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: `${window.location.origin}/admin-login`,
+          queryParams: { prompt: "select_account" },
+        },
       });
-      if (result.error) throw new Error(result.error.message || "Google authentication failed");
-      if (result.redirected) return; // Browser is heading to Google
-      goAfterAuth();
+      if (oauthErr) throw oauthErr;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Google authentication failed");
       setGoogleBusy(false);

@@ -60,6 +60,12 @@ export function useEmployeePresence(options?: {
   const routerState = useRouterState();
   const currentPath = routerState.location.pathname;
 
+  const optionsRef = useRef(options);
+  optionsRef.current = options;
+
+  const currentPathRef = useRef(currentPath);
+  currentPathRef.current = currentPath;
+
   const lastActivityRef = useRef<number>(Date.now());
   const activeSecondsRef = useRef<number>(0);
   const idleSecondsRef = useRef<number>(0);
@@ -122,24 +128,27 @@ export function useEmployeePresence(options?: {
       idleSecondsRef.current = 0;
       awaySecondsRef.current = 0;
 
+      const path = currentPathRef.current || "/admin";
+      const opts = optionsRef.current;
+
       try {
         const res = await recordHeartbeat({
           data: {
             sessionId,
             presenceStatus: statusRef.current,
-            currentPage: currentPath,
+            currentPage: path,
             currentModule:
-              options?.currentModule ||
-              (currentPath.includes("order")
+              opts?.currentModule ||
+              (path.includes("order")
                 ? "Orders"
-                : currentPath.includes("support") || currentPath.includes("ticket")
+                : path.includes("support") || path.includes("ticket")
                 ? "Support"
-                : currentPath.includes("lead")
+                : path.includes("lead")
                 ? "Leads"
                 : "General"),
-            currentOrderId: options?.currentOrderId ?? null,
-            currentOrderCode: options?.currentOrderCode ?? null,
-            lastActionText: options?.lastActionText ?? null,
+            currentOrderId: opts?.currentOrderId ?? null,
+            currentOrderCode: opts?.currentOrderCode ?? null,
+            lastActionText: opts?.lastActionText ?? null,
             activeSecondsDelta: activeDelta,
             idleSecondsDelta: idleDelta,
             awaySecondsDelta: awayDelta,
@@ -156,8 +165,8 @@ export function useEmployeePresence(options?: {
           await supabase.auth.signOut();
           window.location.href = "/admin-login";
         }
-      } catch {
-        // Non-blocking telemetry error
+      } catch (err) {
+        console.warn("[EmployeePresence] Heartbeat error:", err);
       }
     };
 
@@ -173,5 +182,5 @@ export function useEmployeePresence(options?: {
       window.removeEventListener("click", handleUserActivity);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [currentPath, options?.currentModule, options?.currentOrderId, options?.currentOrderCode, options?.lastActionText]);
+  }, []);
 }

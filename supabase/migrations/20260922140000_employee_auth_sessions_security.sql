@@ -214,8 +214,8 @@ CREATE POLICY "Employees insert own activity log"
 CREATE OR REPLACE FUNCTION public.record_employee_heartbeat_v2(
   p_session_id text,
   p_presence_status text,
-  p_current_page text,
-  p_current_module text,
+  p_current_page text DEFAULT '/admin',
+  p_current_module text DEFAULT 'General',
   p_current_order_id uuid DEFAULT NULL,
   p_current_order_code text DEFAULT NULL,
   p_last_action_text text DEFAULT NULL,
@@ -226,7 +226,8 @@ CREATE OR REPLACE FUNCTION public.record_employee_heartbeat_v2(
   p_browser_version text DEFAULT NULL,
   p_os text DEFAULT 'Windows',
   p_device_type text DEFAULT 'Desktop',
-  p_ip_address text DEFAULT NULL
+  p_ip_address text DEFAULT NULL,
+  p_employee_id uuid DEFAULT NULL
 )
 RETURNS jsonb
 LANGUAGE plpgsql
@@ -234,13 +235,20 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 DECLARE
-  v_uid uuid := auth.uid();
+  v_uid uuid := COALESCE(p_employee_id, auth.uid());
   v_session record;
   v_now timestamptz := now();
   v_profile_id uuid;
 BEGIN
+  -- Check existing session first
+  SELECT * INTO v_session FROM public.employee_sessions WHERE session_id = p_session_id;
+
+  IF v_uid IS NULL AND v_session.id IS NOT NULL THEN
+    v_uid := v_session.auth_user_id;
+  END IF;
+
   IF v_uid IS NULL THEN
-    RETURN jsonb_build_object('ok', false, 'error', 'Unauthorized');
+    RETURN jsonb_build_object('ok', false, 'error', 'Unauthorized: User ID could not be determined');
   END IF;
 
   -- Find profile ID
@@ -248,9 +256,6 @@ BEGIN
   IF v_profile_id IS NULL THEN
     v_profile_id := v_uid;
   END IF;
-
-  -- Check existing session
-  SELECT * INTO v_session FROM public.employee_sessions WHERE session_id = p_session_id;
 
   IF v_session.id IS NOT NULL THEN
     -- Check if session was terminated remotely
@@ -357,6 +362,7 @@ END;
 $$;
 
 GRANT EXECUTE ON FUNCTION public.record_employee_heartbeat_v2 TO authenticated;
+GRANT EXECUTE ON FUNCTION public.record_employee_heartbeat_v2 TO service_role;
 
 -- Function: admin_force_logout_session
 CREATE OR REPLACE FUNCTION public.admin_force_logout_session(

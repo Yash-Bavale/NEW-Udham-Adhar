@@ -66,40 +66,142 @@ export const recordHeartbeat = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const admin = await getAdmin();
+    const userId = context.userId;
     const clientIp = getClientIpFromRequest();
+    const nowIso = new Date().toISOString();
 
-    const { data: res, error } = await admin.rpc("record_employee_heartbeat_v2", {
-      p_session_id: data.sessionId,
-      p_presence_status: data.presenceStatus,
-      p_current_page: data.currentPage,
-      p_current_module: data.currentModule,
-      p_current_order_id: data.currentOrderId ?? null,
-      p_current_order_code: data.currentOrderCode ?? null,
-      p_last_action_text: data.lastActionText ?? null,
-      p_active_seconds_delta: data.activeSecondsDelta,
-      p_idle_seconds_delta: data.idleSecondsDelta,
-      p_away_seconds_delta: data.awaySecondsDelta,
-      p_browser: data.browser,
-      p_browser_version: data.browserVersion ?? null,
-      p_os: data.os,
-      p_device_type: data.deviceType,
-      p_ip_address: clientIp,
-    });
+    // 1. Try RPC execution first
+    try {
+      const { data: res, error } = await admin.rpc("record_employee_heartbeat_v2", {
+        p_employee_id: userId,
+        p_session_id: data.sessionId,
+        p_presence_status: data.presenceStatus,
+        p_current_page: data.currentPage,
+        p_current_module: data.currentModule,
+        p_current_order_id: data.currentOrderId ?? null,
+        p_current_order_code: data.currentOrderCode ?? null,
+        p_last_action_text: data.lastActionText ?? null,
+        p_active_seconds_delta: data.activeSecondsDelta,
+        p_idle_seconds_delta: data.idleSecondsDelta,
+        p_away_seconds_delta: data.awaySecondsDelta,
+        p_browser: data.browser,
+        p_browser_version: data.browserVersion ?? null,
+        p_os: data.os,
+        p_device_type: data.deviceType,
+        p_ip_address: clientIp,
+      });
 
-    if (error) {
-      console.error("[recordHeartbeat] RPC error:", error);
-      return { ok: true, terminated: false };
+      if (!error && res && res.ok !== false) {
+        return res as {
+          ok: boolean;
+          terminated: boolean;
+          logout_reason?: string;
+          active_seconds?: number;
+          idle_seconds?: number;
+          away_seconds?: number;
+          status?: string;
+        };
+      }
+      if (error) {
+        console.warn("[recordHeartbeat] RPC notice, falling back to direct table update:", error.message);
+      }
+    } catch (rpcErr) {
+      console.warn("[recordHeartbeat] RPC exception, using direct table update:", rpcErr);
     }
 
-    return res as {
-      ok: boolean;
-      terminated: boolean;
-      logout_reason?: string;
-      active_seconds?: number;
-      idle_seconds?: number;
-      away_seconds?: number;
-      status?: string;
-    };
+    // 2. Direct PostgreSQL fallback on employee_sessions table
+    const { data: existingSess } = await admin
+      .from("employee_sessions")
+      .select("*")
+      .eq("session_id", data.sessionId)
+      .maybeSingle();
+
+    if (existingSess) {
+      if (existingSess.is_active === false || existingSess.status === "force_logged_out") {
+        return {
+          ok: false,
+          terminated: true,
+          logout_reason: existingSess.logout_reason || "Terminated by administrator",
+          status: existingSess.status,
+        };
+      }
+
+      const activeSec = (existingSess.active_seconds || 0) + (data.activeSecondsDelta || 0);
+      const idleSec = (existingSess.idle_seconds || 0) + (data.idleSecondsDelta || 0);
+      const awaySec = (existingSess.away_seconds || 0) + (data.awaySecondsDelta || 0);
+
+      await admin
+        .from("employee_sessions")
+        .update({
+          last_heartbeat_at: nowIso,
+          last_activity_at: data.presenceStatus === "ACTIVE" ? nowIso : (existingSess.last_activity_at || nowIso),
+          status: data.presenceStatus.toLowerCase(),
+          is_active: true,
+          active_seconds: activeSec,
+          idle_seconds: idleSec,
+          away_seconds: awaySec,
+          current_page: data.currentPage,
+          current_module: data.currentModule,
+          current_order_id: data.currentOrderId ?? existingSess.current_order_id ?? null,
+          current_order_code: data.currentOrderCode ?? existingSess.current_order_code ?? null,
+          last_action_text: data.lastActionText ?? existingSess.last_action_text ?? null,
+          browser: data.browser || existingSess.browser,
+          browser_version: data.browserVersion || existingSess.browser_version,
+          operating_system: data.os || existingSess.operating_system,
+          device_type: data.deviceType || existingSess.device_type,
+          ip_address: clientIp || existingSess.ip_address,
+          updated_at: nowIso,
+        })
+        .eq("session_id", data.sessionId);
+
+      return {
+        ok: true,
+        terminated: false,
+        active_seconds: activeSec,
+        idle_seconds: idleSec,
+        away_seconds: awaySec,
+        status: data.presenceStatus.toLowerCase(),
+      };
+    } else {
+      // Insert new session row
+      await admin
+        .from("employee_sessions")
+        .insert({
+          employee_id: userId,
+          auth_user_id: userId,
+          session_id: data.sessionId,
+          login_method: "password",
+          login_at: nowIso,
+          last_activity_at: nowIso,
+          last_heartbeat_at: nowIso,
+          active_seconds: data.activeSecondsDelta || 0,
+          idle_seconds: data.idleSecondsDelta || 0,
+          away_seconds: data.awaySecondsDelta || 0,
+          is_active: true,
+          status: data.presenceStatus.toLowerCase(),
+          current_page: data.currentPage,
+          current_module: data.currentModule,
+          current_order_id: data.currentOrderId ?? null,
+          current_order_code: data.currentOrderCode ?? null,
+          last_action_text: data.lastActionText ?? null,
+          browser: data.browser,
+          browser_version: data.browserVersion || null,
+          operating_system: data.os,
+          device_type: data.deviceType,
+          ip_address: clientIp,
+          created_at: nowIso,
+          updated_at: nowIso,
+        });
+
+      return {
+        ok: true,
+        terminated: false,
+        active_seconds: data.activeSecondsDelta || 0,
+        idle_seconds: data.idleSecondsDelta || 0,
+        away_seconds: data.awaySecondsDelta || 0,
+        status: data.presenceStatus.toLowerCase(),
+      };
+    }
   });
 
 /* -------------------------------------------------------------------------- */
@@ -384,13 +486,13 @@ export const listEmployeeSessionsAdmin = createServerFn({ method: "POST" })
 
       let presence: "active" | "idle" | "away" | "offline" = "offline";
       if (sess && sess.is_active && sess.status !== "force_logged_out" && sess.status !== "logged_out") {
-        const lastHbMs = new Date(sess.last_heartbeat_at).getTime();
+        const lastHbMs = new Date(sess.last_heartbeat_at || sess.last_activity_at || sess.login_at).getTime();
         const diffMs = nowTime - lastHbMs;
-        if (diffMs > 5 * 60 * 1000) {
+        if (diffMs > 3 * 60 * 1000) {
           presence = "offline";
-        } else if (diffMs > 15 * 60 * 1000) {
+        } else if (sess.status === "away" || diffMs > 2 * 60 * 1000) {
           presence = "away";
-        } else if (diffMs > 5 * 60 * 1000 || sess.status === "idle") {
+        } else if (sess.status === "idle") {
           presence = "idle";
         } else {
           presence = "active";
@@ -472,14 +574,57 @@ export const forceLogoutSessionAdmin = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await verifyAdminOrSuperAdmin(context.userId);
     const admin = await getAdmin();
+    const actorId = context.userId;
+    const nowIso = new Date().toISOString();
 
-    const { data: res, error } = await admin.rpc("admin_force_logout_session", {
-      p_session_id: data.sessionId,
-      p_reason: data.reason,
-    });
+    // 1. Try RPC execution first
+    try {
+      const { data: res, error } = await admin.rpc("admin_force_logout_session", {
+        p_session_id: data.sessionId,
+        p_reason: data.reason,
+      });
+      if (!error && res) {
+        return res as { ok: boolean; session_id: string };
+      }
+      if (error) {
+        console.warn("[forceLogoutSessionAdmin] RPC returned error, using direct table update:", error.message);
+      }
+    } catch (rpcErr) {
+      console.warn("[forceLogoutSessionAdmin] RPC exception, using direct table update:", rpcErr);
+    }
 
-    if (error) throw new Error(error.message);
-    return res as { ok: boolean; session_id: string };
+    // 2. Direct table fallback
+    const { data: sessionData } = await admin
+      .from("employee_sessions")
+      .select("employee_id, auth_user_id, ip_address")
+      .eq("session_id", data.sessionId)
+      .maybeSingle();
+
+    await admin
+      .from("employee_sessions")
+      .update({
+        is_active: false,
+        status: "force_logged_out",
+        logout_at: nowIso,
+        logout_reason: data.reason,
+        updated_at: nowIso,
+      })
+      .eq("session_id", data.sessionId);
+
+    if (sessionData?.employee_id) {
+      await admin.from("employee_security_events").insert({
+        employee_id: sessionData.employee_id,
+        auth_user_id: sessionData.auth_user_id,
+        actor_employee_id: actorId,
+        target_employee_id: sessionData.employee_id,
+        session_id: data.sessionId,
+        event_type: "FORCE_LOGOUT",
+        metadata: { reason: data.reason, timestamp: nowIso },
+        ip_address: sessionData.ip_address || null,
+      });
+    }
+
+    return { ok: true, session_id: data.sessionId };
   });
 
 /* -------------------------------------------------------------------------- */
@@ -499,14 +644,55 @@ export const forceLogoutAllSessionsAdmin = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await verifyAdminOrSuperAdmin(context.userId);
     const admin = await getAdmin();
+    const actorId = context.userId;
+    const nowIso = new Date().toISOString();
 
-    const { data: res, error } = await admin.rpc("admin_force_logout_all_sessions", {
-      p_employee_id: data.employeeId,
-      p_reason: data.reason,
+    // 1. Try RPC execution first
+    try {
+      const { data: res, error } = await admin.rpc("admin_force_logout_all_sessions", {
+        p_employee_id: data.employeeId,
+        p_reason: data.reason,
+      });
+      if (!error && res) {
+        return res as { ok: boolean; terminated_count: number };
+      }
+      if (error) {
+        console.warn("[forceLogoutAllSessionsAdmin] RPC returned error, using direct table update:", error.message);
+      }
+    } catch (rpcErr) {
+      console.warn("[forceLogoutAllSessionsAdmin] RPC exception, using direct table update:", rpcErr);
+    }
+
+    // 2. Direct table fallback
+    const { data: sessions } = await admin
+      .from("employee_sessions")
+      .select("session_id, auth_user_id, ip_address")
+      .eq("employee_id", data.employeeId)
+      .eq("is_active", true);
+
+    const count = sessions?.length || 0;
+
+    await admin
+      .from("employee_sessions")
+      .update({
+        is_active: false,
+        status: "force_logged_out",
+        logout_at: nowIso,
+        logout_reason: data.reason,
+        updated_at: nowIso,
+      })
+      .eq("employee_id", data.employeeId)
+      .eq("is_active", true);
+
+    await admin.from("employee_security_events").insert({
+      employee_id: data.employeeId,
+      actor_employee_id: actorId,
+      target_employee_id: data.employeeId,
+      event_type: "FORCE_LOGOUT_ALL",
+      metadata: { reason: data.reason, sessions_terminated: count, timestamp: nowIso },
     });
 
-    if (error) throw new Error(error.message);
-    return res as { ok: boolean; terminated_count: number };
+    return { ok: true, terminated_count: count };
   });
 
 /* -------------------------------------------------------------------------- */

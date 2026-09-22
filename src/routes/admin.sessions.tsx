@@ -1,7 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { getOrCreateSessionId } from "@/hooks/useEmployeePresence";
 import {
   listEmployeeSessionsAdmin,
   forceLogoutSessionAdmin,
@@ -52,6 +54,8 @@ function AdminSessionsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedEmpId, setSelectedEmpId] = useState<string | null>(null);
   const [isRotating, setIsRotating] = useState(false);
+  const [currentAuthUserId, setCurrentAuthUserId] = useState<string | null>(null);
+  const [clientSessionId, setClientSessionId] = useState<string | null>(null);
 
   const qc = useQueryClient();
   const listFn = useServerFn(listEmployeeSessionsAdmin);
@@ -63,6 +67,32 @@ function AdminSessionsPage() {
     queryFn: () => listFn({ data: { statusFilter, searchQuery, limit: 100 } }),
     refetchInterval: 15_000,
   });
+
+  // Fetch client auth state for diagnostic display
+  useEffect(() => {
+    setClientSessionId(getOrCreateSessionId());
+    supabase.auth.getUser().then(({ data: authData }) => {
+      if (authData?.user) {
+        setCurrentAuthUserId(authData.user.id);
+      }
+    });
+
+    // Supabase Realtime channel for live employee_sessions updates
+    const channel = supabase
+      .channel("realtime:employee_sessions")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "employee_sessions" },
+        () => {
+          qc.invalidateQueries({ queryKey: ["admin.sessions"] });
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [qc]);
 
   const handleSync = () => {
     setIsRotating(true);
@@ -98,6 +128,39 @@ function AdminSessionsPage() {
 
   return (
     <div className="w-full space-y-6 pb-20">
+      {/* Dev-Only Diagnostic Panel */}
+      {process.env.NODE_ENV !== "production" && (
+        <section className="bg-slate-900 text-slate-200 rounded-xl p-4 border border-slate-800 text-xs font-mono shadow-md">
+          <div className="flex items-center justify-between pb-2 border-b border-slate-800 mb-3 font-sans font-bold text-amber-400">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+              <span>LIVE TELEMETRY DIAGNOSTICS (DEV ONLY)</span>
+            </div>
+            <span className="text-[11px] text-slate-400">Updated Realtime</span>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div>
+              <span className="text-slate-500 block">Auth User ID:</span>
+              <span className="text-white truncate block">{currentAuthUserId || "Not authenticated"}</span>
+            </div>
+            <div>
+              <span className="text-slate-500 block">Client Session ID:</span>
+              <span className="text-emerald-400 truncate block">{clientSessionId || "—"}</span>
+            </div>
+            <div>
+              <span className="text-slate-500 block">Active Operators:</span>
+              <span className="text-emerald-300 font-bold">{data?.activeCount ?? 0}</span> / {data?.totalStaffCount ?? 0}
+            </div>
+            <div>
+              <span className="text-slate-500 block">Query Status:</span>
+              <span className={isLoading ? "text-amber-400" : "text-emerald-400"}>
+                {isLoading ? "Fetching..." : "Connected (200 OK)"}
+              </span>
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* Header */}
       <section className="bg-white rounded-xl p-5 border border-slate-200/90 shadow-xs flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>

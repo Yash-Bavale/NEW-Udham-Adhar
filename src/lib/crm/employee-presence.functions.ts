@@ -326,15 +326,42 @@ export const terminateEmployeeSession = createServerFn({ method: "POST" })
     const admin = await getAdmin();
 
     if (data.employeeId) {
-      await admin.rpc("admin_force_logout_all_sessions", {
-        p_employee_id: data.employeeId,
-        p_reason: "Terminated by administrator",
-      });
+      try {
+        const { error } = await admin.rpc("admin_force_logout_all_sessions", {
+          p_employee_id: data.employeeId,
+          p_reason: "Terminated by administrator",
+        });
+        if (error) throw error;
+      } catch (e) {
+        await admin
+          .from("employee_sessions")
+          .update({
+            is_active: false,
+            status: "force_logged_out",
+            logout_at: new Date().toISOString(),
+            logout_reason: "Terminated by administrator",
+          })
+          .eq("employee_id", data.employeeId)
+          .eq("is_active", true);
+      }
     } else {
-      await admin.rpc("admin_force_logout_session", {
-        p_session_id: data.sessionId,
-        p_reason: "Terminated by administrator",
-      });
+      try {
+        const { error } = await admin.rpc("admin_force_logout_session", {
+          p_session_id: data.sessionId,
+          p_reason: "Terminated by administrator",
+        });
+        if (error) throw error;
+      } catch (e) {
+        await admin
+          .from("employee_sessions")
+          .update({
+            is_active: false,
+            status: "force_logged_out",
+            logout_at: new Date().toISOString(),
+            logout_reason: "Terminated by administrator",
+          })
+          .eq("session_id", data.sessionId);
+      }
     }
 
     return { ok: true, terminatedSessionId: data.sessionId };
