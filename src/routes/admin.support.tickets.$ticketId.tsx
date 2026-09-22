@@ -2024,11 +2024,11 @@ function MessageCard({
                           PDF
                         </div>
                         <div className="min-w-0">
-                          <div className="text-xs font-medium text-slate-800 truncate" title={doc.file_name || doc.document_type}>
-                            {doc.file_name || doc.document_type || "document.pdf"}
+                          <div className="text-xs font-medium text-slate-800 truncate" title={doc.file_name}>
+                            {doc.file_name || "document.pdf"}
                           </div>
                           <div className="text-[10px] text-slate-400">
-                            {formatBytes(doc.file_size_bytes || doc.file_size || 150000)}
+                            {formatBytes(doc.size_bytes ?? 0)}
                           </div>
                         </div>
                       </div>

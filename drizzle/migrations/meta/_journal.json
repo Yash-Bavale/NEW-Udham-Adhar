@@ -15,6 +15,13 @@
       "when": 1789470570968,
       "tag": "0001_email_dupe_guard_and_app_settings_rls",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790053955940,
+      "tag": "0002_add_is_hot_to_applications",
+      "breakpoints": true
     }
   ]
 }
