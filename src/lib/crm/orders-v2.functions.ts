@@ -553,7 +553,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
 
     // Primary fast path: Execute single database-side aggregation & pagination RPC
     try {
-      const { data: rpcRes, error: rpcErr } = await admin.rpc("get_orders_v3_paged", {
+      const { data: rpcRes, error: rpcErr } = await (admin as any).rpc("get_orders_v3_paged", {
         p_page: data.page,
         p_page_size: data.pageSize,
         p_search: data.search?.trim() || null,
@@ -572,7 +572,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         p_sort_order: data.sortOrder || "desc",
         p_user_id: context.userId || null,
         p_is_admin: isAdmin,
-      } as any);
+      });
 
       if (!rpcErr && rpcRes && typeof rpcRes === "object" && Array.isArray((rpcRes as any).rows)) {
         const parsed = rpcRes as any;
