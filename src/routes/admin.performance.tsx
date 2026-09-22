@@ -240,15 +240,11 @@ function EmployeeActivityCommandCenterPage() {
   };
 
   const employeeRows = data?.employeeRows ?? [];
-  const totalMonitored = employeeRows.length;
+  const totalMonitored = data?.kpiCards?.totalActiveEmployees?.value ?? employeeRows.length;
   const activeCount = employeeRows.filter((e) => e.status === "active").length;
+  const idleCount = employeeRows.filter((e) => e.status === "idle").length;
   const awayCount = employeeRows.filter((e) => e.status === "away").length;
-  // If status is neither active nor away, it's either idle (if active within last hour) or offline
-  const idleCount = employeeRows.filter((e) => {
-    if (e.status === "active" || e.status === "away") return false;
-    return e.lastActiveAgo && !e.lastActiveAgo.includes("d ago") && !e.lastActiveAgo.includes("never");
-  }).length;
-  const offlineCount = Math.max(0, totalMonitored - activeCount - awayCount - idleCount);
+  const offlineCount = employeeRows.filter((e) => e.status === "offline").length;
 
   const activePct = totalMonitored > 0 ? Math.round((activeCount / totalMonitored) * 100) : 0;
   const idlePct = totalMonitored > 0 ? Math.round((idleCount / totalMonitored) * 100) : 0;
@@ -257,14 +253,24 @@ function EmployeeActivityCommandCenterPage() {
 
   // Filtered rows for Operational Registry
   const filteredEmployees = useMemo(() => {
-    if (!tableSearch.trim()) return employeeRows;
+    let list = employeeRows;
+    if (selectedPod && selectedPod !== "All Pods & Pod Alpha") {
+      list = list.filter((e: any) => {
+        const podStr = `${e.pod || ""} ${e.employeeRole || ""}`.toLowerCase();
+        if (selectedPod.includes("Beta")) return podStr.includes("beta") || podStr.includes("operations");
+        if (selectedPod.includes("Gamma")) return podStr.includes("gamma") || podStr.includes("escalation") || podStr.includes("support");
+        if (selectedPod.includes("Verification")) return podStr.includes("verification") || podStr.includes("document");
+        return true;
+      });
+    }
+    if (!tableSearch.trim()) return list;
     const q = tableSearch.toLowerCase();
-    return employeeRows.filter(
+    return list.filter(
       (e: any) =>
         e.employeeName.toLowerCase().includes(q) ||
         (e.employeeRole && e.employeeRole.toLowerCase().includes(q)),
     );
-  }, [employeeRows, tableSearch]);
+  }, [employeeRows, selectedPod, tableSearch]);
 
   // Filtered Audit Feed items
   const filteredAuditFeed = useMemo(() => {
@@ -464,7 +470,7 @@ function EmployeeActivityCommandCenterPage() {
             </div>
             <div className="flex items-baseline gap-2 mt-2">
               <span className="text-3xl font-bold text-slate-900 tracking-tight leading-none">
-                {totalMonitored || 15}
+                {totalMonitored}
               </span>
               <span className="text-xs text-slate-500">Floor Alpha</span>
             </div>
@@ -481,12 +487,12 @@ function EmployeeActivityCommandCenterPage() {
                 Active
               </span>
               <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-800">
-                {activePct || 27}%
+                {activePct}%
               </span>
             </div>
             <div className="flex items-baseline gap-2 mt-2">
               <span className="text-3xl font-bold text-emerald-600 tracking-tight leading-none">
-                {activeCount || 4}
+                {activeCount}
               </span>
               <span className="text-xs text-slate-500">Interacting</span>
             </div>
@@ -503,12 +509,12 @@ function EmployeeActivityCommandCenterPage() {
                 Idle
               </span>
               <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-900">
-                {idlePct || 20}%
+                {idlePct}%
               </span>
             </div>
             <div className="flex items-baseline gap-2 mt-2">
               <span className="text-3xl font-bold text-amber-600 tracking-tight leading-none">
-                {idleCount || 3}
+                {idleCount}
               </span>
               <span className="text-xs text-slate-500">&gt;5m inactive</span>
             </div>
@@ -525,12 +531,12 @@ function EmployeeActivityCommandCenterPage() {
                 Away
               </span>
               <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-orange-100 text-orange-900">
-                {awayPct || 13}%
+                {awayPct}%
               </span>
             </div>
             <div className="flex items-baseline gap-2 mt-2">
               <span className="text-3xl font-bold text-orange-600 tracking-tight leading-none">
-                {awayCount || 2}
+                {awayCount}
               </span>
               <span className="text-xs text-slate-500">&gt;15m away</span>
             </div>
@@ -547,12 +553,12 @@ function EmployeeActivityCommandCenterPage() {
                 Offline
               </span>
               <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-600">
-                {offlinePct || 40}%
+                {offlinePct}%
               </span>
             </div>
             <div className="flex items-baseline gap-2 mt-2">
               <span className="text-3xl font-bold text-slate-400 tracking-tight leading-none">
-                {offlineCount || 6}
+                {offlineCount}
               </span>
               <span className="text-xs text-slate-500">Logged off</span>
             </div>
@@ -1152,7 +1158,7 @@ function EmployeeActivityCommandCenterPage() {
         <div className="p-3 px-4 bg-slate-50 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-2 text-slate-500 text-xs">
           <div className="flex items-center gap-2">
             <span>
-              Showing {filteredEmployees.length} active records of {employeeRows.length || 15} registered operators
+              Showing {filteredEmployees.length} active records of {employeeRows.length} registered operators
             </span>
             <span>•</span>
             <span className="text-emerald-700 font-medium">

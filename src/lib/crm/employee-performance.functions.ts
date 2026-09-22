@@ -741,40 +741,45 @@ export const getEmployeePerformanceCommandCenter = createServerFn({
       data.customEnd,
     );
 
-    // 1. Staff Profiles & Roles
+    // 1. Staff Profiles & Roles (Source of Truth Directory)
     const [{ data: profiles }, { data: staffRoles }] = await Promise.all([
       admin
         .from("profiles")
-        .select("id, full_name, display_name, email, avatar_url, is_active"),
+        .select("id, display_name, email, is_active"),
       admin
         .from("user_roles")
-        .select("user_id, role"),
+        .select("user_id, role")
+        .in("role", ["super_admin", "admin", "operations", "manager", "executive", "support", "finance", "accounts"]),
     ]);
 
     const userRoleMap = new Map<string, string>();
+    const staffUserIds = new Set<string>();
     (staffRoles ?? []).forEach((r: any) => {
-      if (
-        !userRoleMap.has(r.user_id) ||
-        r.role === "admin" ||
-        r.role === "super_admin"
-      ) {
-        userRoleMap.set(r.user_id, r.role);
+      if (r.user_id) {
+        staffUserIds.add(r.user_id);
+        if (
+          !userRoleMap.has(r.user_id) ||
+          r.role === "admin" ||
+          r.role === "super_admin"
+        ) {
+          userRoleMap.set(r.user_id, r.role);
+        }
       }
     });
 
     const profileMap = new Map<string, any>();
     const nameToUserIdMap = new Map<string, string>();
-    const activeStaffProfiles = (profiles ?? []).filter((p: any) => p.is_active !== false);
+
+    // Base workforce: All active registered staff profiles
+    const activeStaffProfiles = (profiles ?? []).filter((p: any) => {
+      if (p.is_active === false) return false;
+      if (staffUserIds.size > 0) return staffUserIds.has(p.id);
+      return true;
+    });
 
     (profiles ?? []).forEach((p: any) => {
       profileMap.set(p.id, p);
       nameToUserIdMap.set(p.id.toLowerCase().trim(), p.id);
-      if (p.full_name) {
-        nameToUserIdMap.set(p.full_name.toLowerCase().trim(), p.id);
-        const parts = p.full_name.trim().split(/\s+/);
-        if (parts[0]) nameToUserIdMap.set(parts[0].toLowerCase(), p.id);
-        if (parts.length > 1) nameToUserIdMap.set(`${parts[0]} ${parts[parts.length - 1]}`.toLowerCase(), p.id);
-      }
       if (p.display_name) {
         nameToUserIdMap.set(p.display_name.toLowerCase().trim(), p.id);
         const parts = p.display_name.trim().split(/\s+/);
@@ -1132,19 +1137,22 @@ export const getEmployeePerformanceCommandCenter = createServerFn({
 
     // 5. Build Employee Performance Table Rows
     const employeeRows = Array.from(empStatsMap.values()).map((s) => {
-      let status: "active" | "away" | "offline" = "offline";
+      let status: "active" | "idle" | "away" | "offline" = "offline";
       let lastActiveAgo = "Never";
       if (s.lastActionTime) {
         const diffMins = Math.floor((nowTime - new Date(s.lastActionTime).getTime()) / 60000);
-        if (diffMins < 30) {
+        if (diffMins < 15) {
           status = "active";
           lastActiveAgo = diffMins <= 1 ? "Just now" : `${diffMins}m ago`;
-        } else if (diffMins < 120) {
+        } else if (diffMins < 60) {
+          status = "idle";
+          lastActiveAgo = `${diffMins}m ago`;
+        } else if (diffMins < 180) {
           status = "away";
           lastActiveAgo = `${diffMins}m ago`;
         } else {
           const hours = Math.floor(diffMins / 60);
-          status = hours < 24 ? "away" : "offline";
+          status = "offline";
           lastActiveAgo = hours < 24 ? `${hours}h ago` : `${Math.floor(hours / 24)}d ago`;
         }
       }
