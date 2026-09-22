@@ -150,13 +150,21 @@ export const listTickets = createServerFn({ method: "POST" })
       q = q.eq("assigned_to", context.userId);
     }
 
-    // Response State Filter (Direct DB conditions where possible)
+    // Response State Filter (Direct DB conditions)
     if (data.responseState === "closed") {
       q = q.in("status", ["resolved", "closed"]);
+    } else if (data.responseState === "open") {
+      q = q.not("status", "in", '("resolved","closed")');
     } else if (data.responseState === "new") {
       q = q.is("first_response_at", null).not("status", "in", '("resolved","closed")');
     } else if (data.responseState === "awaiting_customer") {
       q = q.eq("status", "waiting_customer");
+    } else if (data.responseState === "awaiting_action") {
+      q = q.not("status", "in", '("resolved","closed")').not("first_response_at", "is", null);
+    } else if (data.responseState === "unread") {
+      q = q.not("status", "in", '("resolved","closed")').not("last_customer_message_at", "is", null);
+    } else if (data.responseState === "replied") {
+      q = q.not("status", "in", '("resolved","closed")').not("last_staff_message_at", "is", null).neq("status", "waiting_customer");
     }
 
     // Search query
@@ -229,7 +237,6 @@ export const listTickets = createServerFn({ method: "POST" })
     }
     if (lastErr) throw new Error(lastErr instanceof Error ? lastErr.message : String(lastErr));
 
-
     const assignees = Array.from(
       new Set((rows ?? []).map((r: any) => r.assigned_to).filter(Boolean))
     ) as string[];
@@ -295,15 +302,6 @@ export const listTickets = createServerFn({ method: "POST" })
       };
     });
 
-    // In-memory filter for response states that depend on timestamps if needed
-    if (data.responseState === "unread") {
-      tickets = tickets.filter((t) => t.is_unread);
-    } else if (data.responseState === "awaiting_action") {
-      tickets = tickets.filter((t) => t.response_state === "awaiting_action");
-    } else if (data.responseState === "replied") {
-      tickets = tickets.filter((t) => t.response_state === "replied");
-    }
-
     if (data.stage && data.stage !== "all") {
       tickets = tickets.filter((t) => t.order_stage === data.stage);
     }
@@ -315,31 +313,27 @@ export const getTicketStats = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async () => {
     const admin = await getAdmin();
-    const { data: rows, error } = await admin
-      .from("support_tickets")
-      .select("id, status, first_response_at, last_customer_message_at, last_staff_message_at");
 
-    if (error) throw new Error(error.message);
+    const [totalRes, closedRes, openRes, newRes, awaitingCustRes, activeRowsRes] = await Promise.all([
+      admin.from("support_tickets").select("id", { count: "exact", head: true }),
+      admin.from("support_tickets").select("id", { count: "exact", head: true }).in("status", ["resolved", "closed"]),
+      admin.from("support_tickets").select("id", { count: "exact", head: true }).not("status", "in", '("resolved","closed")'),
+      admin.from("support_tickets").select("id", { count: "exact", head: true }).is("first_response_at", null).not("status", "in", '("resolved","closed")'),
+      admin.from("support_tickets").select("id", { count: "exact", head: true }).eq("status", "waiting_customer"),
+      admin.from("support_tickets").select("id, status, first_response_at, last_customer_message_at, last_staff_message_at").not("status", "in", '("resolved","closed")'),
+    ]);
 
-    let total = 0;
-    let newCount = 0;
+    const total = totalRes.count ?? 0;
+    const closedCount = closedRes.count ?? 0;
+    const openCount = openRes.count ?? 0;
+    const newCount = newRes.count ?? 0;
+    const awaitingCustomerCount = awaitingCustRes.count ?? 0;
+
     let unreadCount = 0;
     let awaitingActionCount = 0;
-    let awaitingCustomerCount = 0;
     let repliedCount = 0;
-    let openCount = 0;
-    let closedCount = 0;
 
-    for (const r of rows ?? []) {
-      total++;
-      const isClosed = r.status === "resolved" || r.status === "closed";
-      if (isClosed) {
-        closedCount++;
-        continue;
-      }
-
-      openCount++;
-
+    for (const r of (activeRowsRes.data ?? []) as any[]) {
       const isUnread = Boolean(
         r.last_customer_message_at &&
           (!r.last_staff_message_at ||
@@ -347,12 +341,8 @@ export const getTicketStats = createServerFn({ method: "POST" })
       );
       if (isUnread) unreadCount++;
 
-      const isNew = !r.first_response_at;
-      if (isNew) newCount++;
-
       const respState = computeTicketResponseState(r);
       if (respState === "awaiting_action") awaitingActionCount++;
-      else if (respState === "awaiting_customer") awaitingCustomerCount++;
       else if (respState === "replied") repliedCount++;
     }
 

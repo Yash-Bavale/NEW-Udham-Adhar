@@ -1,9 +1,10 @@
 // Incoming Zoho mail matcher (server-only).
-// For each fetched message: dedupe by zoho_mail_uid, match to an application
-// via In-Reply-To/References → email_logs.message_id, then X-BHS-Order header,
-// then latest active order by from_email. Persists to email_logs, opens or
-// appends to a support_ticket. Customer-delay closure keeps running unless a
-// staff member explicitly restarts the order.
+// Dedupe by zoho_mail_uid and Message-ID.
+// Inbound routing:
+// 1. Matches active open tickets (token, AP-code, In-Reply-To/References) -> Appends to existing ticket & marks open.
+// 2. Closed tickets remain untouched -> Creates new ticket linked to order.
+// 3. Exact AP/UA code matching in subject.
+// 4. Multi-order customer fallback leaves application_id NULL if customer has > 1 active order.
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import {
@@ -80,13 +81,37 @@ async function ingestOne(msg: ZohoMessageListItem, result: PollResult) {
     .filter(Boolean) as string[];
   const fromEmail = extractEmail(headers.From) || extractEmail(msg.fromAddress);
   const toEmail = extractEmail(headers.To) || extractEmail(msg.toAddress) || "inbox@udyamadhar.in";
-  const subject = decodeEntities(headers.Subject || msg.subject || "(no subject)");
+  const rawSubject = headers.Subject || msg.subject || "(no subject)";
+  const subject = normalizeSubject(rawSubject);
   const receivedAt = msg.receivedTime
     ? new Date(Number(msg.receivedTime)).toISOString()
     : new Date().toISOString();
   const bodyText = body.text || stripHtml(body.html) || "";
 
-  // ── Step 1: Try to match to an existing ticket (v2 flow) ───────────────
+  // ── Deduplication: Check if message has already been ingested ─────────
+  if (messageId) {
+    const { data: dupLog } = await supabaseAdmin
+      .from("email_logs")
+      .select("id")
+      .eq("message_id", messageId)
+      .eq("direction", "incoming")
+      .limit(1)
+      .maybeSingle();
+    if (dupLog) {
+      return;
+    }
+    const { data: dupReply } = await supabaseAdmin
+      .from("ticket_replies")
+      .select("id")
+      .eq("email_message_id", messageId)
+      .limit(1)
+      .maybeSingle();
+    if (dupReply) {
+      return;
+    }
+  }
+
+  // ── Step 1: Try to match to an ACTIVE ticket ──────────────────────────
   const ticketMatch = await matchTicket({
     subject,
     inReplyTo,
@@ -118,46 +143,64 @@ async function ingestOne(msg: ZohoMessageListItem, result: PollResult) {
       return;
     }
 
-    const newTicketId = await createTicketForIncoming({
-      applicationId: ticketMatch.applicationId,
-      customerId: ticketMatch.customerId,
-      leadId: ticketMatch.leadId,
+    // PART 1 & 2: Active ticket exists -> Append message to existing ticket!
+    await supabaseAdmin.from("ticket_replies").insert({
+      ticket_id: ticketMatch.ticketId,
+      reply_text: bodyText.slice(0, 8000),
+      is_internal: false,
+      direction: "inbound",
+      email_message_id: messageId,
+      email_in_reply_to: inReplyTo,
+    } as never);
+
+    await supabaseAdmin
+      .from("support_tickets")
+      .update({
+        last_customer_message_at: receivedAt,
+        updated_at: receivedAt,
+        status: "open", // Transition waiting_customer / in_progress -> open (Action Required)
+      } as never)
+      .eq("id", ticketMatch.ticketId);
+
+    await supabaseAdmin.from("email_logs").insert({
+      direction: "incoming",
+      status: "sent",
+      to_email: toEmail,
+      from_email: fromEmail,
       subject,
-      bodyText,
-      bodyHtml: body.html,
-      fromEmail,
-      toEmail,
-      messageId,
-      inReplyTo,
-      references,
-      zohoUid: msg.messageId,
-      receivedAt,
-    });
+      body_html: body.html,
+      body_text: body.text,
+      message_id: messageId,
+      in_reply_to: inReplyTo,
+      references_header: references.join(" ") || null,
+      zoho_mail_uid: msg.messageId,
+      application_id: ticketMatch.applicationId,
+      lead_id: ticketMatch.leadId,
+      customer_id: ticketMatch.customerId,
+      sent_at: receivedAt,
+    } as never);
 
     const { cancelTicketAutocloseByTicket: cancelByTicket } = await import("@/lib/scheduling/schedulers.server");
     await cancelByTicket(ticketMatch.ticketId, "customer_replied").catch(() => {});
-    if (newTicketId) {
-      await cancelByTicket(newTicketId, "customer_replied").catch(() => {});
-    }
     if (ticketMatch.applicationId) {
       await cancelTicketAutocloseForOrder(ticketMatch.applicationId, "customer_replied").catch(() => {});
-      // A customer reply creates a new support ticket under this order
       try {
         const { dispatchEvent } = await import("@/lib/workflow/engine.server");
         await dispatchEvent({
           type: "TicketOpened",
           applicationId: ticketMatch.applicationId,
-          ticketId: newTicketId ?? ticketMatch.ticketId,
+          ticketId: ticketMatch.ticketId,
         });
       } catch (e) {
         console.error("[workflow] dispatch TicketOpened failed", e);
       }
     }
+
     result.matched += 1;
     return;
   }
 
-  // ── Step 2: Fall back to order-level match (legacy path) ───────────────
+  // ── Step 2: Fall back to order-level match ─────────────────────────────
   const matched = await matchOrder({
     subject,
     inReplyTo,
@@ -170,60 +213,106 @@ async function ingestOne(msg: ZohoMessageListItem, result: PollResult) {
   if (matched?.applicationId || matched?.customerId) result.matched += 1;
   else result.unmatched += 1;
 
-  const { data: logRow, error: logErr } = await supabaseAdmin
-    .from("email_logs")
-    .insert({
-      direction: "incoming",
-      status: "sent",
-      to_email: toEmail,
-      from_email: fromEmail,
-      subject,
-      body_html: body.html,
-      body_text: body.text,
-      message_id: messageId,
-      in_reply_to: inReplyTo,
-      references_header: references.join(" ") || null,
-      zoho_mail_uid: msg.messageId,
-      application_id: matched?.applicationId ?? null,
-      lead_id: matched?.leadId ?? null,
-      customer_id: matched?.customerId ?? null,
-      sent_at: receivedAt,
-    } as never)
-    .select("id")
-    .single();
+  // Check if an active ticket exists for this application
+  if (matched?.applicationId) {
+    const { data: existingActive } = await supabaseAdmin
+      .from("support_tickets")
+      .select("id, ticket_email, application_id, customer_id")
+      .eq("application_id", matched.applicationId)
+      .in("status", ["open", "in_progress", "waiting_customer"])
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
-  if (logErr) throw new Error(logErr.message);
+    if (existingActive) {
+      const activeTicket = existingActive as {
+        id: string;
+        ticket_email: string | null;
+        application_id: string | null;
+        customer_id: string | null;
+      };
 
+      await supabaseAdmin.from("ticket_replies").insert({
+        ticket_id: activeTicket.id,
+        reply_text: bodyText.slice(0, 8000),
+        is_internal: false,
+        direction: "inbound",
+        email_message_id: messageId,
+        email_in_reply_to: inReplyTo,
+      } as never);
+
+      await supabaseAdmin
+        .from("support_tickets")
+        .update({
+          last_customer_message_at: receivedAt,
+          updated_at: receivedAt,
+          status: "open",
+        } as never)
+        .eq("id", activeTicket.id);
+
+      await supabaseAdmin.from("email_logs").insert({
+        direction: "incoming",
+        status: "sent",
+        to_email: toEmail,
+        from_email: fromEmail,
+        subject,
+        body_html: body.html,
+        body_text: body.text,
+        message_id: messageId,
+        in_reply_to: inReplyTo,
+        references_header: references.join(" ") || null,
+        zoho_mail_uid: msg.messageId,
+        application_id: activeTicket.application_id,
+        lead_id: matched.leadId,
+        customer_id: activeTicket.customer_id,
+        sent_at: receivedAt,
+      } as never);
+
+      const { cancelTicketAutocloseByTicket: cancelByTicket } = await import("@/lib/scheduling/schedulers.server");
+      await cancelByTicket(activeTicket.id, "customer_replied").catch(() => {});
+      if (activeTicket.application_id) {
+        await cancelTicketAutocloseForOrder(activeTicket.application_id, "customer_replied").catch(() => {});
+      }
+      return;
+    }
+  }
+
+  // PART 3: No active ticket exists (or previous tickets are closed) -> Create NEW ticket
   if (matched?.applicationId || matched?.customerId) {
     if (matched.applicationId) {
       await cancelTicketAutocloseForOrder(matched.applicationId, "customer_replied").catch(() => {});
     }
-    const openedTicketId = await openOrAppendTicket({
+
+    const newTicketId = await createTicketForIncoming({
       applicationId: matched.applicationId,
       customerId: matched.customerId,
       leadId: matched.leadId,
       subject,
-      body: bodyText,
+      bodyText,
+      bodyHtml: body.html,
       fromEmail,
+      toEmail,
       messageId,
       inReplyTo,
+      references,
+      zohoUid: msg.messageId,
+      receivedAt,
     });
-    if (matched.applicationId && openedTicketId) {
+
+    if (matched.applicationId && newTicketId) {
       try {
         const { dispatchEvent } = await import("@/lib/workflow/engine.server");
         await dispatchEvent({
           type: "TicketOpened",
           applicationId: matched.applicationId,
-          ticketId: openedTicketId,
+          ticketId: newTicketId,
         });
       } catch (e) {
         console.error("[workflow] dispatch TicketOpened failed", e);
       }
     }
   } else if (fromEmail) {
-    // No order/customer match — but we still want staff visibility.
-    // Skip obvious system/self senders; everything else becomes a standalone
-    // ticket so nothing lands only in quarantine and gets missed.
+    // No order/customer match — check system senders vs standalone ticket
     const lower = fromEmail.toLowerCase();
     const isSystem =
       /(^|[.@])(noreply|no-reply|mailer-daemon|postmaster|welcome|notifications?)@/i.test(lower) ||
@@ -247,15 +336,20 @@ async function ingestOne(msg: ZohoMessageListItem, result: PollResult) {
         received_at: receivedAt,
       } as never);
     } else {
-      await openOrAppendTicket({
+      await createTicketForIncoming({
         applicationId: null,
         customerId: null,
         leadId: null,
         subject,
-        body: bodyText,
+        bodyText,
+        bodyHtml: body.html,
         fromEmail,
+        toEmail,
         messageId,
         inReplyTo,
+        references,
+        zohoUid: msg.messageId,
+        receivedAt,
       });
       await supabaseAdmin.from("inbound_email_quarantine").insert({
         zoho_mail_uid: msg.messageId,
@@ -273,7 +367,7 @@ async function ingestOne(msg: ZohoMessageListItem, result: PollResult) {
   }
 }
 
-// ─────────────────────────── Ticket Matching (v2) ───────────────────────
+// ─────────────────────────── Ticket Matching ───────────────────────────
 
 type TicketMatch = {
   ticketId: string;
@@ -288,15 +382,18 @@ async function matchTicket(input: {
   inReplyTo: string | null;
   references: string[];
 }): Promise<TicketMatch | null> {
-  const tokenMatch = input.subject.match(/\[#\s*(TKT-\d{8}-\d{3,6})\s*\]/i);
+  const norm = normalizeSubject(input.subject);
+
+  // 1) [# TKT-...] token in subject — must only match ACTIVE tickets
+  const tokenMatch = norm.match(/\[#\s*(TKT-\d{8}-\d{3,6})\s*\]/i);
   if (tokenMatch) {
     const ticketNumber = tokenMatch[1].toUpperCase();
     const { data } = await supabaseAdmin
       .from("support_tickets")
-      .select("id, ticket_email, application_id, customer_id")
+      .select("id, ticket_email, application_id, customer_id, status")
       .eq("ticket_number", ticketNumber)
       .maybeSingle();
-    if (data) {
+    if (data && ["open", "in_progress", "waiting_customer"].includes((data as any).status)) {
       const r = data as { id: string; ticket_email: string | null; application_id: string | null; customer_id: string | null };
       return {
         ticketId: r.id,
@@ -308,8 +405,7 @@ async function matchTicket(input: {
     }
   }
 
-  // Subject contains AP-YYYY-######/UA-YYYY-###### → find the latest open ticket
-  // on that application. Zoho customer replies frequently drop In-Reply-To.
+  // 2) Subject contains AP-YYYY-######/UA-YYYY-###### -> find latest ACTIVE ticket
   const codeMatch = await matchBySubjectCode(input.subject);
   if (codeMatch?.applicationId) {
     const { data } = await supabaseAdmin
@@ -332,7 +428,7 @@ async function matchTicket(input: {
     }
   }
 
-
+  // 3) In-Reply-To / References -> find matching ACTIVE ticket
   const ids = [input.inReplyTo, ...input.references].filter(Boolean) as string[];
   if (ids.length > 0) {
     const { data } = await supabaseAdmin
@@ -340,23 +436,24 @@ async function matchTicket(input: {
       .select("ticket_id")
       .in("email_message_id", ids)
       .not("ticket_id", "is", null)
-      .limit(1);
-    const row = (data ?? [])[0] as { ticket_id: string } | undefined;
-    if (row?.ticket_id) {
-      const { data: t } = await supabaseAdmin
-        .from("support_tickets")
-        .select("id, ticket_email, application_id, customer_id")
-        .eq("id", row.ticket_id)
-        .maybeSingle();
-      if (t) {
-        const r = t as { id: string; ticket_email: string | null; application_id: string | null; customer_id: string | null };
-        return {
-          ticketId: r.id,
-          ticketEmail: r.ticket_email,
-          applicationId: r.application_id,
-          customerId: r.customer_id,
-          leadId: null,
-        };
+      .limit(5);
+    for (const row of (data ?? []) as Array<{ ticket_id: string }>) {
+      if (row?.ticket_id) {
+        const { data: t } = await supabaseAdmin
+          .from("support_tickets")
+          .select("id, ticket_email, application_id, customer_id, status")
+          .eq("id", row.ticket_id)
+          .maybeSingle();
+        if (t && ["open", "in_progress", "waiting_customer"].includes((t as any).status)) {
+          const r = t as { id: string; ticket_email: string | null; application_id: string | null; customer_id: string | null };
+          return {
+            ticketId: r.id,
+            ticketEmail: r.ticket_email,
+            applicationId: r.application_id,
+            customerId: r.customer_id,
+            leadId: null,
+          };
+        }
       }
     }
   }
@@ -391,6 +488,7 @@ async function createTicketForIncoming(input: {
       source: "email_inbound",
       ticket_email: input.fromEmail ? input.fromEmail.trim().toLowerCase() : null,
       last_customer_message_at: input.receivedAt,
+      first_response_at: null,
     } as never)
     .select("id")
     .single();
@@ -433,7 +531,7 @@ async function createTicketForIncoming(input: {
   return ticketId;
 }
 
-// ─────────────────────────── Matching ───────────────────────────
+// ─────────────────────────── Order Matching ───────────────────────────
 
 type MatchResult = {
   applicationId: string | null;
@@ -450,7 +548,7 @@ async function matchOrder(input: {
   fromEmail: string | null;
 }): Promise<MatchResult> {
   // 0) Subject-embedded order code (AP-YYYY-######) or lead code (UA-YYYY-######).
-  //    Highest priority — most reliable signal from Zoho replies that drop headers.
+  //    Highest priority — exact regex match.
   const bySubject = await matchBySubjectCode(input.subject);
   if (bySubject) return bySubject;
 
@@ -483,103 +581,51 @@ async function matchOrder(input: {
     }
   }
 
-  // 3) From email → most recent open order for that customer
+  // 3) PART 5: From email fallback — ONLY link if customer has EXACTLY ONE active order!
   if (input.fromEmail) {
     const { data: cust } = await supabaseAdmin
       .from("customers")
       .select("id")
-      .ilike("primary_email", input.fromEmail)
+      .ilike("primary_email", input.fromEmail.trim())
       .maybeSingle();
     const customerId = (cust as { id: string } | null)?.id ?? null;
     if (customerId) {
-      const { data: app } = await supabaseAdmin
+      const { data: activeApps } = await supabaseAdmin
         .from("applications")
-        .select("id, lead_id, customer_id, order_status, created_at")
+        .select("id, lead_id, customer_id")
         .eq("customer_id", customerId)
-        .not("order_status", "in", "(COMPLETED,CLOSED,REFUND_PROCESSED)")
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (app) {
-        const r = app as { id: string; lead_id: string | null; customer_id: string | null };
-        return { applicationId: r.id, leadId: r.lead_id, customerId: r.customer_id };
+        .not("order_status", "in", "(COMPLETED,CLOSED,REFUND_PROCESSED)");
+      const apps = (activeApps ?? []) as Array<{ id: string; lead_id: string | null; customer_id: string | null }>;
+      if (apps.length === 1) {
+        return { applicationId: apps[0].id, leadId: apps[0].lead_id, customerId };
       }
-      // Customer known but no open order — still tag customer.
+      // 0 or 2+ active orders -> DO NOT guess! Keep unlinked for manual staff review.
       return { applicationId: null, leadId: null, customerId };
     }
 
     const { data: lead } = await supabaseAdmin
       .from("leads")
       .select("id, customer_id")
-      .ilike("email", input.fromEmail)
+      .ilike("email", input.fromEmail.trim())
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
     const leadRow = lead as { id: string; customer_id: string | null } | null;
     if (leadRow?.id) {
-      const { data: app } = await supabaseAdmin
+      const { data: activeApps } = await supabaseAdmin
         .from("applications")
-        .select("id, lead_id, customer_id, order_status, created_at")
+        .select("id, lead_id, customer_id")
         .eq("lead_id", leadRow.id)
-        .not("order_status", "in", "(COMPLETED,CLOSED,REFUND_PROCESSED)")
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (app) {
-        const r = app as { id: string; lead_id: string | null; customer_id: string | null };
-        return { applicationId: r.id, leadId: r.lead_id, customerId: r.customer_id ?? leadRow.customer_id };
+        .not("order_status", "in", "(COMPLETED,CLOSED,REFUND_PROCESSED)");
+      const apps = (activeApps ?? []) as Array<{ id: string; lead_id: string | null; customer_id: string | null }>;
+      if (apps.length === 1) {
+        return { applicationId: apps[0].id, leadId: apps[0].lead_id, customerId: apps[0].customer_id ?? leadRow.customer_id };
       }
       return { applicationId: null, leadId: leadRow.id, customerId: leadRow.customer_id };
     }
   }
 
   return null;
-}
-
-// ─────────────────────────── Side effects ───────────────────────────
-
-async function openOrAppendTicket(input: {
-  applicationId: string | null;
-  customerId: string | null;
-  leadId?: string | null;
-  subject: string;
-  body: string;
-  fromEmail: string | null;
-  messageId?: string | null;
-  inReplyTo?: string | null;
-}): Promise<string | null> {
-  const { data: created, error } = await supabaseAdmin
-    .from("support_tickets")
-    .insert({
-      application_id: input.applicationId,
-      customer_id: input.customerId,
-      subject: input.subject.slice(0, 250),
-      description: input.body.slice(0, 2000),
-      status: "open",
-      priority: "medium",
-      source: "email_inbound",
-      ticket_email: input.fromEmail ? input.fromEmail.trim().toLowerCase() : null,
-      last_customer_message_at: new Date().toISOString(),
-    } as never)
-    .select("id")
-    .single();
-
-  if (error) {
-    console.error("[zoho-inbox] ticket insert failed", error.message);
-    return null;
-  }
-  const ticketId = (created as { id: string }).id;
-
-  await supabaseAdmin.from("ticket_replies").insert({
-    ticket_id: ticketId,
-    reply_text: `From: ${input.fromEmail || "unknown"}\n\n${input.body.slice(0, 4000)}`,
-    is_internal: false,
-    direction: "inbound",
-    email_message_id: input.messageId ?? null,
-    email_in_reply_to: input.inReplyTo ?? null,
-  } as never);
-
-  return ticketId;
 }
 
 function stripHtml(html: string | null): string {
@@ -599,6 +645,15 @@ function stripHtml(html: string | null): string {
     .replace(/\n{3,}/g, "\n\n")
     .trim();
   return decodeEntities(withBreaks);
+}
+
+/** Decode HTML entities, strip zero-width chars, and normalize whitespace. */
+export function normalizeSubject(subject: string | null | undefined): string {
+  if (!subject) return "";
+  return decodeEntities(subject)
+    .replace(/[\u200B-\u200D\uFEFF]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 /** Decode the common HTML entities that leak into inbound Zoho subjects and text bodies. */
@@ -626,34 +681,35 @@ export function decodeEntities(input: string | null | undefined): string {
 
 /**
  * Extract an application (AP-YYYY-######) or lead (UA-YYYY-######) code from a subject line
- * and resolve it to an application_id / lead_id / customer_id triple. Runs before other
- * matching strategies because Zoho web/mobile replies frequently drop In-Reply-To headers.
+ * and resolve it to an application_id / lead_id / customer_id triple.
  */
 async function matchBySubjectCode(subject: string | null | undefined): Promise<
   { applicationId: string; leadId: string | null; customerId: string | null } | null
 > {
   if (!subject) return null;
-  const decoded = decodeEntities(subject).toUpperCase();
+  const normalized = normalizeSubject(subject);
 
-  const apMatch = decoded.match(/\bAP-\d{4}-\d{6}\b/);
-  if (apMatch) {
+  // Match AP-YYYY-NNNNNN or UA-YYYY-NNNNNN (case-insensitive)
+  const match = normalized.match(/\b(AP|UA)-\d{4}-\d{6}\b/i);
+  if (!match) return null;
+
+  const code = match[0].toUpperCase();
+
+  if (code.startsWith("AP-")) {
     const { data } = await supabaseAdmin
       .from("applications")
       .select("id, lead_id, customer_id")
-      .eq("application_code", apMatch[0])
+      .eq("application_code", code)
       .maybeSingle();
     if (data) {
       const r = data as { id: string; lead_id: string | null; customer_id: string | null };
       return { applicationId: r.id, leadId: r.lead_id, customerId: r.customer_id };
     }
-  }
-
-  const uaMatch = decoded.match(/\bUA-\d{4}-\d{6}\b/);
-  if (uaMatch) {
+  } else if (code.startsWith("UA-")) {
     const { data: lead } = await supabaseAdmin
       .from("leads")
       .select("id, customer_id")
-      .eq("lead_code", uaMatch[0])
+      .eq("lead_code", code)
       .maybeSingle();
     const leadRow = lead as { id: string; customer_id: string | null } | null;
     if (leadRow?.id) {
@@ -668,9 +724,11 @@ async function matchBySubjectCode(subject: string | null | undefined): Promise<
         const r = app as { id: string; lead_id: string | null; customer_id: string | null };
         return { applicationId: r.id, leadId: r.lead_id, customerId: r.customer_id ?? leadRow.customer_id };
       }
+      return { applicationId: null, leadId: leadRow.id, customerId: leadRow.customer_id };
     }
   }
 
   return null;
 }
+
 

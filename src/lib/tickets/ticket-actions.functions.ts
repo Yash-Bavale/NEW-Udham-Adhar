@@ -314,44 +314,31 @@ export const replyToTicket = createServerFn({ method: "POST" })
       return { ok: true, emailed: false, reason: "internal_note" };
     }
 
-    // Close ticket instantly inside CRM when staff replies.
-    // No closure template email is sent to customer — customer only receives the typed reply email.
+    // Normal employee reply -> Set status to waiting_customer (do NOT close)
     const patch: Record<string, unknown> = {
-      status: "closed",
-      resolved_at: now,
-      resolved_by: context.userId,
-      closed_at: now,
+      status: "waiting_customer",
       updated_at: now,
       last_staff_message_at: now,
     };
     if (!ticket.first_response_at) patch.first_response_at = now;
     await admin.from("support_tickets").update(patch as never).eq("id", ticket.id);
 
-    // Cancel any pending auto-close timers
-    try {
-      const { cancelTicketAutocloseByTicket } = await import("@/lib/scheduling/schedulers.server");
-      await cancelTicketAutocloseByTicket(ticket.id, "closed_on_reply");
-    } catch { /* non-fatal */ }
-
-    // Dispatch workflow event if linked to an application
-    if (ticket.application_id) {
+    // Arm auto-close scheduler if requested
+    if (data.armAutoclose) {
       try {
-        const { dispatchEvent } = await import("@/lib/workflow/engine.server");
-        await dispatchEvent(
-          {
-            type: "TicketClosed",
-            applicationId: ticket.application_id,
-            ticketId: ticket.id,
-            outcome: "cooperating",
-            actorId: context.userId,
-          },
-          context.userId,
-        );
-      } catch (e) {
-        console.error("[workflow] TicketClosed dispatch failed", e);
-      }
+        const { startTicketAutocloseScheduler } = await import("@/lib/scheduling/schedulers.server");
+        await startTicketAutocloseScheduler({
+          ticketId: ticket.id,
+          applicationId: ticket.application_id ?? null,
+          totalSeconds: 24 * 60 * 60,
+          createdBy: context.userId,
+          note: "Standard employee reply auto-close timer",
+        });
+      } catch { /* non-fatal */ }
+    }
 
-      // Record in immutable employee action audit log
+    // Record in immutable employee action audit log
+    if (ticket.application_id) {
       try {
         const { logEmployeeOrderAction } = await import("@/lib/orders/order-action-logger.server");
         await logEmployeeOrderAction({
