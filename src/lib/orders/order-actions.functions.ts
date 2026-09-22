@@ -968,8 +968,8 @@ export const reopenOrder = createServerFn({ method: "POST" })
     const { error: upErr } = await supabaseAdmin
       .from("applications")
       .update({
-        order_status: "FORM_RECEIVED",
-        fulfillment_status: "order_reopened",
+        order_status: "REOPENED",
+        fulfillment_status: "form_submitted",
         workflow_status: null,
         closure_stage: "none",
         application_status: "under_process",

@@ -748,7 +748,7 @@ export const closeTicketRestartT001 = createServerFn({ method: "POST" })
       .from("applications")
       .update({
         order_status: "REOPENED",
-        fulfillment_status: "order_reopened",
+        fulfillment_status: "form_submitted",
         workflow_status: null,
         closure_stage: "none",
         application_status: "under_process",
