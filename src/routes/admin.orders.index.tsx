@@ -261,14 +261,22 @@ function OrdersListPage() {
     if (routeSearch.search) setSearch(routeSearch.search);
   }, [routeSearch]);
 
-  const { data: staffData } = useQuery({ queryKey: ["admin.staff"], queryFn: () => staffFn() });
+  const { data: staffData } = useQuery({
+    queryKey: ["admin.staff"],
+    queryFn: () => staffFn(),
+    staleTime: 5 * 60 * 1000,
+  });
   const staffProfiles: Array<{ id: string; display_name?: string; email?: string; name?: string }> = useMemo(() => {
     if (Array.isArray(staffData)) return staffData;
     if (Array.isArray((staffData as any)?.profiles)) return (staffData as any).profiles;
     if (Array.isArray((staffData as any)?.staff)) return (staffData as any).staff;
     return [];
   }, [staffData]);
-  const { data: svcData } = useQuery({ queryKey: ["admin.services.list"], queryFn: () => svcFn() });
+  const { data: svcData } = useQuery({
+    queryKey: ["admin.services.list"],
+    queryFn: () => svcFn(),
+    staleTime: 5 * 60 * 1000,
+  });
 
   // Group active services website-wise
   const groupedServices = useMemo(() => {
@@ -316,8 +324,7 @@ function OrdersListPage() {
     queryKey: ["admin.orders.v2", page, debouncedSearch, fulfillmentStatus, serviceId, assignedTo, paymentStatus, dateFrom, dateTo, bucket, stageFilter, actionStatusFilter, pendingAge, customDays, sortField, sortOrder],
     queryFn: () => listFn({ data: queryPayload }),
     placeholderData: keepPreviousData,
-    refetchInterval: 5_000,
-    staleTime: 2_000,
+    staleTime: 30_000,
     gcTime: 10 * 60 * 1000,
   });
 
@@ -339,13 +346,19 @@ function OrdersListPage() {
 // Preserve scroll position when navigating back from order detail view
 usePreserveScroll("admin.orders", !isLoading);
 
-// Real-time subscription to auto-refresh order cache silently when new orders/payments arrive
-useRealtimeTable("applications", () => {
-  qc.invalidateQueries({ queryKey: ["admin.orders.v2"] });
-});
-useRealtimeTable("payments", () => {
-  qc.invalidateQueries({ queryKey: ["admin.orders.v2"] });
-});
+// Real-time subscription with debouncing to prevent spamming queries
+const invalidateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+const scheduleDebouncedInvalidation = () => {
+  if (invalidateTimeoutRef.current) return;
+  invalidateTimeoutRef.current = setTimeout(() => {
+    invalidateTimeoutRef.current = null;
+    qc.invalidateQueries({ queryKey: ["admin.orders.v2"] });
+  }, 1000);
+};
+
+useRealtimeTable("applications", scheduleDebouncedInvalidation);
+useRealtimeTable("payments", scheduleDebouncedInvalidation);
+useRealtimeTable("order_schedulers", scheduleDebouncedInvalidation);
 
 // Background prefetch for next page
 useEffect(() => {

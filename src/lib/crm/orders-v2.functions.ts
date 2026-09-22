@@ -537,7 +537,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       return {
         rows: [],
         total: 0,
-        counts: { all: 0, needs_action: 0, pending: 0, completed: 0, closed: 0, exception: 0, actionRequired: 0, processed: 0 },
+        counts: { all: 0, needs_action: 0, pending: 0, completed: 0, closed: 0, exception: 0, actionRequired: 0, processed: 0, reminders: 0, hot_orders: 0 },
         ageBuckets: { d1: 0, d2: 0, d3: 0, d7: 0, older: 0 },
         page: data.page,
         pageSize: data.pageSize,
@@ -551,6 +551,59 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
 
     const { fromIso, toIso } = parseDateBounds(data.dateFrom, data.dateTo);
 
+    // Primary fast path: Execute single database-side aggregation & pagination RPC
+    try {
+      const { data: rpcRes, error: rpcErr } = await admin.rpc("get_orders_v3_paged", {
+        p_page: data.page,
+        p_page_size: data.pageSize,
+        p_search: data.search?.trim() || null,
+        p_date_from: fromIso || null,
+        p_date_to: toIso || null,
+        p_bucket: data.bucket || "all",
+        p_stage: data.stage && data.stage !== "all" ? data.stage : null,
+        p_fulfillment_status: data.fulfillmentStatus && data.fulfillmentStatus !== "all" ? data.fulfillmentStatus : null,
+        p_action_status: data.actionStatus || "all",
+        p_service_id: data.serviceId && data.serviceId !== "all" ? data.serviceId : null,
+        p_assigned_to: data.assignedTo && data.assignedTo !== "all" ? data.assignedTo : null,
+        p_payment_status: data.paymentStatus && data.paymentStatus !== "all" ? data.paymentStatus : null,
+        p_pending_age: data.pendingAge && data.pendingAge !== "any" ? data.pendingAge : null,
+        p_custom_days: data.customDays ? parseInt(data.customDays, 10) : null,
+        p_sort_field: data.sortField || "created_at",
+        p_sort_order: data.sortOrder || "desc",
+        p_user_id: context.userId || null,
+        p_is_admin: isAdmin,
+      } as any);
+
+      if (!rpcErr && rpcRes && typeof rpcRes === "object" && Array.isArray((rpcRes as any).rows)) {
+        const parsed = rpcRes as any;
+        return {
+          rows: parsed.rows ?? [],
+          total: parsed.total ?? 0,
+          counts: parsed.counts ?? {
+            all: 0,
+            needs_action: 0,
+            pending: 0,
+            completed: 0,
+            closed: 0,
+            exception: 0,
+            actionRequired: 0,
+            processed: 0,
+            reminders: 0,
+            hot_orders: 0,
+          },
+          ageBuckets: parsed.ageBuckets ?? { d1: 0, d2: 0, d3: 0, d7: 0, older: 0 },
+          page: parsed.page ?? data.page,
+          pageSize: parsed.pageSize ?? data.pageSize,
+        };
+      }
+      if (rpcErr) {
+        console.warn("[listOrdersV2] get_orders_v3_paged RPC fallback triggered:", rpcErr.message);
+      }
+    } catch (e: any) {
+      console.warn("[listOrdersV2] RPC invocation error, using fallback:", e?.message);
+    }
+
+    // Robust fallback path if RPC is unavailable during migration
     let matchingLeadIds: string[] | null = null;
     if (data.search && data.search.trim()) {
       const s = `%${data.search.trim()}%`;
@@ -562,13 +615,11 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       matchingLeadIds = (matchedLeads ?? []).map((l: any) => l.id);
     }
 
-    // Helper to build base query with common filters
     function buildBaseQuery() {
       let query = admin
         .from("applications")
         .select(
           "id, application_code, fulfillment_status, application_status, created_at, assigned_to, lead_id, customer_id, service_id, form_submitted_at, certificate_uploaded_at, workflow_status, closure_stage, closure_reason_code, refund_approved_at, refund_processed_at",
-          { count: "exact" },
         )
         .eq("is_deleted", false);
 
@@ -598,9 +649,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       return query;
     }
 
-    // Fetch candidate applications matching base filters
     let baseQ = buildBaseQuery();
-
     if (data.fulfillmentStatus && data.fulfillmentStatus !== "all" && data.fulfillmentStatus.trim() !== "") {
       baseQ = baseQ.eq("fulfillment_status", data.fulfillmentStatus as any);
     }
@@ -614,7 +663,6 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
     const { data: apps, error: appErr } = await baseQ.limit(5000);
     if (appErr) throw new Error(appErr.message);
 
-    // Fetch all active callback schedulers globally so hot orders and active reminders are NEVER filtered out
     const { data: globalActiveSchedulers } = await admin
       .from("order_schedulers")
       .select("id, application_id, status, scheduler_type, fires_at, remarks, created_at, created_by")
@@ -637,9 +685,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       extraActiveApps = extraApps ?? [];
     }
 
-    // Helper to check if an application strictly matches the user's active dimensional filters
     const matchesActiveFilters = (a: any) => {
-      // 1. Employee / Assignee filter
       if (!isAdmin) {
         if (a.assigned_to !== context.userId) return false;
       } else if (data.assignedTo && data.assignedTo !== "all" && data.assignedTo.trim() !== "") {
@@ -649,38 +695,27 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
           if (a.assigned_to !== data.assignedTo) return false;
         }
       }
-
-      // 2. Service filter
       if (data.serviceId && data.serviceId !== "all" && data.serviceId.trim() !== "") {
         if (a.service_id !== data.serviceId) return false;
       }
-
-      // 3. Search query filter
       if (data.search && data.search.trim()) {
         const term = data.search.trim().toLowerCase();
         const codeMatches = (a.application_code || "").toLowerCase().includes(term);
         const leadMatches = matchingLeadIds && a.lead_id && matchingLeadIds.includes(a.lead_id);
         if (!codeMatches && !leadMatches) return false;
       }
-
-      // 4. Fulfillment status filter
       if (data.fulfillmentStatus && data.fulfillmentStatus !== "all" && data.fulfillmentStatus.trim() !== "") {
         if (a.fulfillment_status !== data.fulfillmentStatus) return false;
       }
-
       return true;
     };
 
     const appMapById = new Map<string, any>();
     for (const a of (apps ?? [])) {
-      if (matchesActiveFilters(a)) {
-        appMapById.set(a.id, a);
-      }
+      if (matchesActiveFilters(a)) appMapById.set(a.id, a);
     }
     for (const a of extraActiveApps) {
-      if (matchesActiveFilters(a)) {
-        appMapById.set(a.id, a);
-      }
+      if (matchesActiveFilters(a)) appMapById.set(a.id, a);
     }
     const appList = Array.from(appMapById.values());
 
@@ -720,8 +755,6 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
     ]);
 
     const leadMap = new Map((leadsData ?? []).map((l: any) => [l.id, l]));
-
-    // Map latest active scheduler per application
     const sortedSchedulers = [...(globalActiveSchedulers ?? [])].sort((a: any, b: any) => {
       const tA = a.created_at ? new Date(a.created_at).getTime() : 0;
       const tB = b.created_at ? new Date(b.created_at).getTime() : 0;
@@ -734,12 +767,8 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       }
     }
 
-    // Gather all serviceIds from applications and linked leads
     const allServiceIds = Array.from(
-      new Set([
-        ...serviceIds,
-        ...(leadsData ?? []).map((l: any) => l.service_id),
-      ].filter(Boolean))
+      new Set([...serviceIds, ...(leadsData ?? []).map((l: any) => l.service_id)].filter(Boolean))
     ) as string[];
 
     const svcsData = await fetchInChunks<any>(allServiceIds, 100, (chunk) =>
@@ -800,8 +829,6 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       );
 
       const payment_status = rollupPaymentStatus(payments, totalAmount);
-
-      // Callback / Reminder / Hot Order status
       const cb = callbackMap.get(a.id);
       let parsedRemarks = null;
       if (cb?.remarks) {
@@ -866,7 +893,6 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       };
     });
 
-    // Compute exact counts across all candidates matching active global filters
     const counts = {
       all: allRows.length,
       needs_action: 0,
@@ -911,7 +937,6 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       }
     }
 
-    // Filter by tab bucket
     let filtered = allRows;
     if (data.bucket && data.bucket !== "all") {
       switch (data.bucket) {
@@ -939,17 +964,12 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       }
     }
 
-    // Filter by stage dropdown
     if (data.stage && data.stage !== "all" && data.stage.trim() !== "") {
       filtered = filtered.filter((r) => r.stage === data.stage);
     }
-
-    // Filter by fulfillment status
     if (data.fulfillmentStatus && data.fulfillmentStatus !== "all" && data.fulfillmentStatus.trim() !== "") {
       filtered = filtered.filter((r) => r.fulfillment_status === data.fulfillmentStatus);
     }
-
-    // Filter by action status
     if (data.actionStatus && data.actionStatus !== "all") {
       if (data.actionStatus === "action_required") {
         filtered = filtered.filter((r) => bucketOfRow(r) === "needs_action");
@@ -961,13 +981,9 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         filtered = filtered.filter((r) => r.is_callback_scheduled && !r.is_hot);
       }
     }
-
-    // Filter by payment status
     if (data.paymentStatus && data.paymentStatus !== "all") {
       filtered = filtered.filter((r) => r.payment_status === data.paymentStatus);
     }
-
-    // Filter by pending age
     if (data.pendingAge && data.pendingAge !== "any") {
       let days = 0;
       if (data.pendingAge === "custom" && data.customDays) {
@@ -981,7 +997,6 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       }
     }
 
-    // Sort: Hot Orders always float to the top!
     if (data.sortField === "stage") {
       filtered.sort((a, b) => {
         if (a.is_hot !== b.is_hot) return a.is_hot ? -1 : 1;
@@ -1013,7 +1028,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
     };
   });
 
-/* ----------------------------- getOrderDetail --------------------------- */
+/* ----------------------------- getOrderDetail (Core Data) --------------------------- */
 
 export const getOrderDetailV2 = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -1029,7 +1044,8 @@ export const getOrderDetailV2 = createServerFn({ method: "POST" })
       .maybeSingle();
     if (error || !app) throw new Error("Order not found");
 
-    const [leadRes, custRes, svcRes, paysRes, docsRes, evRes, staffRes, wfRes, orderTicketsRes, customerTicketsRes, refundRes] = await Promise.all([
+    // Core Data: Load essential display & workflow data immediately
+    const [leadRes, custRes, svcRes, paysRes, docsRes, statusEventsRes, staffRes, wfRes, refundRes] = await Promise.all([
       app.lead_id
         ? admin.from("leads").select("id, lead_code, name, email, mobile, total_amount, base_amount, gst_amount, lead_status_v2, status, lead_source, service, language, state").eq("id", app.lead_id).maybeSingle()
         : Promise.resolve({ data: null }),
@@ -1053,29 +1069,15 @@ export const getOrderDetailV2 = createServerFn({ method: "POST" })
         .from("application_events")
         .select("id, event_type, old_value, new_value, note, staff_name, staff_role, created_at")
         .eq("application_id", data.orderId)
+        .eq("event_type", "status_change")
         .order("created_at", { ascending: false })
-        .limit(200),
+        .limit(50),
       app.assigned_to
         ? admin.from("profiles").select("id, display_name, email").eq("id", app.assigned_to).maybeSingle()
         : Promise.resolve({ data: null }),
       app.service_id
         ? admin.from("services").select("service_code").eq("id", app.service_id).maybeSingle()
         : Promise.resolve({ data: null }),
-      admin
-        .from("support_tickets")
-        .select("id, ticket_number, subject, status, priority, created_at, updated_at")
-        .eq("application_id", data.orderId)
-        .order("created_at", { ascending: false })
-        .limit(50),
-      app.customer_id
-        ? admin
-            .from("support_tickets")
-            .select("id, ticket_number, subject, status, priority, application_id, created_at")
-            .eq("customer_id", app.customer_id)
-            .neq("application_id", data.orderId)
-            .order("created_at", { ascending: false })
-            .limit(20)
-        : Promise.resolve({ data: [] as any[] }),
       admin
         .from("refund_requests")
         .select("id, status, refund_amount, refund_mode, deduction_amount, decided_at, created_at, reason")
@@ -1094,7 +1096,6 @@ export const getOrderDetailV2 = createServerFn({ method: "POST" })
       }
     }
 
-    // Look up service_workflows by service_code if present
     let workflowStages: string[] = FULFILLMENT_STAGES;
     if ((wfRes as any).data?.service_code) {
       const { data: wf } = await admin
@@ -1115,7 +1116,6 @@ export const getOrderDetailV2 = createServerFn({ method: "POST" })
       .reduce((s: number, p: any) => s + Number(p.amount || 0), 0);
     const total = paidSum > 0 ? paidSum : Number(lead?.total_amount || 0);
 
-    // Enrich with invoice_id so admin actions know which invoice to email/download.
     if (payments.length > 0) {
       const payIds = payments.map((p) => p.id);
       const { data: invs } = await admin
@@ -1139,47 +1139,26 @@ export const getOrderDetailV2 = createServerFn({ method: "POST" })
         };
       });
     }
+
     const paymentStatus = rollupPaymentStatus(
       payments.map((p) => ({ status: String(p.status), amount: Number(p.amount || 0) })),
       total,
     );
 
-
-    // Build per-stage timestamps + actor from application_events
-    const stageEvents = (evRes.data ?? []).filter((e: any) => e.event_type === "status_change");
+    const stageEvents = (statusEventsRes.data ?? []);
     const stageMeta: Record<string, { at: string; staff_name: string | null }> = {};
     for (const ev of stageEvents) {
       const key = ev.new_value as string;
       if (key && !stageMeta[key]) stageMeta[key] = { at: (ev.created_at as string) ?? "", staff_name: ev.staff_name ?? null };
     }
-    // Seed `order_received` from the application's own created_at when missing
     if (!stageMeta["order_received"]) {
       stageMeta["order_received"] = { at: app.created_at as string, staff_name: null };
     }
 
-    // Derive paymentSuccessfulAt from the earliest successful payment_date.
     const paymentSuccessfulAt = payments
       .filter((p: any) => ["paid", "success", "successful"].includes(String(p.status)) && p.payment_date)
       .map((p: any) => p.payment_date as string)
       .sort()[0] ?? null;
-
-    // Enrich `email_sent` events with subject/template/status from email_logs so the
-    // Timeline / Activity Log shows the actual template that was sent (not a bare
-    // "Email sent" line). We match by application_id + created_at proximity.
-    const [{ data: emailLogRows }, { data: templateRows }] = await Promise.all([
-      admin
-        .from("email_logs")
-        .select("id, subject, template_code, status, to_email, error_message, created_at, sent_at")
-        .eq("application_id", data.orderId)
-        .order("created_at", { ascending: false })
-        .limit(200),
-      admin.from("email_templates").select("code"),
-    ]);
-    const templateSet = new Set(((templateRows ?? []) as any[]).map((t) => t.code));
-    const emailLogs = ((emailLogRows ?? []) as any[]).map((l) => ({
-      ...l,
-      template_exists: Boolean(l.template_code && templateSet.has(l.template_code)),
-    }));
 
     return {
       application: app,
@@ -1191,13 +1170,82 @@ export const getOrderDetailV2 = createServerFn({ method: "POST" })
       paymentSuccessfulAt,
       total,
       documents: docsRes.data ?? [],
-      events: evRes.data ?? [],
-      emailLogs,
       assignedStaff: (staffRes as any).data ?? null,
       workflowStages,
       stageMeta,
-      orderTickets: (orderTicketsRes as any).data ?? [],
-      customerTickets: (customerTicketsRes as any).data ?? [],
+      // Backward compatibility fields initialized empty, populated on-demand
+      events: [],
+      emailLogs: [],
+      orderTickets: [],
+      customerTickets: [],
+    };
+  });
+
+/* ----------------------------- Lazy Secondary Data Server Functions --------------------------- */
+
+export const getOrderTimelineEvents = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({ orderId: z.string().uuid() }).parse(i))
+  .handler(async ({ data, context }) => {
+    await assertStaff(context.supabase);
+    const admin = await getAdmin();
+
+    const [eventsRes, emailLogRows, templateRows] = await Promise.all([
+      admin
+        .from("application_events")
+        .select("id, event_type, old_value, new_value, note, staff_name, staff_role, created_at")
+        .eq("application_id", data.orderId)
+        .order("created_at", { ascending: false })
+        .limit(200),
+      admin
+        .from("email_logs")
+        .select("id, subject, template_code, status, to_email, error_message, created_at, sent_at")
+        .eq("application_id", data.orderId)
+        .order("created_at", { ascending: false })
+        .limit(200),
+      admin.from("email_templates").select("code"),
+    ]);
+
+    const templateSet = new Set(((templateRows?.data ?? []) as any[]).map((t) => t.code));
+    const emailLogs = ((emailLogRows?.data ?? []) as any[]).map((l) => ({
+      ...l,
+      template_exists: Boolean(l.template_code && templateSet.has(l.template_code)),
+    }));
+
+    return {
+      events: eventsRes.data ?? [],
+      emailLogs,
+    };
+  });
+
+export const getOrderTickets = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({ orderId: z.string().uuid(), customerId: z.string().uuid().nullable().optional() }).parse(i))
+  .handler(async ({ data, context }) => {
+    await assertStaff(context.supabase);
+    const admin = await getAdmin();
+
+    const [orderTicketsRes, customerTicketsRes] = await Promise.all([
+      admin
+        .from("support_tickets")
+        .select("id, ticket_number, subject, status, priority, created_at, updated_at")
+        .eq("application_id", data.orderId)
+        .order("created_at", { ascending: false })
+        .limit(50),
+      data.customerId
+        ? admin
+            .from("support_tickets")
+            .select("id, ticket_number, subject, status, priority, application_id, created_at")
+            .eq("customer_id", data.customerId)
+            .neq("application_id", data.orderId)
+            .order("created_at", { ascending: false })
+            .limit(20)
+        : Promise.resolve({ data: [] as any[] }),
+    ]);
+
+    return {
+      orderTickets: (orderTicketsRes as any)?.data ?? [],
+      customerTickets: (customerTicketsRes as any)?.data ?? [],
     };
   });
 

@@ -29,7 +29,7 @@ import { resumeFromHold, resumeFromCustomerDelay } from "@/lib/orders/actions/ho
 import { handleGovtRejected } from "@/lib/orders/actions/close-actions.functions";
 import { markConsultationCompleted } from "@/lib/orders/actions/consultation.functions";
 import { listCloseReasons } from "@/lib/orders/actions/reasons.functions";
-import { updateFulfillmentStatus, resendServiceChangeEmail } from "@/lib/crm/orders-v2.functions";
+import { updateFulfillmentStatus, resendServiceChangeEmail, getOrderTimelineEvents, getOrderTickets } from "@/lib/crm/orders-v2.functions";
 import { silentCloseOrder } from "@/lib/crm/workflow-closure.functions";
 
 import {
@@ -105,6 +105,22 @@ export function WorkspaceShell(p: Props) {
   >(null);
 
   const { application, lead, customer, service, payments, paymentStatus, total, documents, events, emailLogs, stageMeta } = p.data;
+  const timelineFn = useServerFn(getOrderTimelineEvents);
+  const ticketsFn = useServerFn(getOrderTickets);
+
+  const { data: timelineData } = useQuery({
+    queryKey: ["admin.order.timeline", p.orderId],
+    queryFn: () => timelineFn({ data: { orderId: p.orderId } }),
+    enabled: tab === "activity",
+    staleTime: 60_000,
+  });
+
+  const { data: ticketsData } = useQuery({
+    queryKey: ["admin.order.tickets", p.orderId, application?.customer_id],
+    queryFn: () => ticketsFn({ data: { orderId: p.orderId, customerId: application?.customer_id ?? null } }),
+    enabled: tab === "support",
+    staleTime: 60_000,
+  });
   const govtPortalUrl: string | null = (service as any)?.govt_portal_url ?? null;
   const current = (application.fulfillment_status ?? "order_received") as FulfillmentStatus;
   const orderStatus = (application.order_status ?? null) as OrderStatus | null;
@@ -987,8 +1003,8 @@ export function WorkspaceShell(p: Props) {
             <TabsContent value="activity" className="space-y-4 mt-0 animate-fade-in">
               <UnifiedTimeline
                 applicationId={application.id}
-                events={events}
-                emailLogs={emailLogs ?? []}
+                events={timelineData?.events ?? events ?? []}
+                emailLogs={timelineData?.emailLogs ?? emailLogs ?? []}
                 payments={p.hideAmount ? [] : payments}
                 documents={documents}
                 createdAt={application.created_at}
@@ -998,8 +1014,8 @@ export function WorkspaceShell(p: Props) {
 
             <TabsContent value="support" className="mt-0 animate-fade-in">
               <OrderTicketsPanel
-                orderTickets={p.data.orderTickets ?? []}
-                customerTickets={p.data.customerTickets ?? []}
+                orderTickets={ticketsData?.orderTickets ?? p.data.orderTickets ?? []}
+                customerTickets={ticketsData?.customerTickets ?? p.data.customerTickets ?? []}
               />
             </TabsContent>
 
