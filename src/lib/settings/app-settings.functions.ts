@@ -373,16 +373,18 @@ const CALLBACK_PRESETS_STORAGE_PATH = "config/callback-presets.json";
 export interface CallbackReminderPresetConfig {
   quickMinutes: number;
   recommendedHours: number;
-  eveningHours: number;
-  laterTodayHours: number;
+  afternoonHours: number; // Slot 3: Afternoon
+  beforeShiftEndHours: number; // Slot 4: Before Shift End (X hours)
   tomorrowDefaultTime: string; // "HH:MM" e.g. "10:30"
+  eveningHours?: number; // legacy fallback
+  laterTodayHours?: number; // legacy fallback
 }
 
 export const DEFAULT_CALLBACK_PRESET_CONFIG: CallbackReminderPresetConfig = {
   quickMinutes: 60,
   recommendedHours: 2,
-  eveningHours: 3,
-  laterTodayHours: 4,
+  afternoonHours: 3,
+  beforeShiftEndHours: 4,
   tomorrowDefaultTime: "10:30",
 };
 
@@ -423,11 +425,15 @@ export const getCallbackReminderPresetSettings = createServerFn({ method: "GET" 
   .middleware([requireSupabaseAuth])
   .handler(async () => {
     const storageConfig = await readCallbackPresetsFromStorage();
+    const afternoonHours = storageConfig?.afternoonHours ?? (storageConfig as any)?.eveningHours ?? DEFAULT_CALLBACK_PRESET_CONFIG.afternoonHours;
+    const beforeShiftEndHours = storageConfig?.beforeShiftEndHours ?? (storageConfig as any)?.laterTodayHours ?? DEFAULT_CALLBACK_PRESET_CONFIG.beforeShiftEndHours;
     return {
       quickMinutes: storageConfig?.quickMinutes ?? DEFAULT_CALLBACK_PRESET_CONFIG.quickMinutes,
       recommendedHours: storageConfig?.recommendedHours ?? DEFAULT_CALLBACK_PRESET_CONFIG.recommendedHours,
-      eveningHours: storageConfig?.eveningHours ?? DEFAULT_CALLBACK_PRESET_CONFIG.eveningHours,
-      laterTodayHours: storageConfig?.laterTodayHours ?? DEFAULT_CALLBACK_PRESET_CONFIG.laterTodayHours,
+      afternoonHours,
+      eveningHours: afternoonHours, // alias
+      beforeShiftEndHours,
+      laterTodayHours: beforeShiftEndHours, // alias
       tomorrowDefaultTime: storageConfig?.tomorrowDefaultTime ?? DEFAULT_CALLBACK_PRESET_CONFIG.tomorrowDefaultTime,
     };
   });
@@ -438,10 +444,18 @@ export const saveCallbackReminderPresetSettings = createServerFn({ method: "POST
     z.object({
       quickMinutes: z.number().min(1).max(1440),
       recommendedHours: z.number().min(0.1).max(72),
-      eveningHours: z.number().min(0.1).max(72),
-      laterTodayHours: z.number().min(0.1).max(72),
+      afternoonHours: z.number().min(0.1).max(72).optional(),
+      eveningHours: z.number().min(0.1).max(72).optional(),
+      beforeShiftEndHours: z.number().min(0.1).max(72).optional(),
+      laterTodayHours: z.number().min(0.1).max(72).optional(),
       tomorrowDefaultTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/),
-    }).parse(raw),
+    }).transform((d) => ({
+      quickMinutes: d.quickMinutes,
+      recommendedHours: d.recommendedHours,
+      afternoonHours: d.afternoonHours ?? d.eveningHours ?? 3,
+      beforeShiftEndHours: d.beforeShiftEndHours ?? d.laterTodayHours ?? 4,
+      tomorrowDefaultTime: d.tomorrowDefaultTime,
+    })).parse(raw),
   )
   .handler(async ({ data }) => {
     await writeCallbackPresetsToStorage(data);

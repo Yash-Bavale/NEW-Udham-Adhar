@@ -96,8 +96,8 @@ export function CallbackReminderDialog({
 
   const quickMinutes = presetConfig?.quickMinutes ?? DEFAULT_CALLBACK_PRESET_CONFIG.quickMinutes;
   const recommendedHours = presetConfig?.recommendedHours ?? DEFAULT_CALLBACK_PRESET_CONFIG.recommendedHours;
-  const eveningHours = presetConfig?.eveningHours ?? DEFAULT_CALLBACK_PRESET_CONFIG.eveningHours;
-  const laterTodayHours = presetConfig?.laterTodayHours ?? DEFAULT_CALLBACK_PRESET_CONFIG.laterTodayHours;
+  const afternoonHours = presetConfig?.afternoonHours ?? presetConfig?.eveningHours ?? DEFAULT_CALLBACK_PRESET_CONFIG.afternoonHours;
+  const beforeShiftEndHours = presetConfig?.beforeShiftEndHours ?? presetConfig?.laterTodayHours ?? DEFAULT_CALLBACK_PRESET_CONFIG.beforeShiftEndHours;
   const tomorrowDefaultTime = presetConfig?.tomorrowDefaultTime ?? DEFAULT_CALLBACK_PRESET_CONFIG.tomorrowDefaultTime;
 
   // Fetch active callback
@@ -121,7 +121,7 @@ export function CallbackReminderDialog({
   const staffName = propAssignedName || (orderDetail as any)?.assignedStaff?.display_name || (orderDetail as any)?.assignedStaff?.email || "Assigned Executive";
 
   const [selectedOutcome, setSelectedOutcome] = useState<string>("call_back_later");
-  const [durationPreset, setDurationPreset] = useState<string>("recommended"); // 'quick' | 'recommended' | 'evening' | 'later_today' | 'tomorrow' | 'custom'
+  const [durationPreset, setDurationPreset] = useState<string>("recommended"); // 'quick' | 'recommended' | 'afternoon' | 'before_shift_end' | 'tomorrow' | 'custom'
   const [customDate, setCustomDate] = useState<Date>(() => new Date(Date.now() + 120 * 60_000));
   const [channel, setChannel] = useState<"call" | "email">(initialChannel);
 
@@ -140,10 +140,10 @@ export function CallbackReminderDialog({
       return new Date(now.getTime() + quickMinutes * 60_000);
     } else if (durationPreset === "recommended") {
       return new Date(now.getTime() + Math.round(recommendedHours * 60) * 60_000);
-    } else if (durationPreset === "evening") {
-      return new Date(now.getTime() + Math.round(eveningHours * 60) * 60_000);
-    } else if (durationPreset === "later_today") {
-      return new Date(now.getTime() + Math.round(laterTodayHours * 60) * 60_000);
+    } else if (durationPreset === "afternoon" || durationPreset === "evening") {
+      return new Date(now.getTime() + Math.round(afternoonHours * 60) * 60_000);
+    } else if (durationPreset === "before_shift_end" || durationPreset === "later_today") {
+      return new Date(now.getTime() + Math.round(beforeShiftEndHours * 60) * 60_000);
     } else if (durationPreset === "tomorrow") {
       const t = new Date(now);
       t.setDate(t.getDate() + 1);
@@ -154,7 +154,7 @@ export function CallbackReminderDialog({
       return customDate;
     }
     return new Date(now.getTime() + Math.round(recommendedHours * 60) * 60_000);
-  }, [durationPreset, customDate, quickMinutes, recommendedHours, eveningHours, laterTodayHours, tomorrowDefaultTime]);
+  }, [durationPreset, customDate, quickMinutes, recommendedHours, afternoonHours, beforeShiftEndHours, tomorrowDefaultTime]);
 
 
   // When outcome changes, update default note if user hasn't heavily modified it
@@ -458,38 +458,38 @@ export function CallbackReminderDialog({
                 </div>
               </button>
 
-              {/* Evening Preset */}
+              {/* Afternoon Preset */}
               <button
                 type="button"
-                onClick={() => setDurationPreset("evening")}
+                onClick={() => setDurationPreset("afternoon")}
                 className={cn(
                   "px-2 py-1.5 rounded-lg text-center transition-colors border select-none cursor-pointer",
-                  durationPreset === "evening"
+                  durationPreset === "afternoon" || durationPreset === "evening"
                     ? "bg-blue-600 text-white border-blue-600 shadow-xs font-bold"
                     : "bg-white hover:bg-slate-50 text-slate-800 border-slate-200"
                 )}
               >
-                <div className={cn("text-[10px] uppercase font-semibold", durationPreset === "evening" ? "text-blue-100" : "text-slate-400")}>
-                  Evening
+                <div className={cn("text-[10px] uppercase font-semibold", (durationPreset === "afternoon" || durationPreset === "evening") ? "text-blue-100" : "text-slate-400")}>
+                  Afternoon
                 </div>
-                <div className="text-xs font-bold">{eveningHours} {eveningHours === 1 ? "Hour" : "Hours"}</div>
+                <div className="text-xs font-bold">{afternoonHours} {afternoonHours === 1 ? "Hour" : "Hours"}</div>
               </button>
 
-              {/* Later Today Preset */}
+              {/* Before Shift End Preset */}
               <button
                 type="button"
-                onClick={() => setDurationPreset("later_today")}
+                onClick={() => setDurationPreset("before_shift_end")}
                 className={cn(
                   "px-2 py-1.5 rounded-lg text-center transition-colors border select-none cursor-pointer",
-                  durationPreset === "later_today"
+                  durationPreset === "before_shift_end" || durationPreset === "later_today"
                     ? "bg-blue-600 text-white border-blue-600 shadow-xs font-bold"
                     : "bg-white hover:bg-slate-50 text-slate-800 border-slate-200"
                 )}
               >
-                <div className={cn("text-[10px] uppercase font-semibold", durationPreset === "later_today" ? "text-blue-100" : "text-slate-400")}>
-                  Later Today
+                <div className={cn("text-[10px] uppercase font-semibold", (durationPreset === "before_shift_end" || durationPreset === "later_today") ? "text-blue-100" : "text-slate-400")}>
+                  Before Shift End
                 </div>
-                <div className="text-xs font-bold">{laterTodayHours} {laterTodayHours === 1 ? "Hour" : "Hours"}</div>
+                <div className="text-xs font-bold">{beforeShiftEndHours} {beforeShiftEndHours === 1 ? "Hour" : "Hours"}</div>
               </button>
 
               {/* Tomorrow Default Time */}

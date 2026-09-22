@@ -578,10 +578,10 @@ export function AppSettingsCard() {
               </p>
             </div>
 
-            {/* Evening Preset (Hours) */}
+            {/* Afternoon Preset (Hours) */}
             <div className="space-y-1.5 p-3 rounded-xl bg-slate-50 border border-slate-200">
               <Label className="text-xs font-bold text-slate-800 flex items-center justify-between">
-                <span>Slot 3: Evening</span>
+                <span>Slot 3: Afternoon</span>
                 <span className="text-[10px] text-blue-600 font-mono font-bold">Hours</span>
               </Label>
               <div className="flex items-center gap-1.5">
@@ -590,12 +590,12 @@ export function AppSettingsCard() {
                   min={0.1}
                   step={0.5}
                   max={72}
-                  value={callbackPresets.eveningHours}
+                  value={callbackPresets.afternoonHours ?? callbackPresets.eveningHours ?? 3}
                   onChange={(e) =>
-                    setCallbackPresets((prev) => ({
-                      ...prev,
-                      eveningHours: Math.max(0.1, Number(e.target.value) || 1),
-                    }))
+                    setCallbackPresets((prev) => {
+                      const v = Math.max(0.1, Number(e.target.value) || 1);
+                      return { ...prev, afternoonHours: v, eveningHours: v };
+                    })
                   }
                   disabled={loading}
                   className="bg-white font-mono text-xs"
@@ -603,14 +603,14 @@ export function AppSettingsCard() {
                 <span className="text-xs font-semibold text-slate-500">Hours</span>
               </div>
               <p className="text-[11px] text-slate-500">
-                Button label: <strong className="text-slate-800">{callbackPresets.eveningHours} {callbackPresets.eveningHours === 1 ? "Hour" : "Hours"}</strong>
+                Button label: <strong className="text-slate-800">{callbackPresets.afternoonHours ?? callbackPresets.eveningHours ?? 3} {(callbackPresets.afternoonHours ?? callbackPresets.eveningHours ?? 3) === 1 ? "Hour" : "Hours"}</strong>
               </p>
             </div>
 
-            {/* Later Today Preset (Hours) */}
+            {/* Before Shift End Preset (Hours) */}
             <div className="space-y-1.5 p-3 rounded-xl bg-slate-50 border border-slate-200">
               <Label className="text-xs font-bold text-slate-800 flex items-center justify-between">
-                <span>Slot 4: Later Today</span>
+                <span>Slot 4: Before Shift End</span>
                 <span className="text-[10px] text-blue-600 font-mono font-bold">Hours</span>
               </Label>
               <div className="flex items-center gap-1.5">
@@ -619,12 +619,12 @@ export function AppSettingsCard() {
                   min={0.1}
                   step={0.5}
                   max={72}
-                  value={callbackPresets.laterTodayHours}
+                  value={callbackPresets.beforeShiftEndHours ?? callbackPresets.laterTodayHours ?? 4}
                   onChange={(e) =>
-                    setCallbackPresets((prev) => ({
-                      ...prev,
-                      laterTodayHours: Math.max(0.1, Number(e.target.value) || 1),
-                    }))
+                    setCallbackPresets((prev) => {
+                      const v = Math.max(0.1, Number(e.target.value) || 1);
+                      return { ...prev, beforeShiftEndHours: v, laterTodayHours: v };
+                    })
                   }
                   disabled={loading}
                   className="bg-white font-mono text-xs"
@@ -632,7 +632,7 @@ export function AppSettingsCard() {
                 <span className="text-xs font-semibold text-slate-500">Hours</span>
               </div>
               <p className="text-[11px] text-slate-500">
-                Button label: <strong className="text-slate-800">{callbackPresets.laterTodayHours} {callbackPresets.laterTodayHours === 1 ? "Hour" : "Hours"}</strong>
+                Button label: <strong className="text-slate-800">{callbackPresets.beforeShiftEndHours ?? callbackPresets.laterTodayHours ?? 4} {(callbackPresets.beforeShiftEndHours ?? callbackPresets.laterTodayHours ?? 4) === 1 ? "Hour" : "Hours"}</strong>
               </p>
             </div>
 
@@ -679,12 +679,12 @@ export function AppSettingsCard() {
                 <div className="text-xs font-bold">{callbackPresets.recommendedHours} {callbackPresets.recommendedHours === 1 ? "Hour" : "Hours"}</div>
               </div>
               <div className="p-2 rounded-lg bg-slate-800 text-center border border-slate-700">
-                <div className="text-[9px] uppercase font-semibold text-slate-400">Evening</div>
-                <div className="text-xs font-bold text-white">{callbackPresets.eveningHours} {callbackPresets.eveningHours === 1 ? "Hour" : "Hours"}</div>
+                <div className="text-[9px] uppercase font-semibold text-slate-400">Afternoon</div>
+                <div className="text-xs font-bold text-white">{(callbackPresets.afternoonHours ?? callbackPresets.eveningHours ?? 3)} {((callbackPresets.afternoonHours ?? callbackPresets.eveningHours ?? 3) === 1 ? "Hour" : "Hours")}</div>
               </div>
               <div className="p-2 rounded-lg bg-slate-800 text-center border border-slate-700">
-                <div className="text-[9px] uppercase font-semibold text-slate-400">Later Today</div>
-                <div className="text-xs font-bold text-white">{callbackPresets.laterTodayHours} {callbackPresets.laterTodayHours === 1 ? "Hour" : "Hours"}</div>
+                <div className="text-[9px] uppercase font-semibold text-slate-400">Before Shift End</div>
+                <div className="text-xs font-bold text-white">{(callbackPresets.beforeShiftEndHours ?? callbackPresets.laterTodayHours ?? 4)} {((callbackPresets.beforeShiftEndHours ?? callbackPresets.laterTodayHours ?? 4) === 1 ? "Hour" : "Hours")}</div>
               </div>
               <div className="p-2 rounded-lg bg-slate-800 text-center border border-slate-700">
                 <div className="text-[9px] uppercase font-semibold text-slate-400">Tomorrow</div>
