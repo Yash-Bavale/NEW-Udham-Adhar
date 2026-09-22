@@ -8,7 +8,7 @@ import { resolveApplicationLink } from "@/lib/applications/links.functions";
 export const Route = createFileRoute("/app/$token")({
   component: AppTokenPage,
   head: () => ({ meta: [{ title: "Application link · Business Help Services" }] }),
-  errorComponent: ({ error, reset }) => (
+  errorComponent: ({ error, reset }: any) => (
     <SiteShell>
       <div className="mx-auto max-w-xl px-4 py-16 text-center">
         <h1 className="text-2xl font-bold text-brand-navy">Something went wrong</h1>

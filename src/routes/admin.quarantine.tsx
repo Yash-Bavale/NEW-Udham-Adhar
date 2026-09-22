@@ -51,7 +51,7 @@ export const Route = createFileRoute("/admin/quarantine")({
     ],
   }),
   component: QuarantinePage,
-  errorComponent: ({ error }) => (
+  errorComponent: ({ error }: any) => (
     <div className="p-6 text-sm text-red-600">Failed to load quarantine: {error.message}</div>
   ),
   notFoundComponent: () => <div className="p-6 text-sm">Not found</div>,

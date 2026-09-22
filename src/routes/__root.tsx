@@ -48,7 +48,7 @@ function NotFoundComponent() {
   );
 }
 
-function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
+function ErrorComponent({ error, reset }: { error: any; reset: () => void }) {
   console.error(error);
   const router = useRouter();
   useEffect(() => {
@@ -221,7 +221,7 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
-  const { brand, siteContent, cfArticle } = Route.useLoaderData();
+  const { brand, siteContent, cfArticle } = (Route.useLoaderData() ?? {}) as any;
   const router = useRouter();
   const path = useRouterState({ select: (s) => s.location.pathname });
   // Route id of the deepest match — "/$" means no hardcoded route claims this

@@ -29,7 +29,7 @@ export const Route = createFileRoute("/admin")({
     }
   },
   component: AdminLayout,
-  errorComponent: ({ error }) => (
+  errorComponent: ({ error }: any) => (
     <div className="p-8 text-sm text-red-700">Admin error: {error.message}</div>
   ),
 });
