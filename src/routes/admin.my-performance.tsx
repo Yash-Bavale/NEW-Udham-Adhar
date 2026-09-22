@@ -9,35 +9,28 @@ import {
 import {
   ShoppingBag,
   CheckCircle2,
-  Zap,
   Flame,
   Clock,
-  AlertTriangle,
-  ShieldCheck,
-  ArrowRight,
   ExternalLink,
   RefreshCw,
-  Timer,
-  Phone,
-  PhoneCall,
-  PhoneForwarded,
-  MessageSquare,
-  Send,
-  CloudCheck,
-  ChevronDown,
-  ChevronUp,
-  FileCheck,
-  FileText,
-  BadgeAlert,
-  Headphones,
-  SlidersHorizontal,
-  Download,
   Calendar,
-  Volume2,
-  Mic,
-  Share2,
+  AlertCircle,
+  Archive,
+  Hourglass,
+  Layers,
+  Search,
+  Filter,
+  ArrowRight,
+  Sparkles,
+  Trophy,
+  Activity,
+  Phone,
+  Tag,
+  User,
+  CheckCircle,
+  HelpCircle,
+  AlertTriangle,
 } from "lucide-react";
-import { formatIST } from "@/lib/datetime";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -62,20 +55,21 @@ function getGreeting(name?: string) {
   return `${timeStr}, ${firstName} 👋`;
 }
 
+type OrderTableFilter =
+  | "all"
+  | "needs_action"
+  | "hot"
+  | "pending"
+  | "customer_delay"
+  | "technical_delay"
+  | "completed"
+  | "closed";
+
 function MyPerformanceDashboardPage() {
   const [dateFilter, setDateFilter] = useState<DatePeriodFilter>("today");
-  const [quickNote, setQuickNote] = useState<string>("");
-  const [savedNoteStatus, setSavedNoteStatus] = useState<boolean>(true);
-  const [isQueueExpanded, setIsQueueExpanded] = useState<boolean>(false);
-  const [activeCallTarget, setActiveCallTarget] = useState<{
-    name: string;
-    phone: string;
-    orderCode: string;
-  }>({
-    name: "Soumitra Hazra",
-    phone: "+91 90643 33164",
-    orderCode: "AP-2026-010219",
-  });
+  const [orderFilter, setOrderFilter] = useState<OrderTableFilter>("all");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isRotating, setIsRotating] = useState(false);
 
   const queryClient = useQueryClient();
   const getMyPerfFn = useServerFn(getMyPerformanceDashboard);
@@ -89,7 +83,7 @@ function MyPerformanceDashboardPage() {
   // Realtime subscription on production events
   useEffect(() => {
     const channel = supabase
-      .channel("my_perf_action_sync_v2")
+      .channel("my_perf_action_sync_v5")
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "application_events" },
@@ -126,962 +120,746 @@ function MyPerformanceDashboardPage() {
 
   const emp = data?.employee;
   const kpis = data?.kpiCards;
-  const hotOrders = data?.hotOrders ?? [];
-  const orders = data?.orders ?? [];
+  const flow = data?.workloadFlow;
+  const priorityHopper = data?.priorityHopper ?? [];
+  const topPerformers = data?.topPerformers ?? [];
+  const rawOrders = data?.orders ?? [];
   const timeline = data?.timeline ?? [];
 
-  const empName = emp?.name || "Anisha Kambale";
-  const initials = empName
-    .split(" ")
-    .map((n: string) => n[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase() || "AK";
+  const empName = emp?.name || "Employee";
+  const initials =
+    empName
+      .split(" ")
+      .map((n: string) => n[0])
+      .slice(0, 2)
+      .join("")
+      .toUpperCase() || "OP";
 
-  // Automatically sync active call target from first hot/pending order
-  useEffect(() => {
-    if (hotOrders.length > 0) {
-      const top = hotOrders[0];
-      setActiveCallTarget({
-        name: top.customerName || "Soumitra Hazra",
-        phone: (top as any).customerMobile || (top as any).customerPhone ? `+91 ${(top as any).customerMobile || (top as any).customerPhone}` : "+91 90643 33164",
-        orderCode: (top as any).orderNumber || (top as any).applicationCode || "AP-2026-010219",
-      });
-    } else if (orders.length > 0) {
-      const top = orders[0];
-      setActiveCallTarget({
-        name: top.customerName || "Client Record",
-        phone: (top as any).customerMobile || (top as any).customerPhone ? `+91 ${(top as any).customerMobile || (top as any).customerPhone}` : "+91 98280 76786",
-        orderCode: (top as any).orderNumber || (top as any).applicationCode || "AP-2026-010200",
-      });
-    }
-  }, [hotOrders, orders]);
-
-  const handleAppendTag = (tag: string) => {
-    setQuickNote((prev) => (prev ? `${prev} ${tag}` : tag));
-    setSavedNoteStatus(true);
+  const handleSyncNow = () => {
+    setIsRotating(true);
+    refetch();
+    setTimeout(() => setIsRotating(false), 700);
   };
 
-  const handleLogNote = () => {
-    if (!quickNote.trim()) return;
-    alert(`Call note logged successfully: "${quickNote}"`);
-    setQuickNote("");
-    setSavedNoteStatus(true);
-  };
+  const currentDateFormatted = new Date().toLocaleDateString("en-IN", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+
+  const isEmpActive = emp?.presenceStatus === "active";
+
+  // Filtered orders for My Orders table
+  const filteredOrders = useMemo(() => {
+    return rawOrders.filter((ord) => {
+      // 1. Tab filter
+      if (orderFilter === "needs_action") {
+        const needsActionStages = ["lead_received", "payment_done", "form_submitted", "order_reopened"];
+        if (!needsActionStages.includes(ord.currentStage || "") && !ord.isHot) return false;
+      } else if (orderFilter === "hot") {
+        if (!ord.isHot) return false;
+      } else if (orderFilter === "pending") {
+        if (ord.isCompleted || ord.isClosed) return false;
+      } else if (orderFilter === "customer_delay") {
+        if (!ord.isCustomerDelay) return false;
+      } else if (orderFilter === "technical_delay") {
+        if (!ord.isTechnicalDelay) return false;
+      } else if (orderFilter === "completed") {
+        if (!ord.isCompleted) return false;
+      } else if (orderFilter === "closed") {
+        if (!ord.isClosed) return false;
+      }
+
+      // 2. Search query filter
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim();
+        const matchCode = ord.orderNumber?.toLowerCase().includes(q);
+        const matchCustomer = ord.customerName?.toLowerCase().includes(q);
+        const matchMobile = ord.customerMobile?.toLowerCase().includes(q);
+        const matchService = ord.serviceName?.toLowerCase().includes(q);
+        return matchCode || matchCustomer || matchMobile || matchService;
+      }
+
+      return true;
+    });
+  }, [rawOrders, orderFilter, searchQuery]);
 
   return (
-    <div className="w-full space-y-6 pb-16 font-sans antialiased">
+    <div className="w-full space-y-6 pb-20 font-sans antialiased">
       {/* ───────────────────────────────────────────────────────────── */}
-      {/* 1. WELCOME & LIVE PRESENCE STATUS HEADER                      */}
+      {/* 1. REAL EMPLOYEE IDENTITY & HEADER (PHASE 1)                  */}
       {/* ───────────────────────────────────────────────────────────── */}
-      <section className="bg-white rounded-xl p-5 border border-slate-200/90 shadow-xs flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
+      <section className="bg-white rounded-xl p-5 border border-slate-200/90 shadow-xs flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div className="flex items-center gap-4 min-w-0">
           <div className="relative flex-shrink-0">
             <div className="w-14 h-14 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold text-xl shadow-xs">
               {initials}
             </div>
-            <span className="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full bg-emerald-500 ring-2 ring-white animate-pulse" />
+            <span
+              className={cn(
+                "absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full ring-2 ring-white",
+                isEmpActive ? "bg-emerald-500 animate-pulse" : "bg-slate-400",
+              )}
+            />
           </div>
 
           <div className="flex flex-col min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-                {getGreeting(empName)}
+                {isLoading ? "Loading profile..." : getGreeting(empName)}
               </h1>
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-bold">
-                <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                Active • Connected to CRM
-              </span>
+              {isEmpActive ? (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-bold">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+                  Active • Connected
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[11px] font-medium">
+                  <span className="w-2 h-2 rounded-full bg-slate-400" />
+                  Offline
+                </span>
+              )}
             </div>
 
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-slate-500 text-xs mt-0.5">
-              <span className="flex items-center gap-1">
-                <span className="text-slate-400 font-medium">Pod:</span>
-                Central Pod #02
-              </span>
+              <span>{emp?.email || "—"}</span>
               <span className="text-slate-300">•</span>
-              <span className="flex items-center gap-1">
-                <Phone className="h-3 w-3 text-slate-400" />
-                Ext #104
-              </span>
-              <span className="text-slate-300">•</span>
-              <span className="flex items-center gap-1">
-                <Clock className="h-3 w-3 text-slate-400" />
-                Shift Alpha (09:00 AM – 06:00 PM IST)
-              </span>
+              <span className="capitalize">{emp?.role || "Operations Executive"}</span>
             </div>
           </div>
         </div>
 
-        {/* Session Telemetry Pill Group */}
-        <div className="flex flex-wrap items-center gap-3 bg-slate-50 px-4 py-2.5 rounded-xl border border-slate-100 self-stretch xl:self-auto justify-between xl:justify-end">
-          <div className="flex flex-col px-1">
-            <span className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">
-              Logged In
-            </span>
-            <span className="text-xs font-bold text-slate-800">
-              09:12 AM IST
-            </span>
-          </div>
-
-          <div className="h-7 w-px bg-slate-200 hidden sm:block" />
-
-          <div className="flex flex-col px-1">
-            <span className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">
-              Current Session
-            </span>
-            <span className="text-xs font-bold text-blue-600">
-              {(emp as any)?.sessionLabel || "4h 12m"}
-            </span>
-          </div>
-
-          <div className="h-7 w-px bg-slate-200 hidden sm:block" />
-
-          <div className="flex items-center gap-2 px-1">
-            <span className="flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
-            <div className="flex flex-col">
-              <span className="text-xs font-bold text-slate-900">
-                Synced (45s)
-              </span>
-              <span className="text-[10px] text-slate-400">
-                Safe CRM Telemetry
-              </span>
-            </div>
+        {/* Global Controls */}
+        <div className="flex flex-wrap items-center gap-2 self-stretch md:self-auto justify-between md:justify-end">
+          <div className="flex items-center bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200 text-xs text-slate-700 font-medium">
+            <Calendar className="h-4 w-4 text-slate-400 mr-2" />
+            <span>Today, {currentDateFormatted} IST</span>
           </div>
 
           <button
-            onClick={() => refetch()}
-            className="ml-auto xl:ml-1 p-1.5 rounded-lg text-slate-400 hover:bg-slate-200 hover:text-slate-700 transition"
-            title="Refresh Telemetry"
+            onClick={handleSyncNow}
             type="button"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold transition shadow-xs"
           >
-            <ShieldCheck className="h-4 w-4" />
+            <RefreshCw
+              className={cn(
+                "h-3.5 w-3.5 text-blue-600 transition-transform duration-500",
+                (isRotating || isFetching) && "rotate-180 animate-spin",
+              )}
+            />
+            <span>Sync</span>
           </button>
         </div>
       </section>
 
       {/* ───────────────────────────────────────────────────────────── */}
-      {/* 2. MY DAILY SUMMARY CARDS (6 KPIs)                            */}
+      {/* 2. REAL EMPLOYEE ORDER KPIs (PHASE 2)                         */}
       {/* ───────────────────────────────────────────────────────────── */}
-      <section className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
-        {/* CRM Active */}
-        <div className="bg-white rounded-xl p-3.5 border border-slate-200/90 shadow-xs flex flex-col justify-between">
-          <div className="flex items-center justify-between text-slate-500 text-[10px] uppercase font-bold tracking-wider">
-            <span>CRM Active</span>
-            <Clock className="h-4 w-4 text-emerald-600" />
-          </div>
-          <div className="my-2">
-            <div className="text-2xl font-bold tracking-tight text-slate-900">
-              {(emp as any)?.sessionLabel || "4h 12m"}
-            </div>
-          </div>
-          <div className="flex items-center gap-1 text-[11px] font-semibold text-emerald-700">
-            <Zap className="h-3 w-3" />
-            <span>93% focus ratio</span>
-          </div>
+      <section className="space-y-3">
+        <div className="flex items-center justify-between px-1">
+          <h2 className="text-sm font-bold uppercase tracking-wider text-slate-500">
+            Today's Order Performance
+          </h2>
+          <span className="text-xs text-slate-400">
+            Realtime verified from CRM orders &amp; events
+          </span>
         </div>
 
-        {/* Offline / Calls */}
-        <div className="bg-white rounded-xl p-3.5 border border-slate-200/90 shadow-xs flex flex-col justify-between">
-          <div className="flex items-center justify-between text-slate-500 text-[10px] uppercase font-bold tracking-wider">
-            <span>Offline / Calls</span>
-            <Phone className="h-4 w-4 text-amber-600" />
-          </div>
-          <div className="my-2">
-            <div className="text-2xl font-bold tracking-tight text-slate-900">
-              18m
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {/* 1. ASSIGNED TODAY */}
+          <div className="bg-white rounded-xl p-4 border border-slate-200/90 shadow-xs flex flex-col justify-between transition hover:border-slate-300">
+            <div className="flex items-center justify-between text-slate-500 text-[11px] uppercase font-bold tracking-wider">
+              <span>Assigned Today</span>
+              <ShoppingBag className="h-4 w-4 text-blue-600" />
+            </div>
+            <div className="my-2.5">
+              <div className="text-3xl font-bold tracking-tight text-slate-900">
+                {isLoading ? "--" : (kpis?.assigned ?? 0)}
+              </div>
+            </div>
+            <div className="text-[11px] text-slate-400">
+              Orders allocated to you today
             </div>
           </div>
-          <div className="text-[11px] text-slate-400 truncate" title="Phone desk & paper logs">
-            Phone desk &amp; paper logs
-          </div>
-        </div>
 
-        {/* Orders Worked */}
-        <div className="bg-white rounded-xl p-3.5 border border-slate-200/90 shadow-xs flex flex-col justify-between">
-          <div className="flex items-center justify-between text-slate-500 text-[10px] uppercase font-bold tracking-wider">
-            <span>Orders Worked</span>
-            <ShoppingBag className="h-4 w-4 text-blue-600" />
-          </div>
-          <div className="my-2">
-            <div className="text-2xl font-bold tracking-tight text-slate-900">
-              {kpis?.worked ?? 18}
+          {/* 2. WORKED TODAY */}
+          <div className="bg-white rounded-xl p-4 border border-slate-200/90 shadow-xs flex flex-col justify-between transition hover:border-slate-300">
+            <div className="flex items-center justify-between text-slate-500 text-[11px] uppercase font-bold tracking-wider">
+              <span>Worked Today</span>
+              <CheckCircle2 className="h-4 w-4 text-blue-600" />
+            </div>
+            <div className="my-2.5">
+              <div className="text-3xl font-bold tracking-tight text-blue-600">
+                {isLoading ? "--" : (kpis?.worked ?? 0)}
+              </div>
+            </div>
+            <div className="text-[11px] text-slate-400">
+              Unique orders actioned today
             </div>
           </div>
-          <div className="text-[11px] text-slate-400">
-            Target: 22 / shift
-          </div>
-        </div>
 
-        {/* Actions Logged */}
-        <div className="bg-white rounded-xl p-3.5 border border-slate-200/90 shadow-xs flex flex-col justify-between">
-          <div className="flex items-center justify-between text-slate-500 text-[10px] uppercase font-bold tracking-wider">
-            <span>Actions Logged</span>
-            <FileCheck className="h-4 w-4 text-blue-600" />
-          </div>
-          <div className="my-2">
-            <div className="text-2xl font-bold tracking-tight text-slate-900">
-              {kpis?.actions ?? 47}
+          {/* 3. COMPLETED TODAY */}
+          <div className="bg-white rounded-xl p-4 border border-slate-200/90 shadow-xs flex flex-col justify-between transition hover:border-slate-300">
+            <div className="flex items-center justify-between text-slate-500 text-[11px] uppercase font-bold tracking-wider">
+              <span>Completed Today</span>
+              <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+            </div>
+            <div className="my-2.5">
+              <div className="text-3xl font-bold tracking-tight text-emerald-700">
+                {isLoading ? "--" : (kpis?.completed ?? 0)}
+              </div>
+            </div>
+            <div className="text-[11px] text-emerald-700 font-medium">
+              Certificates delivered today
             </div>
           </div>
-          <div className="text-[11px] text-emerald-700 font-semibold">
-            High pacing (+12% avg)
-          </div>
-        </div>
 
-        {/* Done / Dispatched */}
-        <div className="bg-white rounded-xl p-3.5 border border-slate-200/90 shadow-xs flex flex-col justify-between">
-          <div className="flex items-center justify-between text-slate-500 text-[10px] uppercase font-bold tracking-wider">
-            <span>Done / Dispatched</span>
-            <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-          </div>
-          <div className="my-2">
-            <div className="text-2xl font-bold tracking-tight text-slate-900">
-              {kpis?.completed ?? 8}{" "}
-              <span className="text-xs text-slate-400 font-normal">/ 5 sent</span>
+          {/* 4. CLOSED TODAY */}
+          <div className="bg-white rounded-xl p-4 border border-slate-200/90 shadow-xs flex flex-col justify-between transition hover:border-slate-300">
+            <div className="flex items-center justify-between text-slate-500 text-[11px] uppercase font-bold tracking-wider">
+              <span>Closed Today</span>
+              <Archive className="h-4 w-4 text-slate-500" />
+            </div>
+            <div className="my-2.5">
+              <div className="text-3xl font-bold tracking-tight text-slate-800">
+                {isLoading ? "--" : (kpis?.closed ?? 0)}
+              </div>
+            </div>
+            <div className="text-[11px] text-slate-400">
+              Orders archived today
             </div>
           </div>
-          <div className="text-[11px] text-emerald-700 flex items-center gap-1 font-semibold">
-            <CheckCircle2 className="h-3 w-3" />
-            <span>Zero rework queue</span>
-          </div>
-        </div>
 
-        {/* Shift SLA Compliance */}
-        <div className="bg-white rounded-xl p-3.5 border border-slate-200/90 shadow-xs flex flex-col justify-between">
-          <div className="flex items-center justify-between text-slate-500 text-[10px] uppercase font-bold tracking-wider">
-            <span>SLA Compliance</span>
-            <ShieldCheck className="h-4 w-4 text-emerald-600" />
+          {/* 5. PENDING WORKLOAD */}
+          <div className="bg-white rounded-xl p-4 border border-slate-200/90 shadow-xs flex flex-col justify-between transition hover:border-slate-300">
+            <div className="flex items-center justify-between text-slate-500 text-[11px] uppercase font-bold tracking-wider">
+              <span>Pending</span>
+              <Hourglass className="h-4 w-4 text-amber-600" />
+            </div>
+            <div className="my-2.5">
+              <div className="text-3xl font-bold tracking-tight text-amber-700">
+                {isLoading ? "--" : (kpis?.pending ?? 0)}
+              </div>
+            </div>
+            <div className="text-[11px] text-amber-800/80 font-medium">
+              Current active workload
+            </div>
           </div>
-          <div className="my-2 flex items-baseline gap-1.5">
-            <span className="text-2xl font-bold tracking-tight text-emerald-600">
-              {kpis?.slaCompliance ? `${kpis.slaCompliance}%` : "96.2%"}
-            </span>
-            <span className="text-[10px] text-slate-400 font-medium">0 Breaches</span>
+
+          {/* 6. CUSTOMER DELAY */}
+          <div className="bg-white rounded-xl p-4 border border-slate-200/90 shadow-xs flex flex-col justify-between transition hover:border-slate-300">
+            <div className="flex items-center justify-between text-slate-500 text-[11px] uppercase font-bold tracking-wider">
+              <span>Customer Delay</span>
+              <AlertCircle className="h-4 w-4 text-amber-600" />
+            </div>
+            <div className="my-2.5">
+              <div className="text-3xl font-bold tracking-tight text-amber-800">
+                {isLoading ? "--" : (kpis?.customerDelays ?? 0)}
+              </div>
+            </div>
+            <div className="text-[11px] text-slate-400">
+              Delay actions added today
+            </div>
           </div>
-          <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
-            <div className="bg-emerald-600 h-full rounded-full" style={{ width: "96.2%" }} />
+
+          {/* 7. TECHNICAL DELAY */}
+          <div className="bg-white rounded-xl p-4 border border-slate-200/90 shadow-xs flex flex-col justify-between transition hover:border-slate-300">
+            <div className="flex items-center justify-between text-slate-500 text-[11px] uppercase font-bold tracking-wider">
+              <span>Technical Delay</span>
+              <Layers className="h-4 w-4 text-rose-600" />
+            </div>
+            <div className="my-2.5">
+              <div className="text-3xl font-bold tracking-tight text-rose-700">
+                {isLoading ? "--" : (kpis?.technicalDelays ?? 0)}
+              </div>
+            </div>
+            <div className="text-[11px] text-slate-400">
+              Portal / tech holds today
+            </div>
+          </div>
+
+          {/* 8. HOT ORDERS */}
+          <div className="bg-white rounded-xl p-4 border border-slate-200/90 shadow-xs flex flex-col justify-between transition hover:border-slate-300">
+            <div className="flex items-center justify-between text-slate-500 text-[11px] uppercase font-bold tracking-wider">
+              <span>Hot Orders</span>
+              <Flame className="h-4 w-4 text-rose-600" />
+            </div>
+            <div className="my-2.5">
+              <div className="text-3xl font-bold tracking-tight text-rose-700">
+                {isLoading ? "--" : (kpis?.hotOrders ?? 0)}
+              </div>
+            </div>
+            <div className="text-[11px] text-rose-700 font-medium">
+              High priority / due now
+            </div>
           </div>
         </div>
       </section>
 
       {/* ───────────────────────────────────────────────────────────── */}
-      {/* 3. MAIN WORKSPACE: BENTO LAYOUT (Hopper + Telephony Desk)     */}
+      {/* 3. MY PRIORITY WORK HOPPER + TOP 3 PERFORMERS (PHASE 4 & 7)   */}
       {/* ───────────────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
-        {/* LEFT 7 COLS: Actionable Priority Work Hopper */}
-        <section className="lg:col-span-7 flex flex-col gap-4">
-          <div className="flex items-center justify-between">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Priority Work Hopper (2 cols) */}
+        <section className="lg:col-span-2 bg-white rounded-xl border border-slate-200/90 shadow-xs flex flex-col overflow-hidden">
+          <div className="p-4 border-b border-slate-100 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse" />
-              <h2 className="text-base font-bold text-slate-900">
+              <div className="p-1.5 rounded-lg bg-rose-50 text-rose-600">
+                <Flame className="h-4 w-4" />
+              </div>
+              <h3 className="font-bold text-slate-900 text-sm">
                 My Priority Work Hopper
-              </h2>
+              </h3>
               <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-xs font-semibold">
-                {orders.length || 12} Remaining
+                {priorityHopper.length} remaining
               </span>
             </div>
-
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-800 text-xs font-semibold hover:bg-slate-200 transition"
-              >
-                All Assigned
-              </button>
-              <button
-                type="button"
-                className="px-2.5 py-1 rounded-lg text-blue-600 text-xs font-semibold hover:bg-slate-100 transition"
-              >
-                Urgent First
-              </button>
-            </div>
+            <span className="text-xs text-slate-400 font-medium">
+              Hot &rarr; SLA Risk &rarr; Earliest First
+            </span>
           </div>
 
-          {/* Priority Card 1: Hot Order */}
-          <div className="bg-white rounded-xl p-4 border-l-4 border-l-rose-500 border-y border-r border-slate-200/90 shadow-xs flex flex-col gap-3 transition-all hover:shadow-md">
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex flex-col gap-1 min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 text-[10px] font-bold flex items-center gap-1">
-                    <Flame className="h-3 w-3 text-rose-600" />
-                    Hot Order • Call Due in 4m
-                  </span>
-                  <span className="text-xs font-bold font-mono text-slate-900">
-                    #AP-2026-010219
-                  </span>
-                  <span className="text-[10px] text-slate-400">
-                    Created Today, 10:29 pm
-                  </span>
-                </div>
-
-                <div className="flex items-center gap-2 mt-0.5">
-                  <span className="text-sm font-bold text-slate-900 uppercase">
-                    SOUMITRA HAZRA
-                  </span>
-                  <span className="text-slate-300">•</span>
-                  <span className="text-xs text-slate-500 font-mono">
-                    90643 33164
-                  </span>
-                </div>
-
-                <p className="text-xs text-slate-600">
-                  Service: <span className="text-slate-900 font-medium">Download Old Udyam Certificate</span> • Status: <span className="text-blue-600 font-medium">Form Submitted</span> • Fee: <span className="font-semibold text-slate-900">₹1,180</span>
-                </p>
+          <div className="p-4 space-y-3 flex-1">
+            {priorityHopper.length === 0 ? (
+              <div className="py-12 text-center text-slate-400 text-xs flex flex-col items-center justify-center">
+                <CheckCircle className="h-8 w-8 text-emerald-500 mb-2 opacity-80" />
+                <span className="font-semibold text-slate-700 text-sm">Priority Hopper Clear</span>
+                <span>No high-urgency or pending orders in your active queue.</span>
               </div>
-
-              <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                <span className="text-xs text-rose-600 font-bold flex items-center gap-0.5">
-                  <Timer className="h-3.5 w-3.5" /> 00:04:18 left
-                </span>
-              </div>
-            </div>
-
-            <div className="flex flex-wrap items-center justify-between pt-2 bg-slate-50 -mx-4 -mb-4 px-4 py-2 rounded-b-xl gap-2 border-t border-slate-100">
-              <div className="flex items-center gap-1.5 text-slate-500 text-[11px]">
-                <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
-                <span>Customer verified via OTP • Pending Aadhaar link check</span>
-              </div>
-
-              <div className="flex items-center gap-2 ml-auto">
-                <button
-                  onClick={() => {
-                    setActiveCallTarget({
-                      name: "SOUMITRA HAZRA",
-                      phone: "+91 90643 33164",
-                      orderCode: "AP-2026-010219",
-                    });
-                    alert("Dialing Soumitra Hazra (+91 90643 33164) via VoIP SIP Gateway...");
-                  }}
-                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-xs transition"
-                  type="button"
+            ) : (
+              priorityHopper.slice(0, 5).map((ord) => (
+                <div
+                  key={ord.orderId}
+                  className={cn(
+                    "p-3.5 rounded-xl border transition flex flex-col sm:flex-row sm:items-center justify-between gap-3",
+                    ord.isHot
+                      ? "bg-rose-50/40 border-rose-200 hover:border-rose-300"
+                      : "bg-slate-50/50 border-slate-200 hover:border-slate-300",
+                  )}
                 >
-                  <PhoneCall className="h-3.5 w-3.5" />
-                  <span>Dial VoIP Now</span>
-                </button>
-                <Link
-                  to={"/admin/orders" as any}
-                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-xs transition"
-                >
-                  <ExternalLink className="h-3.5 w-3.5" />
-                  <span>Open Order</span>
-                </Link>
-              </div>
-            </div>
-          </div>
-
-          {/* Priority Card 2: Hot Order */}
-          <div className="bg-white rounded-xl p-4 border-l-4 border-l-rose-500 border-y border-r border-slate-200/90 shadow-xs flex flex-col gap-3 transition-all hover:shadow-md">
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex flex-col gap-1 min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 text-[10px] font-bold flex items-center gap-1">
-                    <Zap className="h-3 w-3 text-rose-600" />
-                    Urgent Filing • High Value
-                  </span>
-                  <span className="text-xs font-bold font-mono text-slate-900">
-                    #AP-2026-010200
-                  </span>
-                  <span className="text-[10px] text-slate-400">
-                    Created Yesterday, 01:47 pm
-                  </span>
-                </div>
-
-                <div className="flex items-center gap-2 mt-0.5">
-                  <span className="text-sm font-bold text-slate-900 uppercase">
-                    Ashish Saxena
-                  </span>
-                  <span className="text-slate-300">•</span>
-                  <span className="text-xs text-slate-500 font-mono">
-                    98280 76786
-                  </span>
-                </div>
-
-                <p className="text-xs text-slate-600">
-                  Service: <span className="text-slate-900 font-medium">Download Old Udyam Certificate</span> • Status: <span className="text-blue-600 font-medium">Form Submitted</span> <span className="px-1.5 py-0.2 bg-slate-100 text-slate-500 text-[10px] rounded font-mono">1d</span>
-                </p>
-              </div>
-
-              <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                <span className="text-xs text-slate-400">Queue: 1d old</span>
-              </div>
-            </div>
-
-            <div className="flex flex-wrap items-center justify-between pt-2 bg-slate-50 -mx-4 -mb-4 px-4 py-2 rounded-b-xl gap-2 border-t border-slate-100">
-              <div className="flex items-center gap-1.5 text-amber-700 text-[11px] font-medium">
-                <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
-                <span>Requires instant portal retrieval before 15:00 cutoff</span>
-              </div>
-
-              <div className="flex items-center gap-2 ml-auto">
-                <button
-                  onClick={() => {
-                    setActiveCallTarget({
-                      name: "Ashish Saxena",
-                      phone: "+91 98280 76786",
-                      orderCode: "AP-2026-010200",
-                    });
-                    alert("Dialing Ashish Saxena via internal SIP...");
-                  }}
-                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs font-semibold transition"
-                  type="button"
-                >
-                  <Phone className="h-3.5 w-3.5" />
-                  <span>Call Due Now</span>
-                </button>
-                <Link
-                  to={"/admin/orders" as any}
-                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-xs transition"
-                >
-                  <ExternalLink className="h-3.5 w-3.5" />
-                  <span>Open Order</span>
-                </Link>
-              </div>
-            </div>
-          </div>
-
-          {/* Priority Card 3: SLA Risk */}
-          <div className="bg-white rounded-xl p-4 border-l-4 border-l-amber-500 border-y border-r border-slate-200/90 shadow-xs flex flex-col gap-3 transition-all hover:shadow-md">
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex flex-col gap-1 min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 text-[10px] font-bold flex items-center gap-1">
-                    <Clock className="h-3 w-3 text-amber-600" />
-                    SLA Approaching Risk • OTP Pending
-                  </span>
-                  <span className="text-xs font-bold font-mono text-slate-900">
-                    #AP-2026-010214
-                  </span>
-                </div>
-
-                <div className="flex items-center gap-2 mt-0.5">
-                  <span className="text-sm font-bold text-slate-900 uppercase">
-                    Rameshwar Logistics
-                  </span>
-                  <span className="text-slate-300">•</span>
-                  <span className="text-xs text-slate-500 font-mono">
-                    98441 55201
-                  </span>
-                </div>
-
-                <p className="text-xs text-slate-600">
-                  Service: <span className="text-slate-900 font-medium">Update Udyam Certificate</span> • Needs mobile OTP confirmation from partner
-                </p>
-              </div>
-
-              <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                <span className="text-xs text-amber-700 font-bold">42m to SLA limit</span>
-              </div>
-            </div>
-
-            <div className="flex flex-wrap items-center justify-between pt-2 bg-slate-50 -mx-4 -mb-4 px-4 py-2 rounded-b-xl gap-2 border-t border-slate-100">
-              <div className="flex items-center gap-1.5 text-slate-500 text-[11px]">
-                <MessageSquare className="h-3.5 w-3.5 text-emerald-600" />
-                <span>Template prepared for WhatsApp API push</span>
-              </div>
-
-              <div className="flex items-center gap-2 ml-auto">
-                <button
-                  onClick={() => alert("WhatsApp OTP Reminder template sent to +91 98441 55201.")}
-                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-xs transition"
-                  type="button"
-                >
-                  <Send className="h-3.5 w-3.5" />
-                  <span>WhatsApp OTP Reminder</span>
-                </button>
-                <Link
-                  to={"/admin/orders" as any}
-                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-xs transition"
-                >
-                  <ExternalLink className="h-3.5 w-3.5" />
-                  <span>Open</span>
-                </Link>
-              </div>
-            </div>
-          </div>
-
-          {/* Quick Pending Queue Accordion Item */}
-          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 flex flex-col gap-2">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 px-1">
-                <span className="w-2 h-2 rounded-full bg-blue-600" />
-                <span className="text-xs font-bold text-slate-900">
-                  7 Additional Orders in Standard Queue
-                </span>
-                <span className="text-slate-400 text-xs hidden sm:inline">
-                  (Normal SLA: &gt; 4 hrs buffer)
-                </span>
-              </div>
-
-              <button
-                onClick={() => setIsQueueExpanded(!isQueueExpanded)}
-                className="flex items-center gap-1 px-3 py-1 rounded-lg bg-white border border-slate-200 text-blue-600 text-xs font-semibold hover:bg-slate-100 shadow-xs transition"
-                type="button"
-              >
-                <span>{isQueueExpanded ? "Collapse" : "Expand Queue"}</span>
-                {isQueueExpanded ? (
-                  <ChevronUp className="h-3.5 w-3.5" />
-                ) : (
-                  <ChevronDown className="h-3.5 w-3.5" />
-                )}
-              </button>
-            </div>
-
-            {isQueueExpanded && (
-              <div className="pt-2 border-t border-slate-200/70 space-y-1.5">
-                {orders.slice(0, 5).map((ord: any) => (
-                  <div
-                    key={ord.id}
-                    className="p-2 rounded-lg bg-white border border-slate-200 flex items-center justify-between text-xs"
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono font-semibold text-blue-600">
-                        #{ord.applicationCode}
+                  <div className="space-y-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span
+                        className={cn(
+                          "px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider",
+                          ord.priorityTone === "red" && "bg-rose-100 text-rose-700",
+                          ord.priorityTone === "amber" && "bg-amber-100 text-amber-700",
+                          ord.priorityTone === "blue" && "bg-blue-100 text-blue-700",
+                          ord.priorityTone === "slate" && "bg-slate-200 text-slate-700",
+                        )}
+                      >
+                        {ord.priorityBadge}
                       </span>
-                      <span className="text-slate-800 font-medium">
+                      <span className="text-xs font-bold text-slate-900">
+                        #{ord.orderNumber}
+                      </span>
+                      <span className="text-slate-300">•</span>
+                      <span className="text-xs font-medium text-slate-700 truncate max-w-[160px]">
                         {ord.customerName}
                       </span>
-                      <span className="text-slate-400 text-[11px] truncate max-w-[150px]">
-                        {ord.serviceName}
+                      <span className="text-xs text-slate-400">
+                        ({ord.customerMobile})
                       </span>
                     </div>
+
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-slate-500">
+                      <span>Service: <strong className="text-slate-700 font-semibold">{ord.serviceName}</strong></span>
+                      <span className="text-slate-300">•</span>
+                      <span>Stage: <span className="text-blue-600 font-medium">{ord.stageName}</span></span>
+                      <span className="text-slate-300">•</span>
+                      <span>Last Action: <span className="text-slate-600">{ord.lastAction}</span></span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 flex-shrink-0">
                     <Link
-                      to={`/admin/orders/${ord.id}` as any}
-                      className="text-blue-600 hover:underline font-semibold text-xs"
+                      to={`/admin/orders/${ord.orderId}` as any}
+                      className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-xs transition inline-flex items-center gap-1.5"
                     >
-                      View
+                      <span>Open Order</span>
+                      <ExternalLink className="h-3 w-3" />
                     </Link>
                   </div>
-                ))}
+                </div>
+              ))
+            )}
+
+            {priorityHopper.length > 5 && (
+              <div className="pt-2 text-center">
+                <button
+                  type="button"
+                  onClick={() => setOrderFilter("pending")}
+                  className="text-xs font-semibold text-blue-600 hover:text-blue-700 transition"
+                >
+                  View all {priorityHopper.length} priority orders &rarr;
+                </button>
               </div>
             )}
           </div>
         </section>
 
-        {/* RIGHT 5 COLS: Telephony Desk & Work Station Utilities */}
-        <aside className="lg:col-span-5 flex flex-col gap-4">
-          {/* Telephony Desk Card */}
-          <div className="bg-white rounded-xl p-4 border border-slate-200/90 shadow-xs flex flex-col gap-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-lg bg-emerald-100 flex items-center justify-center text-emerald-700">
-                  <Headphones className="h-4 w-4" />
-                </div>
-                <span className="text-sm font-bold text-slate-900">
-                  Telephony Desk
-                </span>
+        {/* Today's Top Performers (1 col) */}
+        <section className="bg-white rounded-xl border border-slate-200/90 shadow-xs flex flex-col overflow-hidden">
+          <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 rounded-lg bg-amber-50 text-amber-600">
+                <Trophy className="h-4 w-4" />
               </div>
-              <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold">
-                SIP Ready • WebRTC
-              </span>
+              <h3 className="font-bold text-slate-900 text-sm">
+                Today's Top Performers
+              </h3>
             </div>
-
-            {/* Integrated Quick Call Card */}
-            <div className="bg-slate-50 rounded-lg p-3 border border-slate-100 flex flex-col gap-2">
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-[10px] text-slate-400 font-bold uppercase">
-                  Quick Call Target
-                </span>
-                <span className="text-emerald-700 text-xs font-semibold">
-                  Ready to dial
-                </span>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-sm font-bold text-slate-900">
-                    {activeCallTarget.name}
-                  </div>
-                  <div className="text-xs text-slate-500 font-mono">
-                    {activeCallTarget.phone}
-                  </div>
-                </div>
-
-                <button
-                  onClick={() =>
-                    alert(`Dialing ${activeCallTarget.name} (${activeCallTarget.phone})... Connected.`)
-                  }
-                  className="w-10 h-10 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white flex items-center justify-center shadow-md active:scale-95 transition"
-                  type="button"
-                >
-                  <PhoneCall className="h-5 w-5" />
-                </button>
-              </div>
-
-              {/* Simulated Waveform Audio Visualizer */}
-              <div className="bg-white border border-slate-200 rounded-md p-2 flex items-center justify-between gap-1 h-10">
-                <div className="h-2 w-1 rounded bg-emerald-200" />
-                <div className="h-4 w-1 rounded bg-emerald-500 animate-pulse" />
-                <div className="h-6 w-1 rounded bg-emerald-600" />
-                <div className="h-3 w-1 rounded bg-emerald-500" />
-                <div className="h-7 w-1 rounded bg-emerald-600 animate-pulse" />
-                <div className="h-5 w-1 rounded bg-emerald-500" />
-                <div className="h-2 w-1 rounded bg-emerald-200" />
-                <div className="h-8 w-1 rounded bg-emerald-600" />
-                <div className="h-4 w-1 rounded bg-emerald-500" />
-                <div className="h-6 w-1 rounded bg-emerald-600 animate-pulse" />
-                <div className="h-3 w-1 rounded bg-emerald-500" />
-                <div className="h-1 w-1 rounded bg-emerald-200" />
-                <span className="text-slate-400 text-[10px] pl-2 font-medium truncate">
-                  Auto-recorded • AI transcribed
-                </span>
-              </div>
-            </div>
-
-            {/* Quick Notes Textarea */}
-            <div className="flex flex-col gap-1.5">
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-slate-600 font-medium">
-                  Quick Call / Action Log Note
-                </span>
-                <span className="text-emerald-700 flex items-center gap-1 font-semibold text-[11px]">
-                  <CheckCircle2 className="h-3 w-3" /> Auto-saved
-                </span>
-              </div>
-
-              <textarea
-                value={quickNote}
-                onChange={(e) => setQuickNote(e.target.value)}
-                placeholder="Spoke with client, confirmed father's name as per PAN record. Proceeding with instant update..."
-                className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:bg-white focus:border-blue-500 transition resize-none"
-                rows={3}
-              />
-
-              <div className="flex justify-between items-center mt-1">
-                <div className="flex gap-1">
-                  <button
-                    onClick={() => handleAppendTag("#WrongNumber")}
-                    className="px-2 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-600 text-[11px]"
-                    type="button"
-                  >
-                    #WrongNumber
-                  </button>
-                  <button
-                    onClick={() => handleAppendTag("#AadhaarMismatch")}
-                    className="px-2 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-600 text-[11px]"
-                    type="button"
-                  >
-                    #AadhaarMismatch
-                  </button>
-                  <button
-                    onClick={() => handleAppendTag("#CallLater")}
-                    className="px-2 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-600 text-[11px]"
-                    type="button"
-                  >
-                    #CallLater
-                  </button>
-                </div>
-
-                <button
-                  onClick={handleLogNote}
-                  className="px-3 py-1 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition"
-                  type="button"
-                >
-                  Log Note
-                </button>
-              </div>
-            </div>
+            <span className="text-xs text-slate-400 font-medium">
+              Completed Orders
+            </span>
           </div>
 
-          {/* Quick Canned Responses Dispatch */}
-          <div className="bg-white rounded-xl p-4 border border-slate-200/90 shadow-xs flex flex-col gap-2">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-bold text-slate-900">
-                Canned Response Dispatch
-              </span>
-              <MessageSquare className="h-4 w-4 text-slate-400" />
-            </div>
-            <p className="text-xs text-slate-500">
-              Send pre-approved verification and OTP requests in one tap without opening full ticket.
-            </p>
-
-            <div className="grid grid-cols-2 gap-2 mt-1">
-              <button
-                onClick={() => alert("WhatsApp Template #12 (OTP Verification) pushed to client mobile.")}
-                className="p-2.5 text-left rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-100 transition flex flex-col gap-0.5"
-                type="button"
-              >
-                <span className="text-xs font-bold text-slate-900">
-                  OTP Verification Push
-                </span>
-                <span className="text-[10px] text-slate-500">
-                  Via WhatsApp Template #12
-                </span>
-              </button>
-
-              <button
-                onClick={() => alert("Certificate link and SMS dispatch pushed to customer.")}
-                className="p-2.5 text-left rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-100 transition flex flex-col gap-0.5"
-                type="button"
-              >
-                <span className="text-xs font-bold text-slate-900">
-                  Certificate Dispatched
-                </span>
-                <span className="text-[10px] text-slate-500">
-                  PDF Link + Acknowledgement
-                </span>
-              </button>
+          <div className="p-4 flex-1 flex flex-col justify-center">
+            {topPerformers.length === 0 ? (
+              <div className="py-8 text-center text-slate-400 text-xs">
+                <Trophy className="h-8 w-8 text-slate-300 mx-auto mb-2 opacity-50" />
+                <span>No order completions logged yet today.</span>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {topPerformers.map((p) => (
+                  <div
+                    key={p.rank}
+                    className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-100"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="text-lg flex-shrink-0">
+                        {p.rank === 1 ? "🥇" : p.rank === 2 ? "🥈" : "🥉"}
+                      </div>
+                      <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold text-xs flex-shrink-0">
+                        {p.initial}
+                      </div>
+                      <span className="font-bold text-slate-800 text-sm truncate">
+                        {p.name}
+                      </span>
+                    </div>
+                    <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                      Rank #{p.rank}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="mt-4 pt-3 border-t border-slate-100 text-[11px] text-slate-400 text-center">
+              Rankings updated live on verified completion events
             </div>
           </div>
-        </aside>
+        </section>
       </div>
 
       {/* ───────────────────────────────────────────────────────────── */}
-      {/* 4. MY SHIFT SESSION TIMELINE (Visual & Non-Punitive)          */}
+      {/* 4. MY ORDER TRACKING / WORKLOAD FLOW (PHASE 5)                */}
       {/* ───────────────────────────────────────────────────────────── */}
-      <section className="bg-white rounded-xl p-5 border border-slate-200/90 shadow-xs flex flex-col gap-4">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-          <div className="flex items-center gap-2.5">
-            <Clock className="h-5 w-5 text-blue-600" />
-            <div>
-              <h2 className="text-sm font-bold text-slate-900">
-                My Shift Session Timeline
-              </h2>
-              <p className="text-xs text-slate-500">
-                Continuous telemetry of CRM workspace activity &amp; offline fulfillment periods
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-4 text-xs font-medium">
-            <span className="flex items-center gap-1.5">
-              <span className="w-3 h-3 rounded bg-blue-600 inline-block" />
-              <span>CRM Active Work</span>
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-3 h-3 rounded bg-slate-200 inline-block" />
-              <span>Offline Desk / Calls</span>
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-3 h-3 rounded bg-slate-300 inline-block" />
-              <span>Scheduled Break</span>
-            </span>
+      <section className="bg-white rounded-xl p-5 border border-slate-200/90 shadow-xs space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="font-bold text-slate-900 text-base">
+              My Order Tracking Flow
+            </h3>
+            <p className="text-xs text-slate-500">
+              Real-time pipeline progression of your assigned workload
+            </p>
           </div>
         </div>
 
-        {/* Timeline Graphic Bar */}
-        <div className="flex flex-col gap-2 pt-1">
-          <div className="w-full h-8 rounded-lg overflow-hidden bg-slate-100 flex shadow-inner">
-            {/* 09:12 - 10:48 Active (25%) */}
-            <div
-              className="h-full bg-blue-600 flex items-center justify-center text-white text-[10px] font-bold"
-              style={{ width: "25%" }}
-              title="09:12 - 10:48 (Active CRM)"
-            >
-              09:12 - 10:48
+        {/* Pipeline Stage Blocks */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+          <div className="p-3.5 rounded-xl bg-blue-50/70 border border-blue-100">
+            <div className="text-[11px] font-bold text-blue-700 uppercase tracking-wider">
+              1. Assigned
             </div>
-
-            {/* 10:48 - 10:57 Idle Break (3.5%) */}
-            <div
-              className="h-full bg-slate-200 flex items-center justify-center text-slate-600 text-[10px]"
-              style={{ width: "3.5%" }}
-              title="10:48 - 10:57 (Offline Call)"
-            />
-
-            {/* 10:57 - 11:45 Active (14%) */}
-            <div
-              className="h-full bg-blue-600 flex items-center justify-center text-white text-[10px] font-bold"
-              style={{ width: "14%" }}
-              title="10:57 - 11:45 (Active CRM)"
-            >
-              Active
+            <div className="text-2xl font-bold text-blue-900 mt-1">
+              {flow?.assigned ?? 0}
             </div>
-
-            {/* 11:45 - 11:51 Idle Break (2.5%) */}
-            <div
-              className="h-full bg-slate-200"
-              style={{ width: "2.5%" }}
-              title="11:45 - 11:51 (Desk Break)"
-            />
-
-            {/* 11:51 - 12:30 Active (12%) */}
-            <div
-              className="h-full bg-blue-600 flex items-center justify-center text-white text-[10px] font-bold"
-              style={{ width: "12%" }}
-              title="11:51 - 12:30 (Active CRM)"
-            >
-              Active
-            </div>
-
-            {/* 12:30 - 13:02 Lunch Break (10%) */}
-            <div
-              className="h-full bg-slate-300 flex items-center justify-center text-slate-700 text-[10px] font-semibold"
-              style={{ width: "10%" }}
-              title="12:30 - 13:02 (Lunch Break)"
-            >
-              Lunch
-            </div>
-
-            {/* 13:02 - Present Active (23%) */}
-            <div
-              className="h-full bg-blue-700 flex items-center justify-center text-white text-[10px] font-bold"
-              style={{ width: "23%" }}
-              title="13:02 - Present (Active CRM)"
-            >
-              13:02 - Now
-            </div>
-
-            {/* Remaining Shift (10%) */}
-            <div
-              className="h-full bg-slate-100 flex items-center justify-center text-slate-400 text-[10px]"
-              style={{ width: "10%" }}
-              title="Shift Remaining till 18:00"
-            >
-              Remaining
-            </div>
+            <div className="text-[10px] text-blue-600 mt-0.5">Allocated today</div>
           </div>
 
-          {/* Time markers */}
-          <div className="flex justify-between text-slate-400 text-[11px] px-1 font-medium">
-            <span>09:00 AM (Shift Start)</span>
-            <span>11:00 AM</span>
-            <span>01:00 PM (Lunch)</span>
-            <span>03:00 PM (Current)</span>
-            <span>06:00 PM (Shift End)</span>
+          <div className="p-3.5 rounded-xl bg-indigo-50/70 border border-indigo-100">
+            <div className="text-[11px] font-bold text-indigo-700 uppercase tracking-wider">
+              2. Worked
+            </div>
+            <div className="text-2xl font-bold text-indigo-900 mt-1">
+              {flow?.worked ?? 0}
+            </div>
+            <div className="text-[10px] text-indigo-600 mt-0.5">Unique actioned</div>
+          </div>
+
+          <div className="p-3.5 rounded-xl bg-amber-50/70 border border-amber-100">
+            <div className="text-[11px] font-bold text-amber-700 uppercase tracking-wider">
+              3. Pending
+            </div>
+            <div className="text-2xl font-bold text-amber-900 mt-1">
+              {flow?.pending ?? 0}
+            </div>
+            <div className="text-[10px] text-amber-700 mt-0.5">Active workload</div>
+          </div>
+
+          <div className="p-3.5 rounded-xl bg-sky-50/70 border border-sky-100">
+            <div className="text-[11px] font-bold text-sky-700 uppercase tracking-wider">
+              4. In Progress
+            </div>
+            <div className="text-2xl font-bold text-sky-900 mt-1">
+              {flow?.inProgress ?? 0}
+            </div>
+            <div className="text-[10px] text-sky-600 mt-0.5">Under fulfillment</div>
+          </div>
+
+          <div className="p-3.5 rounded-xl bg-emerald-50/70 border border-emerald-100">
+            <div className="text-[11px] font-bold text-emerald-700 uppercase tracking-wider">
+              5. Completed
+            </div>
+            <div className="text-2xl font-bold text-emerald-900 mt-1">
+              {flow?.completed ?? 0}
+            </div>
+            <div className="text-[10px] text-emerald-700 mt-0.5">Delivered today</div>
+          </div>
+
+          <div className="p-3.5 rounded-xl bg-slate-100 border border-slate-200">
+            <div className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">
+              6. Closed
+            </div>
+            <div className="text-2xl font-bold text-slate-900 mt-1">
+              {flow?.closed ?? 0}
+            </div>
+            <div className="text-[10px] text-slate-500 mt-0.5">Archived today</div>
           </div>
         </div>
 
-        {/* Educational Non-Punitive Notice */}
-        <div className="flex items-center gap-2 p-3 bg-slate-50 border border-slate-200/70 rounded-lg text-slate-600 text-xs">
-          <ShieldCheck className="h-4 w-4 text-emerald-600 flex-shrink-0" />
-          <p>
-            <span className="font-bold text-slate-900">Empowering Telemetry:</span>{" "}
-            Session timeline reflects direct CRM window focus. Idle intervals occur naturally during lengthy customer phone calls, offline paper verification, or scheduled breaks.
-          </p>
+        {/* Secondary Detail Counters */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-2 text-xs">
+          <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-between">
+            <span className="text-slate-600">Customer Delays (Added / Active):</span>
+            <strong className="text-slate-900 font-bold">{flow?.customerDelayAdded ?? 0} / {flow?.currentCustomerDelay ?? 0}</strong>
+          </div>
+          <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-between">
+            <span className="text-slate-600">Technical Delays (Added / Active):</span>
+            <strong className="text-slate-900 font-bold">{flow?.technicalDelayAdded ?? 0} / {flow?.currentTechnicalDelay ?? 0}</strong>
+          </div>
+          <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-between">
+            <span className="text-slate-600">Closed Due to Delays (Cust / Tech):</span>
+            <strong className="text-slate-900 font-bold">{flow?.closedDueToCustomerDelay ?? 0} / {flow?.closedDueToTechnicalDelay ?? 0}</strong>
+          </div>
+          <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-between">
+            <span className="text-slate-600">Hot Orders Handled Today:</span>
+            <strong className="text-rose-600 font-bold">{flow?.hotOrdersHandled ?? 0}</strong>
+          </div>
         </div>
       </section>
 
       {/* ───────────────────────────────────────────────────────────── */}
-      {/* 5. MY WORK ACTIVITY: VERIFIED PRODUCTIVITY LEDGER             */}
+      {/* 5. MY ORDERS TABLE (PHASE 6)                                  */}
       {/* ───────────────────────────────────────────────────────────── */}
-      <section className="bg-white rounded-xl p-5 border border-slate-200/90 shadow-xs flex flex-col gap-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+      <section className="bg-white rounded-xl border border-slate-200/90 shadow-xs overflow-hidden space-y-3 p-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <h2 className="text-base font-bold text-slate-900">
-              My Verified Productivity Ledger
-            </h2>
+            <h3 className="font-bold text-slate-900 text-base">My Orders</h3>
             <p className="text-xs text-slate-500">
-              Immutable chronological stream of your audited client operations today
+              Orders assigned to your queue with live operational status
             </p>
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-400">
-              Showing {timeline.length || 6} most recent
-            </span>
-            <button
-              onClick={() => alert("Printing verified audit slip for operator shift...")}
-              className="px-3 py-1.5 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-200 text-blue-600 text-xs font-semibold transition"
-              type="button"
-            >
-              Export Audit Slip
-            </button>
+            <div className="relative">
+              <Search className="h-3.5 w-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search order #, customer, phone..."
+                className="pl-8 pr-3 py-1.5 text-xs rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 w-56"
+              />
+            </div>
           </div>
         </div>
 
-        {/* Ledger Rows */}
-        <div className="flex flex-col gap-2">
+        {/* Filter Pills */}
+        <div className="flex flex-wrap items-center gap-1.5 border-b border-slate-100 pb-3">
+          {(
+            [
+              { id: "all", label: "All Orders", count: rawOrders.length },
+              { id: "needs_action", label: "Needs Action" },
+              { id: "hot", label: "Hot Orders" },
+              { id: "pending", label: "Pending" },
+              { id: "customer_delay", label: "Customer Delay" },
+              { id: "technical_delay", label: "Technical Delay" },
+              { id: "completed", label: "Completed" },
+              { id: "closed", label: "Closed" },
+            ] as const
+          ).map((tab) => {
+            const countVal = "count" in tab ? tab.count : undefined;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setOrderFilter(tab.id as OrderTableFilter)}
+                className={cn(
+                  "px-3 py-1 rounded-lg text-xs font-semibold transition",
+                  orderFilter === tab.id
+                    ? "bg-slate-900 text-white shadow-xs"
+                    : "bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200/70",
+                )}
+              >
+                {tab.label}
+                {countVal !== undefined && <span className="ml-1 opacity-70 font-normal">({countVal})</span>}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Table View */}
+        <div className="overflow-x-auto rounded-lg border border-slate-100">
+          <table className="w-full text-left text-xs text-slate-600">
+            <thead className="bg-slate-50 text-[11px] uppercase font-bold text-slate-500 tracking-wider border-b border-slate-100">
+              <tr>
+                <th className="py-2.5 px-3">Order #</th>
+                <th className="py-2.5 px-3">Customer</th>
+                <th className="py-2.5 px-3">Service</th>
+                <th className="py-2.5 px-3">Current Stage</th>
+                <th className="py-2.5 px-3">Status</th>
+                <th className="py-2.5 px-3">Last Action</th>
+                <th className="py-2.5 px-3 text-right">Action</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {filteredOrders.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="py-8 text-center text-slate-400">
+                    No orders matching the selected filter.
+                  </td>
+                </tr>
+              ) : (
+                filteredOrders.slice(0, 15).map((ord) => (
+                  <tr key={ord.orderId} className="hover:bg-slate-50/60 transition">
+                    <td className="py-3 px-3 font-bold text-slate-900">
+                      <div className="flex items-center gap-1.5">
+                        {ord.isHot && <Flame className="h-3.5 w-3.5 text-rose-600 flex-shrink-0" />}
+                        <span>#{ord.orderNumber}</span>
+                      </div>
+                    </td>
+                    <td className="py-3 px-3">
+                      <div className="font-semibold text-slate-800">{ord.customerName}</div>
+                      <div className="text-[11px] text-slate-400">{ord.customerMobile}</div>
+                    </td>
+                    <td className="py-3 px-3 font-medium text-slate-700">
+                      {ord.serviceName}
+                    </td>
+                    <td className="py-3 px-3">
+                      <span className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-[10px] font-semibold border border-blue-100">
+                        {ord.stageName}
+                      </span>
+                    </td>
+                    <td className="py-3 px-3">
+                      <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[10px] font-medium">
+                        {ord.currentStatus || "—"}
+                      </span>
+                    </td>
+                    <td className="py-3 px-3 text-slate-500 max-w-[180px] truncate">
+                      {ord.lastActionText}
+                    </td>
+                    <td className="py-3 px-3 text-right">
+                      <Link
+                        to={`/admin/orders/${ord.orderId}` as any}
+                        className="px-2.5 py-1 rounded-md bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 font-semibold shadow-2xs transition inline-flex items-center gap-1"
+                      >
+                        <span>Open</span>
+                        <ExternalLink className="h-3 w-3 text-slate-400" />
+                      </Link>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {filteredOrders.length > 15 && (
+          <div className="text-center pt-2">
+            <Link
+              to={"/admin/orders" as any}
+              className="text-xs font-semibold text-blue-600 hover:text-blue-700 transition"
+            >
+              View all {filteredOrders.length} orders in Orders Workspace &rarr;
+            </Link>
+          </div>
+        )}
+      </section>
+
+      {/* ───────────────────────────────────────────────────────────── */}
+      {/* 6. TODAY'S REAL ACTIVITY TIMELINE (PHASE 8)                   */}
+      {/* ───────────────────────────────────────────────────────────── */}
+      <section className="bg-white rounded-xl p-5 border border-slate-200/90 shadow-xs space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="font-bold text-slate-900 text-base">
+              Today's Real Activity Timeline
+            </h3>
+            <p className="text-xs text-slate-500">
+              Chronological operational CRM events performed by you today
+            </p>
+          </div>
+          <span className="text-xs text-slate-400 font-medium">
+            {timeline.length} actions logged
+          </span>
+        </div>
+
+        <div className="space-y-2.5">
           {timeline.length === 0 ? (
-            <div className="py-8 text-center text-xs text-slate-400">
-              No actions logged yet for this shift.
+            <div className="py-8 text-center text-slate-400 text-xs">
+              <Activity className="h-8 w-8 text-slate-300 mx-auto mb-2 opacity-50" />
+              <span>No CRM operations recorded for today yet.</span>
             </div>
           ) : (
-            timeline.slice(0, 8).map((evt: any, idx: number) => {
-              const isCall = (evt.actionType || "").includes("CONTACT") || (evt.actionType || "").includes("CALL");
-              const isDoc = (evt.actionType || "").includes("DOC");
-              const isTicket = (evt.actionType || "").includes("TICKET");
-              const isComplete = (evt.actionType || "").includes("COMPLETE");
-              const isDelay = (evt.actionType || "").includes("DELAY");
-
-              return (
-                <div
-                  key={evt.id || idx}
-                  className="flex flex-col md:flex-row md:items-center justify-between p-3.5 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-100 transition-colors gap-3"
-                >
-                  <div className="flex items-center gap-3">
-                    <div
-                      className={cn(
-                        "w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 font-bold",
-                        isCall
-                          ? "bg-emerald-100 text-emerald-700"
-                          : isDoc
-                            ? "bg-blue-100 text-blue-700"
-                            : isTicket
-                              ? "bg-purple-100 text-purple-700"
-                              : isComplete
-                                ? "bg-emerald-100 text-emerald-700"
-                                : isDelay
-                                  ? "bg-amber-100 text-amber-700"
-                                  : "bg-slate-200 text-slate-700",
-                      )}
-                    >
-                      {isCall ? (
-                        <PhoneCall className="h-4 w-4" />
-                      ) : isDoc ? (
-                        <FileCheck className="h-4 w-4" />
-                      ) : isTicket ? (
-                        <MessageSquare className="h-4 w-4" />
-                      ) : (
-                        <CheckCircle2 className="h-4 w-4" />
-                      )}
-                    </div>
-
-                    <div className="flex flex-col">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold text-slate-900">
-                          {evt.actionText || "Customer Contacted"}
-                        </span>
-                        {evt.orderCode && (
-                          <span className="px-2 py-0.2 rounded bg-slate-200/80 text-slate-800 text-[10px] font-mono font-bold">
-                            Order #{evt.orderCode}
-                          </span>
-                        )}
-                      </div>
-                      <span className="text-xs text-slate-500 mt-0.5">
-                        {evt.notes || `Successfully performed action for ${evt.customerName || "client"}`}
+            timeline.slice(0, 10).map((item) => (
+              <div
+                key={item.id}
+                className="flex items-start justify-between p-3 rounded-xl bg-slate-50/70 border border-slate-100 text-xs"
+              >
+                <div className="flex items-start gap-3 min-w-0">
+                  <div className="w-2 h-2 rounded-full bg-blue-500 mt-1.5 flex-shrink-0" />
+                  <div className="space-y-0.5 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-bold text-slate-800">
+                        {item.actionLabel}
                       </span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between md:justify-end gap-3 text-right">
-                    <span
-                      className={cn(
-                        "px-2.5 py-0.5 rounded-full text-[10px] font-bold",
-                        isCall
-                          ? "bg-emerald-100 text-emerald-800"
-                          : isComplete
-                            ? "bg-emerald-100 text-emerald-800"
-                            : isDelay
-                              ? "bg-amber-100 text-amber-900"
-                              : "bg-blue-100 text-blue-800",
+                      {item.orderCode && item.orderCode !== "—" && (
+                        <span className="px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 text-[10px] font-bold">
+                          #{item.orderCode}
+                        </span>
                       )}
-                    >
-                      {isCall ? "Call Verified (3m)" : isComplete ? "Delivered" : "Verified"}
-                    </span>
-                    <span className="text-xs font-semibold text-slate-900 font-mono">
-                      {evt.time || "14:24 IST"}
-                    </span>
+                    </div>
+                    {item.notes && (
+                      <div className="text-slate-500 text-[11px] truncate max-w-[400px]">
+                        {item.notes}
+                      </div>
+                    )}
                   </div>
                 </div>
-              );
-            })
+
+                <div className="text-slate-400 text-[11px] font-medium flex-shrink-0 ml-3">
+                  {item.time}
+                </div>
+              </div>
+            ))
           )}
         </div>
+      </section>
 
-        {/* Bottom Summary Banner */}
-        <div className="flex flex-col sm:flex-row items-center justify-between pt-2 border-t border-slate-100 text-slate-500 text-xs">
+      {/* ───────────────────────────────────────────────────────────── */}
+      {/* 7. SESSION & TELEMETRY (PHASE 9 - CLEAN EMPTY STATE)          */}
+      {/* ───────────────────────────────────────────────────────────── */}
+      <section className="p-4 bg-slate-50 rounded-xl border border-slate-200/80 text-xs text-slate-500 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Clock className="h-4 w-4 text-slate-400" />
           <span>
-            All actions cryptographically logged with employee certificate AK-104-ALPHA.
+            Active Session &amp; Heartbeat Telemetry: <strong>Connected</strong> (Metrics will populate automatically as shift progresses)
           </span>
-          <button
-            onClick={() => setDateFilter("30d")}
-            className="text-blue-600 font-semibold hover:underline mt-2 sm:mt-0 flex items-center gap-1"
-            type="button"
-          >
-            <span>View Full Historical Performance (Past 30 Days)</span>
-            <ArrowRight className="h-3.5 w-3.5" />
-          </button>
         </div>
+        <span className="text-[11px] text-slate-400">Phase 3 Telemetry Engine</span>
       </section>
     </div>
   );

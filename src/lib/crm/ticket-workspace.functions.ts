@@ -119,8 +119,7 @@ export const getTicketWorkspace = createServerFn({ method: "POST" })
         .select("id, reply_text, is_internal, created_by, created_at, direction, emailed_at, email_message_id, email_send_log_id")
         .eq("ticket_id", data.ticketId)
         .order("created_at", { ascending: true })
-        .then((r) => r.data ?? [])
-        .catch(() => []),
+        .then((r) => r.data ?? [], () => []),
 
       applicationId
         ? admin
@@ -129,8 +128,7 @@ export const getTicketWorkspace = createServerFn({ method: "POST" })
             .eq("application_id", applicationId)
             .order("created_at", { ascending: false })
             .limit(60)
-            .then((r) => r.data ?? [])
-            .catch(() => [])
+            .then((r) => r.data ?? [], () => [])
         : Promise.resolve([]),
 
       applicationId
@@ -139,8 +137,7 @@ export const getTicketWorkspace = createServerFn({ method: "POST" })
             .select("id, doc_type, file_name, file_path, mime_type, size_bytes, status, uploaded_at, verified_at, verified_by, remarks")
             .eq("application_id", applicationId)
             .order("uploaded_at", { ascending: false })
-            .then((r) => r.data ?? [])
-            .catch(() => [])
+            .then((r) => r.data ?? [], () => [])
         : Promise.resolve([]),
 
       customerId
@@ -151,8 +148,7 @@ export const getTicketWorkspace = createServerFn({ method: "POST" })
             .neq("id", data.ticketId)
             .order("created_at", { ascending: false })
             .limit(20)
-            .then((r) => r.data ?? [])
-            .catch(() => [])
+            .then((r) => r.data ?? [], () => [])
         : Promise.resolve([]),
 
       customerId
@@ -162,8 +158,7 @@ export const getTicketWorkspace = createServerFn({ method: "POST" })
             .eq("customer_id", customerId)
             .order("created_at", { ascending: false })
             .limit(20)
-            .then((r) => r.data ?? [])
-            .catch(() => [])
+            .then((r) => r.data ?? [], () => [])
         : Promise.resolve([]),
 
       customerId
@@ -173,8 +168,7 @@ export const getTicketWorkspace = createServerFn({ method: "POST" })
             .eq("customer_id", customerId)
             .order("created_at", { ascending: false })
             .limit(10)
-            .then((r) => r.data ?? [])
-            .catch(() => [])
+            .then((r) => r.data ?? [], () => [])
         : Promise.resolve([]),
 
       applicationId
@@ -184,8 +178,7 @@ export const getTicketWorkspace = createServerFn({ method: "POST" })
             .eq("application_id", applicationId)
             .order("created_at", { ascending: false })
             .limit(10)
-            .then((r) => r.data ?? [])
-            .catch(() => [])
+            .then((r) => r.data ?? [], () => [])
         : Promise.resolve([]),
 
       applicationId
@@ -195,8 +188,7 @@ export const getTicketWorkspace = createServerFn({ method: "POST" })
             .eq("application_id", applicationId)
             .order("created_at", { ascending: false })
             .limit(10)
-            .then((r) => r.data ?? [])
-            .catch(() => [])
+            .then((r) => r.data ?? [], () => [])
         : Promise.resolve([]),
 
       applicationId
@@ -206,8 +198,7 @@ export const getTicketWorkspace = createServerFn({ method: "POST" })
             .eq("application_id", applicationId)
             .order("created_at", { ascending: false })
             .limit(5)
-            .then((r) => r.data ?? [])
-            .catch(() => [])
+            .then((r) => r.data ?? [], () => [])
         : Promise.resolve([]),
 
       applicationId
@@ -219,8 +210,7 @@ export const getTicketWorkspace = createServerFn({ method: "POST" })
             .order("created_at", { ascending: false })
             .limit(1)
             .maybeSingle()
-            .then((r) => r.data)
-            .catch(() => null)
+            .then((r) => r.data, () => null)
         : Promise.resolve(null),
     ]);
 

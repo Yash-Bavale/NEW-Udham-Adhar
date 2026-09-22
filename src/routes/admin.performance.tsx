@@ -106,6 +106,14 @@ function getCleanActionDetails(raw?: string | null): string {
   return s;
 }
 
+function cleanStageOrStatus(raw?: string | null): string {
+  if (!raw) return "—";
+  return raw
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase())
+    .trim();
+}
+
 /* ─────────────────────────────────────────────────────────────────── */
 /*  MAIN PAGE COMPONENT                                                */
 /* ─────────────────────────────────────────────────────────────────── */

@@ -794,12 +794,7 @@ export const getEmployeePerformanceCommandCenter = createServerFn({
       if (profileMap.has(trimmed)) return trimmed;
       const lower = trimmed.toLowerCase();
       if (nameToUserIdMap.has(lower)) return nameToUserIdMap.get(lower)!;
-      for (const [key, uid] of nameToUserIdMap.entries()) {
-        if (key.length >= 3 && (lower.includes(key) || key.includes(lower))) {
-          return uid;
-        }
-      }
-      return trimmed;
+      return null;
     };
 
     // 2. Fetch Source of Truth Events for the Current Period
@@ -1182,6 +1177,8 @@ export const getEmployeePerformanceCommandCenter = createServerFn({
         closed: s.closedOrders.size,
         customerDelays: s.customerDelays,
         technicalDelays: s.technicalDelays,
+        closedDueToCustomerDelay: s.closedDueToCustomerDelayOrders.size,
+        closedDueToTechnicalDelay: s.closedDueToTechnicalDelayOrders.size,
         hotOrders: s.hotOrders.size,
         slaPercent: 100, // Preserved SLA rate
         lastActionText: s.lastActionText,
@@ -1633,11 +1630,19 @@ export const getMyPerformanceDashboard = createServerFn({ method: "POST" })
       data.customEnd,
     );
 
-    const { data: profile } = await admin
-      .from("profiles")
-      .select("id, full_name, display_name, email")
-      .eq("id", employeeId)
-      .maybeSingle();
+    const [{ data: profile }, { data: userRole }] = await Promise.all([
+      admin
+        .from("profiles")
+        .select("id, full_name, display_name, email")
+        .eq("id", employeeId)
+        .maybeSingle(),
+      admin
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", employeeId)
+        .limit(1)
+        .maybeSingle(),
+    ]);
 
     const empName =
       profile?.full_name ||
@@ -1646,8 +1651,8 @@ export const getMyPerformanceDashboard = createServerFn({ method: "POST" })
       "Operator";
 
     const profileMap = new Map<string, any>([[employeeId, profile]]);
-    const userRoleMap = new Map<string, string>([[employeeId, "operations"]]);
-    const resolveStaffUserId = (raw?: string | null) => (raw?.includes(employeeId) || raw?.toLowerCase().includes(empName.toLowerCase()) ? employeeId : raw || null);
+    const userRoleMap = new Map<string, string>([[employeeId, userRole?.role || "operations"]]);
+    const resolveStaffUserId = (raw?: string | null) => (raw?.includes(employeeId) || raw?.toLowerCase().includes(empName.toLowerCase()) ? employeeId : null);
 
     // Fetch Source of Truth Events for this employee in date range
     const [
@@ -1748,25 +1753,135 @@ export const getMyPerformanceDashboard = createServerFn({ method: "POST" })
     const inProgressCount = Math.max(0, assignedCount - completedCount - closedCount);
     const pendingCount = Math.max(0, assignedCount - actionedCount);
 
-    const hotOrdersQueue = allAssigned
-      .filter((o: any) => (o.fulfillment_status === "order_reopened" || o.order_status === "REOPENED") && !["completed", "order_closed", "cancelled"].includes(o.fulfillment_status))
+    // Top 3 Performers today across the CRM (ranked strictly by successfully completed orders today in IST)
+    const { data: allTodayCompletions } = await admin
+      .from("application_events")
+      .select("id, application_id, created_by, staff_name, created_at, new_value, event_type")
+      .gte("created_at", dateRange.current.start)
+      .lte("created_at", dateRange.current.end);
+
+    const completionCountsByEmp = new Map<string, Set<string>>();
+    (allTodayCompletions ?? []).forEach((ev: any) => {
+      const et = String(ev.event_type ?? "").toLowerCase();
+      const nv = String(ev.new_value ?? "").toUpperCase();
+      const isComp = nv === "COMPLETED" || et === "order_completed" || et.includes("completed");
+      if (isComp && ev.application_id) {
+        const creatorId = ev.created_by;
+        if (creatorId && creatorId !== "00000000-0000-0000-0000-000000000000") {
+          if (!completionCountsByEmp.has(creatorId)) {
+            completionCountsByEmp.set(creatorId, new Set());
+          }
+          completionCountsByEmp.get(creatorId)!.add(ev.application_id);
+        }
+      }
+    });
+
+    const topPerformerEntries = Array.from(completionCountsByEmp.entries())
+      .filter(([_, set]) => set.size > 0)
+      .sort((a, b) => b[1].size - a[1].size)
+      .slice(0, 3);
+
+    const topPerformerUserIds = topPerformerEntries.map(([id]) => id);
+    const { data: topPerformerProfiles } = topPerformerUserIds.length > 0
+      ? await admin.from("profiles").select("id, full_name, display_name, avatar_url").in("id", topPerformerUserIds)
+      : { data: [] };
+
+    const topPerformerProfileMap = new Map((topPerformerProfiles ?? []).map((p: any) => [p.id, p]));
+    const topPerformers = topPerformerEntries.map(([uid], idx) => {
+      const p = topPerformerProfileMap.get(uid);
+      const name = p?.full_name || p?.display_name || "Operator";
+      return {
+        rank: (idx + 1) as 1 | 2 | 3,
+        name,
+        avatarUrl: p?.avatar_url || null,
+        initial: name.charAt(0).toUpperCase(),
+      };
+    });
+
+    // Active delay workloads for current employee
+    const currentCustomerDelayCount = allAssigned.filter((a: any) =>
+      a.fulfillment_status === "customer_delay" || a.order_status === "CUSTOMER_HOLD"
+    ).length;
+
+    const currentTechnicalDelayCount = allAssigned.filter((a: any) =>
+      a.fulfillment_status === "technical_delay" ||
+      a.order_status === "TECHNICAL_HOLD_EXTERNAL" ||
+      a.order_status === "TECHNICAL_HOLD_INTERNAL" ||
+      a.order_status === "OUR_SIDE_DELAY"
+    ).length;
+
+    // Closed due to delays
+    let closedDueToCustomerDelay = 0;
+    let closedDueToTechnicalDelay = 0;
+    allAssigned.forEach((a: any) => {
+      if (a.order_status === "CLOSED" || a.fulfillment_status === "order_closed") {
+        if (a.closure_stage === "customer_hold" || String(a.closure_reason_code ?? "").includes("customer")) {
+          closedDueToCustomerDelay++;
+        } else if (a.closure_stage === "ticket_hold" || String(a.closure_reason_code ?? "").includes("tech")) {
+          closedDueToTechnicalDelay++;
+        }
+      }
+    });
+
+    // Priority Hopper Orders:
+    // 1. Hot orders (active callback/reminder or reopened)
+    // 2. Earliest relevant non-terminal pending orders
+    const nonTerminalOrders = allAssigned.filter((o: any) =>
+      !["completed", "order_completed", "consultation_completed", "order_closed", "closed", "cancelled", "application_rejected", "certificate_rejected"].includes(o.fulfillment_status) &&
+      !["COMPLETED", "CLOSED", "CANCELLED"].includes(o.order_status)
+    );
+
+    const priorityHopperList = nonTerminalOrders
       .map((ord: any) => {
         const orderLogs = canonicalEvents.filter((l) => l.orderId === ord.id);
         const lastAction = orderLogs[0] || null;
         const cust = customerMap.get(ord.customer_id);
         const serviceName = serviceMap.get(ord.service_id) || "Service";
-        const { actionLabel: lastActionLabel } = lastAction ? formatLogAction({ action_type: lastAction.actionType, notes: lastAction.notes }) : { actionLabel: "Awaiting first action" };
+        const isHot = ord.fulfillment_status === "order_reopened" || ord.order_status === "REOPENED" || hotOrdersSet.has(ord.id);
+        const { actionLabel: lastActionLabel } = lastAction
+          ? formatLogAction({ action_type: lastAction.actionType, notes: lastAction.notes })
+          : { actionLabel: "Awaiting first action" };
+
+        let priorityRank = 3;
+        let priorityBadge = "Normal Pending";
+        let priorityTone: "red" | "amber" | "blue" | "slate" = "slate";
+
+        if (isHot) {
+          priorityRank = 1;
+          priorityBadge = "Hot Order • Call Due";
+          priorityTone = "red";
+        } else if (ord.fulfillment_status === "form_submitted") {
+          priorityRank = 2;
+          priorityBadge = "Form Submitted • Review Due";
+          priorityTone = "amber";
+        } else if (ord.fulfillment_status === "payment_done" || ord.fulfillment_status === "lead_received") {
+          priorityRank = 2;
+          priorityBadge = "New Order • Action Required";
+          priorityTone = "blue";
+        }
+
         return {
           orderId: ord.id,
           orderNumber: ord.application_code || ord.id.slice(0, 8),
           customerName: cust?.name || "Customer",
+          customerMobile: cust?.primary_mobile || "—",
           serviceName,
-          ageHours: 2,
+          createdAt: ord.created_at,
+          assignedAt: ord.assigned_at || ord.created_at,
+          currentStage: ord.fulfillment_status,
+          currentStatus: ord.order_status || ord.application_status,
+          stageName: cleanStageOrStatus(ord.fulfillment_status),
           lastAction: lastActionLabel,
-          nextAction: "Contact Customer / Review Form",
-          status: ord.order_status || ord.application_status,
-          stage: ord.fulfillment_status,
+          isHot,
+          priorityRank,
+          priorityBadge,
+          priorityTone,
+          amount: ord.total_amount || ord.fee_amount || 0,
         };
+      })
+      .sort((a, b) => {
+        if (a.priorityRank !== b.priorityRank) return a.priorityRank - b.priorityRank;
+        return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(); // Earliest first
       });
 
     const myOrdersList = allAssigned.map((ord: any) => {
@@ -1774,38 +1889,51 @@ export const getMyPerformanceDashboard = createServerFn({ method: "POST" })
       const lastAction = orderLogs[0] || null;
       const cust = customerMap.get(ord.customer_id);
       const serviceName = serviceMap.get(ord.service_id) || "Service";
-      const { actionLabel: lastActionText } = lastAction ? formatLogAction({ action_type: lastAction.actionType, notes: lastAction.notes }) : { actionLabel: "Pending First Action" };
+      const { actionLabel: lastActionText } = lastAction
+        ? formatLogAction({ action_type: lastAction.actionType, notes: lastAction.notes })
+        : { actionLabel: "Pending First Action" };
+      const isHot = ord.fulfillment_status === "order_reopened" || ord.order_status === "REOPENED" || hotOrdersSet.has(ord.id);
+
       return {
         orderId: ord.id,
         orderNumber: ord.application_code || ord.id.slice(0, 8),
         customerName: cust?.name || "Customer",
         customerMobile: cust?.primary_mobile || "—",
         serviceName,
+        createdAt: ord.created_at,
         assignedAt: ord.assigned_at || ord.created_at,
         lastActionAt: lastAction?.createdAt || null,
         lastActionText,
         currentStage: ord.fulfillment_status,
         currentStatus: ord.order_status || ord.application_status,
-        isHot: ord.fulfillment_status === "order_reopened" || ord.order_status === "REOPENED",
+        stageName: cleanStageOrStatus(ord.fulfillment_status),
+        isHot,
         slaStatus: "COMPLIANT",
+        isCustomerDelay: ord.fulfillment_status === "customer_delay" || ord.order_status === "CUSTOMER_HOLD",
+        isTechnicalDelay: ord.fulfillment_status === "technical_delay" || ord.order_status?.includes("TECHNICAL"),
+        isCompleted: ord.order_status === "COMPLETED" || ["completed", "order_completed", "consultation_completed"].includes(ord.fulfillment_status),
+        isClosed: ord.order_status === "CLOSED" || ["order_closed", "closed", "cancelled"].includes(ord.fulfillment_status),
       };
     });
 
     const activityTimeline = canonicalEvents.slice(0, 50).map((ev) => {
       const { actionLabel, details } = formatLogAction({ action_type: ev.actionType, notes: ev.notes });
       const code = ev.orderId ? (orderCodeMap.get(ev.orderId) || ev.orderId.slice(0, 8)) : "—";
+      const cust = ev.orderId && appsListMap.get(ev.orderId)?.customer_id ? customerMap.get(appsListMap.get(ev.orderId)!.customer_id) : null;
+      const serviceName = ev.orderId && appsListMap.get(ev.orderId)?.service_id ? serviceMap.get(appsListMap.get(ev.orderId)!.service_id) : "—";
+
       return {
         id: ev.id,
         time: formatTimeIST(ev.createdAt),
         createdAt: ev.createdAt,
         orderId: ev.orderId,
-        leadId: ev.leadId,
         orderCode: code,
+        customerName: cust?.name || "Customer",
+        serviceName,
         actionType: ev.actionType,
         actionLabel,
         notes: details || ev.notes,
         slaStatus: "compliant",
-        isSlaBreached: false,
       };
     });
 
@@ -1837,39 +1965,42 @@ export const getMyPerformanceDashboard = createServerFn({ method: "POST" })
         id: employeeId,
         name: empName,
         email: profile?.email,
+        role: userRole?.role || "operations",
         presenceStatus,
       },
       kpiCards: {
         assigned: assignedCount,
-        worked: actionedCount,
-        actions: canonicalEvents.filter((e) => !e.isSystemAction).length,
-        completed: completedCount,
-        closed: closedCount,
-        customerDelays,
-        technicalDelays,
-        hotOrders: hotOrdersSet.size,
-        slaCompliance: 100,
-      },
-      workloadFlow: {
-        assigned: assignedCount,
-        actioned: actionedCount,
-        inProgress: inProgressCount,
+        worked: workedOrdersSet.size,
         completed: completedCount,
         closed: closedCount,
         pending: pendingCount,
+        customerDelays,
+        currentCustomerDelayCount,
+        technicalDelays,
+        currentTechnicalDelayCount,
+        closedDueToCustomerDelay,
+        closedDueToTechnicalDelay,
+        hotOrders: hotOrdersSet.size,
       },
-      slaScorecard: {
-        compliancePercent: 100,
-        ordersAtRisk: 0,
-        ordersBreached: 0,
-        avgFirstResponseMins: 12,
+      workloadFlow: {
+        assigned: assignedCount,
+        worked: workedOrdersSet.size,
+        actioned: actionedCount,
+        inProgress: inProgressCount,
+        pending: pendingCount,
+        completed: completedCount,
+        closed: closedCount,
+        customerDelayAdded: customerDelays,
+        currentCustomerDelay: currentCustomerDelayCount,
+        technicalDelayAdded: technicalDelays,
+        currentTechnicalDelay: currentTechnicalDelayCount,
+        closedDueToCustomerDelay,
+        closedDueToTechnicalDelay,
+        hotOrdersHandled: hotOrdersSet.size,
+        slaRisk: 0,
       },
-      priorityWork: {
-        hotOrders: hotOrdersQueue.length,
-        slaAtRisk: 0,
-        pendingAction: pendingCount,
-      },
-      hotOrders: hotOrdersQueue,
+      priorityHopper: priorityHopperList,
+      topPerformers,
       orders: myOrdersList,
       timeline: activityTimeline,
       recentActions,
@@ -2100,19 +2231,20 @@ export const getEmployeeMetricDrilldown = createServerFn({ method: "POST" })
           .from("applications")
           .select("id, application_code, customer_id, service_id, order_status, fulfillment_status")
           .in("id", appIds)
-      : { data: [] };
+      : { data: [] as any[] };
 
-    const custIds = Array.from(new Set((apps ?? []).map((a: any) => a.customer_id).filter(Boolean)));
-    const svcIds = Array.from(new Set((apps ?? []).map((a: any) => a.service_id).filter(Boolean)));
+    const rawApps = (apps ?? []) as any[];
+    const custIds = Array.from(new Set(rawApps.map((a) => a.customer_id).filter(Boolean))) as string[];
+    const svcIds = Array.from(new Set(rawApps.map((a) => a.service_id).filter(Boolean))) as string[];
 
     const [{ data: customers }, { data: services }] = await Promise.all([
-      custIds.length ? admin.from("customers").select("id, name, primary_mobile").in("id", custIds) : { data: [] },
-      svcIds.length ? admin.from("services").select("id, service_name").in("id", svcIds) : { data: [] },
+      custIds.length ? admin.from("customers").select("id, name, primary_mobile").in("id", custIds) : { data: [] as any[] },
+      svcIds.length ? admin.from("services").select("id, service_name").in("id", svcIds) : { data: [] as any[] },
     ]);
 
-    const appMap = new Map((apps ?? []).map((a: any) => [a.id, a]));
-    const customerMap = new Map((customers ?? []).map((c: any) => [c.id, c]));
-    const serviceMap = new Map((services ?? []).map((s: any) => [s.id, s.service_name]));
+    const appMap = new Map(rawApps.map((a) => [a.id, a]));
+    const customerMap = new Map(((customers ?? []) as any[]).map((c) => [c.id, c]));
+    const serviceMap = new Map(((services ?? []) as any[]).map((s) => [s.id, s.service_name]));
 
     return filteredEvents.map((ev) => {
       const app = ev.orderId ? appMap.get(ev.orderId) : null;
