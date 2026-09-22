@@ -86,13 +86,31 @@ function MyPerformanceDashboardPage() {
     refetchInterval: 20_000,
   });
 
-  // Realtime subscription
+  // Realtime subscription on production events
   useEffect(() => {
     const channel = supabase
       .channel("my_perf_action_sync_v2")
       .on(
         "postgres_changes",
-        { event: "INSERT", schema: "public", table: "order_action_logs" },
+        { event: "*", schema: "public", table: "application_events" },
+        () => {
+          queryClient.invalidateQueries({
+            queryKey: ["employee.my-performance"],
+          });
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "order_schedulers" },
+        () => {
+          queryClient.invalidateQueries({
+            queryKey: ["employee.my-performance"],
+          });
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "applications" },
         () => {
           queryClient.invalidateQueries({
             queryKey: ["employee.my-performance"],

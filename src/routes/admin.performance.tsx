@@ -6,6 +6,7 @@ import {
   getEmployeePerformanceCommandCenter,
   getEmployeeDetailPerformance,
   getLiveActivityFeed,
+  getEmployeeMetricDrilldown,
   type DatePeriodFilter,
 } from "@/lib/crm/employee-performance.functions";
 import {
@@ -115,6 +116,12 @@ function EmployeeActivityCommandCenterPage() {
   const [customEnd, setCustomEnd] = useState<string>("");
   const [selectedPod, setSelectedPod] = useState<string>("All Pods & Pod Alpha");
   const [inspectEmployeeId, setInspectEmployeeId] = useState<string | null>(null);
+  const [drilldownMetric, setDrilldownMetric] = useState<{
+    employeeId?: string | null;
+    employeeName?: string;
+    metric: "assigned" | "worked" | "actions" | "customerDelays" | "technicalDelays" | "hotOrders" | "completed" | "closed";
+    title: string;
+  } | null>(null);
   const [tableSearch, setTableSearch] = useState<string>("");
   const [auditFilter, setAuditFilter] = useState<string>("all");
   const [isRotating, setIsRotating] = useState(false);
@@ -123,6 +130,7 @@ function EmployeeActivityCommandCenterPage() {
   const queryClient = useQueryClient();
   const getCommandCenterFn = useServerFn(getEmployeePerformanceCommandCenter);
   const getLiveFeedFn = useServerFn(getLiveActivityFeed);
+  const getDrilldownFn = useServerFn(getEmployeeMetricDrilldown);
 
   const { data, isLoading, refetch, isFetching } = useQuery({
     queryKey: [
@@ -153,28 +161,60 @@ function EmployeeActivityCommandCenterPage() {
     refetchInterval: 10_000,
   });
 
-  // Realtime subscription
+  const { data: drilldownList, isLoading: isDrilldownLoading } = useQuery({
+    queryKey: [
+      "admin.performance.drilldown",
+      drilldownMetric?.employeeId,
+      drilldownMetric?.metric,
+      dateFilter,
+      customStart,
+      customEnd,
+    ],
+    queryFn: () => {
+      if (!drilldownMetric) return [];
+      return getDrilldownFn({
+        data: {
+          employeeId: drilldownMetric.employeeId,
+          metric: drilldownMetric.metric,
+          dateFilter,
+          customStart: customStart || undefined,
+          customEnd: customEnd || undefined,
+        },
+      });
+    },
+    enabled: !!drilldownMetric,
+  });
+
+  // Realtime subscription on existing production tables
   useEffect(() => {
     const channel = supabase
-      .channel("perf_command_center_feed_v2")
+      .channel("perf_command_center_audit_events")
       .on(
         "postgres_changes",
-        { event: "INSERT", schema: "public", table: "order_action_logs" },
+        { event: "*", schema: "public", table: "application_events" },
         () => {
-          queryClient.invalidateQueries({
-            queryKey: ["admin.performance.command-center"],
-          });
-          queryClient.invalidateQueries({
-            queryKey: ["admin.performance.live-feed"],
-          });
+          queryClient.invalidateQueries({ queryKey: ["admin.performance.command-center"] });
+          queryClient.invalidateQueries({ queryKey: ["admin.performance.live-feed"] });
           if (inspectEmployeeId) {
             queryClient.invalidateQueries({
-              queryKey: [
-                "admin.performance.employee-detail",
-                inspectEmployeeId,
-              ],
+              queryKey: ["admin.performance.employee-detail", inspectEmployeeId],
             });
           }
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "order_schedulers" },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ["admin.performance.command-center"] });
+          queryClient.invalidateQueries({ queryKey: ["admin.performance.live-feed"] });
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "applications" },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ["admin.performance.command-center"] });
         },
       )
       .subscribe();
@@ -875,32 +915,98 @@ function EmployeeActivityCommandCenterPage() {
                       </td>
 
                       {/* Assigned */}
-                      <td className="py-2.5 px-2 text-center font-medium text-slate-800">
+                      <td
+                        onClick={() =>
+                          setDrilldownMetric({
+                            employeeId: emp.employeeId,
+                            employeeName: emp.employeeName,
+                            metric: "assigned",
+                            title: `Assigned Orders — ${emp.employeeName}`,
+                          })
+                        }
+                        className="py-2.5 px-2 text-center font-medium text-slate-800 cursor-pointer hover:bg-slate-100/80 transition rounded"
+                        title="Click to inspect underlying assigned orders"
+                      >
                         {Math.max(emp.assigned, emp.worked)}
                       </td>
 
                       {/* Worked */}
-                      <td className="py-2.5 px-2 text-center font-bold text-blue-600">
+                      <td
+                        onClick={() =>
+                          setDrilldownMetric({
+                            employeeId: emp.employeeId,
+                            employeeName: emp.employeeName,
+                            metric: "worked",
+                            title: `Unique Orders Worked — ${emp.employeeName}`,
+                          })
+                        }
+                        className="py-2.5 px-2 text-center font-bold text-blue-600 cursor-pointer hover:bg-blue-50/80 transition rounded"
+                        title="Click to inspect unique orders worked"
+                      >
                         {emp.worked}
                       </td>
 
                       {/* Actions */}
-                      <td className="py-2.5 px-2 text-center font-medium text-slate-600">
+                      <td
+                        onClick={() =>
+                          setDrilldownMetric({
+                            employeeId: emp.employeeId,
+                            employeeName: emp.employeeName,
+                            metric: "actions",
+                            title: `Operational Actions — ${emp.employeeName}`,
+                          })
+                        }
+                        className="py-2.5 px-2 text-center font-medium text-slate-600 cursor-pointer hover:bg-slate-100/80 transition rounded"
+                        title="Click to inspect all operational actions"
+                      >
                         {emp.actions}
                       </td>
 
                       {/* Completed */}
-                      <td className="py-2.5 px-2 text-center font-bold text-emerald-700 bg-emerald-50/50">
+                      <td
+                        onClick={() =>
+                          setDrilldownMetric({
+                            employeeId: emp.employeeId,
+                            employeeName: emp.employeeName,
+                            metric: "completed",
+                            title: `Completed Orders — ${emp.employeeName}`,
+                          })
+                        }
+                        className="py-2.5 px-2 text-center font-bold text-emerald-700 bg-emerald-50/50 cursor-pointer hover:bg-emerald-100/70 transition rounded"
+                        title="Click to inspect completed orders"
+                      >
                         {emp.completed}
                       </td>
 
                       {/* Closed */}
-                      <td className="py-2.5 px-2 text-center text-slate-600">
+                      <td
+                        onClick={() =>
+                          setDrilldownMetric({
+                            employeeId: emp.employeeId,
+                            employeeName: emp.employeeName,
+                            metric: "closed",
+                            title: `Closed Orders — ${emp.employeeName}`,
+                          })
+                        }
+                        className="py-2.5 px-2 text-center text-slate-600 cursor-pointer hover:bg-slate-100/80 transition rounded"
+                        title="Click to inspect closed orders"
+                      >
                         {emp.closed}
                       </td>
 
                       {/* C.Delay */}
-                      <td className="py-2.5 px-2 text-center">
+                      <td
+                        onClick={() =>
+                          setDrilldownMetric({
+                            employeeId: emp.employeeId,
+                            employeeName: emp.employeeName,
+                            metric: "customerDelays",
+                            title: `Customer Delay Actions — ${emp.employeeName}`,
+                          })
+                        }
+                        className="py-2.5 px-2 text-center cursor-pointer hover:bg-amber-50/80 transition rounded"
+                        title="Click to inspect customer delay actions"
+                      >
                         {emp.customerDelays > 0 ? (
                           <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-900">
                             {emp.customerDelays}
@@ -911,7 +1017,18 @@ function EmployeeActivityCommandCenterPage() {
                       </td>
 
                       {/* T.Delay */}
-                      <td className="py-2.5 px-2 text-center">
+                      <td
+                        onClick={() =>
+                          setDrilldownMetric({
+                            employeeId: emp.employeeId,
+                            employeeName: emp.employeeName,
+                            metric: "technicalDelays",
+                            title: `Technical Delay Actions — ${emp.employeeName}`,
+                          })
+                        }
+                        className="py-2.5 px-2 text-center cursor-pointer hover:bg-rose-50/80 transition rounded"
+                        title="Click to inspect technical delay actions"
+                      >
                         {emp.technicalDelays > 0 ? (
                           <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800">
                             {emp.technicalDelays}
@@ -922,7 +1039,18 @@ function EmployeeActivityCommandCenterPage() {
                       </td>
 
                       {/* Hot */}
-                      <td className="py-2.5 px-2 text-center">
+                      <td
+                        onClick={() =>
+                          setDrilldownMetric({
+                            employeeId: emp.employeeId,
+                            employeeName: emp.employeeName,
+                            metric: "hotOrders",
+                            title: `Hot Orders / Reminders — ${emp.employeeName}`,
+                          })
+                        }
+                        className="py-2.5 px-2 text-center cursor-pointer hover:bg-rose-50/80 transition rounded"
+                        title="Click to inspect hot orders & timers"
+                      >
                         {emp.hotOrders > 0 ? (
                           <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-rose-50 text-rose-700 font-bold text-[10px]">
                             <Flame className="h-3 w-3 text-rose-600" />
@@ -1264,6 +1392,122 @@ function EmployeeActivityCommandCenterPage() {
           </div>
         </div>
       </div>
+
+      {/* ───────────────────────────────────────────────────────────── */}
+      {/* SECTION 5: KPI DRILLDOWN INSPECTION MODAL                      */}
+      {/* ───────────────────────────────────────────────────────────── */}
+      {drilldownMetric && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-4xl w-full max-h-[85vh] flex flex-col overflow-hidden">
+            {/* Modal Header */}
+            <div className="p-4 px-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center font-bold">
+                  <Eye className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">
+                    {drilldownMetric.title}
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Underlying audit trail events verified directly from production orders
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setDrilldownMetric(null)}
+                className="p-2 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition"
+                type="button"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Modal Body: Event / Order Table */}
+            <div className="p-6 overflow-y-auto flex-1">
+              {isDrilldownLoading ? (
+                <div className="py-16 text-center text-slate-400 flex flex-col items-center gap-2">
+                  <RefreshCw className="h-6 w-6 animate-spin text-blue-600" />
+                  <span className="text-xs">Querying verified production events...</span>
+                </div>
+              ) : !drilldownList || drilldownList.length === 0 ? (
+                <div className="py-16 text-center text-slate-400 text-sm">
+                  No underlying events found for this filter.
+                </div>
+              ) : (
+                <div className="w-full overflow-x-auto">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-slate-50 text-slate-500 font-semibold uppercase text-[10px] tracking-wider border-b border-slate-200">
+                        <th className="py-2.5 px-3">Order #</th>
+                        <th className="py-2.5 px-3">Customer</th>
+                        <th className="py-2.5 px-3">Service</th>
+                        <th className="py-2.5 px-3">Action</th>
+                        <th className="py-2.5 px-3">Time (IST)</th>
+                        <th className="py-2.5 px-3">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {drilldownList.map((item: any, idx: number) => (
+                        <tr key={item.id || idx} className="hover:bg-slate-50 transition">
+                          <td className="py-3 px-3 font-semibold text-blue-600">
+                            {item.orderId ? (
+                              <Link
+                                to={`/admin/orders/${item.orderId}` as any}
+                                className="hover:underline"
+                                target="_blank"
+                              >
+                                #{item.orderCode}
+                              </Link>
+                            ) : (
+                              `#${item.orderCode}`
+                            )}
+                          </td>
+                          <td className="py-3 px-3">
+                            <span className="font-medium text-slate-800 block">{item.customerName}</span>
+                            <span className="text-slate-400 text-[10px]">{item.customerMobile}</span>
+                          </td>
+                          <td className="py-3 px-3 text-slate-600 truncate max-w-[150px]">
+                            {item.serviceName}
+                          </td>
+                          <td className="py-3 px-3">
+                            <span className="font-semibold text-slate-800 block">{item.action}</span>
+                            {item.notes && (
+                              <span className="text-slate-400 text-[10px] truncate max-w-[200px] block">
+                                {item.notes}
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-3 px-3 whitespace-nowrap text-slate-600">
+                            {item.timestamp}
+                          </td>
+                          <td className="py-3 px-3">
+                            <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[10px] font-semibold">
+                              {cleanStageOrStatus(item.currentStage || item.currentStatus)}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 px-6 border-t border-slate-100 bg-slate-50 flex items-center justify-between text-xs text-slate-500">
+              <span>{drilldownList?.length || 0} production records returned</span>
+              <button
+                onClick={() => setDrilldownMetric(null)}
+                className="px-4 py-2 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition"
+                type="button"
+              >
+                Close Inspection
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
