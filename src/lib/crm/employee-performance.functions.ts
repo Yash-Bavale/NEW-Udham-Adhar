@@ -778,7 +778,7 @@ export const getEmployeePerformanceCommandCenter = createServerFn({
     let appsQuery = adminAny
       .from("applications")
       .select(
-        "id, application_code, customer_id, lead_id, assigned_to, assigned_at, order_status, fulfillment_status, application_status, is_hot, service_id, created_at, updated_at, form_submitted_at, certificate_uploaded_at, workflow_status, closure_stage, closure_reason_code, refund_approved_at, refund_processed_at",
+        "id, application_code, customer_id, lead_id, assigned_to, assigned_at, order_status, fulfillment_status, application_status, service_id, created_at, updated_at, form_submitted_at, certificate_uploaded_at, workflow_status, closure_stage, closure_reason_code, refund_approved_at, refund_processed_at",
       )
       .eq("is_deleted", false);
 
@@ -810,7 +810,7 @@ export const getEmployeePerformanceCommandCenter = createServerFn({
       const { data: extraApps } = await adminAny
         .from("applications")
         .select(
-          "id, application_code, customer_id, lead_id, assigned_to, assigned_at, order_status, fulfillment_status, application_status, is_hot, service_id, created_at, updated_at, form_submitted_at, certificate_uploaded_at, workflow_status, closure_stage, closure_reason_code, refund_approved_at, refund_processed_at",
+          "id, application_code, customer_id, lead_id, assigned_to, assigned_at, order_status, fulfillment_status, application_status, service_id, created_at, updated_at, form_submitted_at, certificate_uploaded_at, workflow_status, closure_stage, closure_reason_code, refund_approved_at, refund_processed_at",
         )
         .in("id", activeAppIds)
         .eq("is_deleted", false);
@@ -1036,7 +1036,7 @@ export const getEmployeePerformanceCommandCenter = createServerFn({
         ["completed", "closed", "cancelled"].includes(String(o.application_status ?? "").toLowerCase()) ||
         ["completed", "closed", "cancelled"].includes(String(o.order_status ?? "").toLowerCase());
 
-      const is_hot = Boolean(o.is_hot) || (!isTerminal && (is_due || is_reopened));
+      const is_hot = !isTerminal && (is_due || is_reopened);
       if (is_hot) {
         stats.hotOrders.add(o.id);
         hotOrdersSet.add(o.id);
@@ -1573,7 +1573,7 @@ export const getEmployeeDetailPerformance = createServerFn({
     let assignedQ = adminAny
       .from("applications")
       .select(
-        "id, application_code, customer_id, lead_id, service_id, order_status, fulfillment_status, application_status, is_hot, assigned_at, created_at, updated_at, form_submitted_at, certificate_uploaded_at, workflow_status, closure_stage, closure_reason_code, refund_approved_at, refund_processed_at",
+        "id, application_code, customer_id, lead_id, service_id, order_status, fulfillment_status, application_status, assigned_at, created_at, updated_at, form_submitted_at, certificate_uploaded_at, workflow_status, closure_stage, closure_reason_code, refund_approved_at, refund_processed_at",
       )
       .eq("assigned_to", data.employeeId)
       .eq("is_deleted", false);
@@ -1603,7 +1603,7 @@ export const getEmployeeDetailPerformance = createServerFn({
       const { data: extraWorkedApps } = await adminAny
         .from("applications")
         .select(
-          "id, application_code, customer_id, lead_id, service_id, order_status, fulfillment_status, application_status, is_hot, assigned_at, created_at, updated_at, form_submitted_at, certificate_uploaded_at, workflow_status, closure_stage, closure_reason_code, refund_approved_at, refund_processed_at",
+          "id, application_code, customer_id, lead_id, service_id, order_status, fulfillment_status, application_status, assigned_at, created_at, updated_at, form_submitted_at, certificate_uploaded_at, workflow_status, closure_stage, closure_reason_code, refund_approved_at, refund_processed_at",
         )
         .in("id", missingWorkedIds)
         .eq("is_deleted", false);
@@ -1701,7 +1701,7 @@ export const getEmployeeDetailPerformance = createServerFn({
         .map((o: any) => o.id),
     );
     const hotOrdersSet = new Set(
-      appsList.filter((o: any) => o.is_hot).map((o: any) => o.id),
+      appsList.filter((o: any) => o.fulfillment_status === "order_reopened" || o.order_status === "REOPENED").map((o: any) => o.id),
     );
 
     const customerDelays = appsList.filter(
@@ -1801,7 +1801,7 @@ export const getEmployeeDetailPerformance = createServerFn({
         totalActions: orderLogs.length,
         currentStage: ord.fulfillment_status,
         currentStatus: ord.order_status || ord.application_status,
-        isHot: !!ord.is_hot,
+        isHot: ord.fulfillment_status === "order_reopened" || ord.order_status === "REOPENED",
         slaStatus: hasBreached ? "BREACHED" : hasAtRisk ? "AT_RISK" : "COMPLIANT",
         completedAt:
           ord.order_status === "COMPLETED" ||
@@ -2033,7 +2033,7 @@ export const getMyPerformanceDashboard = createServerFn({ method: "POST" })
     let myAssignedQ = admin
       .from("applications")
       .select(
-        "id, application_code, customer_id, lead_id, service_id, order_status, fulfillment_status, application_status, is_hot, is_hold, assigned_at, created_at, updated_at, form_submitted_at, certificate_uploaded_at, workflow_status, closure_stage, closure_reason_code, refund_approved_at, refund_processed_at",
+        "id, application_code, customer_id, lead_id, service_id, order_status, fulfillment_status, application_status, is_hold, assigned_at, created_at, updated_at, form_submitted_at, certificate_uploaded_at, workflow_status, closure_stage, closure_reason_code, refund_approved_at, refund_processed_at",
       )
       .eq("assigned_to", employeeId)
       .eq("is_deleted", false);
@@ -2046,7 +2046,6 @@ export const getMyPerformanceDashboard = createServerFn({ method: "POST" })
     }
 
     const { data: assignedOrders } = await myAssignedQ
-      .order("is_hot", { ascending: false })
       .order("created_at", { ascending: false })
       .limit(300);
 
@@ -2127,7 +2126,7 @@ export const getMyPerformanceDashboard = createServerFn({ method: "POST" })
         .map((o: any) => o.id),
     );
     const hotOrdersSet = new Set(
-      allAssigned.filter((o: any) => o.is_hot).map((o: any) => o.id),
+      allAssigned.filter((o: any) => o.fulfillment_status === "order_reopened" || o.order_status === "REOPENED").map((o: any) => o.id),
     );
 
     const customerDelays = allAssigned.filter(
@@ -2196,7 +2195,7 @@ export const getMyPerformanceDashboard = createServerFn({ method: "POST" })
     const hotOrdersQueue = allAssigned
       .filter(
         (o: any) =>
-          o.is_hot &&
+          (o.fulfillment_status === "order_reopened" || o.order_status === "REOPENED") &&
           !["completed", "order_closed", "cancelled"].includes(
             o.fulfillment_status,
           ),
@@ -2254,7 +2253,7 @@ export const getMyPerformanceDashboard = createServerFn({ method: "POST" })
         lastActionText,
         currentStage: ord.fulfillment_status,
         currentStatus: ord.order_status || ord.application_status,
-        isHot: !!ord.is_hot,
+        isHot: ord.fulfillment_status === "order_reopened" || ord.order_status === "REOPENED",
         slaStatus: hasBreached ? "BREACHED" : isAtRisk ? "AT_RISK" : "COMPLIANT",
       };
     });

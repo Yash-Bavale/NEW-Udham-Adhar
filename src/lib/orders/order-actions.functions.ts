@@ -973,7 +973,6 @@ export const reopenOrder = createServerFn({ method: "POST" })
         workflow_status: null,
         closure_stage: "none",
         application_status: "under_process",
-        is_hot: true,
         closure_reason_id: null,
         closure_remarks: null,
         closure_next_at: null,

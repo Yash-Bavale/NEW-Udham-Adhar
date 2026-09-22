@@ -115,7 +115,7 @@ export async function logEmployeeOrderAction(
     const { data: order } = await client
       .from('applications')
       .select(
-        'id, application_code, assigned_to, assigned_at, created_at, is_hot, order_status, fulfillment_status, application_status, customer_id, lead_id',
+        'id, application_code, assigned_to, assigned_at, created_at, order_status, fulfillment_status, application_status, customer_id, lead_id',
       )
       .eq('id', orderId)
       .maybeSingle();
@@ -148,7 +148,9 @@ export async function logEmployeeOrderAction(
     let slaStatus: 'compliant' | 'at_risk' | 'breached' = 'compliant';
     let isSlaBreached = false;
 
-    if (order?.is_hot) {
+    const isHotOrder = order?.fulfillment_status === 'order_reopened' || order?.order_status === 'REOPENED';
+
+    if (isHotOrder) {
       if (timeSpentSinceAssignmentMs !== null) {
         if (timeSpentSinceAssignmentMs > 1_800_000) {
           // > 30 mins

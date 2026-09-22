@@ -752,7 +752,6 @@ export const closeTicketRestartT001 = createServerFn({ method: "POST" })
         workflow_status: null,
         closure_stage: "none",
         application_status: "under_process",
-        is_hot: true,
         closure_reason_id: null,
         closure_remarks: null,
         closure_next_at: null,
@@ -1034,11 +1033,10 @@ export const makeOrderHotFromTicket = createServerFn({ method: "POST" })
       .maybeSingle();
     const staffName = (staffProf as any)?.display_name || (staffProf as any)?.email || "Staff";
 
-    // 1. Update applications table to mark is_hot = true
+    // 1. Update application updated_at timestamp
     await admin
       .from("applications")
       .update({
-        is_hot: true,
         updated_at: now,
       })
       .eq("id", targetOrderId);

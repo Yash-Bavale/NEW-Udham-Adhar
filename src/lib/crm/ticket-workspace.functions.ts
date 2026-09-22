@@ -19,7 +19,7 @@ export const getTicketWorkspace = createServerFn({ method: "POST" })
     const { data: ticket, error } = await admin
       .from("support_tickets")
       .select(
-        "id, ticket_number, subject, description, status, priority, assigned_to, resolved_at, resolved_by, closed_at, first_response_at, last_customer_message_at, last_staff_message_at, ticket_email, source, created_at, updated_at, customer_id, application_id, service_id, customers(id, name, primary_email, primary_mobile, state, language, created_at, lifetime_value, total_applications, completed_applications), applications(id, application_code, order_status, fulfillment_status, assigned_to, is_hot, created_at, service_id, services(service_name)), services(service_name)"
+        "id, ticket_number, subject, description, status, priority, assigned_to, resolved_at, resolved_by, closed_at, first_response_at, last_customer_message_at, last_staff_message_at, ticket_email, source, created_at, updated_at, customer_id, application_id, service_id, customers(id, name, primary_email, primary_mobile, state, language, created_at, lifetime_value, total_applications, completed_applications), applications(id, application_code, order_status, fulfillment_status, assigned_to, created_at, service_id, services(service_name)), services(service_name)"
       )
       .eq("id", data.ticketId)
       .maybeSingle();
@@ -35,7 +35,7 @@ export const getTicketWorkspace = createServerFn({ method: "POST" })
       const { data: latestApp } = await admin
         .from("applications")
         .select(
-          "id, application_code, order_status, fulfillment_status, assigned_to, is_hot, created_at, service_id, services(service_name)"
+          "id, application_code, order_status, fulfillment_status, assigned_to, created_at, service_id, services(service_name)"
         )
         .eq("customer_id", customerId)
         .eq("is_deleted", false)
@@ -59,6 +59,7 @@ export const getTicketWorkspace = createServerFn({ method: "POST" })
       refundsRes,
       paymentsRes,
       invoicesRes,
+      activeSchedulerRes,
     ] = await Promise.all([
       admin
         .from("ticket_replies")
@@ -129,6 +130,16 @@ export const getTicketWorkspace = createServerFn({ method: "POST" })
             .order("created_at", { ascending: false })
             .limit(5)
         : Promise.resolve({ data: [] as any[], error: null }),
+      applicationId
+        ? admin
+            .from("order_schedulers")
+            .select("id, status, fires_at, remarks")
+            .eq("application_id", applicationId)
+            .eq("status", "active")
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle()
+        : Promise.resolve({ data: null, error: null }),
     ]);
 
     // Resolve profile names for authors/assignees.
@@ -227,11 +238,26 @@ export const getTicketWorkspace = createServerFn({ method: "POST" })
     const closedTicketsForCustomer =
       (prevTicketsRes.data ?? []).length - openTicketsForCustomer;
 
+    const activeSched = activeSchedulerRes.data;
+    const firesAt = activeSched?.fires_at ? new Date(activeSched.fires_at).getTime() : 0;
+    const isDue = firesAt > 0 && firesAt <= Date.now();
+    const isReopened =
+      resolvedApplication?.fulfillment_status === "order_reopened" ||
+      resolvedApplication?.order_status === "REOPENED";
+    const isHotOrder = Boolean(resolvedApplication) && (isDue || isReopened);
+
+    const appPayload = resolvedApplication
+      ? {
+          ...resolvedApplication,
+          is_hot: isHotOrder,
+        }
+      : null;
+
     return {
       ticket: {
         ...t,
         application_id: applicationId,
-        applications: resolvedApplication,
+        applications: appPayload,
         assigned_name: t.assigned_to ? nameMap.get(t.assigned_to) ?? null : null,
         resolved_name: t.resolved_by ? nameMap.get(t.resolved_by) ?? null : null,
         executive_name: resolvedApplication?.assigned_to
