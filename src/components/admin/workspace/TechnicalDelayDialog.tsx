@@ -105,7 +105,7 @@ export function TechnicalDelayDialog({ applicationId, open, onClose }: Props) {
       if (!reason) throw new Error("Please pick a reason");
       if (reminderMinutes < 15) throw new Error("Reminder must be at least 15 minutes");
       if (reminderMinutes > 60 * 24 * 30) throw new Error("Reminder cannot exceed 30 days");
-      const expectedIso = new Date(Date.now() + reminderMinutes * 60_000).toISOString().slice(0, 10);
+      const expectedIso = new Date(Date.now() + reminderMinutes * 60_000).toISOString();
       await fnSubmit({
         data: {
           applicationId,
@@ -120,10 +120,16 @@ export function TechnicalDelayDialog({ applicationId, open, onClose }: Props) {
     },
     onSuccess: () => {
       toast.success(`E003 sent to customer + reminder queued for assignee in ${fmtReminder(reminderMinutes)}.`);
+      qc.invalidateQueries({ queryKey: ["admin.orders.v2"] });
+      qc.invalidateQueries({ queryKey: ["orders-v2"] });
+      qc.invalidateQueries({ queryKey: ["active-order-callback"] });
+      qc.invalidateQueries({ queryKey: ["active-order-callback", applicationId] });
+      qc.invalidateQueries({ queryKey: ["due-reminders-summary"] });
       qc.invalidateQueries({ queryKey: ["workflow-events", applicationId] });
       qc.invalidateQueries({ queryKey: ["workflow-reminders", applicationId] });
       qc.invalidateQueries({ queryKey: ["order-detail-v2", applicationId] });
       qc.invalidateQueries({ queryKey: ["order-workflow-state", applicationId] });
+      qc.invalidateQueries({ queryKey: ["admin.order", applicationId] });
       onClose();
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Failed to mark delay"),

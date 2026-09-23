@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, keepPreviousData, useQueryClient } from "@tanstack/react-query";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
-import { Search, ChevronLeft, ChevronRight, RotateCcw, X, Filter, Loader2, ArrowUpDown, ArrowUp, ArrowDown, ShieldAlert, Flame, PhoneCall, PhoneForwarded, Clock } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight, RotateCcw, X, Filter, Loader2, ArrowUpDown, ArrowUp, ArrowDown, ShieldAlert, Flame, PhoneCall, PhoneForwarded, Clock, Server } from "lucide-react";
 import { formatIST, istDateKey } from "@/lib/datetime";
 import { toast } from "sonner";
 
@@ -1072,13 +1072,31 @@ function OrderCardMobile({
         <div className="flex items-center gap-1.5 flex-wrap">
           {order.is_hot ? (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-rose-100 text-rose-800 border border-rose-300">
-              <PhoneCall className="size-3 text-rose-600" />
-              Call Due Now
+              {order.fulfillment_status === "technical_delay" || order.callback_reminder?.remarks?.channel === "technical_delay" ? (
+                <>
+                  <Server className="size-3 text-rose-600" />
+                  Tech Delay Due
+                </>
+              ) : (
+                <>
+                  <PhoneCall className="size-3 text-rose-600" />
+                  Call Due Now
+                </>
+              )}
             </span>
           ) : order.is_callback_scheduled ? (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
-              <PhoneForwarded className="size-3 text-indigo-600" />
-              Scheduled Callback
+              {order.fulfillment_status === "technical_delay" || order.callback_reminder?.remarks?.channel === "technical_delay" ? (
+                <>
+                  <Server className="size-3 text-indigo-600" />
+                  Tech Delay Scheduled
+                </>
+              ) : (
+                <>
+                  <PhoneForwarded className="size-3 text-indigo-600" />
+                  Scheduled Callback
+                </>
+              )}
             </span>
           ) : actionStatus.tone === "red" ? (
             <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200">
@@ -1136,11 +1154,12 @@ function formatDayHeader(day: string): string {
 }
 
 export function getOrderActionStatus(order: any): { label: string; tone: "red" | "green" | "blue" } {
+  const isTechDelay = order.fulfillment_status === "technical_delay" || order.callback_reminder?.remarks?.channel === "technical_delay";
   if (order.is_hot) {
-    return { label: "Call Due Now", tone: "red" };
+    return { label: isTechDelay ? "Tech Delay Due" : "Call Due Now", tone: "red" };
   }
   if (order.is_callback_scheduled) {
-    return { label: "Scheduled Callback", tone: "blue" };
+    return { label: isTechDelay ? "Tech Delay Scheduled" : "Scheduled Callback", tone: "blue" };
   }
 
   const fs = order.fulfillment_status ?? "order_received";
@@ -1304,13 +1323,31 @@ function OrderRow({
       <td className="px-2 py-2.5 whitespace-nowrap">
         {order.is_hot ? (
           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-rose-100 text-rose-800 border border-rose-300 shadow-2xs">
-            <PhoneCall className="size-3 text-rose-600" />
-            Call Due Now
+            {order.fulfillment_status === "technical_delay" || order.callback_reminder?.remarks?.channel === "technical_delay" ? (
+              <>
+                <Server className="size-3 text-rose-600" />
+                Tech Delay Due
+              </>
+            ) : (
+              <>
+                <PhoneCall className="size-3 text-rose-600" />
+                Call Due Now
+              </>
+            )}
           </span>
         ) : order.is_callback_scheduled ? (
           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
-            <PhoneForwarded className="size-3 text-indigo-600" />
-            Scheduled Callback
+            {order.fulfillment_status === "technical_delay" || order.callback_reminder?.remarks?.channel === "technical_delay" ? (
+              <>
+                <Server className="size-3 text-indigo-600" />
+                Tech Delay Scheduled
+              </>
+            ) : (
+              <>
+                <PhoneForwarded className="size-3 text-indigo-600" />
+                Scheduled Callback
+              </>
+            )}
           </span>
         ) : actionStatus.tone === "red" ? (
           <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200">

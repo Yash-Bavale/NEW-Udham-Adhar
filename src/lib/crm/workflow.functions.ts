@@ -375,6 +375,87 @@ export const setExternalDelay = createServerFn({ method: "POST" })
       await emitToRole("super_admin", notifBase);
       await emitToRole("admin", notifBase);
 
+      // Stop any existing active/paused schedulers for this order first
+      await admin
+        .from("order_schedulers")
+        .update({
+          status: "stopped",
+          stopped_at: new Date().toISOString(),
+          stop_reason: "technical_delay_reminder_scheduled",
+          stop_triggered_by: context.userId,
+        } as never)
+        .eq("application_id", app.id)
+        .in("status", ["active", "paused"]);
+
+      // Calculate reminder duration in minutes for scheduler tracking
+      const firesAtTime = new Date(dueAt).getTime();
+      const durationMinutes = Math.max(1, Math.round((firesAtTime - Date.now()) / 60_000));
+      const remarksObj = {
+        reason: data.reasonCode,
+        reasonLabel: data.reasonLabel,
+        note: data.internalNote?.trim() || null,
+        durationMinutes,
+        channel: "technical_delay",
+        created_by_name: name,
+        created_at: new Date().toISOString(),
+      };
+
+      // Arm active scheduler in order_schedulers so it triggers Hot Order status and audio/desktop alerts when due
+      const { data: createdScheduler } = await admin
+        .from("order_schedulers")
+        .insert({
+          application_id: app.id,
+          scheduler_type: "our_side_reminder",
+          status: "active",
+          started_at: holdStartedAt,
+          fires_at: dueAt,
+          business_seconds_total: durationMinutes * 60,
+          business_seconds_remaining: durationMinutes * 60,
+          remarks: JSON.stringify(remarksObj),
+          created_by: context.userId,
+        } as never)
+        .select("id")
+        .maybeSingle();
+
+      if (createdScheduler?.id) {
+        await admin.from("order_reminders").insert({
+          application_id: app.id,
+          scheduler_id: createdScheduler.id,
+          reminder_type: "manual",
+          remind_at: dueAt,
+          interval_business_seconds: durationMinutes * 60,
+          times_fired: 0,
+          is_active: true,
+          created_by: context.userId,
+        } as never);
+      }
+
+      try {
+        await admin.from("application_events").insert({
+          application_id: app.id,
+          event_type: "technical_delay_reminder_scheduled",
+          note: `Technical delay reminder set for ${expectedIst} · Reason: ${data.reasonLabel}${data.internalNote ? ` (${data.internalNote})` : ""}`,
+          staff_name: name,
+          staff_role: "staff",
+        } as never);
+      } catch (evtErr) {
+        console.warn("[setExternalDelay] application_events warning:", evtErr);
+      }
+
+      try {
+        const { logEmployeeOrderAction } = await import("@/lib/orders/order-action-logger.server");
+        await logEmployeeOrderAction({
+          orderId: app.id,
+          employeeId: context.userId,
+          employeeName: name,
+          actionType: "TECHNICAL_DELAY_ADDED",
+          notes: `Technical delay marked: ${data.reasonLabel}. Reminder set for ${expectedIst}.${data.internalNote ? ` Note: ${data.internalNote}` : ""}`,
+          source: "employee",
+          supabase: admin,
+        });
+      } catch (auditErr) {
+        console.warn("[setExternalDelay] order_action_logs warning:", auditErr);
+      }
 
       // Send our-side delay hold intimation email to customer (E005).
       if (lead?.email) {
@@ -458,6 +539,23 @@ export const resumeOrder = createServerFn({ method: "POST" })
       .update({ status: "cancelled" } as never)
       .eq("application_id", app.id)
       .eq("status", "pending");
+
+    // Stop active schedulers and order reminders for this order
+    await admin
+      .from("order_schedulers")
+      .update({
+        status: "stopped",
+        stopped_at: new Date().toISOString(),
+        stop_reason: "order_resumed",
+        stop_triggered_by: context.userId,
+      } as never)
+      .eq("application_id", app.id)
+      .in("status", ["active", "paused"]);
+
+    await admin
+      .from("order_reminders")
+      .update({ is_active: false, stopped_at: new Date().toISOString(), stop_reason: "order_resumed" } as never)
+      .eq("application_id", app.id);
 
 
     await admin

@@ -12,7 +12,7 @@ import {
   Clock, XCircle, CheckCircle2, ClipboardCheck,
   Wrench, UserX, LifeBuoy, Send, UploadCloud, Mail,
   ArrowRight, AlertTriangle, RotateCcw, MailWarning, ShoppingBag, ShieldAlert,
-  PhoneCall, Flame, VolumeX, Loader2,
+  PhoneCall, Flame, VolumeX, Loader2, Server,
   type LucideIcon,
 } from "lucide-react";
 
@@ -667,9 +667,9 @@ export function CustomerJourneyMap(p: Props) {
           >
             {activeCallback?.isDue && !closed && !completed ? <Flame className="size-3.5" /> : <PhoneCall className="size-3.5" />}
             {activeCallback?.isDue && !closed && !completed
-              ? "Call Due Now (HOT ORDER)"
+              ? (activeCallback.parsedRemarks?.channel === "technical_delay" ? "Tech Delay Due (HOT ORDER)" : "Call Due Now (HOT ORDER)")
               : activeCallback && !closed && !completed
-                ? "Callback Scheduled"
+                ? (activeCallback.parsedRemarks?.channel === "technical_delay" ? "Tech Delay Scheduled" : "Callback Scheduled")
                 : "Call Back / Reminder"}
           </button>
         </div>
@@ -688,7 +688,7 @@ export function CustomerJourneyMap(p: Props) {
                 </span>
               ) : (
                 <span className="inline-flex items-center gap-1 rounded-md bg-indigo-600 px-2 py-0.5 text-[10px] font-black uppercase text-white shadow-xs tracking-wider">
-                  <Clock className="size-3" /> Scheduled Callback
+                  <Clock className="size-3" /> {activeCallback.parsedRemarks?.channel === "technical_delay" ? "Tech Delay Reminder" : "Scheduled Callback"}
                 </span>
               )}
               <span className="text-sm font-bold text-slate-900">
@@ -702,7 +702,11 @@ export function CustomerJourneyMap(p: Props) {
               </span>
 
               {/* Channel Indicator Badge */}
-              {activeCallback.parsedRemarks?.channel === "email" ? (
+              {activeCallback.parsedRemarks?.channel === "technical_delay" ? (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-sky-100 text-sky-900 border border-sky-300 text-xs font-bold shadow-2xs">
+                  <Server className="size-3.5 text-sky-700" /> Technical Delay
+                </span>
+              ) : activeCallback.parsedRemarks?.channel === "email" ? (
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-purple-100 text-purple-900 border border-purple-300 text-xs font-bold shadow-2xs">
                   <Mail className="size-3.5 text-purple-700" /> Check Email
                 </span>
@@ -718,7 +722,7 @@ export function CustomerJourneyMap(p: Props) {
               onClick={() => setDialog({ kind: "callback_reminder" })}
               className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-800 hover:bg-slate-50 transition cursor-pointer shadow-2xs ml-auto"
             >
-              Manage Callback
+              Manage Reminder
             </button>
           </div>
         )}

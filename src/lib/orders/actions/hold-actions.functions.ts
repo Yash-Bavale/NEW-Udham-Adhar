@@ -225,6 +225,28 @@ export const resumeFromHold = createServerFn({ method: "POST" })
     ]);
 
     await supabaseAdmin
+      .from("order_schedulers")
+      .update({
+        status: "stopped",
+        stopped_at: new Date().toISOString(),
+        stop_reason: "technical_delay_resolved",
+        stop_triggered_by: context.userId,
+      } as never)
+      .eq("application_id", data.orderId)
+      .in("status", ["active", "paused"]);
+
+    await supabaseAdmin
+      .from("order_reminders")
+      .update({ is_active: false, stopped_at: new Date().toISOString(), stop_reason: "technical_delay_resolved" } as never)
+      .eq("application_id", data.orderId);
+
+    await supabaseAdmin
+      .from("workflow_reminders")
+      .update({ status: "cancelled" } as never)
+      .eq("application_id", data.orderId)
+      .eq("status", "pending");
+
+    await supabaseAdmin
       .from("applications")
       .update({
         technical_hold_started_at: null,

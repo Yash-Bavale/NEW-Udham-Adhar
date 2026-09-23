@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { Flame, PhoneCall, ArrowRight, X } from "lucide-react";
+import { Flame, PhoneCall, ArrowRight, X, Server } from "lucide-react";
 import { getDueRemindersSummary } from "@/lib/orders/actions/callback-reminder.functions";
 import { getGlobalReminderSoundSettings } from "@/lib/settings/app-settings.functions";
 import { playReminderSound, showDesktopNotification, syncGlobalSoundSettings, preloadAudio } from "@/lib/audio/reminder-sounds";
@@ -49,7 +49,7 @@ export function ReminderNotificationManager() {
     application_code: string;
     customer_name: string;
     customer_mobile: string;
-    remarks?: { reasonLabel?: string; note?: string | null } | null;
+    remarks?: { reasonLabel?: string; note?: string | null; channel?: string | null } | null;
   }) => {
     if (!reminder.id || notifiedIdsRef.current.has(reminder.id)) return;
     notifiedIdsRef.current.add(reminder.id);
@@ -67,13 +67,14 @@ export function ReminderNotificationManager() {
     qc.invalidateQueries({ queryKey: ["due-reminders-summary"] });
     qc.invalidateQueries({ queryKey: ["orders-v2"] });
 
-    const reasonText = reminder.remarks?.reasonLabel || "Customer Follow-Up";
+    const isTechDelay = reminder.remarks?.channel === "technical_delay";
+    const reasonText = reminder.remarks?.reasonLabel || (isTechDelay ? "Technical Delay Follow-Up" : "Customer Follow-Up");
     const customerInfo = `${reminder.customer_name} ${reminder.customer_mobile ? `(${reminder.customer_mobile})` : ""}`.trim();
     const orderCode = reminder.application_code || "Order";
 
     // 3. Desktop Browser Notification
     showDesktopNotification(
-      `🔥 Hot Order: Callback Due Now!`,
+      `🔥 Hot Order: ${isTechDelay ? "Technical Delay Reminder Due!" : "Callback Due Now!"}`,
       {
         body: `${orderCode} · ${customerInfo} · Reason: ${reasonText}`,
       },
@@ -123,7 +124,15 @@ export function ReminderNotificationManager() {
                 }}
                 className="inline-flex items-center gap-1.5 rounded-lg bg-white px-3.5 py-1.5 text-xs font-bold text-slate-900 shadow-md hover:bg-slate-100 transition cursor-pointer"
               >
-                <PhoneCall className="size-3.5 text-rose-600" /> Open &amp; Call Customer <ArrowRight className="size-3" />
+                {isTechDelay ? (
+                  <>
+                    <Server className="size-3.5 text-rose-600" /> Open &amp; View Technical Delay <ArrowRight className="size-3" />
+                  </>
+                ) : (
+                  <>
+                    <PhoneCall className="size-3.5 text-rose-600" /> Open &amp; Call Customer <ArrowRight className="size-3" />
+                  </>
+                )}
               </button>
             </div>
           </div>
