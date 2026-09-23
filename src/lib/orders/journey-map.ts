@@ -57,6 +57,7 @@ export function stageToJourneyIndex(stage: OrderStage): number {
     case "consultation_completed":
       return 4;
     case "form_submitted":
+    case "order_reopened":
     case "customer_delay":
     case "technical_delay":
     case "in_progress":
@@ -340,10 +341,11 @@ export function deriveJourneyLiveState(input: {
   formSubmittedAt?: string | null;
   fulfillmentStatus?: string | null;
 }): JourneyLiveState {
+  const isReopened = input.stage === "order_reopened" || input.fulfillmentStatus === "order_reopened" || input.workflowStatus === "order_reopened";
   const closureStageValue = (input.closureStage ?? "").toLowerCase();
-  const isClosed = input.stage === "closed" || /^(closed|auto_closed|force_closed|order_closed)$/.test(closureStageValue);
+  const isClosed = !isReopened && (input.stage === "closed" || /^(closed|auto_closed|force_closed|order_closed)$/.test(closureStageValue));
   const isConsultationCompleted = input.stage === "consultation_completed";
-  const isCompleted = input.stage === "completed" || isConsultationCompleted;
+  const isCompleted = !isReopened && (input.stage === "completed" || isConsultationCompleted);
   const ws = (input.workflowStatus ?? "").toLowerCase();
   const fs = (input.fulfillmentStatus ?? "").toLowerCase();
 
@@ -366,7 +368,9 @@ export function deriveJourneyLiveState(input: {
   }
 
   let activeSubKey: JourneyLiveSubKey = null;
-  if (isConsultationCompleted) {
+  if (isReopened) {
+    activeSubKey = null;
+  } else if (isConsultationCompleted) {
     activeSubKey = null;
   } else if (/form_pending|awaiting_form|form_not_submitted/.test(ws) || (idx === 2 && !ws && !isClosed)) {
     activeSubKey = "form-not-submitted";
@@ -399,6 +403,8 @@ export function deriveJourneyLiveState(input: {
     } else {
       subStateLabel = `Closed${reasonCode ? ` · ${reasonCode}` : ""}`;
     }
+  } else if (isReopened) {
+    subStateLabel = "Order Reopened";
   } else if (isConsultationCompleted) {
     subStateLabel = "Order Completed";
   } else if (activeSubKey === "form-not-submitted") {

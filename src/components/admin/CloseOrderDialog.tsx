@@ -125,24 +125,6 @@ export function CloseOrderDialog({
           silent: isSilent,
         },
       });
-
-      // Also ensure backend flags applications table as order_closed & closed
-      try {
-        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-        await supabaseAdmin
-          .from("applications")
-          .update({
-            fulfillment_status: "order_closed",
-            order_status: "CLOSED",
-            workflow_status: "closed",
-            closure_stage: "closed",
-            closure_remarks: notes.trim() || selectedReason.label,
-            updated_at: new Date().toISOString(),
-          } as never)
-          .eq("id", applicationId);
-      } catch (e) {
-        console.error("[CloseOrderDialog] direct table update notice", e);
-      }
     },
     onSuccess: () => {
       toast.success(`Order closed — closure reason: ${selectedReason?.label ?? "Force Closed"}`);
@@ -151,6 +133,9 @@ export function CloseOrderDialog({
       qc.invalidateQueries({ queryKey: ["order-workflow-state", applicationId] });
       qc.invalidateQueries({ queryKey: ["workflow-events", applicationId] });
       qc.invalidateQueries({ queryKey: ["order-detail-v2", applicationId] });
+      qc.invalidateQueries({ queryKey: ["workflow-timers", applicationId] });
+      qc.invalidateQueries({ queryKey: ["order-tickets", applicationId] });
+      qc.invalidateQueries({ queryKey: ["due-reminders-summary"] });
       onClose();
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Failed to force close order"),

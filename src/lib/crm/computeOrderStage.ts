@@ -99,6 +99,17 @@ export function computeOrderStage(
   // "Payment Done" if an order is force-completed without a customer form.
   const fs = application.fulfillment_status ?? "order_received";
   const ws = application.workflow_status ?? "";
+  const os = (application as any).order_status ?? "";
+
+  // Reopened state takes precedence over prior closed status
+  if (
+    fs === "order_reopened" ||
+    ws === "order_reopened" ||
+    application.application_status === "order_reopened" ||
+    os === "REOPENED"
+  ) {
+    return "order_reopened";
+  }
 
   // Terminals
   if (fs === "completed" || fs === "order_completed" || application.application_status === "completed") return "completed";
@@ -125,7 +136,6 @@ export function computeOrderStage(
 
   if (fs === "customer_delay" || ws === "waiting_for_customer" || ws === "waiting_for_documents" || ws === "customer_non_responsive" || ws === "customer_delay") return "customer_delay";
   if (fs === "technical_delay" || fs === "technical_hold" || ws === "government_portal_pending" || ws === "technical_hold" || ws === "external_dependency") return "technical_delay";
-  if (fs === "order_reopened" || application.application_status === "order_reopened" || (application as any).order_status === "REOPENED") return "order_reopened";
 
   if (fs === "consultation_completed") return "consultation_completed";
 

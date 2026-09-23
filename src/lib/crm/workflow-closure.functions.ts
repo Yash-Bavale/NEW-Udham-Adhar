@@ -34,17 +34,13 @@ export const closeOrder = createServerFn({ method: "POST" })
     }).parse(d),
   )
   .handler(async ({ data, context }) => {
-    if (data.silent) {
-      await assertRole(context.supabase, [...ADMIN_ONLY]);
-    } else {
-      await assertRole(context.supabase, [...STAFF]);
-    }
+    await assertRole(context.supabase, [...STAFF]);
     const admin = await getAdmin();
     const name = await actorName(context.supabase, context.userId);
 
     const { data: app } = await admin
       .from("applications")
-      .select("id, lead_id, application_code, workflow_status, created_at")
+      .select("id, lead_id, customer_id, application_code, workflow_status, fulfillment_status, order_status, created_at")
       .eq("id", data.applicationId)
       .maybeSingle();
     if (!app) throw new Error("Application not found");
@@ -54,13 +50,25 @@ export const closeOrder = createServerFn({ method: "POST" })
       .from("workflow_reminders")
       .update({ status: "cancelled" } as never)
       .eq("application_id", app.id)
-      .eq("status", "pending");
+      .in("status", ["pending", "failed"]);
+
+    await admin
+      .from("order_reminders")
+      .update({ is_active: false, stopped_at: new Date().toISOString(), stop_reason: data.silent ? "silent_order_closed" : "order_closed" } as never)
+      .eq("application_id", app.id);
 
     try {
       const { cancelAllForOrder } = await import("@/lib/scheduling/schedulers.server");
-      await cancelAllForOrder(app.id, data.silent ? "silent_admin_close" : "order_closed");
+      await cancelAllForOrder(app.id, data.silent ? "silent_order_closed" : "order_closed");
     } catch (schedErr) {
       console.warn("[closeOrder] scheduler cancel warning:", schedErr);
+    }
+
+    try {
+      const { cancelTimers } = await import("@/lib/orders/actions/timers.server");
+      await cancelTimers(app.id);
+    } catch (timerErr) {
+      console.warn("[closeOrder] timer cancel warning:", timerErr);
     }
 
     const closedAt = new Date().toISOString();
@@ -72,6 +80,18 @@ export const closeOrder = createServerFn({ method: "POST" })
         fulfillment_status: "order_closed",
         application_status: "closed",
         order_status: "CLOSED",
+        closure_stage: "closed",
+        closure_reason_code: data.reasonCode,
+        closure_remarks: data.notes ?? data.reasonLabel,
+        customer_hold_started_at: null,
+        technical_hold_started_at: null,
+        technical_hold_kind: null,
+        awaiting_govt_started_at: null,
+        active_reason_id: null,
+        active_reason_text: null,
+        workflow_delay_reason: null,
+        workflow_expected_review_at: null,
+        updated_at: closedAt,
       } as never)
       .eq("id", app.id);
 
@@ -87,7 +107,35 @@ export const closeOrder = createServerFn({ method: "POST" })
       actor_id: context.userId,
       actor_name: name,
       is_system: false,
-      metadata: { reason_code: data.reasonCode, reason_label: data.reasonLabel, notes: data.notes ?? null, silent: data.silent },
+      metadata: {
+        reason_code: data.reasonCode,
+        reason_label: data.reasonLabel,
+        notes: data.notes ?? null,
+        silent: data.silent,
+        previous_stage: app.fulfillment_status || app.workflow_status || "in_progress",
+        email_sent: !data.silent,
+      },
+    } as never);
+
+    await admin.from("application_events").insert({
+      application_id: app.id,
+      lead_id: app.lead_id,
+      customer_id: app.customer_id,
+      event_type: "order_status_change",
+      old_value: String(app.order_status ?? "ACTIVE"),
+      new_value: "CLOSED",
+      note: data.silent
+        ? `Order silently closed (${data.reasonLabel}) — no customer email`
+        : `Order closed (${data.reasonLabel})`,
+      created_by: context.userId,
+      staff_name: name,
+      staff_role: "staff",
+      metadata: {
+        silent: data.silent,
+        reason_code: data.reasonCode,
+        reason_label: data.reasonLabel,
+        previous_fulfillment_status: app.fulfillment_status,
+      } as any,
     } as never);
 
     // Record in immutable employee action audit log
@@ -95,13 +143,23 @@ export const closeOrder = createServerFn({ method: "POST" })
       const { logEmployeeOrderAction } = await import("@/lib/orders/order-action-logger.server");
       await logEmployeeOrderAction({
         orderId: app.id,
+        leadId: app.lead_id,
+        customerId: app.customer_id,
         employeeId: context.userId,
         employeeName: name,
         actionType: "ORDER_CLOSED",
-        previousStatus: app.workflow_status,
-        newStatus: "closed",
-        notes: `Order closed: ${data.reasonLabel}${data.notes ? ` - ${data.notes}` : ""}`,
+        previousStatus: app.workflow_status || app.order_status || "active",
+        newStatus: "CLOSED",
+        previousStage: app.fulfillment_status,
+        newStage: "Order Closed",
+        notes: `Order closed${data.silent ? " silently" : ""}: ${data.reasonLabel}${data.notes ? ` - ${data.notes}` : ""}`,
         source: data.silent ? "admin" : "employee",
+        customMetadata: {
+          silent: data.silent,
+          reasonCode: data.reasonCode,
+          reasonLabel: data.reasonLabel,
+          emailSent: !data.silent,
+        },
         supabase: admin,
       });
     } catch (auditErr) {

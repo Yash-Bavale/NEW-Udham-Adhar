@@ -364,3 +364,123 @@ export const resumeFromCustomerDelay = createServerFn({ method: "POST" })
 
     return { ok: true };
   });
+
+// ── Resume from Order Reopened (moves back to active processing stage) ──
+export const resumeReopenedOrder = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((raw: unknown) => z.object({ orderId: OrderId, note: z.string().max(2000).optional() }).parse(raw))
+  .handler(async ({ data, context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: preRow, error: preErr } = await supabaseAdmin
+      .from("applications")
+      .select("id, lead_id, customer_id, order_status, fulfillment_status, form_submitted_at, application_code")
+      .eq("id", data.orderId)
+      .maybeSingle();
+    if (preErr) throw new Error(preErr.message);
+    if (!preRow) throw new Error("Order not found.");
+
+    const now = new Date().toISOString();
+    const nextFulfillmentStatus = preRow.form_submitted_at ? "form_submitted" : "form_not_submitted";
+    const nextOrderStatus = "UNDER_PROCESS";
+
+    const { error: rpcError } = await context.supabase.rpc("transition_order_status", {
+      _order_id: data.orderId,
+      _new_status: preRow.form_submitted_at ? "FORM_RECEIVED" : "NEW",
+    });
+    if (rpcError) console.warn("[resumeReopenedOrder] transition skipped:", rpcError.message);
+
+    const { cancelAllForOrder } = await import("@/lib/scheduling/schedulers.server");
+    await cancelAllForOrder(data.orderId, "order_reopened_resumed");
+
+    await supabaseAdmin
+      .from("order_schedulers")
+      .update({
+        status: "stopped",
+        stopped_at: now,
+        stop_reason: "order_reopened_resumed",
+        stop_triggered_by: context.userId,
+      } as never)
+      .eq("application_id", data.orderId)
+      .in("status", ["active", "paused"]);
+
+    await supabaseAdmin
+      .from("workflow_reminders")
+      .update({ status: "cancelled" } as never)
+      .eq("application_id", data.orderId)
+      .in("status", ["pending", "failed"]);
+
+    const { error } = await supabaseAdmin
+      .from("applications")
+      .update({
+        order_status: nextOrderStatus,
+        fulfillment_status: nextFulfillmentStatus,
+        application_status: "under_process",
+        workflow_status: "processing",
+        workflow_delay_reason: null,
+        updated_at: now,
+      } as never)
+      .eq("id", data.orderId);
+    if (error) throw new Error(error.message);
+
+    const { data: staffProf } = await supabaseAdmin
+      .from("profiles")
+      .select("display_name, email")
+      .eq("id", context.userId)
+      .maybeSingle();
+    const staffName = (staffProf as any)?.display_name || (staffProf as any)?.email || "Staff";
+
+    await supabaseAdmin.from("application_events").insert({
+      application_id: data.orderId,
+      lead_id: preRow.lead_id,
+      customer_id: preRow.customer_id,
+      event_type: "fulfillment_status_change",
+      old_value: "order_reopened",
+      new_value: nextFulfillmentStatus,
+      note: data.note || "Order resumed from reopened state",
+      staff_name: staffName,
+      staff_role: "staff",
+      created_by: context.userId,
+    } as never);
+
+    await supabaseAdmin.from("workflow_events").insert({
+      application_id: data.orderId,
+      lead_id: preRow.lead_id,
+      event_type: "order_resumed",
+      title: "Order Resumed from Reopened State",
+      description: data.note ?? "Order resumed into active processing",
+      customer_visible: false,
+      actor_id: context.userId,
+      actor_name: staffName,
+      is_system: false,
+      metadata: {
+        previousStage: "order_reopened",
+        nextStage: nextFulfillmentStatus,
+        notes: data.note ?? null,
+      },
+    } as never);
+
+    try {
+      const { logEmployeeOrderAction } = await import("@/lib/orders/order-action-logger.server");
+      await logEmployeeOrderAction({
+        orderId: data.orderId,
+        leadId: preRow.lead_id,
+        customerId: preRow.customer_id,
+        employeeId: context.userId,
+        employeeName: staffName,
+        actionType: "PROCESSING_STARTED",
+        previousStatus: "REOPENED",
+        newStatus: nextOrderStatus,
+        previousStage: "Order Reopened",
+        newStage: nextFulfillmentStatus === "form_submitted" ? "Form Submitted" : "Form Not Submitted",
+        notes: data.note || "Order resumed from reopened state",
+        source: "employee",
+        supabase: supabaseAdmin,
+      });
+    } catch (auditErr) {
+      console.warn("[resumeReopenedOrder] audit log error:", auditErr);
+    }
+
+    return { ok: true, nextStage: nextFulfillmentStatus };
+  });
+

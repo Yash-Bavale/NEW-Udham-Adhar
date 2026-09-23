@@ -46,7 +46,7 @@ import { CountdownChip } from "./CountdownChip";
 import {
   sendFormLink, markSubmittedToGovt, sendManualReminder, completeOrder, reopenOrder,
 } from "@/lib/orders/order-actions.functions";
-import { resumeFromHold, resumeFromCustomerDelay } from "@/lib/orders/actions/hold-actions.functions";
+import { resumeFromHold, resumeFromCustomerDelay, resumeReopenedOrder } from "@/lib/orders/actions/hold-actions.functions";
 import { handleGovtRejected } from "@/lib/orders/actions/close-actions.functions";
 import { listCloseReasons } from "@/lib/orders/actions/reasons.functions";
 import { updateFulfillmentStatus } from "@/lib/crm/orders-v2.functions";
@@ -252,6 +252,8 @@ export function CustomerJourneyMap(p: Props) {
     qc.invalidateQueries({ queryKey: ["order-workflow-state", p.applicationId] });
     qc.invalidateQueries({ queryKey: ["order-tickets", p.applicationId] });
     qc.invalidateQueries({ queryKey: ["workflow-timers", p.applicationId] });
+    qc.invalidateQueries({ queryKey: ["workflow-events", p.applicationId] });
+    qc.invalidateQueries({ queryKey: ["due-reminders-summary"] });
   };
 
   const fnFormLink = useServerFn(sendFormLink);
@@ -260,6 +262,9 @@ export function CustomerJourneyMap(p: Props) {
   const fnComplete = useServerFn(completeOrder);
   const fnUpdateFF = useServerFn(updateFulfillmentStatus);
   const fnResume = useServerFn(resumeFromHold);
+  const fnResumeCustomer = useServerFn(resumeFromCustomerDelay);
+  const fnResumeReopened = useServerFn(resumeReopenedOrder);
+  const fnReopen = useServerFn(reopenOrder);
   const fnConsultation = useServerFn(markConsultationCompleted);
 
   const mutResume = useMutation({
@@ -267,16 +272,22 @@ export function CustomerJourneyMap(p: Props) {
     onSuccess: () => { toast.success("E011 sent — technical delay resolved, order resumed"); markTechDelayResolved(); invalidate(); },
     onError: (e: Error) => toast.error(e.message),
   });
-  const fnResumeCustomer = useServerFn(resumeFromCustomerDelay);
   const mutResumeCustomer = useMutation({
     mutationFn: () => fnResumeCustomer({ data: { orderId: p.applicationId } }),
     onSuccess: () => { toast.success("Order resumed — moved to Form Submitted"); invalidate(); },
     onError: (e: Error) => toast.error(e.message),
   });
-  const fnReopen = useServerFn(reopenOrder);
+  const mutResumeReopened = useMutation({
+    mutationFn: () => fnResumeReopened({ data: { orderId: p.applicationId } }),
+    onSuccess: (res: any) => {
+      toast.success(`Order resumed — moved to ${res?.nextStage === "form_not_submitted" ? "Form Not Submitted" : "Form Submitted"}`);
+      invalidate();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
   const mutReopen = useMutation({
     mutationFn: () => fnReopen({ data: { orderId: p.applicationId } }),
-    onSuccess: () => { toast.success("E09 sent — order reopened successfully"); invalidate(); },
+    onSuccess: () => { toast.success("Order reopened successfully — active in Hot Orders"); invalidate(); },
     onError: (e: Error) => toast.error(e.message),
   });
   const mutFormLink = useMutation({
@@ -317,7 +328,8 @@ export function CustomerJourneyMap(p: Props) {
   });
 
   const inCustomerDelay = phase === "customer_delay";
-  const canResume = !closed && !completed && (inCustomerDelay || phase === "technical_delay" || phase === "form_not_submitted" || phase === "form_link_sent" || Boolean(p.adminOverride));
+  const isOrderReopened = p.stage === "order_reopened";
+  const canResume = !closed && !completed && (inCustomerDelay || phase === "technical_delay" || phase === "form_not_submitted" || phase === "form_link_sent" || isOrderReopened || Boolean(p.adminOverride));
 
   const buttonHandlers: Record<string, { onClick: () => void; pending?: boolean; label?: string }> = {
     B01: { onClick: () => mutFormLink.mutate(), pending: mutFormLink.isPending },
@@ -569,7 +581,7 @@ export function CustomerJourneyMap(p: Props) {
               onClick={() => mutReopen.mutate()}
               disabled={mutReopen.isPending}
               className="inline-flex items-center gap-1.5 rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-indigo-700 disabled:opacity-50 cursor-pointer transition select-none"
-              title="Reopen closed order back to Form Submitted (E09 / B09)"
+              title="Reopen closed order into dedicated Order Reopened stage"
             >
               <RotateCcw className="size-3.5" />
               {mutReopen.isPending ? "Reopening…" : "Reopen Order (B09)"}
@@ -578,13 +590,15 @@ export function CustomerJourneyMap(p: Props) {
             <button
               type="button"
               onClick={() => {
-                if (phase === "technical_delay") {
+                if (isOrderReopened) {
+                  mutResumeReopened.mutate();
+                } else if (phase === "technical_delay") {
                   mutResume.mutate();
                 } else {
                   mutResumeCustomer.mutate();
                 }
               }}
-              disabled={!canResume || mutResumeCustomer.isPending || mutResume.isPending}
+              disabled={!canResume || mutResumeCustomer.isPending || mutResume.isPending || mutResumeReopened.isPending}
               className={cn(
                 "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-bold shadow-xs transition select-none",
                 canResume
@@ -594,11 +608,11 @@ export function CustomerJourneyMap(p: Props) {
               title={
                 canResume
                   ? "Resume order to active workflow processing"
-                  : "Resume Order is active when an order is in Customer Delay, Technical Delay, or On Hold (or when Admin Override is ON)"
+                  : "Resume Order is active when an order is in Order Reopened, Customer Delay, Technical Delay, or On Hold (or when Admin Override is ON)"
               }
             >
               <RotateCcw className="size-3.5" />
-              {(mutResumeCustomer.isPending || mutResume.isPending) ? "Resuming…" : "Resume Order"}
+              {(mutResumeCustomer.isPending || mutResume.isPending || mutResumeReopened.isPending) ? "Resuming…" : "Resume Order"}
             </button>
           )}
 
@@ -1132,6 +1146,7 @@ function SilentCloseInline({ applicationId, onClose }: { applicationId: string; 
   const [reasonText, setReasonText] = useState("");
   const fnSilent = useServerFn(silentCloseOrder);
   const [busy, setBusy] = useState(false);
+  const qc = useQueryClient();
 
   const submit = async () => {
     setBusy(true);
@@ -1145,6 +1160,13 @@ function SilentCloseInline({ applicationId, onClose }: { applicationId: string; 
         },
       });
       toast.success("Order closed silently — no customer email sent");
+      qc.invalidateQueries({ queryKey: ["admin.order", applicationId] });
+      qc.invalidateQueries({ queryKey: ["admin.orders.v2"] });
+      qc.invalidateQueries({ queryKey: ["order-workflow-state", applicationId] });
+      qc.invalidateQueries({ queryKey: ["order-tickets", applicationId] });
+      qc.invalidateQueries({ queryKey: ["workflow-timers", applicationId] });
+      qc.invalidateQueries({ queryKey: ["workflow-events", applicationId] });
+      qc.invalidateQueries({ queryKey: ["due-reminders-summary"] });
       onClose();
     } catch (e: any) {
       toast.error(e?.message ?? "Silent close failed");

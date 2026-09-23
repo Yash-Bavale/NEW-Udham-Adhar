@@ -25,7 +25,7 @@ import { CompletionGateDialogStandalone } from "./CompletionGateDialogStandalone
 import {
   sendFormLink, markSubmittedToGovt, completeOrder, reopenOrder,
 } from "@/lib/orders/order-actions.functions";
-import { resumeFromHold, resumeFromCustomerDelay } from "@/lib/orders/actions/hold-actions.functions";
+import { resumeFromHold, resumeFromCustomerDelay, resumeReopenedOrder } from "@/lib/orders/actions/hold-actions.functions";
 import { handleGovtRejected } from "@/lib/orders/actions/close-actions.functions";
 import { markConsultationCompleted } from "@/lib/orders/actions/consultation.functions";
 import { listCloseReasons } from "@/lib/orders/actions/reasons.functions";
@@ -226,6 +226,8 @@ export function WorkspaceShell(p: Props) {
     qc.invalidateQueries({ queryKey: ["order-workflow-state", p.orderId] });
     qc.invalidateQueries({ queryKey: ["order-tickets", p.orderId] });
     qc.invalidateQueries({ queryKey: ["workflow-timers", p.orderId] });
+    qc.invalidateQueries({ queryKey: ["workflow-events", p.orderId] });
+    qc.invalidateQueries({ queryKey: ["due-reminders-summary"] });
   }, [qc, p.orderId]);
 
   const [sendingUpdateEmail, setSendingUpdateEmail] = useState(false);
@@ -234,6 +236,8 @@ export function WorkspaceShell(p: Props) {
   const fnComplete = useServerFn(completeOrder);
   const fnUpdateFF = useServerFn(updateFulfillmentStatus);
   const fnResume = useServerFn(resumeFromHold);
+  const fnResumeCustomer = useServerFn(resumeFromCustomerDelay);
+  const fnResumeReopened = useServerFn(resumeReopenedOrder);
   const fnReopen = useServerFn(reopenOrder);
   const fnConsultation = useServerFn(markConsultationCompleted);
   const fnResendServiceEmail = useServerFn(resendServiceChangeEmail);
@@ -249,11 +253,19 @@ export function WorkspaceShell(p: Props) {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const fnResumeCustomer = useServerFn(resumeFromCustomerDelay);
   const mutResumeCustomer = useMutation({
     mutationFn: () => fnResumeCustomer({ data: { orderId: p.orderId } }),
     onSuccess: () => {
       toast.success("Order resumed — moved to Form Submitted");
+      invalidate();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const mutResumeReopened = useMutation({
+    mutationFn: () => fnResumeReopened({ data: { orderId: p.orderId } }),
+    onSuccess: (res: any) => {
+      toast.success(`Order resumed — moved to ${res?.nextStage === "form_not_submitted" ? "Form Not Submitted" : "Form Submitted"}`);
       invalidate();
     },
     onError: (e: Error) => toast.error(e.message),
@@ -1270,6 +1282,7 @@ function SilentCloseInline({ applicationId, onClose }: { applicationId: string; 
   const [reasonText, setReasonText] = useState("");
   const fnSilent = useServerFn(silentCloseOrder);
   const [busy, setBusy] = useState(false);
+  const qc = useQueryClient();
 
   const submit = async () => {
     setBusy(true);
@@ -1283,6 +1296,13 @@ function SilentCloseInline({ applicationId, onClose }: { applicationId: string; 
         },
       });
       toast.success("Order closed silently — no customer email sent");
+      qc.invalidateQueries({ queryKey: ["admin.order", applicationId] });
+      qc.invalidateQueries({ queryKey: ["admin.orders.v2"] });
+      qc.invalidateQueries({ queryKey: ["order-workflow-state", applicationId] });
+      qc.invalidateQueries({ queryKey: ["order-tickets", applicationId] });
+      qc.invalidateQueries({ queryKey: ["workflow-timers", applicationId] });
+      qc.invalidateQueries({ queryKey: ["workflow-events", applicationId] });
+      qc.invalidateQueries({ queryKey: ["due-reminders-summary"] });
       onClose();
     } catch (e: any) {
       toast.error(e?.message ?? "Silent close failed");

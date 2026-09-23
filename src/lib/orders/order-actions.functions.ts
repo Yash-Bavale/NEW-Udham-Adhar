@@ -949,30 +949,45 @@ export const reopenOrder = createServerFn({ method: "POST" })
     z.object({ orderId: z.string().uuid(), remarks: z.string().max(2000).optional() }).parse(raw),
   )
   .handler(async ({ data, context }) => {
-    const { data: result, error } = await context.supabase.rpc("restart_order", {
-      _order_id: data.orderId,
-      _note: data.remarks ?? undefined,
-    });
-    if (error) throw new Error(error.message);
-
-    // Reset all workflow & closure fields so computeOrderStage & deriveJourneyLiveState recognise the order as active
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const now = new Date().toISOString();
 
-    const { data: app } = await supabaseAdmin
+    // 1. Snapshot previous state before modifying to preserve history
+    const { data: preApp } = await supabaseAdmin
       .from("applications")
-      .select("id, lead_id")
+      .select("id, lead_id, customer_id, application_code, order_status, fulfillment_status, workflow_status, application_status, form_submitted_at")
       .eq("id", data.orderId)
       .maybeSingle();
 
+    const previousStage = preApp?.fulfillment_status || preApp?.workflow_status || preApp?.order_status || "closed";
+    const previousStatus = preApp?.order_status || "CLOSED";
+
+    // 2. Best-effort restart_order RPC call (wrapped in try/catch)
+    try {
+      await context.supabase.rpc("restart_order", {
+        _order_id: data.orderId,
+        _note: data.remarks ?? undefined,
+      });
+    } catch (rpcErr) {
+      console.warn("[reopenOrder] restart_order RPC notice:", rpcErr);
+    }
+
+    const { data: staffProf } = await supabaseAdmin
+      .from("profiles")
+      .select("display_name, email")
+      .eq("id", context.userId)
+      .maybeSingle();
+    const staffName = (staffProf as any)?.display_name || (staffProf as any)?.email || "Staff";
+
+    // 3. Set dedicated ORDER_REOPENED status across all status columns
     const { error: upErr } = await supabaseAdmin
       .from("applications")
       .update({
         order_status: "REOPENED",
-        fulfillment_status: "form_submitted",
-        workflow_status: null,
+        fulfillment_status: "order_reopened",
+        workflow_status: "order_reopened",
         closure_stage: "none",
-        application_status: "under_process",
+        application_status: "order_reopened",
         closure_reason_id: null,
         closure_remarks: null,
         closure_next_at: null,
@@ -990,15 +1005,8 @@ export const reopenOrder = createServerFn({ method: "POST" })
 
     if (upErr) throw new Error(`Failed to update application status: ${upErr.message}`);
 
-    // Immediately schedule an active Hot Order reminder so the reopened order appears on top and triggers alert instantly
+    // 4. Immediately schedule an active Hot Order reminder so the reopened order appears in Hot Orders
     try {
-      const { data: staffProf } = await supabaseAdmin
-        .from("profiles")
-        .select("display_name, email")
-        .eq("id", context.userId)
-        .maybeSingle();
-      const staffName = (staffProf as any)?.display_name || (staffProf as any)?.email || "Staff";
-
       // Stop any prior open schedulers to satisfy one_open_scheduler_per_order
       await supabaseAdmin
         .from("order_schedulers")
@@ -1030,6 +1038,72 @@ export const reopenOrder = createServerFn({ method: "POST" })
       });
     } catch (schedErr) {
       console.warn("[reopenOrder] hot order scheduler insert warning:", schedErr);
+    }
+
+    // 5. Audit logs: workflow_events, application_events, and employee order action log
+    await supabaseAdmin.from("workflow_events").insert({
+      application_id: data.orderId,
+      lead_id: preApp?.lead_id ?? null,
+      event_type: "order_reopened",
+      title: "Order Reopened",
+      description: data.remarks ?? "Order reopened by staff",
+      customer_visible: false,
+      actor_id: context.userId,
+      actor_name: staffName,
+      is_system: false,
+      metadata: {
+        event: "ORDER_REOPENED",
+        previousStage,
+        previousStatus,
+        newStage: "Order Reopened",
+        reopenedBy: context.userId,
+        reopenedAt: now,
+        notes: data.remarks ?? null,
+      },
+    } as never);
+
+    await supabaseAdmin.from("application_events").insert({
+      application_id: data.orderId,
+      lead_id: preApp?.lead_id ?? null,
+      customer_id: preApp?.customer_id ?? null,
+      event_type: "order_status_change",
+      old_value: String(previousStatus),
+      new_value: "REOPENED",
+      note: data.remarks ?? "Order reopened — entered Order Reopened stage",
+      created_by: context.userId,
+      staff_name: staffName,
+      staff_role: "staff",
+      metadata: {
+        previousStage,
+        newStage: "order_reopened",
+      } as any,
+    } as never);
+
+    try {
+      const { logEmployeeOrderAction } = await import("@/lib/orders/order-action-logger.server");
+      await logEmployeeOrderAction({
+        orderId: data.orderId,
+        leadId: preApp?.lead_id,
+        customerId: preApp?.customer_id,
+        employeeId: context.userId,
+        employeeName: staffName,
+        actionType: "ORDER_REOPENED",
+        previousStatus,
+        newStatus: "REOPENED",
+        previousStage,
+        newStage: "Order Reopened",
+        notes: data.remarks || "Order reopened by staff",
+        source: "employee",
+        customMetadata: {
+          previousStage,
+          previousStatus,
+          reopenedAt: now,
+          reopenedBy: context.userId,
+        },
+        supabase: supabaseAdmin,
+      });
+    } catch (auditErr) {
+      console.warn("[reopenOrder] audit log warning:", auditErr);
     }
 
     if (app?.lead_id) {

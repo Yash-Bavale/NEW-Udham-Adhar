@@ -825,6 +825,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
           closure_stage: (a as any).closure_stage,
           refund_approved_at: (a as any).refund_approved_at,
           refund_processed_at: (a as any).refund_processed_at,
+          order_status: (a as any).order_status,
         },
       );
 
@@ -844,17 +845,20 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         stage === "order_reopened" ||
         a.fulfillment_status === "order_reopened" ||
         (a as any).application_status === "order_reopened" ||
-        (a as any).order_status === "REOPENED";
+        (a as any).order_status === "REOPENED" ||
+        (a as any).workflow_status === "order_reopened";
 
       const fsLower = String(a.fulfillment_status ?? "").toLowerCase();
       const isTerminal =
-        stage === "completed" ||
-        stage === "closed" ||
-        CLOSED_FS.has(fsLower) ||
-        COMPLETED_FS.has(fsLower) ||
-        ["completed", "closed", "cancelled"].includes(String(a.application_status ?? "").toLowerCase()) ||
-        ["completed", "closed", "cancelled"].includes(String((a as any).order_status ?? "").toLowerCase()) ||
-        ["completed", "closed", "cancelled"].includes(String((a as any).workflow_status ?? "").toLowerCase());
+        !is_reopened && (
+          stage === "completed" ||
+          stage === "closed" ||
+          CLOSED_FS.has(fsLower) ||
+          COMPLETED_FS.has(fsLower) ||
+          ["completed", "closed", "cancelled"].includes(String(a.application_status ?? "").toLowerCase()) ||
+          ["completed", "closed", "cancelled"].includes(String((a as any).order_status ?? "").toLowerCase()) ||
+          ["completed", "closed", "cancelled"].includes(String((a as any).workflow_status ?? "").toLowerCase())
+        );
 
       const is_hot = !isTerminal && (is_due || is_reopened);
       const is_callback_scheduled = !isTerminal && (!!cb || is_reopened);
