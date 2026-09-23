@@ -61,6 +61,8 @@ interface GlobalSoundConfig {
   customAudioName?: string | null;
   leadsSoundEnabled?: boolean;
   ordersSoundEnabled?: boolean;
+  leadsToastEnabled?: boolean;
+  ordersToastEnabled?: boolean;
   leadsRingtone?: string;
   leadsCustomUrl?: string | null;
   leadsCustomName?: string | null;
@@ -78,6 +80,8 @@ const DEFAULT_GLOBAL_SOUND_CONFIG: GlobalSoundConfig = {
   customAudioName: null,
   leadsSoundEnabled: true,
   ordersSoundEnabled: true,
+  leadsToastEnabled: true,
+  ordersToastEnabled: true,
   leadsRingtone: "chime",
   leadsCustomUrl: null,
   leadsCustomName: null,
@@ -150,6 +154,8 @@ export const getGlobalReminderSoundSettings = createServerFn({ method: "GET" })
 
     const leadsSoundEnabled = dbRow?.leads_sound_enabled ?? storageConfig?.leadsSoundEnabled ?? true;
     const ordersSoundEnabled = dbRow?.orders_sound_enabled ?? storageConfig?.ordersSoundEnabled ?? true;
+    const leadsToastEnabled = dbRow?.leads_toast_enabled ?? storageConfig?.leadsToastEnabled ?? true;
+    const ordersToastEnabled = dbRow?.orders_toast_enabled ?? storageConfig?.ordersToastEnabled ?? true;
     const leadsRingtone = dbRow?.leads_ringtone || storageConfig?.leadsRingtone || "chime";
     const leadsCustomUrl = dbRow?.leads_custom_url || storageConfig?.leadsCustomUrl || null;
     const leadsCustomName = dbRow?.leads_custom_name || storageConfig?.leadsCustomName || null;
@@ -166,6 +172,8 @@ export const getGlobalReminderSoundSettings = createServerFn({ method: "GET" })
       customAudioName,
       leadsSoundEnabled: leadsSoundEnabled !== false,
       ordersSoundEnabled: ordersSoundEnabled !== false,
+      leadsToastEnabled: leadsToastEnabled !== false,
+      ordersToastEnabled: ordersToastEnabled !== false,
       leadsRingtone,
       leadsCustomUrl,
       leadsCustomName,
@@ -321,6 +329,8 @@ export const updateSoundSettings = createServerFn({ method: "POST" })
     z.object({
       leadsSoundEnabled: z.boolean(),
       ordersSoundEnabled: z.boolean(),
+      leadsToastEnabled: z.boolean().optional(),
+      ordersToastEnabled: z.boolean().optional(),
       leadsRingtone: z.enum(["chime", "bell", "alert", "ding", "soft", "custom"]),
       leadsCustomUrl: z.string().optional().nullable(),
       leadsCustomName: z.string().optional().nullable(),
@@ -334,6 +344,8 @@ export const updateSoundSettings = createServerFn({ method: "POST" })
     await writeSoundConfigToStorage({
       leadsSoundEnabled: data.leadsSoundEnabled,
       ordersSoundEnabled: data.ordersSoundEnabled,
+      leadsToastEnabled: data.leadsToastEnabled !== false,
+      ordersToastEnabled: data.ordersToastEnabled !== false,
       leadsRingtone: data.leadsRingtone,
       leadsCustomUrl: data.leadsCustomUrl || null,
       leadsCustomName: data.leadsCustomName || null,
@@ -352,6 +364,8 @@ export const updateSoundSettings = createServerFn({ method: "POST" })
             id: 1,
             leads_sound_enabled: data.leadsSoundEnabled,
             orders_sound_enabled: data.ordersSoundEnabled,
+            leads_toast_enabled: data.leadsToastEnabled !== false,
+            orders_toast_enabled: data.ordersToastEnabled !== false,
             leads_ringtone: data.leadsRingtone,
             leads_custom_url: data.leadsCustomUrl || null,
             leads_custom_name: data.leadsCustomName || null,

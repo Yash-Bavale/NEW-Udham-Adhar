@@ -588,6 +588,8 @@ function playChime() {
   try {
     if (typeof window === "undefined") return;
     if (localStorage.getItem(MUTE_KEY) === "1") return;
+    if (localStorage.getItem("udyam.sound.enabled") === "false") return;
+    if (localStorage.getItem("udyam.sound.leads") === "false" && localStorage.getItem("udyam.sound.orders") === "false") return;
     const AC: typeof AudioContext | undefined =
       (window as any).AudioContext || (window as any).webkitAudioContext;
     if (!AC) return;
@@ -616,7 +618,10 @@ function NotificationsBell() {
   const lastCountRef = useRef<number>(0);
   const primedRef = useRef<boolean>(false);
   useEffect(() => {
-    if (typeof window !== "undefined") setMuted(localStorage.getItem(MUTE_KEY) === "1");
+    if (typeof window !== "undefined") {
+      const isMuted = localStorage.getItem(MUTE_KEY) === "1" || localStorage.getItem("udyam.sound.enabled") === "false";
+      setMuted(isMuted);
+    }
     let active = true;
     supabase.auth.getSession().then(({ data }) => {
       if (active) setHasSession(!!data.session);
@@ -656,7 +661,16 @@ function NotificationsBell() {
       lastCountRef.current = count;
       return;
     }
-    if (count > lastCountRef.current) playChime();
+    if (count > lastCountRef.current) {
+      const isMuted = typeof window !== "undefined" && (
+        localStorage.getItem(MUTE_KEY) === "1" ||
+        localStorage.getItem("udyam.sound.enabled") === "false" ||
+        (localStorage.getItem("udyam.sound.leads") === "false" && localStorage.getItem("udyam.sound.orders") === "false")
+      );
+      if (!isMuted) {
+        playChime();
+      }
+    }
     lastCountRef.current = count;
   }, [count]);
 

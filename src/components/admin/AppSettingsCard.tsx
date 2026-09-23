@@ -47,6 +47,15 @@ export function AppSettingsCard() {
   const [callbackPresets, setCallbackPresets] = useState<CallbackReminderPresetConfig>(DEFAULT_CALLBACK_PRESET_CONFIG);
   const [savingPresets, setSavingPresets] = useState(false);
 
+  const [leadsToast, setLeadsToast] = useState(() => {
+    if (typeof window === "undefined") return true;
+    return localStorage.getItem("udyam.toast.leads") !== "false";
+  });
+  const [ordersToast, setOrdersToast] = useState(() => {
+    if (typeof window === "undefined") return true;
+    return localStorage.getItem("udyam.toast.orders") !== "false";
+  });
+
   const [leadsSound, setLeadsSound] = useState(() => {
     if (typeof window === "undefined") return true;
     return localStorage.getItem("udyam.sound.leads") !== "false";
@@ -105,6 +114,8 @@ export function AppSettingsCard() {
           const s = soundRes.value;
           if (s.leadsSoundEnabled !== undefined) setLeadsSound(s.leadsSoundEnabled);
           if (s.ordersSoundEnabled !== undefined) setOrdersSound(s.ordersSoundEnabled);
+          if (s.leadsToastEnabled !== undefined) setLeadsToast(s.leadsToastEnabled);
+          if (s.ordersToastEnabled !== undefined) setOrdersToast(s.ordersToastEnabled);
           if (s.leadsRingtone) setLeadsRingtone(s.leadsRingtone as RingtoneTone);
           if (s.leadsCustomUrl) setLeadsCustomUrl(s.leadsCustomUrl);
           if (s.leadsCustomName) setLeadFileName(s.leadsCustomName);
@@ -115,6 +126,8 @@ export function AppSettingsCard() {
           // Sync local storage
           localStorage.setItem("udyam.sound.leads", String(s.leadsSoundEnabled !== false));
           localStorage.setItem("udyam.sound.orders", String(s.ordersSoundEnabled !== false));
+          localStorage.setItem("udyam.toast.leads", String(s.leadsToastEnabled !== false));
+          localStorage.setItem("udyam.toast.orders", String(s.ordersToastEnabled !== false));
           if (s.leadsRingtone) localStorage.setItem("udyam.sound.leads_ringtone", s.leadsRingtone);
           if (s.leadsCustomUrl) localStorage.setItem("udyam.sound.leads_custom_url", s.leadsCustomUrl);
           if (s.leadsCustomName) localStorage.setItem("udyam.sound.leads_file_name", s.leadsCustomName);
@@ -166,6 +179,8 @@ export function AppSettingsCard() {
         data: {
           leadsSoundEnabled: leadsSound,
           ordersSoundEnabled: ordersSound,
+          leadsToastEnabled: leadsToast,
+          ordersToastEnabled: ordersToast,
           leadsRingtone,
           leadsCustomUrl,
           leadsCustomName: leadFileName,
@@ -178,6 +193,8 @@ export function AppSettingsCard() {
       // Update local storage for active browser tab
       localStorage.setItem("udyam.sound.leads", String(leadsSound));
       localStorage.setItem("udyam.sound.orders", String(ordersSound));
+      localStorage.setItem("udyam.toast.leads", String(leadsToast));
+      localStorage.setItem("udyam.toast.orders", String(ordersToast));
       localStorage.setItem("udyam.sound.leads_ringtone", leadsRingtone);
       localStorage.setItem("udyam.sound.leads_custom_url", leadsCustomUrl);
       localStorage.setItem("udyam.sound.leads_file_name", leadFileName);
@@ -185,7 +202,7 @@ export function AppSettingsCard() {
       localStorage.setItem("udyam.sound.orders_custom_url", ordersCustomUrl);
       localStorage.setItem("udyam.sound.orders_file_name", orderFileName);
 
-      toast.success("Notification sound & MP3 ringtones saved & synced company-wide!");
+      toast.success("Notification sound & Screen toast settings saved & synced company-wide!");
     } catch (e) {
       toast.error((e as Error).message || "Failed to save sound settings");
     } finally {
@@ -400,6 +417,17 @@ export function AppSettingsCard() {
                 )}
               </div>
             )}
+
+            {/* Lead Screen Toast Popup Switch */}
+            <div className="flex items-center justify-between pt-3 border-t border-slate-200/80">
+              <div className="space-y-0.5">
+                <Label className="text-xs font-semibold text-slate-800 flex items-center gap-1.5">
+                  💬 Lead Screen Toast Popup (Bottom-Right Corner)
+                </Label>
+                <p className="text-[11px] text-slate-500">Show notification banner popup at the bottom right corner inside CRM when new lead arrives</p>
+              </div>
+              <Switch checked={leadsToast} onCheckedChange={setLeadsToast} disabled={loading} />
+            </div>
           </div>
 
           {/* ORDERS SOUND CONFIGURATION */}
@@ -482,6 +510,17 @@ export function AppSettingsCard() {
                 )}
               </div>
             )}
+
+            {/* Order Screen Toast Popup Switch */}
+            <div className="flex items-center justify-between pt-3 border-t border-slate-200/80">
+              <div className="space-y-0.5">
+                <Label className="text-xs font-semibold text-slate-800 flex items-center gap-1.5">
+                  💬 Order Screen Toast Popup (Bottom-Right Corner)
+                </Label>
+                <p className="text-[11px] text-slate-500">Show notification banner popup at the bottom right corner inside CRM when new order arrives or updates</p>
+              </div>
+              <Switch checked={ordersToast} onCheckedChange={setOrdersToast} disabled={loading} />
+            </div>
           </div>
 
           <p className="text-xs text-slate-500">

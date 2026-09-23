@@ -85,14 +85,30 @@ export function useNewLeadsWatcher() {
         invalidateOrdersData();
       }
 
-      playNotificationSound(kind);
+      // Check sound configuration
+      const soundEnabled = kind === "lead"
+        ? localStorage.getItem("udyam.sound.leads") !== "false"
+        : localStorage.getItem("udyam.sound.orders") !== "false";
 
+      if (soundEnabled) {
+        playNotificationSound(kind);
+      }
+
+      // Check desktop browser notification
       notify({ title, body, url, tag: dedupeKey });
-      toast.info(title, {
-        description: body,
-        duration: 6000,
-        action: { label: "View Details", onClick: () => { window.location.href = url; } },
-      });
+
+      // Check CRM bottom-right in-app toast notification toggle
+      const toastEnabled = kind === "lead"
+        ? localStorage.getItem("udyam.toast.leads") !== "false"
+        : localStorage.getItem("udyam.toast.orders") !== "false";
+
+      if (toastEnabled) {
+        toast.info(title, {
+          description: body,
+          duration: 6000,
+          action: { label: "View Details", onClick: () => { window.location.href = url; } },
+        });
+      }
     };
 
     (async () => {

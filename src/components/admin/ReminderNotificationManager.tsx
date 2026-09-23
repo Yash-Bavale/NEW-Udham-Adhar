@@ -9,15 +9,40 @@ import { getGlobalReminderSoundSettings } from "@/lib/settings/app-settings.func
 import { playReminderSound, showDesktopNotification, syncGlobalSoundSettings, preloadAudio } from "@/lib/audio/reminder-sounds";
 import { useRealtimeTable } from "@/hooks/useRealtimeTable";
 
+const NOTIFIED_STORAGE_KEY = "bhs.notified.reminders.v2";
+
+function loadNotifiedIds(): Set<string> {
+  if (typeof window === "undefined") return new Set();
+  try {
+    const raw = localStorage.getItem(NOTIFIED_STORAGE_KEY);
+    if (!raw) return new Set();
+    const arr = JSON.parse(raw);
+    return new Set(Array.isArray(arr) ? arr : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function saveNotifiedId(id: string) {
+  if (typeof window === "undefined" || !id) return;
+  try {
+    const current = loadNotifiedIds();
+    current.add(id);
+    const arr = Array.from(current).slice(-500);
+    localStorage.setItem(NOTIFIED_STORAGE_KEY, JSON.stringify(arr));
+  } catch {}
+}
+
 export function ReminderNotificationManager() {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const getSummaryFn = useServerFn(getDueRemindersSummary);
   const getSoundSettingsFn = useServerFn(getGlobalReminderSoundSettings);
 
-  // Set of notified scheduler IDs in session
-  const notifiedIdsRef = useRef<Set<string>>(new Set());
+  // Set of notified scheduler IDs persisted across reloads
+  const notifiedIdsRef = useRef<Set<string>>(loadNotifiedIds());
   const scheduledTimeoutsRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const isInitialLoadRef = useRef<boolean>(true);
 
   // Fetch and synchronize global audio settings across all employee sessions
   const { data: globalSound } = useQuery({
@@ -53,6 +78,7 @@ export function ReminderNotificationManager() {
   }) => {
     if (!reminder.id || notifiedIdsRef.current.has(reminder.id)) return;
     notifiedIdsRef.current.add(reminder.id);
+    saveNotifiedId(reminder.id);
 
     // 1. Play alert audio (custom uploaded audio if set, or configured tone)
     playReminderSound(
@@ -169,12 +195,27 @@ export function ReminderNotificationManager() {
   });
 
   useEffect(() => {
-    const dueList = data?.dueReminders ?? [];
-    const upcomingList = data?.upcomingReminders ?? [];
+    if (!data) return;
+    const dueList = data.dueReminders ?? [];
+    const upcomingList = data.upcomingReminders ?? [];
 
-    // Trigger alert immediately for all due items
-    for (const reminder of dueList) {
-      triggerDueAlert(reminder);
+    if (isInitialLoadRef.current) {
+      isInitialLoadRef.current = false;
+      // On initial mount / page reload, mark any reminders that were already overdue as notified
+      // so screen reload never blasts multiple repeat bells or popups for existing hot orders!
+      for (const reminder of dueList) {
+        if (reminder.id) {
+          notifiedIdsRef.current.add(reminder.id);
+          saveNotifiedId(reminder.id);
+        }
+      }
+    } else {
+      // For any reminder that newly transitions to due in this active session
+      for (const reminder of dueList) {
+        if (reminder.id && !notifiedIdsRef.current.has(reminder.id)) {
+          triggerDueAlert(reminder);
+        }
+      }
     }
 
     // Schedule client-side high-precision timers for upcoming items
