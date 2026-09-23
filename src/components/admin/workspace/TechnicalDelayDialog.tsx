@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Loader2, Server, CheckCircle2, Info, Search, Bell } from "lucide-react";
+import { Loader2, Server, CheckCircle2, Info, Search } from "lucide-react";
 import { setExternalDelay, listDelayReasons } from "@/lib/crm/workflow.functions";
 import { toast } from "sonner";
 import {
@@ -15,39 +15,10 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 
-type Priority = "low" | "normal" | "high" | "urgent";
-
 interface Props {
   applicationId: string;
   open: boolean;
   onClose: () => void;
-}
-
-const PRIORITY_META: Record<Priority, { label: string; className: string }> = {
-  low:    { label: "Low",    className: "border-slate-300 data-[on=true]:bg-slate-100 data-[on=true]:text-slate-900" },
-  normal: { label: "Normal", className: "border-sky-300 data-[on=true]:bg-sky-50 data-[on=true]:text-sky-900" },
-  high:   { label: "High",   className: "border-amber-300 data-[on=true]:bg-amber-50 data-[on=true]:text-amber-900" },
-  urgent: { label: "Urgent", className: "border-rose-300 data-[on=true]:bg-rose-50 data-[on=true]:text-rose-900" },
-};
-
-const REMINDER_PRESETS: { label: string; minutes: number }[] = [
-  { label: "1 hour",  minutes: 60 },
-  { label: "2 hours", minutes: 120 },
-  { label: "3 hours", minutes: 180 },
-  { label: "6 hours", minutes: 360 },
-  { label: "1 day",   minutes: 60 * 24 },
-  { label: "3 days",  minutes: 60 * 24 * 3 },
-  { label: "7 days",  minutes: 60 * 24 * 7 },
-];
-
-function fmtReminder(mins: number) {
-  if (mins < 60) return `${mins} min`;
-  if (mins < 60 * 24) {
-    const h = Math.floor(mins / 60), m = mins % 60;
-    return m ? `${h}h ${m}m` : `${h} hour${h === 1 ? "" : "s"}`;
-  }
-  const d = Math.floor(mins / (60 * 24));
-  return `${d} day${d === 1 ? "" : "s"}`;
 }
 
 export function TechnicalDelayDialog({ applicationId, open, onClose }: Props) {
@@ -63,11 +34,7 @@ export function TechnicalDelayDialog({ applicationId, open, onClose }: Props) {
 
   const [reasonCode, setReasonCode] = useState("");
   const [internalNote, setInternalNote] = useState("");
-  const [priority, setPriority] = useState<Priority>("normal");
   const [search, setSearch] = useState("");
-  const [reminderMinutes, setReminderMinutes] = useState<number>(120);
-  const [customOpen, setCustomOpen] = useState(false);
-  const [customValue, setCustomValue] = useState<string>("120");
 
   const allReasons = reasons?.reasons ?? [];
   const filteredReasons = useMemo(() => {
@@ -82,10 +49,6 @@ export function TechnicalDelayDialog({ applicationId, open, onClose }: Props) {
     if (open) {
       setSearch("");
       setInternalNote("");
-      setPriority("normal");
-      setReminderMinutes(120);
-      setCustomOpen(false);
-      setCustomValue("120");
       setReasonCode("");
     }
   }, [open]);
@@ -97,29 +60,25 @@ export function TechnicalDelayDialog({ applicationId, open, onClose }: Props) {
   }, [open, reasons]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const selected = filteredReasons.find((r: any) => r.code === reasonCode) ?? null;
-  const isPreset = REMINDER_PRESETS.some((p) => p.minutes === reminderMinutes) && !customOpen;
 
   const mut = useMutation({
     mutationFn: async () => {
       const reason = allReasons.find((r) => r.code === reasonCode);
       if (!reason) throw new Error("Please pick a reason");
-      if (reminderMinutes < 15) throw new Error("Reminder must be at least 15 minutes");
-      if (reminderMinutes > 60 * 24 * 30) throw new Error("Reminder cannot exceed 30 days");
-      const expectedIso = new Date(Date.now() + reminderMinutes * 60_000).toISOString();
       await fnSubmit({
         data: {
           applicationId,
           reasonCode,
           reasonLabel: reason.label,
           internalNote: internalNote || undefined,
-          expectedReviewAt: expectedIso,
-          priority,
+          expectedReviewAt: new Date().toISOString(),
+          priority: "normal",
           kind: "government_portal_pending",
         },
       });
     },
     onSuccess: () => {
-      toast.success(`E003 sent to customer + reminder queued for assignee in ${fmtReminder(reminderMinutes)}.`);
+      toast.success("Technical delay marked — order placed on hold.");
       qc.invalidateQueries({ queryKey: ["admin.orders.v2"] });
       qc.invalidateQueries({ queryKey: ["orders-v2"] });
       qc.invalidateQueries({ queryKey: ["active-order-callback"] });
@@ -137,7 +96,7 @@ export function TechnicalDelayDialog({ applicationId, open, onClose }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col p-0 overflow-hidden gap-0">
+      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col p-0 overflow-hidden gap-0">
         <DialogHeader className="shrink-0 px-5 py-4 border-b bg-gradient-to-r from-sky-50 to-white">
           <div className="flex items-center gap-2">
             <div className="grid place-items-center size-9 rounded-full bg-sky-100 text-sky-700 shrink-0">
@@ -146,14 +105,14 @@ export function TechnicalDelayDialog({ applicationId, open, onClose }: Props) {
             <div>
               <DialogTitle className="text-base">Our-side (technical) delay — internal follow-up</DialogTitle>
               <DialogDescription className="text-xs">
-                E003 goes to the customer AND a recurring reminder is queued for the assignee.
+                Marks the order on technical hold and notifies the customer of the delay.
               </DialogDescription>
             </div>
           </div>
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto min-h-0">
-          <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_320px]">
+          <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_260px]">
             <div className="border-r">
               <div className="px-4 pt-3 pb-2 flex items-center gap-2">
                 <div className="relative flex-1">
@@ -218,88 +177,11 @@ export function TechnicalDelayDialog({ applicationId, open, onClose }: Props) {
               </ScrollArea>
             </div>
 
-            <div className="p-4 space-y-4 bg-slate-50/30">
-              <div>
-                <Label className="text-[11px] uppercase tracking-wider text-slate-500 flex items-center gap-1">
-                  <Bell className="size-3" /> Follow-up reminder
-                </Label>
-                <div className="mt-1.5 grid grid-cols-3 gap-1.5">
-                  {REMINDER_PRESETS.map((p) => {
-                    const on = !customOpen && p.minutes === reminderMinutes;
-                    return (
-                      <button
-                        key={p.label}
-                        type="button"
-                        onClick={() => { setCustomOpen(false); setReminderMinutes(p.minutes); }}
-                        className={cn(
-                          "text-[11px] font-medium rounded-md border px-2 py-1.5 transition",
-                          on ? "border-indigo-400 bg-indigo-50 text-indigo-700" : "border-slate-200 bg-white text-slate-600 hover:border-slate-300",
-                        )}
-                      >
-                        {p.label}
-                      </button>
-                    );
-                  })}
-                  <button
-                    type="button"
-                    onClick={() => setCustomOpen(true)}
-                    className={cn(
-                      "text-[11px] font-medium rounded-md border px-2 py-1.5 transition",
-                      customOpen ? "border-indigo-400 bg-indigo-50 text-indigo-700" : "border-slate-200 bg-white text-slate-600 hover:border-slate-300",
-                    )}
-                  >
-                    Custom…
-                  </button>
-                </div>
-                {customOpen && (
-                  <div className="mt-2 flex items-center gap-2">
-                    <Input
-                      type="number"
-                      min={15}
-                      max={43200}
-                      value={customValue}
-                      onChange={(e) => {
-                        setCustomValue(e.target.value);
-                        const num = parseInt(e.target.value, 10);
-                        if (!isNaN(num) && num >= 15) setReminderMinutes(num);
-                      }}
-                      className="h-8 text-xs w-28"
-                      placeholder="Minutes"
-                    />
-                    <span className="text-xs text-slate-500">minutes ({fmtReminder(reminderMinutes)})</span>
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <Label className="text-[11px] uppercase tracking-wider text-slate-500">Priority</Label>
-                <div className="mt-1.5 grid grid-cols-4 gap-1">
-                  {(["low", "normal", "high", "urgent"] as Priority[]).map((p) => {
-                    const meta = PRIORITY_META[p];
-                    const on = priority === p;
-                    return (
-                      <button
-                        key={p}
-                        type="button"
-                        data-on={on}
-                        onClick={() => setPriority(p)}
-                        className={cn(
-                          "text-[11px] font-medium rounded-md border py-1.5 transition text-center",
-                          meta.className,
-                          !on && "border-slate-200 bg-white text-slate-600 hover:border-slate-300",
-                        )}
-                      >
-                        {meta.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
+            <div className="p-4 bg-slate-50/30">
               <div className="rounded-md border border-sky-200 bg-sky-50/70 p-3 text-[11.5px] text-sky-900 flex gap-2">
                 <Info className="size-3.5 shrink-0 mt-0.5" />
                 <div className="leading-snug">
-                  Customer gets delay status email. System schedules reminder for assignee in <b>{fmtReminder(reminderMinutes)}</b>.
+                  Customer will receive a delay notification email. The order is placed on <b>Technical Delay</b> hold until you <b>Resume</b> it.
                 </div>
               </div>
             </div>

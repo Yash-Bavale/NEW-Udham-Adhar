@@ -341,30 +341,13 @@ export const setExternalDelay = createServerFn({ method: "POST" })
         await emitToRole("super_admin", notifBase);
       }
     } else {
-      // ── Internal / our-side: notify customer with E005 hold intimation + assignee review reminder ──
-      const dueAt = expectedReviewIso ?? new Date(Date.now() + 24 * 3600 * 1000).toISOString();
-      await admin.from("workflow_reminders").insert({
-        application_id: app.id,
-        lead_id: app.lead_id,
-        kind: "internal_review",
-        template_code: null,
-        due_at: dueAt,
-        assigned_to: lead?.assigned_to ?? null,
-        status: "pending",
-        payload: {
-          reason: data.reasonLabel,
-          reason_block: reasonBlock,
-          reason_code: data.reasonCode,
-        },
-        created_by: context.userId,
-      } as never);
-
+      // ── Internal / our-side: notify customer with hold intimation ──
       // Internal notifications: assignee (if any) + Super Admin/Admin/Ops so someone always sees it.
       const { emitToUsers, emitToRole } = await import("@/lib/notifications/emit.server");
       const notifBase = {
         kind: "our_side_delay_start" as const,
         title: `Our-Side Delay — ${data.reasonLabel}`,
-        body: `Order ${app.application_code ?? ""} paused (internal). Review by ${new Date(dueAt).toLocaleString("en-IN")}.`,
+        body: `Order ${app.application_code ?? ""} paused (internal delay).`,
         href: `/admin/orders/${app.id}`,
         entityKind: "application",
         entityId: app.id,
@@ -375,66 +358,11 @@ export const setExternalDelay = createServerFn({ method: "POST" })
       await emitToRole("super_admin", notifBase);
       await emitToRole("admin", notifBase);
 
-      // Stop any existing active/paused schedulers for this order first
-      await admin
-        .from("order_schedulers")
-        .update({
-          status: "stopped",
-          stopped_at: new Date().toISOString(),
-          stop_reason: "technical_delay_reminder_scheduled",
-          stop_triggered_by: context.userId,
-        } as never)
-        .eq("application_id", app.id)
-        .in("status", ["active", "paused"]);
-
-      // Calculate reminder duration in minutes for scheduler tracking
-      const firesAtTime = new Date(dueAt).getTime();
-      const durationMinutes = Math.max(1, Math.round((firesAtTime - Date.now()) / 60_000));
-      const remarksObj = {
-        reason: data.reasonCode,
-        reasonLabel: data.reasonLabel,
-        note: data.internalNote?.trim() || null,
-        durationMinutes,
-        channel: "technical_delay",
-        created_by_name: name,
-        created_at: new Date().toISOString(),
-      };
-
-      // Arm active scheduler in order_schedulers so it triggers Hot Order status and audio/desktop alerts when due
-      const { data: createdScheduler } = await admin
-        .from("order_schedulers")
-        .insert({
-          application_id: app.id,
-          scheduler_type: "our_side_reminder",
-          status: "active",
-          started_at: holdStartedAt,
-          fires_at: dueAt,
-          business_seconds_total: durationMinutes * 60,
-          business_seconds_remaining: durationMinutes * 60,
-          remarks: JSON.stringify(remarksObj),
-          created_by: context.userId,
-        } as never)
-        .select("id")
-        .maybeSingle();
-
-      if (createdScheduler?.id) {
-        await admin.from("order_reminders").insert({
-          application_id: app.id,
-          scheduler_id: createdScheduler.id,
-          reminder_type: "manual",
-          remind_at: dueAt,
-          interval_business_seconds: durationMinutes * 60,
-          times_fired: 0,
-          is_active: true,
-          created_by: context.userId,
-        } as never);
-      }
-
       try {
         await admin.from("application_events").insert({
           application_id: app.id,
-          event_type: "technical_delay_reminder_scheduled",
-          note: `Technical delay reminder set for ${expectedIst} · Reason: ${data.reasonLabel}${data.internalNote ? ` (${data.internalNote})` : ""}`,
+          event_type: "technical_delay_marked",
+          note: `Technical delay marked: ${data.reasonLabel}${data.internalNote ? ` (${data.internalNote})` : ""}`,
           staff_name: name,
           staff_role: "staff",
         } as never);
@@ -449,7 +377,7 @@ export const setExternalDelay = createServerFn({ method: "POST" })
           employeeId: context.userId,
           employeeName: name,
           actionType: "TECHNICAL_DELAY_ADDED",
-          notes: `Technical delay marked: ${data.reasonLabel}. Reminder set for ${expectedIst}.${data.internalNote ? ` Note: ${data.internalNote}` : ""}`,
+          notes: `Technical delay marked: ${data.reasonLabel}.${data.internalNote ? ` Note: ${data.internalNote}` : ""}`,
           source: "employee",
           supabase: admin,
         });
