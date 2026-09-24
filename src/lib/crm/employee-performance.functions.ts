@@ -1493,7 +1493,7 @@ export const getEmployeeDetailPerformance = createServerFn({
         .eq("user_id", data.employeeId)
         .limit(1)
         .maybeSingle(),
-      admin
+      adminAny
         .from("employee_sessions")
         .select("id, started_at, ended_at, last_heartbeat_at, last_activity_at, active_seconds, idle_seconds, away_seconds, status, is_active, current_module, current_order_id")
         .eq("employee_id", data.employeeId)

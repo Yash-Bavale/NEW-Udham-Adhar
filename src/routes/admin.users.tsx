@@ -47,12 +47,12 @@ function UsersPage() {
           </thead>
           <tbody>
             {isLoading && <tr><td colSpan={5} className="px-3 py-6 text-center text-slate-500">Loading…</td></tr>}
-            {data?.rows.map((u) => (
+            {data?.rows.map((u: any) => (
               <tr key={u.id} className="border-t align-top">
                 <td className="px-3 py-2">{u.email}</td>
                 <td className="px-3 py-2">
                   <div className="flex flex-wrap gap-1">
-                    {u.roles.map((r) => (
+                    {u.roles.map((r: string) => (
                       <span key={r} className="inline-flex items-center gap-1 rounded bg-slate-100 px-2 py-0.5 text-xs">
                         {r}
                         <button

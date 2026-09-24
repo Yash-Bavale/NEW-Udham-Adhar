@@ -119,19 +119,19 @@ function WorkforcePage() {
 
   // Filter into discrete lifecycle tabs
   const activeWorkforce = useMemo(() => {
-    return rows.filter((r) => r.employment_status === "ACTIVE" && r.is_active);
+    return rows.filter((r: any) => r.employment_status === "ACTIVE" && r.is_active);
   }, [rows]);
 
   const poolMembers = useMemo(() => {
-    return rows.filter((r) => r.is_in_pool || r.auto_assign_enabled);
+    return rows.filter((r: any) => r.is_in_pool || r.auto_assign_enabled);
   }, [rows]);
 
   const onLeaveOrUnavailable = useMemo(() => {
-    return rows.filter((r) => r.is_on_leave || !r.is_active || r.employment_status === "SUSPENDED");
+    return rows.filter((r: any) => r.is_on_leave || !r.is_active || r.employment_status === "SUSPENDED");
   }, [rows]);
 
   const archivedOrInactive = useMemo(() => {
-    return rows.filter((r) => r.employment_status === "ARCHIVED" || r.employment_status === "TERMINATED" || r.employment_status === "INACTIVE");
+    return rows.filter((r: any) => r.employment_status === "ARCHIVED" || r.employment_status === "TERMINATED" || r.employment_status === "INACTIVE");
   }, [rows]);
 
   const [addOpen, setAddOpen] = useState(false);
@@ -303,8 +303,8 @@ function WorkforcePage() {
                     <tr><td colSpan={8} className="px-4 py-10 text-center text-slate-500">No active employees found.</td></tr>
                   )}
                   {activeWorkforce
-                    .filter((u) => !query || (u.full_name || "").toLowerCase().includes(query.toLowerCase()) || u.email.toLowerCase().includes(query.toLowerCase()))
-                    .map((u) => (
+                    .filter((u: any) => !query || (u.full_name || "").toLowerCase().includes(query.toLowerCase()) || u.email.toLowerCase().includes(query.toLowerCase()))
+                    .map((u: any) => (
                       <tr key={u.id} className="hover:bg-slate-50/70 transition-colors">
                         <td className="px-4 py-2.5 font-mono text-xs font-semibold text-slate-600">
                           {u.employee_code || "—"}
@@ -467,7 +467,7 @@ function WorkforcePage() {
                   {archivedOrInactive.length === 0 && (
                     <tr><td colSpan={5} className="px-4 py-8 text-center text-xs text-slate-500">No archived employees.</td></tr>
                   )}
-                  {archivedOrInactive.map((u) => (
+                  {archivedOrInactive.map((u: any) => (
                     <tr key={u.id} className="hover:bg-slate-50/70">
                       <td className="px-4 py-2.5">
                         <div className="font-semibold text-slate-700">{u.full_name || "—"}</div>
