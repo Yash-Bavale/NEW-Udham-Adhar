@@ -190,10 +190,10 @@ export const resumeFromHold = createServerFn({ method: "POST" })
 
     const [{ data: lead, error: leadError }, { data: customer, error: customerError }] = await Promise.all([
       preRow.lead_id
-        ? supabaseAdmin.from("leads").select("email, name").eq("id", preRow.lead_id).maybeSingle()
+        ? supabaseAdmin.from("leads").select("email, name, mobile, service, assigned_to").eq("id", preRow.lead_id).maybeSingle()
         : Promise.resolve({ data: null, error: null }),
       preRow.customer_id
-        ? supabaseAdmin.from("customers").select("primary_email, name").eq("id", preRow.customer_id).maybeSingle()
+        ? supabaseAdmin.from("customers").select("primary_email, primary_phone, name").eq("id", preRow.customer_id).maybeSingle()
         : Promise.resolve({ data: null, error: null }),
     ]);
     if (leadError) throw new Error(`Unable to read the order recipient: ${leadError.message}`);
@@ -278,15 +278,41 @@ export const resumeFromHold = createServerFn({ method: "POST" })
         timeZone: "Asia/Kolkata", day: "2-digit", month: "short", year: "numeric",
         hour: "2-digit", minute: "2-digit", hour12: true,
       });
+
+      // Resolve executive name
+      let executiveName = "Customer Care Team";
+      const staffId = (preRow as any).assigned_to || lead?.assigned_to || context.userId;
+      if (staffId) {
+        const { data: prof } = await supabaseAdmin
+          .from("profiles")
+          .select("display_name, full_name, email")
+          .eq("id", staffId)
+          .maybeSingle();
+        const p = prof as { display_name?: string | null; full_name?: string | null; email?: string | null } | null;
+        if (p?.display_name || p?.full_name || p?.email) {
+          executiveName = p.display_name || p.full_name || p.email || "Customer Care Team";
+        }
+      }
+
       const sendResult = await enqueueFromTemplateInternal(
         BHS_EMAILS.E011_TECHNICAL_DELAY_RESOLVED,
         email,
         {
-          customerName: recipientName,
+          order_number: preRow.application_code || data.orderId.slice(0, 8),
           orderNumber: preRow.application_code || data.orderId.slice(0, 8),
+          customer_name: recipientName,
+          customerName: recipientName,
+          service_name: lead?.service || "Business Registration & Filing",
+          serviceName: lead?.service || "Business Registration & Filing",
           resolved_at: resolvedAt,
-          resolvedAt,
-          fromName: process.env.ZOHO_FROM_NAME || "Udyam Support",
+          resolvedAt: resolvedAt,
+          customer_email: email,
+          customerEmail: email,
+          customer_mobile: lead?.mobile || customer?.primary_phone || "—",
+          customerMobile: lead?.mobile || customer?.primary_phone || "—",
+          executive_name: executiveName,
+          executiveName: executiveName,
+          fromName: process.env.ZOHO_FROM_NAME || "Care | Business Help Services",
         },
         {
           applicationId: data.orderId,

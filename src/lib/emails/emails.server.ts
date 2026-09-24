@@ -328,14 +328,14 @@ async function backfillCommonVariables(
   if (!leadId && !applicationId) return out;
   try {
     type LeadRow = { id?: string; lead_code?: string | null; name?: string | null; email?: string | null; mobile?: string | null; service?: string | null; assigned_to?: string | null; created_at?: string | null };
-    type AppRow = { id?: string; application_code?: string | null; lead_id?: string | null; assigned_to?: string | null; created_at?: string | null; updated_at?: string | null; closure_reason_id?: string | null; closure_remarks?: string | null; fulfillment_status?: string | null };
+    type AppRow = { id?: string; application_code?: string | null; lead_id?: string | null; customer_id?: string | null; assigned_to?: string | null; created_at?: string | null; updated_at?: string | null; closure_reason_id?: string | null; closure_remarks?: string | null; fulfillment_status?: string | null };
     let lead: LeadRow | null = null;
     let app: AppRow | null = null;
 
     if (applicationId) {
       const { data } = await supabaseAdmin
         .from("applications")
-        .select("id, application_code, lead_id, assigned_to, created_at, updated_at, closure_reason_id, closure_remarks, fulfillment_status, fulfilled_at, certificate_uploaded_at")
+        .select("id, application_code, lead_id, customer_id, assigned_to, created_at, updated_at, closure_reason_id, closure_remarks, fulfillment_status, fulfilled_at, certificate_uploaded_at")
         .eq("id", applicationId)
         .maybeSingle();
       app = (data as AppRow | null) ?? null;
@@ -350,11 +350,23 @@ async function backfillCommonVariables(
       lead = (data as LeadRow | null) ?? null;
     }
 
+    if (app?.customer_id && (missing("customer_name") || missing("customer_email") || missing("customer_mobile"))) {
+      const { data: cust } = await supabaseAdmin
+        .from("customers")
+        .select("name, primary_email, primary_phone")
+        .eq("id", app.customer_id)
+        .maybeSingle();
+      const c = cust as { name?: string; primary_email?: string; primary_phone?: string } | null;
+      if (missing("customer_name") && c?.name) out.customer_name = c.name;
+      if (missing("customer_email") && c?.primary_email) out.customer_email = c.primary_email;
+      if (missing("customer_mobile") && c?.primary_phone) out.customer_mobile = c.primary_phone;
+    }
 
     if (missing("customer_name") && lead?.name) out.customer_name = lead.name;
     if (missing("customer_email") && lead?.email) out.customer_email = lead.email;
     if (missing("customer_mobile") && lead?.mobile) out.customer_mobile = lead.mobile;
     if (missing("service_name") && lead?.service) out.service_name = lead.service;
+    if (missing("customer_mobile")) out.customer_mobile = "—";
     // Order number is ALWAYS the application_code — never fall back to the lead_code.
     // Lead code is a pre-order identifier and must never appear as the order number.
     if (missing("order_number")) out.order_number = app?.application_code ?? "";
