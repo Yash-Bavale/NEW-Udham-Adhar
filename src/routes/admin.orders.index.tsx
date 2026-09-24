@@ -821,7 +821,15 @@ return (
         let countCls = "text-slate-900";
         let subtitleCls = "text-slate-400";
 
-        if (b.id === "hot_orders") {
+        if (b.id === "needs_action") {
+          cardContainerCls = active
+            ? "bg-red-50 border-red-500 text-red-950 shadow-sm ring-2 ring-red-300"
+            : "bg-red-50/40 border-red-200/80 text-red-950 hover:bg-red-50 hover:border-red-300";
+          headerCls = "text-red-600 font-bold";
+          iconCls = "text-red-500";
+          countCls = "text-red-600";
+          subtitleCls = "text-red-500/80";
+        } else if (b.id === "hot_orders") {
           cardContainerCls = active
             ? "bg-rose-50 border-rose-400 text-rose-950 shadow-sm ring-2 ring-rose-300"
             : "bg-rose-50/70 border-rose-200/90 text-rose-950 hover:bg-rose-100/70 hover:border-rose-300";
@@ -829,6 +837,38 @@ return (
           iconCls = "text-rose-600";
           countCls = "text-rose-700";
           subtitleCls = "text-rose-500/80";
+        } else if (b.id === "pending") {
+          cardContainerCls = active
+            ? "bg-amber-50 border-amber-500 text-amber-950 shadow-sm ring-2 ring-amber-300"
+            : "bg-amber-50/50 border-amber-200/90 text-amber-950 hover:bg-amber-100/60 hover:border-amber-300";
+          headerCls = "text-amber-700 font-bold";
+          iconCls = "text-amber-600 animate-[spin_3s_ease-in-out_infinite]";
+          countCls = "text-amber-950";
+          subtitleCls = "text-amber-600/80";
+        } else if (b.id === "completed") {
+          cardContainerCls = active
+            ? "bg-emerald-50 border-emerald-500 text-emerald-950 shadow-sm ring-2 ring-emerald-300"
+            : "bg-emerald-50/40 border-emerald-200/80 text-emerald-950 hover:bg-emerald-50 hover:border-emerald-300";
+          headerCls = "text-emerald-700 font-bold";
+          iconCls = "text-emerald-600";
+          countCls = "text-emerald-900";
+          subtitleCls = "text-emerald-600/80";
+        } else if (b.id === "technical_delay") {
+          cardContainerCls = active
+            ? "bg-sky-100/80 border-sky-500 text-sky-950 shadow-sm ring-2 ring-sky-300"
+            : "bg-sky-50/60 border-sky-200/90 text-sky-950 hover:bg-sky-100/60 hover:border-sky-300";
+          headerCls = "text-sky-700 font-bold";
+          iconCls = "text-sky-600";
+          countCls = "text-sky-900";
+          subtitleCls = "text-sky-600/80";
+        } else if (b.id === "customer_delay") {
+          cardContainerCls = active
+            ? "bg-orange-50 border-orange-500 text-orange-950 shadow-sm ring-2 ring-orange-300"
+            : "bg-orange-50/40 border-orange-200/80 text-orange-950 hover:bg-orange-50 hover:border-orange-300";
+          headerCls = "text-orange-700 font-bold";
+          iconCls = "text-orange-600";
+          countCls = "text-orange-950";
+          subtitleCls = "text-orange-600/70";
         } else if (b.id === "reminders") {
           cardContainerCls = active
             ? "bg-indigo-50 border-indigo-400 text-indigo-950 shadow-sm ring-2 ring-indigo-300"
@@ -839,46 +879,22 @@ return (
           iconCls = active || countVal > 0 ? "text-indigo-600" : "text-slate-400";
           countCls = active || countVal > 0 ? "text-indigo-950" : "text-slate-900";
           subtitleCls = active || countVal > 0 ? "text-indigo-600/70" : "text-slate-400";
-        } else if (b.id === "exception" && countVal > 0) {
+        } else if (b.id === "exception") {
           cardContainerCls = active
             ? "bg-amber-50 border-amber-400 text-amber-950 shadow-sm ring-2 ring-amber-300"
-            : "bg-amber-50/40 border-amber-200/90 text-amber-950 hover:bg-amber-50/80 hover:border-amber-300";
-          headerCls = "text-amber-600 font-bold";
-          iconCls = "text-amber-600";
-          countCls = "text-amber-950";
-          subtitleCls = "text-amber-600/70";
+            : countVal > 0
+              ? "bg-amber-50/40 border-amber-200/90 text-amber-950 hover:bg-amber-50/80 hover:border-amber-300"
+              : "bg-white border-slate-200 text-slate-800 hover:border-slate-300 hover:bg-slate-50/70";
+          headerCls = active || countVal > 0 ? "text-amber-600 font-bold" : "text-slate-500";
+          iconCls = active || countVal > 0 ? "text-amber-600" : "text-slate-400";
+          countCls = active || countVal > 0 ? "text-amber-950" : "text-slate-900";
+          subtitleCls = active || countVal > 0 ? "text-amber-600/70" : "text-slate-400";
         } else if (active) {
-          if (b.id === "all") {
-            cardContainerCls = "bg-slate-900 text-white border-slate-900 shadow-sm";
-            headerCls = "text-slate-300";
-            iconCls = "text-slate-300";
-            countCls = "text-white";
-            subtitleCls = "text-slate-400";
-          } else if (b.id === "completed") {
-            cardContainerCls = "bg-emerald-50 border-emerald-400 text-emerald-950 shadow-sm ring-2 ring-emerald-300";
-            headerCls = "text-emerald-700 font-bold";
-            iconCls = "text-emerald-600";
-            countCls = "text-emerald-950";
-            subtitleCls = "text-emerald-600/80";
-          } else if (b.id === "technical_delay") {
-            cardContainerCls = "bg-sky-50 border-sky-400 text-sky-950 shadow-sm ring-2 ring-sky-300";
-            headerCls = "text-sky-700 font-bold";
-            iconCls = "text-sky-600";
-            countCls = "text-sky-950";
-            subtitleCls = "text-sky-600/80";
-          } else if (b.id === "customer_delay") {
-            cardContainerCls = "bg-amber-50 border-amber-400 text-amber-950 shadow-sm ring-2 ring-amber-300";
-            headerCls = "text-amber-700 font-bold";
-            iconCls = "text-amber-600";
-            countCls = "text-amber-950";
-            subtitleCls = "text-amber-600/80";
-          } else {
-            cardContainerCls = "bg-slate-900 text-white border-slate-900 shadow-sm";
-            headerCls = "text-slate-300";
-            iconCls = "text-slate-300";
-            countCls = "text-white";
-            subtitleCls = "text-slate-400";
-          }
+          cardContainerCls = "bg-slate-900 text-white border-slate-900 shadow-sm";
+          headerCls = "text-slate-300";
+          iconCls = "text-slate-300";
+          countCls = "text-white";
+          subtitleCls = "text-slate-400";
         }
 
         return (
@@ -896,12 +912,20 @@ return (
           >
             {/* Top row: Label & Icon */}
             <div className="flex items-center justify-between gap-1 w-full">
-              <span
-                className={cn("text-[10px] font-bold tracking-wider uppercase truncate", headerCls)}
-                title={b.label}
-              >
-                {b.shortLabel || b.label}
-              </span>
+              <div className="flex items-center gap-1.5 min-w-0">
+                {b.id === "hot_orders" && countVal > 0 && (
+                  <span className="relative flex h-2 w-2 shrink-0">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-600"></span>
+                  </span>
+                )}
+                <span
+                  className={cn("text-[10px] font-bold tracking-wider uppercase truncate", headerCls)}
+                  title={b.label}
+                >
+                  {b.shortLabel || b.label}
+                </span>
+              </div>
               <IconComponent className={cn("w-3.5 h-3.5 shrink-0 transition-transform group-hover:scale-110", iconCls)} />
             </div>
 
