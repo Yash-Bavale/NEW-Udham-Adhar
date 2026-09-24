@@ -695,67 +695,13 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
     const { data: apps, error: appErr } = await baseQ.limit(5000);
     if (appErr) throw new Error(appErr.message);
 
-    const { data: globalActiveSchedulers } = await admin
-      .from("order_schedulers")
-      .select("id, application_id, status, scheduler_type, fires_at, remarks, created_at, created_by")
-      .eq("status", "active")
-      .order("created_at", { ascending: false });
-
-    const activeAppIds = Array.from(
-      new Set((globalActiveSchedulers ?? []).map((s) => s.application_id).filter(Boolean))
-    ) as string[];
-
-    let extraActiveApps: any[] = [];
-    if (activeAppIds.length > 0) {
-      const { data: extraApps } = await admin
-        .from("applications")
-        .select(
-          "id, application_code, fulfillment_status, application_status, created_at, assigned_to, lead_id, customer_id, service_id, form_submitted_at, certificate_uploaded_at, workflow_status, closure_stage, closure_reason_code, refund_approved_at, refund_processed_at"
-        )
-        .in("id", activeAppIds)
-        .eq("is_deleted", false);
-      extraActiveApps = extraApps ?? [];
-    }
-
-    const matchesActiveFilters = (a: any) => {
-      if (!isAdmin) {
-        if (a.assigned_to !== context.userId) return false;
-      } else if (data.assignedTo && data.assignedTo !== "all" && data.assignedTo.trim() !== "") {
-        if (data.assignedTo === "unassigned") {
-          if (a.assigned_to !== null && a.assigned_to !== undefined) return false;
-        } else {
-          if (a.assigned_to !== data.assignedTo) return false;
-        }
-      }
-      if (data.serviceId && data.serviceId !== "all" && data.serviceId.trim() !== "") {
-        if (a.service_id !== data.serviceId) return false;
-      }
-      if (data.search && data.search.trim()) {
-        const term = data.search.trim().toLowerCase();
-        const codeMatches = (a.application_code || "").toLowerCase().includes(term);
-        const leadMatches = matchingLeadIds && a.lead_id && matchingLeadIds.includes(a.lead_id);
-        if (!codeMatches && !leadMatches) return false;
-      }
-      if (data.fulfillmentStatus && data.fulfillmentStatus !== "all" && data.fulfillmentStatus.trim() !== "") {
-        if (a.fulfillment_status !== data.fulfillmentStatus) return false;
-      }
-      return true;
-    };
-
-    const appMapById = new Map<string, any>();
-    for (const a of (apps ?? [])) {
-      if (matchesActiveFilters(a)) appMapById.set(a.id, a);
-    }
-    for (const a of extraActiveApps) {
-      if (matchesActiveFilters(a)) appMapById.set(a.id, a);
-    }
-    const appList = Array.from(appMapById.values());
+    const appList = apps ?? [];
 
     if (appList.length === 0) {
       return {
         rows: [],
         total: 0,
-        counts: { all: 0, needs_action: 0, pending: 0, completed: 0, closed: 0, exception: 0, actionRequired: 0, processed: 0, reminders: 0, hot_orders: 0, technical_delay: 0, customer_delay: 0 },
+        counts: { all: 0, needs_action: 0, pending: 0, completed: 0, closed: 0, exception: 0, actionRequired: 0, processed: 0, reminders: 0, hot_orders: 0, technical_delay: 0, customer_delay: 0, totalAll: 0 },
         ageBuckets: { d1: 0, d2: 0, d3: 0, d7: 0, older: 0 },
         page: data.page,
         pageSize: data.pageSize,
@@ -763,6 +709,13 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
     }
 
     const ids = appList.map((a) => a.id);
+
+    const { data: globalActiveSchedulers } = await admin
+      .from("order_schedulers")
+      .select("id, application_id, status, scheduler_type, fires_at, remarks, created_at, created_by")
+      .in("application_id", ids)
+      .eq("status", "active")
+      .order("created_at", { ascending: false });
     const leadIds = Array.from(new Set(appList.map((a) => a.lead_id).filter(Boolean))) as string[];
     const customerIds = Array.from(new Set(appList.map((a) => a.customer_id).filter(Boolean))) as string[];
     const serviceIds = Array.from(new Set(appList.map((a) => a.service_id).filter(Boolean))) as string[];
