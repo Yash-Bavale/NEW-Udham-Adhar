@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, keepPreviousData, useQueryClient } from "@tanstack/react-query";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
-import { Search, ChevronLeft, ChevronRight, RotateCcw, X, Filter, Loader2, ArrowUpDown, ArrowUp, ArrowDown, ShieldAlert, Flame, PhoneCall, PhoneForwarded, Clock, Server, LayoutGrid, Inbox, Bell, Hourglass, CheckCircle2, CheckCheck, AlertTriangle, UserX, UserCheck } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight, RotateCcw, X, Filter, Loader2, ArrowUpDown, ArrowUp, ArrowDown, ShieldAlert, Flame, PhoneCall, PhoneForwarded, Clock, Server, LayoutGrid, Inbox, Bell, Hourglass, CheckCircle2, CheckCheck, AlertTriangle, UserX, UserCheck, Scale, Sparkles } from "lucide-react";
 import { formatIST, istDateKey } from "@/lib/datetime";
 import { toast } from "sonner";
 
@@ -10,6 +10,7 @@ import { listOrdersV2 } from "@/lib/crm/orders-v2.functions";
 import { listStaff } from "@/lib/crm/leads-admin.functions";
 import { listServices } from "@/lib/crm/services-admin.functions";
 import { bulkAssignOrders } from "@/lib/crm/orders.functions";
+import { autoDistributeSelectedOrders } from "@/lib/crm/assignment-history.functions";
 import { STAGE_META, type OrderStage } from "@/lib/crm/computeOrderStage";
 
 import { Input } from "@/components/ui/input";
@@ -458,11 +459,41 @@ useEffect(() => {
 }, [page, total, queryPayload, debouncedSearch, fulfillmentStatus, serviceId, assignedTo, paymentStatus, dateFrom, dateTo, bucket, stageFilter, actionStatusFilter, pendingAge, customDays, sortField, sortOrder, qc, listFn, pageSize]);
 
 const bulkAssignFn = useServerFn(bulkAssignOrders);
+const autoDistributeFn = useServerFn(autoDistributeSelectedOrders);
 const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
 const [assigningBusy, setAssigningBusy] = useState(false);
 
+async function handleAutoDistribute() {
+  if (!selectedOrderIds.length) return;
+  setAssigningBusy(true);
+  try {
+    const res = await autoDistributeFn({
+      data: {
+        applicationIds: selectedOrderIds,
+        reason: "Equally distributed by Admin across active staff",
+      },
+    });
+    if (res.success) {
+      toast.success(res.summaryMessage || `Equally distributed ${res.distributedCount} order(s)!`);
+      setSelectedOrderIds([]);
+      qc.invalidateQueries({ queryKey: ["admin.orders.v2"] });
+      qc.invalidateQueries({ queryKey: ["admin.assignment.metrics"] });
+      qc.invalidateQueries({ queryKey: ["admin.assignment.history"] });
+    } else {
+      toast.error(res.summaryMessage || "Failed to distribute orders");
+    }
+  } catch (e) {
+    toast.error((e as Error).message || "Failed to auto-distribute orders");
+  } finally {
+    setAssigningBusy(false);
+  }
+}
+
 async function handleBulkReassign(targetStaffId: string) {
   if (!selectedOrderIds.length) return;
+  if (targetStaffId === "auto_distribute") {
+    return handleAutoDistribute();
+  }
   setAssigningBusy(true);
   try {
     const assignedTo = targetStaffId === "unassign" ? null : targetStaffId;
@@ -472,6 +503,8 @@ async function handleBulkReassign(targetStaffId: string) {
     toast.success(`Successfully reassigned ${selectedOrderIds.length} order(s) to ${name}`);
     setSelectedOrderIds([]);
     qc.invalidateQueries({ queryKey: ["admin.orders.v2"] });
+    qc.invalidateQueries({ queryKey: ["admin.assignment.metrics"] });
+    qc.invalidateQueries({ queryKey: ["admin.assignment.history"] });
   } catch (e) {
     toast.error((e as Error).message || "Failed to reassign orders");
   } finally {
@@ -960,13 +993,30 @@ return (
           <span>{selectedOrderIds.length === 1 ? "Order Selected" : "Orders Selected"}</span>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button
+            size="sm"
+            onClick={handleAutoDistribute}
+            disabled={assigningBusy}
+            className="h-8 text-xs font-bold gap-1.5 bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 text-white shadow-xs border border-indigo-400/30 transition-all duration-150 active:scale-95"
+          >
+            {assigningBusy ? (
+              <Loader2 className="size-3.5 animate-spin" />
+            ) : (
+              <Scale className="size-3.5" />
+            )}
+            Equally Distribute
+          </Button>
+
           <Select onValueChange={(val) => handleBulkReassign(val)} disabled={assigningBusy}>
             <SelectTrigger className="h-8 text-xs bg-slate-800 border-slate-700 text-white w-[190px]">
               <UserCheck className="size-3.5 mr-1.5 text-indigo-400" />
               <SelectValue placeholder={assigningBusy ? "Reassigning…" : "Reassign Staff…"} />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value="auto_distribute" className="font-semibold text-indigo-600 dark:text-indigo-400">
+                ⚖️ Auto-Balance / Equally Distribute
+              </SelectItem>
               <SelectItem value="unassign">❌ Unassign Order</SelectItem>
               {staffProfiles.map((s: any) => (
                 <SelectItem key={s.id} value={s.id}>

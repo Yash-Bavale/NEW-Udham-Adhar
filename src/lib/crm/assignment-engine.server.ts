@@ -685,6 +685,141 @@ export async function reassignOrdersFromUnavailableEmployee(params: {
 }
 
 /**
+ * 4b. Canonical Equal Workload Distribution across active eligible staff
+ */
+export async function distributeOrdersEquallyCanonical(input: {
+  applicationIds: string[];
+  actorId?: string;
+  source?: "super_admin" | "admin" | "system";
+  reason?: string;
+  targetEmployeeIds?: string[];
+}): Promise<{
+  success: boolean;
+  distributedCount: number;
+  overflowCount: number;
+  skippedCount: number;
+  assignments: Array<{ orderId: string; applicationCode: string; newEmployeeId: string | null }>;
+  summaryMessage: string;
+}> {
+  await ensureTablesExist();
+  const { applicationIds, actorId, source = "super_admin", reason = "Equally distributed by Admin", targetEmployeeIds } = input;
+  if (!applicationIds || !applicationIds.length) {
+    return { success: true, distributedCount: 0, overflowCount: 0, skippedCount: 0, assignments: [], summaryMessage: "No orders selected." };
+  }
+
+  // 1. Fetch orders
+  const { data: rawApps, error: fetchErr } = await (supabaseAdmin as any)
+    .from("applications")
+    .select("id, application_code, assigned_to, lead_id, customer_id, fulfillment_status, application_status, created_at")
+    .in("id", applicationIds);
+
+  if (fetchErr || !rawApps || rawApps.length === 0) {
+    return { success: false, distributedCount: 0, overflowCount: 0, skippedCount: 0, assignments: [], summaryMessage: "Selected orders not found." };
+  }
+
+  // 2. Fetch available staff and workloads
+  const allStaffWorkloads = await calculateStaffWorkloads();
+  let availableStaff = allStaffWorkloads.filter((s) => s.isAvailable);
+  if (targetEmployeeIds && targetEmployeeIds.length > 0) {
+    availableStaff = availableStaff.filter((s) => targetEmployeeIds.includes(s.employeeId));
+  }
+
+  if (availableStaff.length === 0) {
+    return {
+      success: false,
+      distributedCount: 0,
+      overflowCount: 0,
+      skippedCount: 0,
+      assignments: [],
+      summaryMessage: "No active eligible staff available to receive orders.",
+    };
+  }
+
+  // Workload pool for dynamic in-memory balancing
+  const staffPool = availableStaff.map((s) => ({
+    employeeId: s.employeeId,
+    name: s.name,
+    email: s.email,
+    workload: s.effectiveWorkload,
+    assignedCount: 0,
+  }));
+
+  const assignments: Array<{ orderId: string; applicationCode: string; newEmployeeId: string | null }> = [];
+  let distributedCount = 0;
+  let skippedCount = 0;
+  const notificationsByStaff = new Map<string, number>();
+
+  for (const app of rawApps) {
+    const orderId = String(app.id);
+    const prevAssignee = app.assigned_to;
+
+    // Pick staff with lowest effective workload
+    const targetStaff = staffPool.reduce((min, cur) => (cur.workload < min.workload ? cur : min), staffPool[0]);
+
+    const assignRes = await assignOrderCanonical({
+      orderId,
+      newEmployeeId: targetStaff.employeeId,
+      changeType: "AUTO_CAPACITY",
+      reason,
+      source,
+      actorId,
+      expectedPreviousEmployeeId: prevAssignee,
+      skipNotification: true,
+      metadata: {
+        batchReassignment: true,
+        distributionStrategy: "EQUAL_WORKLOAD_BALANCE",
+        targetStaffWorkloadBefore: targetStaff.workload,
+      },
+    });
+
+    if (assignRes.success && !assignRes.skippedDueToConflict) {
+      targetStaff.workload += 1;
+      targetStaff.assignedCount += 1;
+      distributedCount += 1;
+      assignments.push({
+        orderId,
+        applicationCode: assignRes.applicationCode || orderId,
+        newEmployeeId: targetStaff.employeeId,
+      });
+
+      notificationsByStaff.set(
+        targetStaff.employeeId,
+        (notificationsByStaff.get(targetStaff.employeeId) || 0) + 1,
+      );
+    } else {
+      skippedCount += 1;
+    }
+  }
+
+  // Dispatch batched notifications
+  for (const [empId, count] of notificationsByStaff.entries()) {
+    try {
+      await createInAppNotification({
+        userId: empId,
+        type: "ORDER_ASSIGNED",
+        title: `${count} New Order(s) Assigned (Auto-Balanced)`,
+        body: `You received ${count} order(s) via automated workload redistribution.`,
+        actionUrl: `/admin/orders`,
+        metadata: { batchAssignedCount: count },
+      });
+    } catch (err) {
+      console.warn("[distributeOrdersEquallyCanonical] Notification error:", err);
+    }
+  }
+
+  const summary = `Equally distributed ${distributedCount} order(s) across ${staffPool.filter(s => s.assignedCount > 0).length} active staff members.`;
+
+  return {
+    success: true,
+    distributedCount,
+    overflowCount: 0,
+    skippedCount,
+    assignments,
+    summaryMessage: summary,
+  };
+}
+
+/**
  * 5. SuperAdmin Operational Dashboard Metrics
  */
 export async function getReassignmentOperationalMetrics() {

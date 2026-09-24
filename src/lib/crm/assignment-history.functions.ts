@@ -5,6 +5,7 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import {
   assignOrderCanonical,
   reassignOrdersFromUnavailableEmployee,
+  distributeOrdersEquallyCanonical,
   calculateStaffWorkloads,
   getReassignmentOperationalMetrics,
   type AssignmentChangeType,
@@ -360,3 +361,30 @@ export const triggerEmployeeReassignment = createServerFn({ method: "POST" })
       actorId: context.userId,
     });
   });
+
+/* -------------------------------------------------------------------------- */
+/*  6. EQUALLY DISTRIBUTE / AUTO-BALANCE ARBITRARY SELECTED ORDERS            */
+/* -------------------------------------------------------------------------- */
+
+export const autoDistributeSelectedOrders = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        applicationIds: z.array(z.string().uuid()).min(1),
+        reason: z.string().optional(),
+        targetEmployeeIds: z.array(z.string().uuid()).optional(),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    await assertAdminOrStaff(context.supabase, context.userId);
+    return await distributeOrdersEquallyCanonical({
+      applicationIds: data.applicationIds,
+      actorId: context.userId,
+      source: "super_admin",
+      reason: data.reason || "Equally distributed by SuperAdmin across active staff",
+      targetEmployeeIds: data.targetEmployeeIds,
+    });
+  });
+
