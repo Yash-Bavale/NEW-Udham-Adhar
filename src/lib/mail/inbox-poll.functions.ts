@@ -20,6 +20,14 @@ export const pollInboxNow = createServerFn({ method: "POST" })
     if (!isAdmin) throw new Error("Forbidden");
 
     const { pollZohoInbox } = await import("@/lib/mail/inbox-matcher.server");
-    const result = await pollZohoInbox(50);
-    return result;
+    const result = await pollZohoInbox({ limit: 50 });
+    return {
+      fetched: result.fetched,
+      new: result.new,
+      matched: result.matched,
+      unmatched: result.unmatched,
+      duplicates: result.duplicates,
+      errors: result.errors,
+      foldersScanned: result.foldersScanned,
+    };
   });

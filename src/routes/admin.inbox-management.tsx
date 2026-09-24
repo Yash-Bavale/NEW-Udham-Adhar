@@ -1,15 +1,16 @@
 import { useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import {
-  getInboxStats,
-  getRecentInboxEmails,
-  getQuarantinedEmails,
+  getPipelineHealth,
+  getProcessingErrors,
+  retryProcessingError,
+  createTicketFromProcessingError,
+  searchEmailAuditTrace,
   getAllTickets,
+  getRecentInboxEmails,
   pollInboxNow,
-  getTicketConversation,
-  getEmailsByDomain,
 } from "@/lib/mail/inbox-admin.functions";
 import {
   Tabs,
@@ -27,14 +28,27 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import {
   Mail,
-  AlertCircle,
   CheckCircle2,
-  Clock,
   AlertTriangle,
   RefreshCw,
-  Inbox,
+  Search,
+  ExternalLink,
+  ShieldCheck,
+  FolderSync,
+  Ticket as TicketIcon,
+  HelpCircle,
+  Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -47,134 +61,89 @@ function StatsCard({ label, value, color }: { label: string; value: number; colo
   );
 }
 
-function InboxStatsTab() {
-  const statsFn = useServerFn(getInboxStats);
-  const { data } = useQuery({
-    queryKey: ["inbox.stats"],
-    queryFn: () => statsFn(),
+// ─── PIPELINE HEALTH TAB ───────────────────────────────────────────────
+
+function PipelineHealthTab() {
+  const healthFn = useServerFn(getPipelineHealth);
+  const { data, isLoading, refetch } = useQuery({
+    queryKey: ["inbox.health"],
+    queryFn: () => healthFn(),
   });
 
-  if (!data) return <div className="text-sm text-slate-600">Loading stats...</div>;
+  if (isLoading || !data) {
+    return <div className="p-8 text-center text-sm text-slate-500">Loading pipeline health...</div>;
+  }
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-        <StatsCard
-          label="Incoming Emails"
-          value={data.totals.incomingEmailLogs}
-          color="text-blue-600"
-        />
-        <StatsCard
-          label="Support Tickets"
-          value={data.totals.supportTickets}
-          color="text-emerald-600"
-        />
-        <StatsCard
-          label="Ticket Replies"
-          value={data.totals.ticketReplies}
-          color="text-indigo-600"
-        />
-        <StatsCard
-          label="Quarantined"
-          value={data.totals.quarantinedEmails}
-          color="text-orange-600"
-        />
-        <StatsCard
-          label="Outgoing Queue"
-          value={data.totals.outgoingQueue}
-          color="text-slate-600"
-        />
-      </div>
-
-      <div className="grid md:grid-cols-2 gap-6">
-        <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-          <h3 className="font-semibold text-sm mb-3">Last 7 Days</h3>
-          <div className="space-y-2 text-sm">
-            <div className="flex justify-between">
-              <span className="text-slate-600">Emails Received:</span>
-              <span className="font-semibold">{data.recent7days.emails}</span>
-            </div>
-            {Object.entries(data.recent7days.statusCounts || {}).map(([status, count]: any) => (
-              <div key={status} className="flex justify-between">
-                <span className="text-slate-600">{status}:</span>
-                <span className="font-semibold">{count}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-          <h3 className="font-semibold text-sm mb-3">Quarantine Reasons</h3>
-          <div className="space-y-2 text-sm">
-            {Object.entries(data.quarantine.reasonCounts || {}).map(([reason, count]: any) => (
-              <div key={reason} className="flex justify-between">
-                <span className="text-slate-600">{reason}:</span>
-                <span className="font-semibold">{count}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm">
-        <div className="flex items-start gap-2">
-          <Inbox className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+      {/* Top Banner */}
+      <div className="flex items-center justify-between p-4 bg-white border rounded-lg shadow-sm">
+        <div className="flex items-center gap-3">
+          <div className={`h-4 w-4 rounded-full ${data.isHealthy ? "bg-emerald-500 animate-pulse" : "bg-red-500"}`} />
           <div>
-            <p className="font-semibold text-blue-900">Inbox</p>
-            <p className="text-blue-800">{data.inbox}</p>
+            <div className="font-semibold text-slate-900 flex items-center gap-2">
+              Status: {data.isHealthy ? "Healthy & Operational" : "Action Required"}
+              <Badge variant="outline" className="text-xs font-mono">{data.mailbox}</Badge>
+            </div>
+            <div className="text-xs text-slate-500">
+              Last synchronized: {data.lastSyncAt ? new Date(data.lastSyncAt).toLocaleString() : "Never"}
+            </div>
           </div>
         </div>
+        <Button variant="outline" size="sm" onClick={() => refetch()}>
+          <RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Refresh
+        </Button>
       </div>
-    </div>
-  );
-}
 
-function RecentEmailsTab() {
-  const emailsFn = useServerFn(getRecentInboxEmails);
-  const [page, setPage] = useState(1);
+      {/* Today's Metrics */}
+      <div>
+        <h3 className="text-sm font-semibold text-slate-700 mb-3">Today's Ingestion Metrics</h3>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <StatsCard label="Emails Discovered" value={data.today.discovered} color="text-blue-600" />
+          <StatsCard label="Successfully Ingested" value={data.today.completed} color="text-emerald-600" />
+          <StatsCard label="New Support Tickets" value={data.today.newTickets} color="text-indigo-600" />
+          <StatsCard label="Processing Errors" value={data.today.errors} color={data.today.errors > 0 ? "text-amber-600" : "text-slate-600"} />
+        </div>
+      </div>
 
-  const { data, isLoading } = useQuery({
-    queryKey: ["inbox.emails", page],
-    queryFn: () => emailsFn({ data: { limit: 30, page } }),
-  });
-
-  return (
-    <div className="space-y-4">
-      <div className="rounded-lg border border-slate-200 bg-white shadow-sm overflow-hidden">
+      {/* Discovered Folders & Checkpoints */}
+      <div className="rounded-lg border bg-white shadow-sm overflow-hidden">
+        <div className="p-4 border-b flex items-center justify-between bg-slate-50/50">
+          <div className="font-medium text-sm flex items-center gap-2">
+            <FolderSync className="h-4 w-4 text-blue-600" /> Monitored Folders & Sync Checkpoints
+          </div>
+          <span className="text-xs text-slate-500">{data.checkpoints.length} folders active</span>
+        </div>
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>From</TableHead>
-              <TableHead>Subject</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Received</TableHead>
+              <TableHead>Folder Name</TableHead>
+              <TableHead>Type</TableHead>
+              <TableHead>Last Processed Time</TableHead>
+              <TableHead>Sync Status</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {isLoading ? (
+            {data.checkpoints.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={4} className="text-center py-6 text-slate-500">
-                  Loading...
-                </TableCell>
-              </TableRow>
-            ) : data?.emails?.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={4} className="text-center py-6 text-slate-500">
-                  No emails found
+                <TableCell colSpan={4} className="text-center py-6 text-slate-500 text-sm">
+                  No checkpoints recorded yet. Click "Poll Now" to discover folders.
                 </TableCell>
               </TableRow>
             ) : (
-              data?.emails?.map((email: any) => (
-                <TableRow key={email.id}>
-                  <TableCell className="text-xs truncate">{email.from_email}</TableCell>
-                  <TableCell className="text-sm truncate">{email.subject}</TableCell>
-                  <TableCell>
-                    <Badge variant={email.status === "sent" ? "default" : "secondary"}>
-                      {email.status}
-                    </Badge>
-                  </TableCell>
+              data.checkpoints.map((cp) => (
+                <TableRow key={cp.id}>
+                  <TableCell className="font-medium text-sm">{cp.folder_name}</TableCell>
+                  <TableCell className="text-xs text-slate-500">{cp.folder_type || "Custom"}</TableCell>
                   <TableCell className="text-xs">
-                    {email.received_at ? new Date(email.received_at).toLocaleString() : "-"}
+                    {cp.last_received_time_ms > 0
+                      ? new Date(cp.last_received_time_ms).toLocaleString()
+                      : "Initialized"}
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={cp.status === "active" ? "default" : "destructive"}>
+                      {cp.status}
+                    </Badge>
                   </TableCell>
                 </TableRow>
               ))
@@ -182,206 +151,109 @@ function RecentEmailsTab() {
           </TableBody>
         </Table>
       </div>
-
-      {data?.totalPages && data.totalPages > 1 && (
-        <div className="flex justify-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={page === 1}
-            onClick={() => setPage(Math.max(1, page - 1))}
-          >
-            Previous
-          </Button>
-          <span className="text-sm text-slate-600 py-1 px-3">
-            Page {page} of {data.totalPages}
-          </span>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={page >= data.totalPages}
-            onClick={() => setPage(page + 1)}
-          >
-            Next
-          </Button>
-        </div>
-      )}
     </div>
   );
 }
 
-function QuarantineTab() {
-  const quarantineFn = useServerFn(getQuarantinedEmails);
+// ─── PROCESSING ERRORS TAB ─────────────────────────────────────────────
+
+function ProcessingErrorsTab() {
+  const qc = useQueryClient();
   const [page, setPage] = useState(1);
+  const [status, setStatus] = useState<"new" | "retrying" | "resolved" | "failed" | "dismissed" | "all">("new");
+  const [selectedError, setSelectedError] = useState<any | null>(null);
+
+  const errorsFn = useServerFn(getProcessingErrors);
+  const retryFn = useServerFn(retryProcessingError);
+  const createTicketFn = useServerFn(createTicketFromProcessingError);
 
   const { data, isLoading } = useQuery({
-    queryKey: ["inbox.quarantine", page],
-    queryFn: () => quarantineFn({ data: { limit: 30, page } }),
+    queryKey: ["inbox.errors", page, status],
+    queryFn: () => errorsFn({ data: { page, limit: 30, status } }),
   });
 
-  return (
-    <div className="space-y-4">
-      <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 text-sm flex gap-2">
-        <AlertTriangle className="w-4 h-4 text-orange-600 flex-shrink-0 mt-0.5" />
-        <div>
-          <p className="font-semibold text-orange-900">Quarantined Emails</p>
-          <p className="text-orange-800">
-            {data?.total || 0} emails couldn't be automatically matched to orders or tickets
-          </p>
-        </div>
-      </div>
-
-      <div className="rounded-lg border border-slate-200 bg-white shadow-sm overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>From</TableHead>
-              <TableHead>Subject</TableHead>
-              <TableHead>Reason</TableHead>
-              <TableHead>Received</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isLoading ? (
-              <TableRow>
-                <TableCell colSpan={4} className="text-center py-6 text-slate-500">
-                  Loading...
-                </TableCell>
-              </TableRow>
-            ) : data?.emails?.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={4} className="text-center py-6 text-slate-500">
-                  No quarantined emails
-                </TableCell>
-              </TableRow>
-            ) : (
-              data?.emails?.map((email: any) => (
-                <TableRow key={email.id}>
-                  <TableCell className="text-xs truncate">{email.from_email}</TableCell>
-                  <TableCell className="text-sm truncate">{email.subject}</TableCell>
-                  <TableCell>
-                    <Badge variant={email.reason === "no_match" ? "destructive" : "secondary"}>
-                      {email.reason === "no_match" ? "No Match" : "Sender Mismatch"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-xs">
-                    {email.received_at ? new Date(email.received_at).toLocaleString() : "-"}
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
-
-      {data?.totalPages && data.totalPages > 1 && (
-        <div className="flex justify-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={page === 1}
-            onClick={() => setPage(Math.max(1, page - 1))}
-          >
-            Previous
-          </Button>
-          <span className="text-sm text-slate-600 py-1 px-3">
-            Page {page} of {data.totalPages}
-          </span>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={page >= data.totalPages}
-            onClick={() => setPage(page + 1)}
-          >
-            Next
-          </Button>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function TicketsTab() {
-  const ticketsFn = useServerFn(getAllTickets);
-  const [page, setPage] = useState(1);
-  const [status, setStatus] = useState<string | undefined>();
-
-  const { data, isLoading } = useQuery({
-    queryKey: ["inbox.tickets", page, status],
-    queryFn: () => ticketsFn({ data: { limit: 30, page, status: status as any } }),
+  const retryMut = useMutation({
+    mutationFn: (id: string) => retryFn({ data: { id } }),
+    onSuccess: (r) => {
+      toast.success(r.message);
+      qc.invalidateQueries({ queryKey: ["inbox"] });
+      setSelectedError(null);
+    },
+    onError: (e: Error) => toast.error(e.message),
   });
 
-  const statuses = ["open", "in_progress", "waiting_customer", "resolved", "closed"];
+  const createMut = useMutation({
+    mutationFn: (id: string) => createTicketFn({ data: { id } }),
+    onSuccess: (r) => {
+      toast.success(`Ticket ${r.ticketNumber} created`);
+      qc.invalidateQueries({ queryKey: ["inbox"] });
+      setSelectedError(null);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const errorList = (data as any)?.errors as any[] | undefined;
 
   return (
     <div className="space-y-4">
       <div className="flex gap-2 flex-wrap">
-        <Button
-          variant={status === undefined ? "default" : "outline"}
-          size="sm"
-          onClick={() => { setStatus(undefined); setPage(1); }}
-        >
-          All
-        </Button>
-        {statuses.map((s) => (
+        {(["new", "retrying", "resolved", "failed", "all"] as const).map((s) => (
           <Button
             key={s}
             variant={status === s ? "default" : "outline"}
             size="sm"
             onClick={() => { setStatus(s); setPage(1); }}
           >
-            {s.replace(/_/g, " ")}
+            {s.charAt(0).toUpperCase() + s.slice(1)}
           </Button>
         ))}
       </div>
 
-      <div className="rounded-lg border border-slate-200 bg-white shadow-sm overflow-hidden">
+      <div className="rounded-lg border bg-white shadow-sm overflow-hidden">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Ticket #</TableHead>
+              <TableHead>Sender</TableHead>
               <TableHead>Subject</TableHead>
+              <TableHead>Stage</TableHead>
+              <TableHead>Error Message</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead>Priority</TableHead>
-              <TableHead>Created</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center py-6 text-slate-500">
-                  Loading...
+                <TableCell colSpan={6} className="text-center py-6 text-slate-500">
+                  <Loader2 className="h-4 w-4 animate-spin inline mr-2" /> Loading errors...
                 </TableCell>
               </TableRow>
-            ) : data?.tickets?.length === 0 ? (
+            ) : !errorList || errorList.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center py-6 text-slate-500">
-                  No tickets found
+                <TableCell colSpan={6} className="text-center py-6 text-slate-500 text-sm">
+                  No processing errors matching filter.
                 </TableCell>
               </TableRow>
             ) : (
-              data?.tickets?.map((ticket: any) => (
-                <TableRow key={ticket.id}>
-                  <TableCell className="text-sm font-mono text-blue-600">{ticket.ticket_number}</TableCell>
-                  <TableCell className="text-sm">{ticket.subject}</TableCell>
+              errorList.map((err: any) => (
+                <TableRow key={err.id}>
+                  <TableCell className="text-xs font-mono">{err.from_email || "unknown"}</TableCell>
+                  <TableCell className="text-sm truncate max-w-[200px]">{err.subject || "(no subject)"}</TableCell>
                   <TableCell>
-                    <Badge variant={ticket.status === "open" ? "destructive" : "default"}>
-                      {ticket.status}
-                    </Badge>
+                    <Badge variant="outline" className="text-[10px]">{err.error_stage}</Badge>
+                  </TableCell>
+                  <TableCell className="text-xs text-red-600 truncate max-w-[260px]">
+                    {err.error_message}
                   </TableCell>
                   <TableCell>
-                    <Badge
-                      variant={
-                        ticket.priority === "high" || ticket.priority === "urgent"
-                          ? "destructive"
-                          : "secondary"
-                      }
-                    >
-                      {ticket.priority}
+                    <Badge variant={err.status === "resolved" ? "default" : "destructive"}>
+                      {err.status}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-xs">
-                    {ticket.created_at ? new Date(ticket.created_at).toLocaleString() : "-"}
+                  <TableCell className="text-right">
+                    <Button size="sm" variant="ghost" onClick={() => setSelectedError(err)}>
+                      Inspect
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))
@@ -390,105 +262,280 @@ function TicketsTab() {
         </Table>
       </div>
 
-      {data?.totalPages && data.totalPages > 1 && (
-        <div className="flex justify-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={page === 1}
-            onClick={() => setPage(Math.max(1, page - 1))}
-          >
-            Previous
-          </Button>
-          <span className="text-sm text-slate-600 py-1 px-3">
-            Page {page} of {data.totalPages}
-          </span>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={page >= data.totalPages}
-            onClick={() => setPage(page + 1)}
-          >
-            Next
-          </Button>
+      {selectedError && (
+        <Dialog open={!!selectedError} onOpenChange={(v) => !v && setSelectedError(null)}>
+          <DialogContent className="max-w-xl">
+            <DialogHeader>
+              <DialogTitle>Email Processing Error</DialogTitle>
+              <DialogDescription>
+                Technical failure on UID {selectedError.zoho_mail_uid} in folder {selectedError.zoho_folder_name}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3 text-sm max-h-[60vh] overflow-y-auto">
+              <div className="bg-red-50 border border-red-200 text-red-700 p-3 rounded text-xs font-mono whitespace-pre-wrap">
+                {selectedError.error_message}
+                {selectedError.error_stack && `\n\nStack:\n${selectedError.error_stack}`}
+              </div>
+              <div>
+                <div className="font-semibold text-xs text-slate-600">Subject:</div>
+                <div>{selectedError.subject || "(no subject)"}</div>
+              </div>
+              <div>
+                <div className="font-semibold text-xs text-slate-600">Body Preview:</div>
+                <div className="p-2 bg-slate-50 border rounded text-xs whitespace-pre-wrap">
+                  {selectedError.body_snippet || "(no body snippet)"}
+                </div>
+              </div>
+            </div>
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button
+                variant="outline"
+                onClick={() => retryMut.mutate(selectedError.id)}
+                disabled={retryMut.isPending}
+              >
+                <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${retryMut.isPending ? "animate-spin" : ""}`} /> Retry
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => createMut.mutate(selectedError.id)}
+                disabled={createMut.isPending}
+              >
+                <TicketIcon className="h-3.5 w-3.5 mr-1.5" /> Create Ticket Manually
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+    </div>
+  );
+}
+
+// ─── ADMIN EMAIL AUDIT TRACE SEARCH TAB ────────────────────────────────
+
+function EmailSearchTab() {
+  const [query, setQuery] = useState("");
+  const searchFn = useServerFn(searchEmailAuditTrace);
+
+  const searchMut = useMutation({
+    mutationFn: (q: string) => searchFn({ data: { query: q } }),
+  });
+
+  return (
+    <div className="space-y-6">
+      <div className="flex gap-2">
+        <Input
+          placeholder="Search by sender email, subject, Message-ID, or Zoho UID..."
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && query.trim()) searchMut.mutate(query.trim());
+          }}
+        />
+        <Button onClick={() => query.trim() && searchMut.mutate(query.trim())} disabled={searchMut.isPending}>
+          {searchMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4 mr-2" />} Search
+        </Button>
+      </div>
+
+      {searchMut.data && (
+        <div className="space-y-6">
+          {/* Matched Tickets */}
+          {searchMut.data.tickets.length > 0 && (
+            <div className="rounded-lg border bg-white p-4 shadow-sm">
+              <h3 className="font-semibold text-sm mb-3">Matched Support Tickets</h3>
+              <div className="divide-y text-sm">
+                {searchMut.data.tickets.map((t: any) => (
+                  <div key={t.id} className="py-2 flex items-center justify-between">
+                    <div>
+                      <Link to="/admin/tickets/$ticketId" params={{ ticketId: t.id }} className="font-mono text-blue-600 hover:underline">
+                        {t.ticket_number}
+                      </Link>
+                      <span className="ml-2">{t.subject}</span>
+                      <span className="text-xs text-slate-500 ml-2">({t.ticket_email})</span>
+                    </div>
+                    <Badge variant="outline">{t.status}</Badge>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Audit Lifecycle Trail */}
+          <div className="rounded-lg border bg-white shadow-sm overflow-hidden">
+            <div className="p-4 border-b bg-slate-50/50 font-medium text-sm flex items-center gap-2">
+              <ShieldCheck className="h-4 w-4 text-emerald-600" /> Lifecycle Audit Events ({searchMut.data.auditEvents.length})
+            </div>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Timestamp</TableHead>
+                  <TableHead>Stage</TableHead>
+                  <TableHead>Sender</TableHead>
+                  <TableHead>Subject</TableHead>
+                  <TableHead>Folder</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {searchMut.data.auditEvents.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center py-6 text-slate-500 text-sm">
+                      No audit records found matching "{query}".
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  searchMut.data.auditEvents.map((evt: any) => (
+                    <TableRow key={evt.id}>
+                      <TableCell className="text-xs text-slate-500">{new Date(evt.created_at).toLocaleString()}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="text-[10px] font-mono">{evt.stage}</Badge>
+                      </TableCell>
+                      <TableCell className="text-xs font-mono">{evt.sender_normalized}</TableCell>
+                      <TableCell className="text-sm truncate max-w-[240px]">{evt.subject}</TableCell>
+                      <TableCell className="text-xs text-slate-500">{evt.zoho_folder_name || "-"}</TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </div>
       )}
     </div>
   );
 }
 
-function PollSection() {
-  const pollFn = useServerFn(pollInboxNow);
-  const qc = useQueryClient();
-  const [loading, setLoading] = useState(false);
+// ─── TICKETS & INBOX LOGS TAB ──────────────────────────────────────────
 
-  const handlePoll = async () => {
-    setLoading(true);
-    try {
-      const result = await pollFn({ data: { limit: 100 } });
-      toast.success(result.message);
-      await qc.invalidateQueries({ queryKey: ["inbox"] });
-    } catch (err) {
-      toast.error((err as Error).message);
-    } finally {
-      setLoading(false);
-    }
-  };
+function TicketsListTab() {
+  const [unlinkedOnly, setUnlinkedOnly] = useState(false);
+  const [page, setPage] = useState(1);
+  const ticketsFn = useServerFn(getAllTickets);
+
+  const { data, isLoading } = useQuery({
+    queryKey: ["inbox.allTickets", page, unlinkedOnly],
+    queryFn: () => ticketsFn({ data: { page, limit: 30, unlinkedOnly } }),
+  });
 
   return (
-    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+    <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <div>
-          <p className="font-semibold text-blue-900">Manual Email Poll</p>
-          <p className="text-sm text-blue-800">
-            Fetch new emails from Zoho inbox (normally runs every 2 minutes automatically)
-          </p>
-        </div>
         <Button
-          onClick={handlePoll}
-          disabled={loading}
-          className="gap-2"
+          variant={unlinkedOnly ? "default" : "outline"}
+          size="sm"
+          onClick={() => { setUnlinkedOnly(!unlinkedOnly); setPage(1); }}
         >
-          <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
-          {loading ? "Polling..." : "Poll Now"}
+          {unlinkedOnly ? "Showing: Needs Review / Unlinked" : "Filter: Needs Review / Unlinked"}
         </Button>
+      </div>
+
+      <div className="rounded-lg border bg-white shadow-sm overflow-hidden">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Ticket #</TableHead>
+              <TableHead>Subject</TableHead>
+              <TableHead>Sender Email</TableHead>
+              <TableHead>Order Status</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Created</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {isLoading ? (
+              <TableRow>
+                <TableCell colSpan={6} className="text-center py-6 text-slate-500">
+                  <Loader2 className="h-4 w-4 animate-spin inline mr-2" /> Loading tickets...
+                </TableCell>
+              </TableRow>
+            ) : (
+              data?.tickets?.map((t: any) => (
+                <TableRow key={t.id}>
+                  <TableCell className="font-mono text-sm">
+                    <Link to="/admin/tickets/$ticketId" params={{ ticketId: t.id }} className="text-blue-600 hover:underline">
+                      {t.ticket_number}
+                    </Link>
+                  </TableCell>
+                  <TableCell className="text-sm truncate max-w-[200px]">{t.subject}</TableCell>
+                  <TableCell className="text-xs font-mono">{t.ticket_email}</TableCell>
+                  <TableCell>
+                    {t.order_link_status === "needs_review" ? (
+                      <Badge variant="destructive" className="text-[10px]">Needs Order Review</Badge>
+                    ) : t.is_unlinked ? (
+                      <Badge variant="outline" className="text-[10px] text-amber-600 border-amber-300">Unlinked</Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-[10px] text-emerald-600 border-emerald-300">Linked</Badge>
+                    )}
+                  </TableCell>
+                  <TableCell><Badge variant="outline">{t.status}</Badge></TableCell>
+                  <TableCell className="text-xs text-slate-500">{new Date(t.created_at).toLocaleString()}</TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
       </div>
     </div>
   );
 }
 
-function InboxManagementPage() {
+// ─── MAIN PAGE ─────────────────────────────────────────────────────────
+
+export function InboxManagementPage() {
+  const qc = useQueryClient();
+  const pollFn = useServerFn(pollInboxNow);
+  const [isPolling, setIsPolling] = useState(false);
+
+  const handlePoll = async () => {
+    setIsPolling(true);
+    try {
+      const res = (await pollFn({ data: { limit: 50 } })) as { message?: string };
+      toast.success(res.message || "Inbox polled successfully");
+      await qc.invalidateQueries({ queryKey: ["inbox"] });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Polling failed");
+    } finally {
+      setIsPolling(false);
+    }
+  };
+
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900">Inbox Management</h1>
-        <p className="text-slate-600">Manage incoming emails, support tickets, and quarantined messages</p>
+    <div className="p-6 space-y-6 max-w-7xl mx-auto">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold flex items-center gap-2 text-slate-900">
+            <Mail className="h-6 w-6 text-blue-600" /> Support Email Ingestion & Health
+          </h1>
+          <p className="text-sm text-slate-500">
+            Deterministic email pipeline monitoring, multi-folder checkpoints, error queues, and lifecycle audit.
+          </p>
+        </div>
+        <Button onClick={handlePoll} disabled={isPolling} className="gap-2">
+          <RefreshCw className={`h-4 w-4 ${isPolling ? "animate-spin" : ""}`} />
+          {isPolling ? "Scanning all folders..." : "Poll All Folders Now"}
+        </Button>
       </div>
 
-      <PollSection />
-
-      <Tabs defaultValue="stats" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="stats">Statistics</TabsTrigger>
-          <TabsTrigger value="emails">Recent Emails</TabsTrigger>
-          <TabsTrigger value="tickets">Tickets</TabsTrigger>
-          <TabsTrigger value="quarantine">Quarantine</TabsTrigger>
+      <Tabs defaultValue="health" className="w-full">
+        <TabsList className="grid grid-cols-4 w-full">
+          <TabsTrigger value="health">Pipeline Health</TabsTrigger>
+          <TabsTrigger value="errors">Processing Errors</TabsTrigger>
+          <TabsTrigger value="search">Admin Email Search</TabsTrigger>
+          <TabsTrigger value="tickets">Support Tickets</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="stats" className="mt-6">
-          <InboxStatsTab />
+        <TabsContent value="health" className="mt-4">
+          <PipelineHealthTab />
         </TabsContent>
 
-        <TabsContent value="emails" className="mt-6">
-          <RecentEmailsTab />
+        <TabsContent value="errors" className="mt-4">
+          <ProcessingErrorsTab />
         </TabsContent>
 
-        <TabsContent value="tickets" className="mt-6">
-          <TicketsTab />
+        <TabsContent value="search" className="mt-4">
+          <EmailSearchTab />
         </TabsContent>
 
-        <TabsContent value="quarantine" className="mt-6">
-          <QuarantineTab />
+        <TabsContent value="tickets" className="mt-4">
+          <TicketsListTab />
         </TabsContent>
       </Tabs>
     </div>
@@ -496,5 +543,11 @@ function InboxManagementPage() {
 }
 
 export const Route = createFileRoute("/admin/inbox-management")({
+  head: () => ({
+    meta: [
+      { title: "Email Pipeline Health — BHS Support" },
+      { name: "robots", content: "noindex,nofollow" },
+    ],
+  }),
   component: InboxManagementPage,
 });

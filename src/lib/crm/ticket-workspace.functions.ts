@@ -21,7 +21,7 @@ export const getTicketWorkspace = createServerFn({ method: "POST" })
     const { data: ticket, error: ticketErr } = await admin
       .from("support_tickets")
       .select(
-        "id, ticket_number, subject, description, status, priority, assigned_to, resolved_at, resolved_by, closed_at, first_response_at, last_customer_message_at, last_staff_message_at, ticket_email, source, created_at, updated_at, customer_id, application_id, service_id"
+        "id, ticket_number, subject, description, status, priority, assigned_to, resolved_at, resolved_by, closed_at, first_response_at, last_customer_message_at, last_staff_message_at, ticket_email, source, created_at, updated_at, customer_id, application_id, service_id, parent_ticket_id"
       )
       .eq("id", data.ticketId)
       .maybeSingle();
@@ -113,6 +113,8 @@ export const getTicketWorkspace = createServerFn({ method: "POST" })
       paymentsList,
       invoicesList,
       activeScheduler,
+      parentTicket,
+      childTickets,
     ] = await Promise.all([
       admin
         .from("ticket_replies")
@@ -212,7 +214,26 @@ export const getTicketWorkspace = createServerFn({ method: "POST" })
             .maybeSingle()
             .then((r) => r.data, () => null)
         : Promise.resolve(null),
+
+      t.parent_ticket_id
+        ? admin
+            .from("support_tickets")
+            .select("id, ticket_number, subject, status, created_at")
+            .eq("id", t.parent_ticket_id)
+            .maybeSingle()
+            .then((r) => r.data, () => null)
+        : Promise.resolve(null),
+
+      admin
+        .from("support_tickets")
+        .select("id, ticket_number, subject, status, created_at")
+        .eq("parent_ticket_id" as any, data.ticketId)
+        .order("created_at", { ascending: false })
+        .then((r) => r.data ?? [], () => []),
     ]);
+
+    const parentTicketData = parentTicket;
+    const childTicketsData = childTickets;
 
     // 6. Resolve profile names for authors/assignees
     const ids = new Set<string>();
@@ -365,6 +386,8 @@ export const getTicketWorkspace = createServerFn({ method: "POST" })
       complaints: complaintsList,
       refunds: refundsList,
       emails: allMatchedEmails,
+      parentTicket: parentTicketData,
+      childTickets: childTicketsData,
       customerStats: {
         lifetimeValue,
         totalOrders: Number(customerData?.total_applications ?? prevOrdersList.length),

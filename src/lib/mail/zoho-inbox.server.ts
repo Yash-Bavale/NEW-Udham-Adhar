@@ -1,7 +1,11 @@
 // Zoho Mail REST API client (server-only).
-// Uses OAuth2 refresh-token flow to poll the Inbox folder and fetch full
-// message headers + content. All calls target the .in DC to match the SMTP
-// config; override via env if the mailbox is on .com/.eu.
+// Provides OAuth2 authentication, multi-folder discovery, paginated message fetching,
+// header parsing, body extraction, and attachment downloads.
+
+import {
+  extractEmailAddress,
+  normalizeMessageId as normMsgId,
+} from "./email-normalizer";
 
 const DC = (process.env.ZOHO_MAIL_DC || "in").trim(); // "in" | "com" | "eu" | "com.au" | "jp"
 const ACCOUNTS_HOST = `https://accounts.zoho.${DC}`;
@@ -17,15 +21,10 @@ function requireEnv(name: string): string {
   return v.trim();
 }
 
-/** Resolve the numeric Zoho account ID. If ZOHO_MAIL_ACCOUNT_ID is set to a
- *  numeric value we trust it; otherwise (empty or an email address) we call
- *  /api/accounts and pick the account whose primary email matches, falling
- *  back to the first account. Cached per-worker. */
-async function resolveAccountId(forceRefresh = false): Promise<string> {
+/** Resolve the numeric Zoho account ID. Cached per-worker. */
+export async function resolveAccountId(forceRefresh = false): Promise<string> {
   if (accountIdCache && !forceRefresh) return accountIdCache;
   const raw = (process.env.ZOHO_MAIL_ACCOUNT_ID || "").trim();
-  // If env holds a numeric id, trust it — but only until a call proves it stale
-  // (see zohoFetch's 404 handling, which forces a refresh via /api/accounts).
   if (raw && /^\d+$/.test(raw) && !forceRefresh) {
     accountIdCache = raw;
     return raw;
@@ -59,7 +58,6 @@ async function resolveAccountId(forceRefresh = false): Promise<string> {
   return accountIdCache;
 }
 
-
 /** Exchange refresh token for a 1h access token; cached in-memory per worker. */
 export async function getZohoAccessToken(): Promise<string> {
   if (tokenCache && tokenCache.expiresAt > Date.now() + 60_000) {
@@ -85,7 +83,7 @@ export async function getZohoAccessToken(): Promise<string> {
   return j.access_token;
 }
 
-async function zohoFetch<T>(path: string): Promise<T> {
+export async function zohoFetch<T>(path: string): Promise<T> {
   const token = await getZohoAccessToken();
   const res = await fetch(`${MAIL_HOST}${path}`, {
     headers: { Authorization: `Zoho-oauthtoken ${token}` },
@@ -110,6 +108,13 @@ async function zohoFetch<T>(path: string): Promise<T> {
   return (await res.json()) as T;
 }
 
+export type ZohoFolderInfo = {
+  folderId: string;
+  folderName: string;
+  folderType?: string;
+  isRelevantInbound: boolean;
+};
+
 export type ZohoMessageListItem = {
   messageId: string;   // Zoho's internal numeric ID (per-account)
   folderId: string;
@@ -130,62 +135,98 @@ export type ZohoHeaders = {
   Subject?: string;
   From?: string;
   To?: string;
+  "Reply-To"?: string;
   Date?: string;
   "X-BHS-Order"?: string;
   "X-BHS-Customer"?: string;
+  "X-BHS-Ticket"?: string;
   [k: string]: string | undefined;
 };
 
-/** Find the Inbox folder ID for this account. Retries with a refreshed
- *  account id if the initial one 404s (env var stale or account rotated). */
-export async function getInboxFolderId(): Promise<string> {
-  const call = async (accountId: string) =>
-    zohoFetch<{ data: Array<{ folderId: string; folderName: string; folderType?: string }> }>(
+export type ZohoAttachmentMeta = {
+  attachmentId: string;
+  attachmentName: string;
+  attachmentSize: string | number;
+  contentType?: string;
+};
+
+/** Discover all folders in Zoho and filter for relevant inbound folders.
+ *  Includes: Inbox, Spam, Junk, Archive, and custom user folders.
+ *  Excludes: Sent, Drafts, Trash, Outbox, Templates. */
+export async function discoverZohoFolders(): Promise<ZohoFolderInfo[]> {
+  const accountId = await resolveAccountId();
+  let data: { data?: Array<{ folderId: string; folderName: string; folderType?: string }> };
+  try {
+    data = await zohoFetch<{ data: Array<{ folderId: string; folderName: string; folderType?: string }> }>(
       `/api/accounts/${accountId}/folders`,
     );
-  let accountId = await resolveAccountId();
-  let data: { data: Array<{ folderId: string; folderName: string; folderType?: string }> };
-  try {
-    data = await call(accountId);
   } catch (e) {
-    // Both 401 and 404 usually mean the cached account ID is stale for this
-    // token (mailbox re-provisioned or account rotated). Force /api/accounts
-    // to fetch a fresh ID and retry once before giving up.
     const msg = String((e as Error).message || "");
     if (/ 401| 404/.test(msg)) {
       accountIdCache = null;
-      accountId = await resolveAccountId(true);
-      data = await call(accountId);
+      const freshAcc = await resolveAccountId(true);
+      data = await zohoFetch<{ data: Array<{ folderId: string; folderName: string; folderType?: string }> }>(
+        `/api/accounts/${freshAcc}/folders`,
+      );
     } else {
       throw e;
     }
   }
-  const folders = data?.data ?? [];
+
+  const list = data?.data ?? [];
+  const ignoredPatterns = /^(sent|drafts?|trash|deleted|outbox|templates|scheduled)$/i;
+
+  return list.map((f) => {
+    const name = (f.folderName || "").trim();
+    const type = (f.folderType || "").trim();
+    const isIgnored = ignoredPatterns.test(name) || ignoredPatterns.test(type);
+    return {
+      folderId: String(f.folderId),
+      folderName: name,
+      folderType: type || undefined,
+      isRelevantInbound: !isIgnored,
+    };
+  });
+}
+
+/** Find the Inbox folder ID for this account (backward-compatibility helper). */
+export async function getInboxFolderId(): Promise<string> {
+  const folders = await discoverZohoFolders();
   const inbox = folders.find((f) => f.folderType === "Inbox" || /inbox/i.test(f.folderName));
   if (!inbox) throw new Error("Zoho: Inbox folder not found");
   return inbox.folderId;
 }
 
-/** List recent messages in Inbox (most recent first). */
-export async function listInboxMessages(limit = 50): Promise<ZohoMessageListItem[]> {
-  const folderId = await getInboxFolderId();
+/** Fetch a single paginated page of messages from a specific folder. */
+export async function fetchFolderMessagesPage(
+  folderId: string,
+  start = 1,
+  limit = 50,
+): Promise<ZohoMessageListItem[]> {
   const accountId = await resolveAccountId();
-  const data = await zohoFetch<{ data: ZohoMessageListItem[] }>(
-    `/api/accounts/${accountId}/messages/view?folderId=${folderId}&start=1&limit=${limit}&sortBy=date&sortorder=false`,
+  const data = await zohoFetch<{ data?: ZohoMessageListItem[] }>(
+    `/api/accounts/${accountId}/messages/view?folderId=${folderId}&start=${start}&limit=${limit}&sortBy=date&sortorder=false`,
   );
   return data?.data ?? [];
+}
+
+/** List recent messages in Inbox (most recent first, backward-compatibility). */
+export async function listInboxMessages(limit = 50): Promise<ZohoMessageListItem[]> {
+  const folderId = await getInboxFolderId();
+  return fetchFolderMessagesPage(folderId, 1, limit);
 }
 
 /** Fetch the raw RFC-822 headers for a message as a lookup map. */
 export async function getMessageHeaders(messageId: string, folderId: string): Promise<ZohoHeaders> {
   const accountId = await resolveAccountId();
-  const data = await zohoFetch<{ data: string | Record<string, string> }>(
+  const data = await zohoFetch<{ data?: string | Record<string, string> }>(
     `/api/accounts/${accountId}/folders/${folderId}/messages/${messageId}/header`,
   );
   const raw = data?.data;
   if (!raw) return {};
   if (typeof raw === "object") return raw as ZohoHeaders;
-  // Parse the raw header block
+
+  // Parse raw RFC-822 header block
   const out: ZohoHeaders = {};
   const lines = String(raw).split(/\r?\n/);
   let lastKey: string | null = null;
@@ -209,7 +250,7 @@ export async function getMessageContent(
   folderId: string,
 ): Promise<{ html: string | null; text: string | null }> {
   const accountId = await resolveAccountId();
-  const data = await zohoFetch<{ data: { content?: string; contentType?: string } }>(
+  const data = await zohoFetch<{ data?: { content?: string; contentType?: string } }>(
     `/api/accounts/${accountId}/folders/${folderId}/messages/${messageId}/content`,
   );
   const c = data?.data?.content ?? null;
@@ -219,17 +260,61 @@ export async function getMessageContent(
   return { html: null, text: c };
 }
 
-/** Extract an angle-bracketed Message-ID (or the raw token if unwrapped). */
-export function normalizeMessageId(id: string | undefined | null): string | null {
-  if (!id) return null;
-  const m = id.match(/<([^>]+)>/);
-  return m ? m[1].trim() : id.trim().replace(/^<|>$/g, "");
+/** List attachments associated with an inbound message. */
+export async function fetchMessageAttachmentsList(
+  messageId: string,
+  folderId: string,
+): Promise<ZohoAttachmentMeta[]> {
+  const accountId = await resolveAccountId();
+  try {
+    const data = await zohoFetch<{ data?: Array<{ attachmentId?: string; attachmentName?: string; attachmentSize?: string | number; contentType?: string }> }>(
+      `/api/accounts/${accountId}/folders/${folderId}/messages/${messageId}/attachmentinfo`,
+    );
+    const list = data?.data ?? [];
+    return list.map((a) => ({
+      attachmentId: String(a.attachmentId || ""),
+      attachmentName: a.attachmentName || "attachment",
+      attachmentSize: a.attachmentSize || 0,
+      contentType: a.contentType || "application/octet-stream",
+    })).filter((a) => a.attachmentId);
+  } catch (e) {
+    console.warn(`[zoho-inbox] fetchMessageAttachmentsList error for msg ${messageId}:`, e);
+    return [];
+  }
 }
 
-/** Parse a "Name <email>" or bare email string, returning lowercase email. */
+/** Download raw attachment bytes from Zoho Mail API. */
+export async function downloadZohoAttachment(
+  messageId: string,
+  folderId: string,
+  attachmentId: string,
+  attachmentName: string,
+): Promise<{ buffer: Buffer; contentType: string } | null> {
+  const accountId = await resolveAccountId();
+  const token = await getZohoAccessToken();
+  const encodedName = encodeURIComponent(attachmentName);
+  const url = `${MAIL_HOST}/api/accounts/${accountId}/folders/${folderId}/messages/${messageId}/attachments/${attachmentId}?fileName=${encodedName}`;
+
+  const res = await fetch(url, {
+    headers: { Authorization: `Zoho-oauthtoken ${token}` },
+  });
+
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "");
+    throw new Error(`Zoho download attachment failed: ${res.status} ${errText.slice(0, 200)}`);
+  }
+
+  const arrayBuf = await res.arrayBuffer();
+  const buffer = Buffer.from(arrayBuf);
+  const contentType = res.headers.get("content-type") || "application/octet-stream";
+  return { buffer, contentType };
+}
+
+// Re-export common normalizer functions for backward-compatibility
+export function normalizeMessageId(id: string | undefined | null): string | null {
+  return normMsgId(id);
+}
+
 export function extractEmail(v: string | undefined | null): string | null {
-  if (!v) return null;
-  const m = v.match(/<([^>]+)>/);
-  const e = m ? m[1] : v;
-  return e.trim().toLowerCase();
+  return extractEmailAddress(v);
 }

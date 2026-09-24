@@ -229,22 +229,28 @@ export async function sendViaZoho(input: ZohoSendInput): Promise<ZohoSendResult>
       ? (Array.isArray(input.bcc) ? input.bcc.join(",") : input.bcc).trim()
       : undefined;
 
+    const payload: Record<string, unknown> = {
+      fromAddress: fromEmail,
+      toAddress: input.to,
+      subject: input.subject,
+      content: input.html,
+      mailFormat: "html",
+      encoding: "UTF-8",
+      askReceipt: "no",
+      ...(ccAddress ? { ccAddress } : {}),
+      ...(bccAddress ? { bccAddress } : {}),
+      ...(input.replyTo ? { replyToAddress: input.replyTo } : {}),
+      ...(input.inReplyTo ? { inReplyTo: angleWrap(input.inReplyTo) } : {}),
+      ...(input.references ? { references: threadHeaders["References"] } : {}),
+      headers: threadHeaders,
+      attachments,
+    };
+
     const response = await zohoApi<{ data?: { messageId?: string; status?: string; message?: string }; status?: { code?: number; description?: string } }>(
       `/api/accounts/${accountId}/messages`,
       {
         method: "POST",
-        body: JSON.stringify({
-          fromAddress: fromEmail,
-          toAddress: input.to,
-          ...(ccAddress ? { ccAddress } : {}),
-          ...(bccAddress ? { bccAddress } : {}),
-          subject: input.subject,
-          content: input.html,
-          mailFormat: "html",
-          encoding: "UTF-8",
-          askReceipt: "no",
-          attachments,
-        }),
+        body: JSON.stringify(payload),
       },
       true,
     );

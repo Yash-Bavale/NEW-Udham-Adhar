@@ -867,6 +867,44 @@ function TicketWorkspace() {
           <div className="mt-1 text-xs font-semibold text-slate-700 truncate">
             {ticket.subject ? `Re: ${ticket.subject}` : "(no subject)"}
           </div>
+
+          {/* Relationship indicators (Created from closed ticket / follow-up tickets) */}
+          {(data as any)?.parentTicket && (
+            <div className="mt-2.5 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-50 border border-amber-200 text-amber-900 text-xs">
+              <Link2 className="size-3.5 text-amber-600 shrink-0" />
+              <span>
+                Created from closed ticket{" "}
+                <Link
+                  to="/admin/support/tickets/$ticketId"
+                  params={{ ticketId: (data as any).parentTicket.id }}
+                  className="font-mono font-bold text-amber-900 underline hover:text-amber-950"
+                >
+                  {(data as any).parentTicket.ticket_number || (data as any).parentTicket.id.slice(0, 8)}
+                </Link>
+              </span>
+            </div>
+          )}
+
+          {(data as any)?.childTickets && (data as any).childTickets.length > 0 && (
+            <div className="mt-2.5 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-blue-50 border border-blue-200 text-blue-900 text-xs">
+              <Link2 className="size-3.5 text-blue-600 shrink-0" />
+              <span>
+                Created follow-up ticket{(data as any).childTickets.length > 1 ? "s" : ""}:{" "}
+                {(data as any).childTickets.map((ct: any, idx: number) => (
+                  <span key={ct.id}>
+                    {idx > 0 && ", "}
+                    <Link
+                      to="/admin/support/tickets/$ticketId"
+                      params={{ ticketId: ct.id }}
+                      className="font-mono font-bold text-blue-900 underline hover:text-blue-950"
+                    >
+                      {ct.ticket_number || ct.id.slice(0, 8)}
+                    </Link>
+                  </span>
+                ))}
+              </span>
+            </div>
+          )}
         </div>
 
         {/* ── 2. Conversation Box + Sticky Reply Composer Container ──────── */}
