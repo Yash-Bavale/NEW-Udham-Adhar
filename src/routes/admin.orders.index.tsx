@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, keepPreviousData, useQueryClient } from "@tanstack/react-query";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
-import { Search, ChevronLeft, ChevronRight, RotateCcw, X, Filter, Loader2, ArrowUpDown, ArrowUp, ArrowDown, ShieldAlert, Flame, PhoneCall, PhoneForwarded, Clock, Server } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight, RotateCcw, X, Filter, Loader2, ArrowUpDown, ArrowUp, ArrowDown, ShieldAlert, Flame, PhoneCall, PhoneForwarded, Clock, Server, LayoutGrid, Inbox, Bell, Hourglass, CheckCircle2, CheckCheck, AlertTriangle, UserX, UserCheck } from "lucide-react";
 import { formatIST, istDateKey } from "@/lib/datetime";
 import { toast } from "sonner";
 
@@ -23,8 +23,7 @@ import { useRole } from "@/hooks/useRole";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useRealtimeTable } from "@/hooks/useRealtimeTable";
 import { usePreserveScroll, saveModuleFilterState, getModuleFilterState, clearModuleFilterState } from "@/hooks/usePreserveScroll";
-import { formatMobile55 } from "@/lib/utils";
-import { UserCheck } from "lucide-react";
+import { formatMobile55, cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/admin/orders/")({
   validateSearch: (
@@ -48,7 +47,7 @@ export const Route = createFileRoute("/admin/orders/")({
   component: OrdersListPage,
 });
 
-type Bucket = "all" | "needs_action" | "pending" | "completed" | "closed" | "exception" | "reminders" | "hot_orders";
+type Bucket = "all" | "needs_action" | "pending" | "completed" | "closed" | "exception" | "reminders" | "hot_orders" | "technical_delay" | "customer_delay";
 
 const CLOSED_FS = new Set<string>([
   "application_rejected", "certificate_rejected", "order_closed", "cancelled",
@@ -85,15 +84,96 @@ function isPendingRow(row: {
   return b === "pending" || b === "needs_action";
 }
 
-const BUCKETS: { id: Bucket; label: string; icon?: string; badgeSuffix?: string; tone?: "red" | "indigo" }[] = [
-  { id: "all", label: "All" },
-  { id: "needs_action", label: "Needs Action" },
-  { id: "reminders", label: "Reminders", icon: "⏱", badgeSuffix: "Active", tone: "indigo" },
-  { id: "hot_orders", label: "Hot Orders", icon: "🔥", badgeSuffix: "Due Now", tone: "red" },
-  { id: "pending", label: "Pending" },
-  { id: "completed", label: "Completed" },
-  { id: "closed", label: "Closed" },
-  { id: "exception", label: "Exception" },
+interface BucketCardItem {
+  id: Bucket;
+  label: string;
+  shortLabel?: string;
+  subtitle: string;
+  icon: React.ComponentType<{ className?: string }>;
+  badge?: {
+    text: string;
+    pillClass: string;
+  };
+  tone?: "default" | "rose" | "indigo" | "emerald" | "amber" | "sky";
+}
+
+const BUCKET_CARDS: BucketCardItem[] = [
+  {
+    id: "all",
+    label: "ALL",
+    subtitle: "Full Intake Portfolio",
+    icon: LayoutGrid,
+  },
+  {
+    id: "needs_action",
+    label: "NEEDS ACTION",
+    subtitle: "Touch SLA Pending",
+    icon: Inbox,
+  },
+  {
+    id: "reminders",
+    label: "REMINDERS",
+    subtitle: "Follow-ups set",
+    icon: Bell,
+    badge: {
+      text: "Active",
+      pillClass: "bg-blue-600 text-white font-bold",
+    },
+    tone: "indigo",
+  },
+  {
+    id: "hot_orders",
+    label: "HOT ORDERS",
+    subtitle: "<15m Critical SLA",
+    icon: Flame,
+    badge: {
+      text: "Due Now",
+      pillClass: "bg-rose-500 text-white font-bold",
+    },
+    tone: "rose",
+  },
+  {
+    id: "pending",
+    label: "PENDING",
+    subtitle: "Pipeline Queued",
+    icon: Hourglass,
+  },
+  {
+    id: "completed",
+    label: "COMPLETED",
+    subtitle: "Fulfilled Today",
+    icon: CheckCircle2,
+    tone: "emerald",
+  },
+  {
+    id: "closed",
+    label: "CLOSED",
+    subtitle: "Archived & Settled",
+    icon: CheckCheck,
+  },
+  {
+    id: "exception",
+    label: "EXCEPTION",
+    subtitle: "Supervisor Audit",
+    icon: AlertTriangle,
+    tone: "amber",
+  },
+  {
+    id: "technical_delay",
+    label: "TECH DELAY",
+    shortLabel: "TECH D...",
+    subtitle: "NIC/Gov Down...",
+    icon: Server,
+    tone: "sky",
+  },
+  {
+    id: "customer_delay",
+    label: "CUST DELAY",
+    shortLabel: "CUST D...",
+    subtitle: "Pending OTP/Docs",
+    icon: UserX,
+    tone: "amber",
+  },
 ];
 
 const STAGE_FILTER_OPTIONS: Array<{ id: string; label: string; tone: string }> = [
@@ -330,7 +410,7 @@ function OrdersListPage() {
 
   const rows = (data?.rows ?? []) as any[];
   const total = data?.total ?? 0;
-  const counts = data?.counts ?? {
+  const counts = (data?.counts as any) ?? {
     all: 0,
     needs_action: 0,
     pending: 0,
@@ -339,6 +419,10 @@ function OrdersListPage() {
     exception: 0,
     actionRequired: 0,
     processed: 0,
+    reminders: 0,
+    hot_orders: 0,
+    technical_delay: 0,
+    customer_delay: 0,
   };
   const ageBuckets = data?.ageBuckets ?? { d1: 0, d2: 0, d3: 0, d7: 0, older: 0 };
 
@@ -724,35 +808,76 @@ return (
       </div>
     )}
 
-    {/* Bucket chips */}
-    <div className="flex flex-wrap gap-2">
-      {BUCKETS.map((b) => {
+    {/* KPI Cards Row */}
+    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-10 gap-2 w-full">
+      {BUCKET_CARDS.map((b) => {
         const active = bucket === b.id;
-        const countVal = (counts as any)[b.id] ?? 0;
-        const isHotTab = b.id === "hot_orders";
-        const isReminderTab = b.id === "reminders";
+        const countVal = Number((counts as any)[b.id] ?? 0);
+        const IconComponent = b.icon;
 
-        let buttonCls = "bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:border-slate-300";
-        let badgeCls = "bg-slate-100 text-slate-600";
+        let cardContainerCls = "bg-white border-slate-200 text-slate-800 hover:border-slate-300 hover:bg-slate-50/70";
+        let headerCls = "text-slate-500";
+        let iconCls = "text-slate-400";
+        let countCls = "text-slate-900";
+        let subtitleCls = "text-slate-400";
 
-        if (active) {
-          if (isHotTab) {
-            buttonCls = "bg-rose-600 text-white border-rose-600 shadow-sm";
-            badgeCls = "bg-white text-rose-700 font-bold";
-          } else if (isReminderTab) {
-            buttonCls = "bg-indigo-600 text-white border-indigo-600 shadow-sm";
-            badgeCls = "bg-white text-indigo-700 font-bold";
+        if (b.id === "hot_orders") {
+          cardContainerCls = active
+            ? "bg-rose-50 border-rose-400 text-rose-950 shadow-sm ring-2 ring-rose-300"
+            : "bg-rose-50/70 border-rose-200/90 text-rose-950 hover:bg-rose-100/70 hover:border-rose-300";
+          headerCls = "text-rose-600 font-bold";
+          iconCls = "text-rose-600";
+          countCls = "text-rose-700";
+          subtitleCls = "text-rose-500/80";
+        } else if (b.id === "reminders") {
+          cardContainerCls = active
+            ? "bg-indigo-50 border-indigo-400 text-indigo-950 shadow-sm ring-2 ring-indigo-300"
+            : countVal > 0
+              ? "bg-indigo-50/40 border-indigo-200/90 text-indigo-950 hover:bg-indigo-50/80 hover:border-indigo-300"
+              : "bg-white border-slate-200 text-slate-800 hover:border-slate-300 hover:bg-slate-50/70";
+          headerCls = active || countVal > 0 ? "text-indigo-600 font-bold" : "text-slate-500";
+          iconCls = active || countVal > 0 ? "text-indigo-600" : "text-slate-400";
+          countCls = active || countVal > 0 ? "text-indigo-950" : "text-slate-900";
+          subtitleCls = active || countVal > 0 ? "text-indigo-600/70" : "text-slate-400";
+        } else if (b.id === "exception" && countVal > 0) {
+          cardContainerCls = active
+            ? "bg-amber-50 border-amber-400 text-amber-950 shadow-sm ring-2 ring-amber-300"
+            : "bg-amber-50/40 border-amber-200/90 text-amber-950 hover:bg-amber-50/80 hover:border-amber-300";
+          headerCls = "text-amber-600 font-bold";
+          iconCls = "text-amber-600";
+          countCls = "text-amber-950";
+          subtitleCls = "text-amber-600/70";
+        } else if (active) {
+          if (b.id === "all") {
+            cardContainerCls = "bg-slate-900 text-white border-slate-900 shadow-sm";
+            headerCls = "text-slate-300";
+            iconCls = "text-slate-300";
+            countCls = "text-white";
+            subtitleCls = "text-slate-400";
+          } else if (b.id === "completed") {
+            cardContainerCls = "bg-emerald-50 border-emerald-400 text-emerald-950 shadow-sm ring-2 ring-emerald-300";
+            headerCls = "text-emerald-700 font-bold";
+            iconCls = "text-emerald-600";
+            countCls = "text-emerald-950";
+            subtitleCls = "text-emerald-600/80";
+          } else if (b.id === "technical_delay") {
+            cardContainerCls = "bg-sky-50 border-sky-400 text-sky-950 shadow-sm ring-2 ring-sky-300";
+            headerCls = "text-sky-700 font-bold";
+            iconCls = "text-sky-600";
+            countCls = "text-sky-950";
+            subtitleCls = "text-sky-600/80";
+          } else if (b.id === "customer_delay") {
+            cardContainerCls = "bg-amber-50 border-amber-400 text-amber-950 shadow-sm ring-2 ring-amber-300";
+            headerCls = "text-amber-700 font-bold";
+            iconCls = "text-amber-600";
+            countCls = "text-amber-950";
+            subtitleCls = "text-amber-600/80";
           } else {
-            buttonCls = "bg-slate-900 text-white border-slate-900";
-            badgeCls = "bg-slate-800 text-white";
-          }
-        } else {
-          if (isHotTab && countVal > 0) {
-            buttonCls = "bg-rose-50/90 text-rose-800 border-rose-300 hover:bg-rose-100";
-            badgeCls = "bg-rose-600 text-white font-bold";
-          } else if (isReminderTab && countVal > 0) {
-            buttonCls = "bg-indigo-50/90 text-indigo-800 border-indigo-200 hover:bg-indigo-100";
-            badgeCls = "bg-indigo-600 text-white font-bold";
+            cardContainerCls = "bg-slate-900 text-white border-slate-900 shadow-sm";
+            headerCls = "text-slate-300";
+            iconCls = "text-slate-300";
+            countCls = "text-white";
+            subtitleCls = "text-slate-400";
           }
         }
 
@@ -760,16 +885,42 @@ return (
           <button
             key={b.id}
             type="button"
-            onClick={() => setBucket(b.id)}
-            className={`inline-flex items-center gap-2 h-8 px-3.5 rounded-full text-xs font-medium transition-all border shadow-xs ${buttonCls}`}
+            onClick={() => {
+              setBucket(b.id);
+              setPage(1);
+            }}
+            className={cn(
+              "flex flex-col justify-between p-2.5 sm:p-3 rounded-xl min-h-[82px] border transition-all duration-150 cursor-pointer select-none text-left group shadow-xs hover:shadow-sm",
+              cardContainerCls
+            )}
           >
-            <span className="flex items-center gap-1">
-              {b.icon && <span>{b.icon}</span>}
-              <span>{b.label}</span>
-            </span>
-            <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${badgeCls}`}>
-              {countVal} {b.badgeSuffix ? `${b.badgeSuffix}` : ""}
-            </span>
+            {/* Top row: Label & Icon */}
+            <div className="flex items-center justify-between gap-1 w-full">
+              <span
+                className={cn("text-[10px] font-bold tracking-wider uppercase truncate", headerCls)}
+                title={b.label}
+              >
+                {b.shortLabel || b.label}
+              </span>
+              <IconComponent className={cn("w-3.5 h-3.5 shrink-0 transition-transform group-hover:scale-110", iconCls)} />
+            </div>
+
+            {/* Middle row: Count & Badge */}
+            <div className="flex items-baseline gap-1.5 mt-1">
+              <span className={cn("text-lg sm:text-xl font-black tracking-tight", countCls)}>
+                {countVal.toLocaleString()}
+              </span>
+              {b.badge && (
+                <span className={cn("text-[9px] font-bold px-1.5 py-0.5 rounded leading-none shrink-0", b.badge.pillClass)}>
+                  {b.badge.text}
+                </span>
+              )}
+            </div>
+
+            {/* Bottom row: Subtitle */}
+            <div className={cn("text-[9.5px] font-medium truncate mt-0.5", subtitleCls)} title={b.subtitle}>
+              {b.subtitle}
+            </div>
           </button>
         );
       })}

@@ -353,7 +353,7 @@ async function ensurePaidOrdersIntegrated(admin: any) {
   }
 }
 
-export type Bucket = "all" | "needs_action" | "pending" | "completed" | "closed" | "exception" | "reminders" | "hot_orders";
+export type Bucket = "all" | "needs_action" | "pending" | "completed" | "closed" | "exception" | "reminders" | "hot_orders" | "technical_delay" | "customer_delay";
 
 const CLOSED_FS = new Set<string>([
   "application_rejected", "certificate_rejected", "order_closed", "cancelled",
@@ -537,7 +537,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       return {
         rows: [],
         total: 0,
-        counts: { all: 0, needs_action: 0, pending: 0, completed: 0, closed: 0, exception: 0, actionRequired: 0, processed: 0, reminders: 0, hot_orders: 0 },
+        counts: { all: 0, needs_action: 0, pending: 0, completed: 0, closed: 0, exception: 0, actionRequired: 0, processed: 0, reminders: 0, hot_orders: 0, technical_delay: 0, customer_delay: 0 },
         ageBuckets: { d1: 0, d2: 0, d3: 0, d7: 0, older: 0 },
         page: data.page,
         pageSize: data.pageSize,
@@ -590,6 +590,8 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
             processed: 0,
             reminders: 0,
             hot_orders: 0,
+            technical_delay: 0,
+            customer_delay: 0,
           },
           ageBuckets: parsed.ageBuckets ?? { d1: 0, d2: 0, d3: 0, d7: 0, older: 0 },
           page: parsed.page ?? data.page,
@@ -723,7 +725,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       return {
         rows: [],
         total: 0,
-        counts: { all: 0, needs_action: 0, pending: 0, completed: 0, closed: 0, exception: 0, actionRequired: 0, processed: 0, reminders: 0, hot_orders: 0 },
+        counts: { all: 0, needs_action: 0, pending: 0, completed: 0, closed: 0, exception: 0, actionRequired: 0, processed: 0, reminders: 0, hot_orders: 0, technical_delay: 0, customer_delay: 0 },
         ageBuckets: { d1: 0, d2: 0, d3: 0, d7: 0, older: 0 },
         page: data.page,
         pageSize: data.pageSize,
@@ -908,12 +910,16 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       processed: 0,
       reminders: 0,
       hot_orders: 0,
+      technical_delay: 0,
+      customer_delay: 0,
     };
     const ageBuckets = { d1: 0, d2: 0, d3: 0, d7: 0, older: 0 };
 
     for (const r of allRows) {
       if (r.is_callback_scheduled) counts.reminders++;
       if (r.is_hot) counts.hot_orders++;
+      if (r.stage === "technical_delay" || r.fulfillment_status === "technical_delay") counts.technical_delay++;
+      if (r.stage === "customer_delay" || r.fulfillment_status === "customer_delay") counts.customer_delay++;
 
       const b = bucketOfRow(r);
       if (b === "needs_action") {
@@ -964,6 +970,12 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
           break;
         case "exception":
           filtered = filtered.filter((r) => bucketOfRow(r) === "exception");
+          break;
+        case "technical_delay":
+          filtered = filtered.filter((r) => r.stage === "technical_delay" || r.fulfillment_status === "technical_delay");
+          break;
+        case "customer_delay":
+          filtered = filtered.filter((r) => r.stage === "customer_delay" || r.fulfillment_status === "customer_delay");
           break;
       }
     }
