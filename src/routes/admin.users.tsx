@@ -52,7 +52,7 @@ function UsersPage() {
                 <td className="px-3 py-2">{u.email}</td>
                 <td className="px-3 py-2">
                   <div className="flex flex-wrap gap-1">
-                    {u.roles.map((r: any) => (
+                    {u.roles.map((r: string) => (
                       <span key={r} className="inline-flex items-center gap-1 rounded bg-slate-100 px-2 py-0.5 text-xs">
                         {r}
                         <button
