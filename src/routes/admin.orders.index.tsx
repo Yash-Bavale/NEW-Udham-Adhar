@@ -552,7 +552,7 @@ async function handleBulkReassign(targetStaffId: string) {
   try {
     const assignedTo = targetStaffId === "unassign" ? null : targetStaffId;
     await bulkAssignFn({ data: { applicationIds: selectedOrderIds, assignedTo } });
-    const staffObj = staffProfiles.find((s) => s.id === targetStaffId);
+    const staffObj = assignStaffProfiles.find((s: any) => s.id === targetStaffId);
     const name = targetStaffId === "unassign" ? "Unassigned" : (staffObj?.display_name || staffObj?.name || staffObj?.email || "staff");
     toast.success(`Successfully reassigned ${selectedOrderIds.length} order(s) to ${name}`);
     setSelectedOrderIds([]);
