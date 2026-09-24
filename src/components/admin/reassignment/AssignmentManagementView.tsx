@@ -341,7 +341,7 @@ export function AssignmentManagementView() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="ALL">All New Assignees</SelectItem>
-                    {staffList?.rows?.map((s) => (
+                    {staffList?.rows?.map((s: any) => (
                       <SelectItem key={s.id} value={s.id}>
                         {s.full_name || s.email}
                       </SelectItem>

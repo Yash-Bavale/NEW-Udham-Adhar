@@ -379,12 +379,10 @@ export const autoDistributeSelectedOrders = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await assertAdminOrStaff(context.supabase, context.userId);
-    return await distributeOrdersEquallyCanonical({
-      applicationIds: data.applicationIds,
-      actorId: context.userId,
-      source: "super_admin",
-      reason: data.reason || "Equally distributed by SuperAdmin across active staff",
-      targetEmployeeIds: data.targetEmployeeIds,
-    });
+    return await distributeOrdersEquallyCanonical(
+      data.applicationIds,
+      context.userId,
+      data.reason || "Equally distributed by SuperAdmin across active staff",
+    );
   });
 
