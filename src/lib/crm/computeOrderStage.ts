@@ -49,6 +49,7 @@ export interface ComputeStageApplication {
   refund_processed_at?: string | null;
   closure_stage?: string | null;
   refund_status?: string | null;
+  order_status?: string | null;
 }
 
 export function computeOrderStage(
@@ -99,7 +100,7 @@ export function computeOrderStage(
   // "Payment Done" if an order is force-completed without a customer form.
   const fs = application.fulfillment_status ?? "order_received";
   const ws = application.workflow_status ?? "";
-  const os = (application as any).order_status ?? "";
+  const os = application.order_status ?? "";
 
   // Reopened state takes precedence over prior closed status
   if (

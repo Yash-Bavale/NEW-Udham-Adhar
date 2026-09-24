@@ -104,13 +104,9 @@ export function AssignmentManagementView() {
   const cancelLeaveMutation = useMutation({
     mutationFn: (leaveId: string) => cancelLeaveFn({ data: { leaveId } }),
     onSuccess: (res) => {
-      if (res.success) {
-        toast.success("Leave cancelled successfully");
-        qc.invalidateQueries({ queryKey: ["admin.employee.leaves"] });
-        qc.invalidateQueries({ queryKey: ["admin.assignment.metrics"] });
-      } else {
-        toast.error(res.error ?? "Failed to cancel leave");
-      }
+      toast.success("Leave cancelled successfully");
+      qc.invalidateQueries({ queryKey: ["admin.employee.leaves"] });
+      qc.invalidateQueries({ queryKey: ["admin.assignment.metrics"] });
     },
   });
 
@@ -124,20 +120,16 @@ export function AssignmentManagementView() {
         },
       }),
     onSuccess: (res) => {
-      if (res.success) {
-        toast.success(`Successfully reassigned ${res.reassignedCount} orders!`);
-        setManualReassignTarget(null);
-        qc.invalidateQueries({ queryKey: ["admin.assignment.metrics"] });
-        qc.invalidateQueries({ queryKey: ["admin.assignment.history"] });
-        qc.invalidateQueries({ queryKey: ["admin.orders"] });
-      } else {
-        toast.error(res.error ?? "Failed to trigger reassignment");
-      }
+      toast.success(res.summaryMessage || `Successfully reassigned ${res.reassignedCount} orders!`);
+      setManualReassignTarget(null);
+      qc.invalidateQueries({ queryKey: ["admin.assignment.metrics"] });
+      qc.invalidateQueries({ queryKey: ["admin.assignment.history"] });
+      qc.invalidateQueries({ queryKey: ["admin.orders"] });
     },
   });
 
   const activeLeavesCount = useMemo(() => {
-    return (leavesData?.leaves ?? []).filter((l) => l.status === "active").length;
+    return (leavesData?.rows ?? []).filter((l: any) => String(l.status).toUpperCase() === "ACTIVE").length;
   }, [leavesData]);
 
   return (
@@ -183,7 +175,7 @@ export function AssignmentManagementView() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
         <MetricCard
           title="Staff Unavailable"
-          value={metrics?.metrics?.employeesUnavailable ?? 0}
+          value={metrics?.employeesUnavailableCount ?? 0}
           subtitle={`${activeLeavesCount} on scheduled leave`}
           icon={UserX}
           color="amber"
@@ -191,7 +183,7 @@ export function AssignmentManagementView() {
         />
         <MetricCard
           title="Reassigned Today"
-          value={metrics?.metrics?.ordersReassignedToday ?? 0}
+          value={metrics?.ordersReassignedToday ?? 0}
           subtitle="Action orders redistributed"
           icon={Sparkles}
           color="indigo"
@@ -199,7 +191,7 @@ export function AssignmentManagementView() {
         />
         <MetricCard
           title="Auto Reassignments"
-          value={metrics?.metrics?.autoReassignmentsToday ?? 0}
+          value={metrics?.autoReassignmentsToday ?? 0}
           subtitle="Engine triggered changes"
           icon={RefreshCw}
           color="emerald"
@@ -207,7 +199,7 @@ export function AssignmentManagementView() {
         />
         <MetricCard
           title="Manual Assignments"
-          value={metrics?.metrics?.manualReassignmentsToday ?? 0}
+          value={metrics?.manualReassignmentsToday ?? 0}
           subtitle="SuperAdmin / Single & Bulk"
           icon={Users}
           color="blue"
@@ -215,10 +207,10 @@ export function AssignmentManagementView() {
         />
         <MetricCard
           title="Capacity Alerts"
-          value={metrics?.metrics?.ordersNeedingAssignment ?? 0}
+          value={metrics?.ordersNeedingAssignment ?? 0}
           subtitle="Orders requiring attention"
           icon={AlertTriangle}
-          color={metrics?.metrics?.ordersNeedingAssignment ? "red" : "slate"}
+          color={metrics?.ordersNeedingAssignment ? "red" : "slate"}
           loading={loadingMetrics}
         />
       </div>
@@ -241,13 +233,13 @@ export function AssignmentManagementView() {
                 className="flex items-center justify-between bg-white dark:bg-slate-900 p-3 rounded-lg border border-amber-200 dark:border-amber-900/60 shadow-xs"
               >
                 <div>
-                  <div className="text-sm font-bold text-slate-800 dark:text-slate-200">{emp.employeeName}</div>
+                  <div className="text-sm font-bold text-slate-800 dark:text-slate-200">{emp.name}</div>
                   <div className="flex items-center gap-1.5 mt-0.5">
                     <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-200">
-                      {emp.reason}
+                      {emp.unavailabilityReason || "Unavailable"}
                     </span>
                     <span className="text-xs text-slate-500 font-medium">
-                      {emp.ordersReassigned} orders redistributed
+                      {emp.activeActionOrders} active orders
                     </span>
                   </div>
                 </div>
@@ -289,7 +281,7 @@ export function AssignmentManagementView() {
               : "text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
           }`}
         >
-          Staff Leave Schedule ({leavesData?.leaves?.length ?? 0})
+          Staff Leave Schedule ({leavesData?.rows?.length ?? 0})
         </button>
       </div>
 
@@ -349,7 +341,7 @@ export function AssignmentManagementView() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="ALL">All New Assignees</SelectItem>
-                    {staffList?.map((s) => (
+                    {staffList?.rows?.map((s) => (
                       <SelectItem key={s.id} value={s.id}>
                         {s.full_name || s.email}
                       </SelectItem>
@@ -400,7 +392,7 @@ export function AssignmentManagementView() {
                         </td>
                       </tr>
                     ))
-                  ) : (historyData?.entries?.length ?? 0) === 0 ? (
+                  ) : (historyData?.rows?.length ?? 0) === 0 ? (
                     <tr>
                       <td colSpan={9} className="px-4 py-12 text-center text-slate-500">
                         <History className="size-8 mx-auto mb-2 text-slate-300" />
@@ -408,32 +400,32 @@ export function AssignmentManagementView() {
                       </td>
                     </tr>
                   ) : (
-                    historyData?.entries?.map((row) => {
-                      const badge = CHANGE_TYPE_CONFIG[row.change_type] ?? CHANGE_TYPE_CONFIG.SYSTEM;
+                    historyData?.rows?.map((row: any) => {
+                      const badge = CHANGE_TYPE_CONFIG[row.changeType] ?? CHANGE_TYPE_CONFIG.SYSTEM;
                       return (
                         <tr key={row.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition">
                           <td className="px-4 py-3">
                             <a
-                              href={`/admin/orders/${row.order_id}`}
+                              href={`/admin/orders/${row.orderId}`}
                               className="font-mono font-bold text-indigo-600 dark:text-indigo-400 hover:underline"
                             >
-                              {row.order_number || "—"}
+                              {row.applicationCode || "—"}
                             </a>
-                            <div className="text-[11px] text-slate-500">{row.service_name || "Service"}</div>
+                            <div className="text-[11px] text-slate-500">Order assignment</div>
                           </td>
                           <td className="px-4 py-3">
-                            <div className="font-medium text-slate-800 dark:text-slate-200">{row.customer_name || "—"}</div>
-                            <div className="text-[11px] text-slate-500">{row.customer_phone || ""}</div>
+                            <div className="font-medium text-slate-800 dark:text-slate-200">{row.customerName || "—"}</div>
+                            <div className="text-[11px] text-slate-500">{row.customerMobile || ""}</div>
                           </td>
                           <td className="px-4 py-3 text-slate-600 dark:text-slate-400 font-medium">
-                            {row.previous_employee_name || "Unassigned"}
+                            {row.previousEmployeeName || "Unassigned"}
                           </td>
                           <td className="px-4 py-3 text-center text-slate-400">
                             <ArrowRight className="size-3.5 mx-auto" />
                           </td>
                           <td className="px-4 py-3">
                             <span className="font-bold text-slate-900 dark:text-slate-100">
-                              {row.new_employee_name || "Unassigned"}
+                              {row.newEmployeeName || "Unassigned"}
                             </span>
                           </td>
                           <td className="px-4 py-3">
@@ -448,11 +440,11 @@ export function AssignmentManagementView() {
                           </td>
                           <td className="px-4 py-3 text-slate-500">
                             <div className="font-semibold text-slate-700 dark:text-slate-300">{row.source || "SYSTEM"}</div>
-                            <div className="text-[10px]">{row.changed_by_name}</div>
+                            <div className="text-[10px]">{row.changedByName}</div>
                           </td>
                           <td className="px-4 py-3 text-right text-slate-500 whitespace-nowrap">
-                            <div className="font-medium text-slate-700 dark:text-slate-300">{formatIST(row.created_at)}</div>
-                            <div className="text-[10px] text-slate-400">{relativeIST(row.created_at)}</div>
+                            <div className="font-medium text-slate-700 dark:text-slate-300">{formatIST(row.createdAt)}</div>
+                            <div className="text-[10px] text-slate-400">{relativeIST(row.createdAt)}</div>
                           </td>
                         </tr>
                       );
@@ -535,7 +527,7 @@ export function AssignmentManagementView() {
                         </td>
                       </tr>
                     ))
-                  ) : (leavesData?.leaves?.length ?? 0) === 0 ? (
+                  ) : (leavesData?.rows?.length ?? 0) === 0 ? (
                     <tr>
                       <td colSpan={7} className="px-4 py-10 text-center text-slate-500">
                         <Calendar className="size-8 mx-auto mb-2 text-slate-300" />
@@ -543,20 +535,19 @@ export function AssignmentManagementView() {
                       </td>
                     </tr>
                   ) : (
-                    leavesData?.leaves?.map((l) => (
+                    leavesData?.rows?.map((l: any) => (
                       <tr key={l.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40">
                         <td className="px-4 py-3">
-                          <div className="font-bold text-slate-900 dark:text-slate-100">{l.employee_name}</div>
-                          <div className="text-[10px] text-slate-500">{l.employee_email}</div>
+                          <div className="font-bold text-slate-900 dark:text-slate-100">{l.employeeName}</div>
                         </td>
                         <td className="px-4 py-3">
                           <div className="font-medium text-slate-800 dark:text-slate-200">
-                            {formatIST(l.start_time)} → {formatIST(l.end_time)}
+                            {formatIST(l.startTime)} → {formatIST(l.endTime)}
                           </div>
                         </td>
                         <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{l.reason || "Scheduled Leave"}</td>
                         <td className="px-4 py-3">
-                          {l.auto_reassign ? (
+                          {l.autoReassign ? (
                             <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
                               <CheckCircle2 className="size-3" /> Enabled
                             </span>
@@ -567,7 +558,7 @@ export function AssignmentManagementView() {
                           )}
                         </td>
                         <td className="px-4 py-3 font-bold text-indigo-600 dark:text-indigo-400">
-                          {l.reassigned_count} orders
+                          {l.reassignedCount} orders
                         </td>
                         <td className="px-4 py-3">
                           <span
@@ -612,7 +603,7 @@ export function AssignmentManagementView() {
         <ScheduleLeaveDialog
           open={leaveModalOpen}
           onClose={() => setLeaveModalOpen(false)}
-          staffList={staffList ?? []}
+          staffList={staffList?.rows ?? []}
           onCreated={() => {
             qc.invalidateQueries({ queryKey: ["admin.employee.leaves"] });
             qc.invalidateQueries({ queryKey: ["admin.assignment.metrics"] });
@@ -698,13 +689,10 @@ function ScheduleLeaveDialog({
         },
       }),
     onSuccess: (res) => {
-      if (res.success) {
-        toast.success(`Leave scheduled! ${res.reassignedCount ? `${res.reassignedCount} orders reassigned.` : ""}`);
-        onCreated();
-        onClose();
-      } else {
-        toast.error(res.error ?? "Failed to create leave");
-      }
+      const reassignedCount = res.redistributionSummary?.reassignedCount ?? 0;
+      toast.success(`Leave scheduled! ${reassignedCount ? `${reassignedCount} orders reassigned.` : ""}`);
+      onCreated();
+      onClose();
     },
   });
 

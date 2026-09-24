@@ -1,5 +1,5 @@
 import { createStart, createMiddleware } from "@tanstack/react-start";
-
+import { isAbortError } from "./lib/abort-error";
 import { renderErrorPage } from "./lib/error-page";
 // Lazy-loading equivalent of the generated attachSupabaseAuth (keeps the auth
 // SDK out of the initial bundle).
@@ -14,6 +14,9 @@ const errorMiddleware = createMiddleware().server(async ({ request, next }) => {
   try {
     return await next();
   } catch (error) {
+    if (isAbortError(error)) {
+      throw error;
+    }
     if (error != null && typeof error === "object" && "statusCode" in error) {
       throw error;
     }

@@ -23,6 +23,7 @@ import { isBlockedOnSecondarySite } from "@/lib/websites/secondary-site-routes";
 import { getContentfulSeoArticle } from "@/lib/contentful/client.functions";
 import { SeoContentPage } from "@/components/site/SeoContentPage";
 import { cfToSeoPageData } from "@/lib/contentful/seo-page-data";
+import { isAbortError } from "../lib/abort-error";
 
 
 
@@ -50,6 +51,7 @@ function NotFoundComponent() {
 
 function ErrorComponent({ error, reset }: { error: any; reset: () => void }) {
   console.error(error);
+  if (isAbortError(error)) return;
   const router = useRouter();
   useEffect(() => {
     reportLovableError(error, { boundary: "tanstack_root_error_component" });
