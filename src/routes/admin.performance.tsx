@@ -131,7 +131,7 @@ function EmployeeActivityCommandCenterPage() {
     title: string;
   } | null>(null);
   const [tableSearch, setTableSearch] = useState<string>("");
-  const [auditFilter, setAuditFilter] = useState<string>("all");
+  const [auditFilter, setAuditFilter] = useState<string>("human");
   const [isRotating, setIsRotating] = useState(false);
   const [broadcastNote, setBroadcastNote] = useState<string | null>(null);
 
@@ -159,11 +159,12 @@ function EmployeeActivityCommandCenterPage() {
   });
 
   const { data: liveFeed, refetch: refetchFeed } = useQuery({
-    queryKey: ["admin.performance.live-feed"],
+    queryKey: ["admin.performance.live-feed", auditFilter],
     queryFn: () =>
       getLiveFeedFn({
         data: {
-          limit: 30,
+          limit: 40,
+          filter: auditFilter === "system" ? "system" : auditFilter === "all" ? "all" : auditFilter === "human" ? "human" : "all",
         },
       }),
     refetchInterval: 10_000,
@@ -275,7 +276,7 @@ function EmployeeActivityCommandCenterPage() {
   // Filtered Audit Feed items
   const filteredAuditFeed = useMemo(() => {
     if (!liveFeed) return [];
-    if (auditFilter === "all") return liveFeed;
+    if (auditFilter === "human" || auditFilter === "system" || auditFilter === "all") return liveFeed;
     return liveFeed.filter((item: any) => {
       const type = (item.actionType || "").toUpperCase();
       const txt = (item.actionText || "").toUpperCase();
@@ -1196,7 +1197,9 @@ function EmployeeActivityCommandCenterPage() {
             {/* Filter Pills */}
             <div className="flex flex-wrap items-center gap-1">
               {[
-                { key: "all", label: "All Actions" },
+                { key: "human", label: "Human Actions" },
+                { key: "system", label: "System Events" },
+                { key: "all", label: "All Activity" },
                 { key: "Orders", label: "Orders" },
                 { key: "Support Tickets", label: "Tickets" },
                 { key: "Documents", label: "Documents" },
@@ -1238,17 +1241,26 @@ function EmployeeActivityCommandCenterPage() {
                 const isTicket = (item.actionType || "").includes("TICKET");
                 const isDoc = (item.actionType || "").includes("DOC");
                 const isDelay = (item.actionType || "").includes("DELAY");
+                const isSystem = !!item.isSystemAction;
 
                 return (
                   <div
                     key={item.id}
-                    className="p-3 rounded-xl bg-slate-50/80 hover:bg-slate-100/70 border border-slate-100 transition-colors flex items-start gap-3"
+                    className={cn(
+                      "p-3 rounded-xl border transition-colors flex items-start gap-3",
+                      isSystem
+                        ? "bg-slate-50/50 hover:bg-slate-100/50 border-slate-200/60"
+                        : "bg-white hover:bg-blue-50/30 border-slate-200/90 shadow-2xs"
+                    )}
                   >
                     <div className="font-mono text-[11px] text-slate-400 font-semibold pt-0.5 flex-shrink-0">
                       {item.time || "14:24:18"}
                     </div>
 
-                    <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-900 flex items-center justify-center font-bold text-xs flex-shrink-0">
+                    <div className={cn(
+                      "w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs flex-shrink-0",
+                      isSystem ? "bg-slate-200 text-slate-700" : "bg-blue-100 text-blue-900"
+                    )}>
                       {initials}
                     </div>
 
@@ -1260,21 +1272,23 @@ function EmployeeActivityCommandCenterPage() {
                         <span
                           className={cn(
                             "px-2 py-0.2 rounded-full text-[10px] font-bold uppercase",
-                            isOrder
-                              ? "bg-blue-100 text-blue-800"
-                              : isTicket
-                                ? "bg-amber-100 text-amber-900"
-                                : isDoc
-                                  ? "bg-emerald-100 text-emerald-800"
-                                  : isDelay
-                                    ? "bg-rose-100 text-rose-800"
-                                    : "bg-slate-200 text-slate-700",
+                            isSystem
+                              ? "bg-slate-200 text-slate-700"
+                              : isOrder
+                                ? "bg-blue-100 text-blue-800"
+                                : isTicket
+                                  ? "bg-amber-100 text-amber-900"
+                                  : isDoc
+                                    ? "bg-emerald-100 text-emerald-800"
+                                    : isDelay
+                                      ? "bg-rose-100 text-rose-800"
+                                      : "bg-indigo-100 text-indigo-800",
                           )}
                         >
                           {item.actionType || "ACTION_LOGGED"}
                         </span>
                         <span className="text-slate-400 text-[10px]">
-                          in {isTicket ? "Support Tickets" : isDoc ? "Documents" : "Orders module"}
+                          {isSystem ? "Automated system event" : `in ${isTicket ? "Support Tickets" : isDoc ? "Documents" : "Orders module"}`}
                         </span>
                       </div>
 
@@ -1293,8 +1307,11 @@ function EmployeeActivityCommandCenterPage() {
                     </div>
 
                     <div className="flex-shrink-0 text-right">
-                      <span className="text-[11px] text-emerald-700 font-semibold">
-                        {isOrder ? "Verified Call" : isTicket ? "Resolved" : "Milestone Met"}
+                      <span className={cn(
+                        "text-[11px] font-semibold",
+                        isSystem ? "text-slate-400" : "text-emerald-700"
+                      )}>
+                        {isSystem ? "System" : isOrder ? "Verified Action" : isTicket ? "Resolved" : "Milestone Met"}
                       </span>
                     </div>
                   </div>

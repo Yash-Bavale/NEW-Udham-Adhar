@@ -106,6 +106,10 @@ export const ORDER_ACCESS_ROLES = [
   "admin",
   "super_admin",
   "support",
+  "accounts",
+  "finance",
+  "agent",
+  "verifier",
 ] as const;
 
 export const TERMINAL_STAGES: Set<string> = new Set([
@@ -459,24 +463,38 @@ export async function assignOrderCanonical(
  * 3. Calculate dynamic live workloads & eligibility across staff members
  */
 export async function calculateStaffWorkloads(): Promise<StaffWorkloadSummary[]> {
-  const { data: roleRows } = await (supabaseAdmin as any)
-    .from("user_roles")
-    .select("user_id, role")
-    .in("role", ORDER_ACCESS_ROLES);
+  const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-  const staffUserIds: string[] = Array.from(
-    new Set<string>((roleRows ?? []).map((r: any) => String(r.user_id))),
-  );
+  const [{ data: roleRows }, { data: activeProfiles }] = await Promise.all([
+    (supabaseAdmin as any)
+      .from("user_roles")
+      .select("user_id, role")
+      .in("role", ORDER_ACCESS_ROLES),
+    (supabaseAdmin as any)
+      .from("profiles")
+      .select("id, display_name, full_name, email, is_active, employment_status, auto_assign_enabled, max_workload, work_schedule")
+      .not("id", "is", null),
+  ]);
+
+  const rawUserIds = new Set<string>();
+  (roleRows ?? []).forEach((r: any) => {
+    if (r.user_id && UUID_REGEX.test(String(r.user_id))) {
+      rawUserIds.add(String(r.user_id));
+    }
+  });
+  (activeProfiles ?? []).forEach((p: any) => {
+    if (p.id && UUID_REGEX.test(String(p.id)) && p.employment_status !== "ARCHIVED" && p.employment_status !== "TERMINATED") {
+      rawUserIds.add(String(p.id));
+    }
+  });
+
+  const staffUserIds: string[] = Array.from(rawUserIds);
   if (!staffUserIds.length) return [];
 
   const nowIso = new Date().toISOString();
 
-  // Concurrently fetch profiles, pool memberships, leaves, sessions, open applications & schedulers
-  const [profilesRes, poolRes, leavesRes, sessionsRes, appsRes, schedulersRes] = await Promise.all([
-    (supabaseAdmin as any)
-      .from("profiles")
-      .select("id, display_name, full_name, email, is_active, employment_status, auto_assign_enabled, max_workload, work_schedule")
-      .in("id", staffUserIds),
+  // Concurrently fetch pool memberships, leaves, sessions, open applications & schedulers
+  const [poolRes, leavesRes, sessionsRes, appsRes, schedulersRes] = await Promise.all([
     (supabaseAdmin as any)
       .from("assignment_pool")
       .select("user_id, is_active")
@@ -489,7 +507,7 @@ export async function calculateStaffWorkloads(): Promise<StaffWorkloadSummary[]>
       .gte("end_time", nowIso),
     (supabaseAdmin as any)
       .from("employee_sessions")
-      .select("employee_id, is_active, last_heartbeat_at, last_activity_at")
+      .select("employee_id, is_active, last_heartbeat_at, last_activity_at, status")
       .in("employee_id", staffUserIds)
       .eq("is_active", true)
       .order("last_heartbeat_at", { ascending: false }),
@@ -505,7 +523,7 @@ export async function calculateStaffWorkloads(): Promise<StaffWorkloadSummary[]>
   ]);
 
   const profileMap = new Map<string, any>();
-  (profilesRes.data ?? []).forEach((p: any) => profileMap.set(String(p.id), p));
+  (activeProfiles ?? []).forEach((p: any) => profileMap.set(String(p.id), p));
 
   const poolActiveMap = new Map<string, boolean>();
   (poolRes.data ?? []).forEach((ap: any) => {
@@ -618,7 +636,7 @@ export async function calculateStaffWorkloads(): Promise<StaffWorkloadSummary[]>
       isActive: isActiveAcc,
       autoAssignEnabled,
       isInAssignmentPool: isPoolActive,
-      role: roleMap.get(uid),
+      role: roleMap.get(uid) || "operations",
       isOnLeave,
       workSchedule: prof?.work_schedule,
       currentWorkload: counts.activeActionOrders,
@@ -634,11 +652,16 @@ export async function calculateStaffWorkloads(): Promise<StaffWorkloadSummary[]>
     else if (presence === "AWAY") unavailReason = "Staff Away (>15m)";
     else if (!isEligible && reasons.length > 0) unavailReason = reasons[0];
 
+    const resolvedName = prof?.full_name?.trim() || prof?.display_name?.trim() || prof?.email?.split("@")[0] || "Unknown Employee";
+    if (resolvedName === "Unknown Employee" && !prof) {
+      console.warn(`[calculateStaffWorkloads] Missing profile record for staff user: ${uid}`);
+    }
+
     return {
       employeeId: uid,
-      name: prof?.full_name ?? prof?.display_name ?? prof?.email ?? "Staff",
+      name: resolvedName,
       email: prof?.email ?? "",
-      role: roleMap.get(uid) ?? "executive",
+      role: roleMap.get(uid) ?? "operations",
       employmentStatus: empStatus,
       effectiveWorkload,
       activeActionOrders: counts.activeActionOrders,

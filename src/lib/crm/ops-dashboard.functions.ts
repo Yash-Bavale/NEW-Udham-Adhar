@@ -135,7 +135,7 @@ export const getOpsDashboard = createServerFn({ method: "GET" })
       fetchAll<any>(supabase.from("documents").select("id, application_id, lead_id, doc_type, status, created_at").order("created_at", { ascending: false })),
       supabase.from("application_events").select("id, event_type, old_value, new_value, staff_name, created_at, application_id").order("created_at", { ascending: false }).limit(20),
       supabase.from("services").select("id, service_name, service_code, is_active"),
-      supabase.from("profiles").select("id, display_name, email"),
+      supabase.from("profiles").select("id, full_name, display_name, email"),
       followupsQ,
       tasksQ,
       fetchAll<any>(supabase.from("customers").select("id, name")),
@@ -153,7 +153,7 @@ export const getOpsDashboard = createServerFn({ method: "GET" })
     const customerNameById = new Map<string, string>((customersLookup as any[]).map((c) => [c.id, c.name]));
 
     const serviceById = new Map(services.map((s: any) => [s.id, s.service_name as string]));
-    const profileById = new Map(profiles.map((p: any) => [p.id, (p.display_name as string) || (p.email as string) || "—"]));
+    const profileById = new Map(profiles.map((p: any) => [p.id, (p.full_name as string) || (p.display_name as string) || (p.email as string) || "Unknown Employee"]));
     const leadById = new Map(leads.map((l: any) => [l.id, l]));
 
 
@@ -389,7 +389,7 @@ export const getOpsDashboard = createServerFn({ method: "GET" })
     });
     const staffPerformance: StaffRow[] = Array.from(staffMap.entries()).map(([user_id, v]) => ({
       user_id,
-      name: profileById.get(user_id) || "Staff",
+      name: profileById.get(user_id) || "Unknown Employee",
       ...v,
     })).sort((a, b) => b.handled - a.handled).slice(0, 8);
 

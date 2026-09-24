@@ -328,14 +328,46 @@ export function formatLogAction(log: {
   };
 }
 
-export function buildDynamicTelemetrySegments(logs: any[], dayStartIso?: string) {
-  if (!logs || logs.length === 0) {
+/**
+ * Resolves an employee's authentic display name from profile, full_name, display_name, or email.
+ * Never falls back to generic "Staff".
+ */
+export function resolveEmployeeName(p?: any, rawFallback?: string | null): string {
+  const fullName = p?.full_name?.trim();
+  if (fullName) return fullName;
+  const displayName = p?.display_name?.trim();
+  if (displayName) return displayName;
+  const emailPrefix = p?.email?.split("@")[0]?.trim();
+  if (emailPrefix) return emailPrefix;
+  if (rawFallback && rawFallback.trim() && rawFallback !== "Staff" && rawFallback !== "00000000-0000-0000-0000-000000000000") {
+    return rawFallback.trim();
+  }
+  if (p?.id) {
+    console.warn(`[EmployeePerformance] Unresolved employee identity for profile: ${p.id}`);
+  }
+  return "Unknown Employee";
+}
+
+/**
+ * Builds authentic session telemetry segments from public.employee_sessions records.
+ * Does not synthesize artificial telemetry when data is missing.
+ */
+export function buildDynamicTelemetrySegments(sessions: any[] = [], logs: any[] = []) {
+  if (!sessions || sessions.length === 0) {
     return [
-      { id: "seg_off", label: "OFFLINE", durationMins: 480, startTime: "09:00", endTime: "18:00", type: "offline", percent: 100, color: "#94a3b8" },
+      {
+        id: "seg_unavailable",
+        label: "Telemetry unavailable for this period",
+        durationMins: 0,
+        startTime: "—",
+        endTime: "—",
+        type: "offline" as const,
+        percent: 100,
+        color: "#94a3b8",
+      },
     ];
   }
 
-  const chronological = [...logs].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
   const segments: Array<{
     id: string;
     label: string;
@@ -347,56 +379,95 @@ export function buildDynamicTelemetrySegments(logs: any[], dayStartIso?: string)
     color: string;
   }> = [];
 
-  let currentSegmentStart = new Date(chronological[0].created_at);
-  let lastActionTime = currentSegmentStart;
+  const sortedSessions = [...sessions].sort(
+    (a, b) => new Date(a.started_at).getTime() - new Date(b.started_at).getTime(),
+  );
 
-  for (let i = 1; i < chronological.length; i++) {
-    const actTime = new Date(chronological[i].created_at);
-    const gapMins = Math.round((actTime.getTime() - lastActionTime.getTime()) / 60000);
+  sortedSessions.forEach((sess, idx) => {
+    const start = new Date(sess.started_at);
+    const end = sess.ended_at
+      ? new Date(sess.ended_at)
+      : sess.last_heartbeat_at
+        ? new Date(sess.last_heartbeat_at)
+        : new Date(sess.started_at);
 
-    if (gapMins > 25) {
-      const actDur = Math.max(10, Math.round((lastActionTime.getTime() - currentSegmentStart.getTime()) / 60000));
+    const activeSecs = Number(sess.active_seconds || 0);
+    const idleSecs = Number(sess.idle_seconds || 0);
+    const awaySecs = Number(sess.away_seconds || 0);
+
+    const activeMins = Math.round(activeSecs / 60);
+    const idleMins = Math.round(idleSecs / 60);
+    const awayMins = Math.round(awaySecs / 60);
+
+    if (activeMins > 0) {
       segments.push({
-        id: `seg_${segments.length}`,
-        label: `${actDur}m ACTIVE`,
-        durationMins: actDur,
-        startTime: formatTimeISTShort(currentSegmentStart),
-        endTime: formatTimeISTShort(lastActionTime),
+        id: `seg_act_${idx}`,
+        label: `${activeMins}m ACTIVE`,
+        durationMins: activeMins,
+        startTime: formatTimeISTShort(start),
+        endTime: formatTimeISTShort(end),
         type: "active",
         percent: 0,
         color: "#059669",
       });
-
-      const awayType = gapMins >= 40 ? "away" : "idle";
-      segments.push({
-        id: `seg_${segments.length}`,
-        label: `${gapMins}m ${awayType.toUpperCase()}`,
-        durationMins: gapMins,
-        startTime: formatTimeISTShort(lastActionTime),
-        endTime: formatTimeISTShort(actTime),
-        type: awayType,
-        percent: 0,
-        color: awayType === "away" ? "#d97706" : "#f59e0b",
-      });
-
-      currentSegmentStart = actTime;
-      lastActionTime = actTime;
-    } else {
-      lastActionTime = actTime;
     }
-  }
 
-  const finalActDur = Math.max(10, Math.round((lastActionTime.getTime() - currentSegmentStart.getTime()) / 60000));
-  segments.push({
-    id: `seg_${segments.length}`,
-    label: `${finalActDur}m ACTIVE NOW`,
-    durationMins: finalActDur,
-    startTime: formatTimeISTShort(currentSegmentStart),
-    endTime: formatTimeISTShort(lastActionTime),
-    type: "active",
-    percent: 0,
-    color: "#059669",
+    if (idleMins > 0) {
+      segments.push({
+        id: `seg_idle_${idx}`,
+        label: `${idleMins}m IDLE`,
+        durationMins: idleMins,
+        startTime: formatTimeISTShort(start),
+        endTime: formatTimeISTShort(end),
+        type: "idle",
+        percent: 0,
+        color: "#f59e0b",
+      });
+    }
+
+    if (awayMins > 0) {
+      segments.push({
+        id: `seg_away_${idx}`,
+        label: `${awayMins}m AWAY`,
+        durationMins: awayMins,
+        startTime: formatTimeISTShort(start),
+        endTime: formatTimeISTShort(end),
+        type: "away",
+        percent: 0,
+        color: "#d97706",
+      });
+    }
+
+    if (activeMins === 0 && idleMins === 0 && awayMins === 0) {
+      const diffMins = Math.max(1, Math.round((end.getTime() - start.getTime()) / 60000));
+      const sType = sess.status === "active" ? "active" : sess.status === "idle" ? "idle" : sess.status === "away" ? "away" : "offline";
+      segments.push({
+        id: `seg_sess_${idx}`,
+        label: `${diffMins}m ${sType.toUpperCase()}`,
+        durationMins: diffMins,
+        startTime: formatTimeISTShort(start),
+        endTime: formatTimeISTShort(end),
+        type: sType,
+        percent: 0,
+        color: sType === "active" ? "#059669" : sType === "idle" ? "#f59e0b" : sType === "away" ? "#d97706" : "#94a3b8",
+      });
+    }
   });
+
+  if (segments.length === 0) {
+    return [
+      {
+        id: "seg_unavailable",
+        label: "Telemetry unavailable for this period",
+        durationMins: 0,
+        startTime: "—",
+        endTime: "—",
+        type: "offline" as const,
+        percent: 100,
+        color: "#94a3b8",
+      },
+    ];
+  }
 
   const totalMins = segments.reduce((acc, s) => acc + s.durationMins, 0) || 1;
   segments.forEach((s) => {
@@ -505,6 +576,7 @@ interface NormalizedOperationalEvent {
 /**
  * Normalizes raw application_events, order_schedulers, and activity_logs
  * into a single deduplicated stream of authentic operational events.
+ * Strictly separates HUMAN actions from SYSTEM automations (ORDER_ASSIGNED, crons, auto-reassignments).
  */
 function normalizeOperationalEvents(params: {
   appEvents: any[];
@@ -523,7 +595,7 @@ function normalizeOperationalEvents(params: {
     const rawCreator = s.created_by;
     const resolvedEmpId = resolveStaffUserId(rawCreator);
     const p = resolvedEmpId ? profileMap.get(resolvedEmpId) : null;
-    const empName = p?.full_name || p?.display_name || p?.email?.split("@")[0] || "Staff";
+    const empName = resolveEmployeeName(p);
     const role = (resolvedEmpId && userRoleMap.get(resolvedEmpId)) || "operations";
     const eventTime = s.started_at || s.created_at;
     if (!eventTime) return;
@@ -551,6 +623,13 @@ function normalizeOperationalEvents(params: {
     const dedupKey = `${s.application_id}_${actionCategory}_${timeBucket}`;
     seenDelayKeys.add(dedupKey);
 
+    const isSystemAction =
+      !resolvedEmpId ||
+      resolvedEmpId === "00000000-0000-0000-0000-000000000000" ||
+      st.includes("system") ||
+      st.includes("cron") ||
+      st.includes("auto");
+
     results.push({
       id: `sch_${s.id}`,
       orderId: s.application_id,
@@ -564,7 +643,7 @@ function normalizeOperationalEvents(params: {
       newStatus: actionCategory === "customer_delay" ? "CUSTOMER_HOLD" : actionCategory === "technical_delay" ? "TECHNICAL_HOLD" : null,
       notes,
       createdAt: eventTime,
-      isSystemAction: !resolvedEmpId || resolvedEmpId === "00000000-0000-0000-0000-000000000000",
+      isSystemAction,
     });
   });
 
@@ -573,7 +652,7 @@ function normalizeOperationalEvents(params: {
     const rawCreator = evt.created_by || evt.staff_name;
     const resolvedEmpId = resolveStaffUserId(rawCreator);
     const p = resolvedEmpId ? profileMap.get(resolvedEmpId) : null;
-    const empName = evt.staff_name || p?.full_name || p?.display_name || p?.email?.split("@")[0] || "Staff";
+    const empName = resolveEmployeeName(p, evt.staff_name);
     const role = evt.staff_role || (resolvedEmpId && userRoleMap.get(resolvedEmpId)) || "operations";
     const eventTime = evt.created_at;
     if (!eventTime) return;
@@ -584,11 +663,25 @@ function normalizeOperationalEvents(params: {
 
     let actionCategory: NormalizedOperationalEvent["actionCategory"] = "status_change";
     let actionType = "STATUS_CHANGED";
-    let isSystemAction = !evt.created_by || evt.created_by === "00000000-0000-0000-0000-000000000000" || et === "system_close";
+
+    // Strict classification: assignments and automated events are ALWAYS system actions
+    let isSystemAction =
+      !evt.created_by ||
+      evt.created_by === "00000000-0000-0000-0000-000000000000" ||
+      et === "assignment_change" ||
+      et.includes("assigned") ||
+      et === "system_close" ||
+      et.startsWith("auto_") ||
+      et.includes("cron") ||
+      et.includes("scheduler") ||
+      et.includes("heartbeat") ||
+      et.includes("telemetry") ||
+      et.includes("workload");
 
     if (et === "assignment_change" || et.includes("assigned")) {
       actionCategory = "assignment";
       actionType = "ORDER_ASSIGNED";
+      isSystemAction = true;
     } else if (nv === "CUSTOMER_HOLD" || et.includes("customer_delay")) {
       actionCategory = "customer_delay";
       actionType = "CUSTOMER_DELAY_ADDED";
@@ -656,7 +749,7 @@ function normalizeOperationalEvents(params: {
     const rawCreator = act.user_id;
     const resolvedEmpId = resolveStaffUserId(rawCreator);
     const p = resolvedEmpId ? profileMap.get(resolvedEmpId) : null;
-    const empName = p?.full_name || p?.display_name || p?.email?.split("@")[0] || "Staff";
+    const empName = resolveEmployeeName(p);
     const role = (resolvedEmpId && userRoleMap.get(resolvedEmpId)) || "operations";
     const eventTime = act.created_at;
     if (!eventTime) return;
@@ -664,6 +757,7 @@ function normalizeOperationalEvents(params: {
     const at = String(act.activity_type ?? "").toLowerCase();
     let actionCategory: NormalizedOperationalEvent["actionCategory"] = "note";
     let actionType = "NOTE_ADDED";
+    let isSystemAction = !resolvedEmpId || resolvedEmpId === "00000000-0000-0000-0000-000000000000" || at.includes("system") || at.includes("auto") || at.includes("cron");
 
     if (at.includes("call") || at.includes("contact")) {
       actionCategory = "callback";
@@ -691,7 +785,7 @@ function normalizeOperationalEvents(params: {
       actionCategory,
       notes: act.activity_description,
       createdAt: eventTime,
-      isSystemAction: false,
+      isSystemAction,
     });
   });
 
@@ -745,7 +839,7 @@ export const getEmployeePerformanceCommandCenter = createServerFn({
     const [{ data: profiles }, { data: staffRoles }] = await Promise.all([
       admin
         .from("profiles")
-        .select("id, display_name, email, is_active"),
+        .select("id, full_name, display_name, email, is_active, avatar_url"),
       admin
         .from("user_roles")
         .select("user_id, role")
@@ -780,6 +874,12 @@ export const getEmployeePerformanceCommandCenter = createServerFn({
     (profiles ?? []).forEach((p: any) => {
       profileMap.set(p.id, p);
       nameToUserIdMap.set(p.id.toLowerCase().trim(), p.id);
+      if (p.full_name) {
+        nameToUserIdMap.set(p.full_name.toLowerCase().trim(), p.id);
+        const parts = p.full_name.trim().split(/\s+/);
+        if (parts[0]) nameToUserIdMap.set(parts[0].toLowerCase(), p.id);
+        if (parts.length > 1) nameToUserIdMap.set(`${parts[0]} ${parts[parts.length - 1]}`.toLowerCase(), p.id);
+      }
       if (p.display_name) {
         nameToUserIdMap.set(p.display_name.toLowerCase().trim(), p.id);
         const parts = p.display_name.trim().split(/\s+/);
@@ -958,7 +1058,7 @@ export const getEmployeePerformanceCommandCenter = createServerFn({
 
     activeStaffProfiles.forEach((p: any) => {
       const uid = p.id;
-      const name = p.full_name || p.display_name || p.email?.split("@")[0] || "Staff";
+      const name = resolveEmployeeName(p);
       empStatsMap.set(uid, {
         employeeId: uid,
         employeeName: name,
@@ -1010,6 +1110,20 @@ export const getEmployeePerformanceCommandCenter = createServerFn({
           totalAssignedInPeriod++;
         }
       }
+
+      // Dynamic SLA evaluation for completed orders
+      const isCompleted = app.fulfillment_status === "completed" || app.order_status === "COMPLETED";
+      if (isCompleted && app.created_at && app.updated_at && app.assigned_to) {
+        const empId = resolveStaffUserId(app.assigned_to);
+        if (empId && empStatsMap.has(empId)) {
+          const stats = empStatsMap.get(empId)!;
+          stats.slaTotalCount++;
+          const durHours = (new Date(app.updated_at).getTime() - new Date(app.created_at).getTime()) / 3_600_000;
+          if (durHours <= 48) {
+            stats.slaCompliantCount++;
+          }
+        }
+      }
     });
 
     // Also parse assignment_change events from application_events
@@ -1024,14 +1138,14 @@ export const getEmployeePerformanceCommandCenter = createServerFn({
       }
     });
 
-    // B. Aggregate Canonical Operational Events for each Employee
+    // B. Aggregate Canonical Operational Events for each Employee (STRICT: Human Actions Only for Actions / Worked / Last Action)
     currentCanonicalEvents.forEach((ev) => {
       const empId = ev.employeeId;
       if (!empId) return;
 
       if (!empStatsMap.has(empId)) {
         const p = profileMap.get(empId);
-        const name = p?.full_name || p?.display_name || p?.email?.split("@")[0] || ev.employeeName || "Staff";
+        const name = resolveEmployeeName(p, ev.employeeName);
         empStatsMap.set(empId, {
           employeeId: empId,
           employeeName: name,
@@ -1058,15 +1172,33 @@ export const getEmployeePerformanceCommandCenter = createServerFn({
       }
 
       const stats = empStatsMap.get(empId)!;
-      activeEmployeesSet.add(empId);
-      workedEmployeesSet.add(empId);
 
-      // Actions & Worked
+      // Human Operational Actions & Worked orders
       if (!ev.isSystemAction) {
         stats.actions += 1;
+        activeEmployeesSet.add(empId);
+        workedEmployeesSet.add(empId);
         if (ev.orderId) {
           stats.workedOrders.add(ev.orderId);
           uniqueOrdersWorkedSet.add(ev.orderId);
+        }
+
+        // Track Last Action & First Action Timestamps for HUMAN actions ONLY
+        if (!stats.lastActionTime || new Date(ev.createdAt) > new Date(stats.lastActionTime)) {
+          stats.lastActionTime = ev.createdAt;
+          stats.lastActionType = ev.actionType;
+          const { actionLabel } = formatLogAction({
+            action_type: ev.actionType,
+            previous_status: ev.previousStatus,
+            new_status: ev.newStatus,
+            notes: ev.notes,
+          });
+          stats.lastActionText = actionLabel;
+          stats.lastOrderCode = ev.orderId ? (orderCodeMap.get(ev.orderId) || ev.orderId.slice(0, 8)) : null;
+        }
+
+        if (!stats.firstActionTime || new Date(ev.createdAt) < new Date(stats.firstActionTime)) {
+          stats.firstActionTime = ev.createdAt;
         }
       }
 
@@ -1111,26 +1243,6 @@ export const getEmployeePerformanceCommandCenter = createServerFn({
           }
         }
       }
-
-      // Track Last Action & First Action Timestamps
-      if (!ev.isSystemAction) {
-        if (!stats.lastActionTime || new Date(ev.createdAt) > new Date(stats.lastActionTime)) {
-          stats.lastActionTime = ev.createdAt;
-          stats.lastActionType = ev.actionType;
-          const { actionLabel } = formatLogAction({
-            action_type: ev.actionType,
-            previous_status: ev.previousStatus,
-            new_status: ev.newStatus,
-            notes: ev.notes,
-          });
-          stats.lastActionText = actionLabel;
-          stats.lastOrderCode = ev.orderId ? (orderCodeMap.get(ev.orderId) || ev.orderId.slice(0, 8)) : null;
-        }
-
-        if (!stats.firstActionTime || new Date(ev.createdAt) < new Date(stats.firstActionTime)) {
-          stats.firstActionTime = ev.createdAt;
-        }
-      }
     });
 
     const nowTime = Date.now();
@@ -1172,6 +1284,7 @@ export const getEmployeePerformanceCommandCenter = createServerFn({
 
       // Effective assigned count: Assigned in range or worked in range
       const assignedCount = Math.max(s.assignedOrders.size, s.workedOrders.size);
+      const slaPercent = s.slaTotalCount > 0 ? Math.round((s.slaCompliantCount / s.slaTotalCount) * 100) : 100;
 
       return {
         employeeId: s.employeeId,
@@ -1188,7 +1301,7 @@ export const getEmployeePerformanceCommandCenter = createServerFn({
         closedDueToCustomerDelay: s.closedDueToCustomerDelayOrders.size,
         closedDueToTechnicalDelay: s.closedDueToTechnicalDelayOrders.size,
         hotOrders: s.hotOrders.size,
-        slaPercent: 100, // Preserved SLA rate
+        slaPercent,
         lastActionText: s.lastActionText,
         lastActionTime: s.lastActionTime,
         firstActionTime: s.firstActionTime,
@@ -1210,8 +1323,10 @@ export const getEmployeePerformanceCommandCenter = createServerFn({
 
     const hourlyActionCounts = Array(24).fill(0);
     currentCanonicalEvents.forEach((l) => {
-      const hour = new Date(l.createdAt).getHours();
-      if (hour >= 0 && hour < 24) hourlyActionCounts[hour] += 1;
+      if (!l.isSystemAction) {
+        const hour = new Date(l.createdAt).getHours();
+        if (hour >= 0 && hour < 24) hourlyActionCounts[hour] += 1;
+      }
     });
 
     const workloadDistribution = employeeRows
@@ -1225,9 +1340,13 @@ export const getEmployeePerformanceCommandCenter = createServerFn({
       }));
 
     // Previous period counts for trends
-    const prevWorked = new Set(prevCanonicalEvents.filter((l) => l.orderId).map((l) => l.orderId)).size;
+    const prevWorked = new Set(prevCanonicalEvents.filter((l) => !l.isSystemAction && l.orderId).map((l) => l.orderId)).size;
     const prevCompleted = prevCanonicalEvents.filter((l) => l.actionCategory === "completion").length;
-    const prevClosed = prevCanonicalEvents.filter((l) => l.actionCategory === "closure").length;
+    const prevClosed = prevCanonicalEvents.filter((l) => l.actionCategory === "closure" && !l.isSystemAction).length;
+
+    const totalSlaTargetOrders = Array.from(empStatsMap.values()).reduce((sum, s) => sum + s.slaTotalCount, 0);
+    const totalSlaCompliantOrders = Array.from(empStatsMap.values()).reduce((sum, s) => sum + s.slaCompliantCount, 0);
+    const overallSlaPercent = totalSlaTargetOrders > 0 ? Math.round((totalSlaCompliantOrders / totalSlaTargetOrders) * 100) : 100;
 
     const kpiCards = {
       totalActiveEmployees: {
@@ -1257,8 +1376,8 @@ export const getEmployeePerformanceCommandCenter = createServerFn({
       },
       totalActions: {
         value: currentCanonicalEvents.filter((e) => !e.isSystemAction).length,
-        trend: computeTrend(currentCanonicalEvents.length, prevCanonicalEvents.length),
-        label: "Operations performed",
+        trend: computeTrend(currentCanonicalEvents.filter((e) => !e.isSystemAction).length, prevCanonicalEvents.filter((e) => !e.isSystemAction).length),
+        label: "Human operations",
       },
       ordersCompleted: {
         value: completedTotal,
@@ -1271,12 +1390,12 @@ export const getEmployeePerformanceCommandCenter = createServerFn({
         label: "Orders archived",
       },
       slaBreached: {
-        value: 0,
+        value: Math.max(0, totalSlaTargetOrders - totalSlaCompliantOrders),
         trend: { percent: 0, isUp: false },
         label: "Threshold exceeded",
       },
       slaCompliantPercent: {
-        value: 100,
+        value: overallSlaPercent,
         trend: { percent: 0, isUp: true },
         label: "Target: ≥ 95%",
       },
@@ -1362,7 +1481,7 @@ export const getEmployeeDetailPerformance = createServerFn({
       data.customEnd,
     );
 
-    const [{ data: profile }, { data: userRole }] = await Promise.all([
+    const [{ data: profile }, { data: userRole }, { data: dbSessions }] = await Promise.all([
       admin
         .from("profiles")
         .select("id, full_name, display_name, email")
@@ -1374,14 +1493,17 @@ export const getEmployeeDetailPerformance = createServerFn({
         .eq("user_id", data.employeeId)
         .limit(1)
         .maybeSingle(),
+      admin
+        .from("employee_sessions")
+        .select("id, started_at, ended_at, last_heartbeat_at, last_activity_at, active_seconds, idle_seconds, away_seconds, status, is_active, current_module, current_order_id")
+        .eq("employee_id", data.employeeId)
+        .gte("started_at", dateRange.current.start)
+        .lte("started_at", dateRange.current.end)
+        .order("started_at", { ascending: false }),
     ]);
 
     if (!profile) throw new Error("Employee not found");
-    const empName =
-      profile.full_name ||
-      profile.display_name ||
-      profile.email?.split("@")[0] ||
-      "Staff";
+    const empName = resolveEmployeeName(profile);
 
     const profileMap = new Map<string, any>([[profile.id, profile]]);
     const userRoleMap = new Map<string, string>([[profile.id, userRole?.role || "operations"]]);
@@ -1539,15 +1661,42 @@ export const getEmployeeDetailPerformance = createServerFn({
 
     const firstActionIso = canonicalEvents.length > 0 ? canonicalEvents[canonicalEvents.length - 1].createdAt : null;
     const lastActionIso = canonicalEvents.length > 0 ? canonicalEvents[0].createdAt : null;
-    const firstLoginFormatted = firstActionIso ? formatTimeIST(firstActionIso) : "09:12 AM";
+    const firstLoginFormatted = firstActionIso ? formatTimeIST(firstActionIso) : "—";
     const lastActiveAgoText = lastActionIso
       ? `${Math.max(1, Math.round((Date.now() - new Date(lastActionIso).getTime()) / 60000))}m ago`
       : "Never";
 
-    const sessionSegments = buildDynamicTelemetrySegments(
-      canonicalEvents.map((c) => ({ created_at: c.createdAt })),
-      dateRange.current.start,
-    );
+    // Dynamic SLA calculation from real completed orders
+    let totalCompletedSla = 0;
+    let compliantCompletedSla = 0;
+    appsList.forEach((app: any) => {
+      if (app.order_status === "COMPLETED" && app.created_at && app.updated_at) {
+        totalCompletedSla++;
+        const durHours = (new Date(app.updated_at).getTime() - new Date(app.created_at).getTime()) / 3_600_000;
+        if (durHours <= 48) compliantCompletedSla++;
+      }
+    });
+    const slaCompliance = totalCompletedSla > 0 ? Math.round((compliantCompletedSla / totalCompletedSla) * 100) : 100;
+
+    // Real session duration calculations from database records
+    let totalActiveSecs = 0;
+    let totalIdleSecs = 0;
+    let totalAwaySecs = 0;
+    (dbSessions ?? []).forEach((s: any) => {
+      totalActiveSecs += Number(s.active_seconds || 0);
+      totalIdleSecs += Number(s.idle_seconds || 0);
+      totalAwaySecs += Number(s.away_seconds || 0);
+    });
+
+    const activeMins = Math.round(totalActiveSecs / 60);
+    const idleMins = Math.round(totalIdleSecs / 60);
+    const awayMins = Math.round(totalAwaySecs / 60);
+
+    const activeFormatted = `${Math.floor(activeMins / 60)}h ${activeMins % 60}m`;
+    const idleFormatted = `${idleMins}m`;
+    const awayFormatted = `${awayMins}m`;
+
+    const sessionSegments = buildDynamicTelemetrySegments(dbSessions ?? [], canonicalEvents);
     const stepperEvents = buildDynamicStepperEvents(
       canonicalEvents.map((c) => ({ created_at: c.createdAt, notes: c.notes, action_type: c.actionType, order_id: c.orderId })),
       firstActionIso,
@@ -1557,14 +1706,6 @@ export const getEmployeeDetailPerformance = createServerFn({
     const presenceState = getEmployeePresenceState(data.employeeId);
     const liveSession: any = presenceState.session;
     const shift = presenceState.shift;
-
-    const activeMins = liveSession?.activeDurationMinutes ?? (canonicalEvents.length > 0 ? Math.min(480, Math.round(canonicalEvents.length * 4.5)) : 0);
-    const idleMins = liveSession?.idleDurationMinutes ?? (canonicalEvents.length > 0 ? Math.round(activeMins * 0.08) : 0);
-    const awayMins = liveSession?.awayDurationMinutes ?? (canonicalEvents.length > 0 ? Math.round(activeMins * 0.04) : 0);
-
-    const activeFormatted = `${Math.floor(activeMins / 60)}h ${activeMins % 60}m`;
-    const idleFormatted = `${idleMins}m`;
-    const awayFormatted = `${awayMins}m`;
 
     return {
       employee: {
@@ -1582,8 +1723,8 @@ export const getEmployeeDetailPerformance = createServerFn({
         customerDelays,
         technicalDelays,
         hotOrders: hotOrdersSet.size,
-        slaCompliance: 100,
-        slaBreaches: 0,
+        slaCompliance,
+        slaBreaches: Math.max(0, totalCompletedSla - compliantCompletedSla),
         avgFirstResponseMins: 12,
       },
       session: {
@@ -1593,7 +1734,7 @@ export const getEmployeeDetailPerformance = createServerFn({
         currentModule: "Orders",
         currentOrderId: canonicalEvents[0]?.orderId || null,
         currentOrderCode: canonicalEvents[0]?.orderId ? orderCodeMap.get(canonicalEvents[0].orderId) : ((appsList[0] as any)?.application_code || "—"),
-        presenceStatus: liveSession?.presenceStatus ?? (canonicalEvents.length > 0 ? "ACTIVE" : "OFFLINE"),
+        presenceStatus: liveSession?.presenceStatus ?? (activeMins > 0 ? "ACTIVE" : "OFFLINE"),
         shiftName: shift.name,
         shiftCode: shift.code,
         shiftWindow: `${shift.startTime} — ${shift.endTime} IST`,
@@ -1652,11 +1793,7 @@ export const getMyPerformanceDashboard = createServerFn({ method: "POST" })
         .maybeSingle(),
     ]);
 
-    const empName =
-      profile?.full_name ||
-      profile?.display_name ||
-      profile?.email?.split("@")[0] ||
-      "Operator";
+    const empName = resolveEmployeeName(profile, "Unknown Employee");
 
     const profileMap = new Map<string, any>([[employeeId, profile]]);
     const userRoleMap = new Map<string, string>([[employeeId, userRole?.role || "operations"]]);
@@ -2026,6 +2163,7 @@ export const getLiveActivityFeed = createServerFn({ method: "POST" })
       .object({
         limit: z.number().int().min(5).max(100).default(30),
         employeeId: z.string().optional(),
+        filter: z.enum(["human", "system", "all"]).default("human"),
       })
       .parse(i),
   )
@@ -2044,17 +2182,17 @@ export const getLiveActivityFeed = createServerFn({ method: "POST" })
         .from("application_events")
         .select("id, application_id, lead_id, event_type, old_value, new_value, note, staff_name, created_at, created_by")
         .order("created_at", { ascending: false })
-        .limit(data.limit * 2),
+        .limit(data.limit * 3),
       adminAny
         .from("order_schedulers")
         .select("id, application_id, status, scheduler_type, started_at, fires_at, remarks, created_at, created_by")
         .order("created_at", { ascending: false })
-        .limit(data.limit * 2),
+        .limit(data.limit * 3),
       admin
         .from("activity_logs")
         .select("id, activity_type, activity_description, application_id, lead_id, created_at, user_id")
         .order("created_at", { ascending: false })
-        .limit(data.limit * 2),
+        .limit(data.limit * 3),
       admin
         .from("profiles")
         .select("id, full_name, display_name, email"),
@@ -2087,6 +2225,12 @@ export const getLiveActivityFeed = createServerFn({ method: "POST" })
       filtered = filtered.filter((e) => e.employeeId === data.employeeId);
     }
 
+    if (data.filter === "human") {
+      filtered = filtered.filter((e) => !e.isSystemAction);
+    } else if (data.filter === "system") {
+      filtered = filtered.filter((e) => e.isSystemAction);
+    }
+
     const orderIds = Array.from(new Set(filtered.map((f) => f.orderId).filter(Boolean))) as string[];
     const orderCodeMap = new Map<string, string>();
     if (orderIds.length > 0) {
@@ -2116,6 +2260,7 @@ export const getLiveActivityFeed = createServerFn({ method: "POST" })
         orderCode: ev.orderId ? (orderCodeMap.get(ev.orderId) || ev.orderId.slice(0, 8)) : "—",
         notes: details || ev.notes,
         createdAt: ev.createdAt,
+        isSystemAction: ev.isSystemAction,
       };
     });
   });

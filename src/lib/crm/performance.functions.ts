@@ -70,7 +70,7 @@ export const logLeadContact = createServerFn({ method: "POST" })
     // Mirror into application_events so the Internal Notes & Activity feed shows it.
     try {
       const [{ data: profile }, { data: roleRow }, { data: lead }] = await Promise.all([
-        supabase.from("profiles").select("display_name, email").eq("id", userId).maybeSingle(),
+        supabase.from("profiles").select("full_name, display_name, email").eq("id", userId).maybeSingle(),
         supabase.from("user_roles").select("role").eq("user_id", userId).maybeSingle(),
         supabase.from("leads").select("customer_id").eq("id", data.leadId).maybeSingle(),
       ]);
@@ -82,7 +82,7 @@ export const logLeadContact = createServerFn({ method: "POST" })
         new_value: outcomeText,
         note: data.notes ?? null,
         created_by: userId,
-        staff_name: profile?.display_name || profile?.email || "Staff",
+        staff_name: profile?.full_name || profile?.display_name || profile?.email || "Unknown Employee",
         staff_role: (roleRow?.role as string | undefined) ?? "staff",
       } as never);
     } catch { /* non-fatal */ }
@@ -107,11 +107,11 @@ export const listContactEvents = createServerFn({ method: "GET" })
     if (userIds.length) {
       const { data: profs } = await supabase
         .from("profiles")
-        .select("id, display_name, email")
+        .select("id, full_name, display_name, email")
         .in("id", userIds);
-      for (const p of profs ?? []) nameMap.set(p.id, p.display_name || p.email || "Staff");
+      for (const p of profs ?? []) nameMap.set(p.id, p.full_name || p.display_name || p.email || "Unknown Employee");
     }
-    return { rows: (rows ?? []).map((r) => ({ ...r, staff_name: nameMap.get(r.user_id) || "Staff" })) };
+    return { rows: (rows ?? []).map((r) => ({ ...r, staff_name: nameMap.get(r.user_id) || "Unknown Employee" })) };
   });
 
 const RangeInput = z.object({
@@ -153,7 +153,7 @@ export const getPerformanceOverview = createServerFn({ method: "POST" })
 
     // Pull staff list
     const [profilesRes, rolesRes] = await Promise.all([
-      supabase.from("profiles").select("id, display_name, email"),
+      supabase.from("profiles").select("id, full_name, display_name, email"),
       supabase.from("user_roles").select("user_id, role"),
     ]);
     if (profilesRes.error) throw new Error(profilesRes.error.message);
@@ -247,7 +247,7 @@ export const getPerformanceOverview = createServerFn({ method: "POST" })
 
       return {
         userId: s.id,
-        name: s.display_name ?? s.email ?? "Staff",
+        name: s.full_name ?? s.display_name ?? s.email ?? "Unknown Employee",
         email: s.email ?? "",
         role: roleMap.get(s.id) ?? null,
         leadsAssigned: leadsAssigned.length,

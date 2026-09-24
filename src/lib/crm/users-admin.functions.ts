@@ -31,6 +31,7 @@ async function assertAdmin(userId: string) {
 
 /**
  * Lists all staff users with complete employment lifecycle, workload, capacity, presence, and performance metadata.
+ * Uses public.profiles and public.user_roles as the primary workforce directory source.
  */
 export const listStaffUsers = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -38,17 +39,12 @@ export const listStaffUsers = createServerFn({ method: "GET" })
     await assertAdmin(context.userId);
     const admin = await getAdmin();
 
-    const { data: usersRes, error: uErr } = await admin.auth.admin.listUsers({
-      page: 1,
-      perPage: 200,
-    });
-    if (uErr) throw new Error(uErr.message);
-
     const monthStart = new Date();
     monthStart.setUTCDate(1);
     monthStart.setUTCHours(0, 0, 0, 0);
     const monthStartIso = monthStart.toISOString();
 
+    // Query profiles and operational data concurrently
     const [
       { data: roles, error: rErr },
       { data: profiles, error: pErr },
@@ -60,7 +56,7 @@ export const listStaffUsers = createServerFn({ method: "GET" })
       { data: appsCompletedAll, error: caErr },
     ] = await Promise.all([
       admin.from("user_roles").select("user_id, role"),
-      admin.from("profiles").select("id, full_name, display_name, mobile, is_active, email, employee_code, department, joining_date, employment_status, auto_assign_enabled, max_workload, work_schedule, archived_at, terminated_at"),
+      admin.from("profiles").select("id, full_name, display_name, mobile, is_active, email, employee_code, department, joining_date, employment_status, auto_assign_enabled, max_workload, work_schedule, archived_at, terminated_at, created_at, updated_at"),
       admin.from("assignment_pool").select("user_id, is_active, total_assigned, last_assigned_at"),
       admin.from("employee_leaves").select("employee_id, start_time, end_time, status, reason, leave_type").eq("status", "ACTIVE"),
       admin.from("leads").select("assigned_to, status, created_at, updated_at"),
@@ -79,11 +75,25 @@ export const listStaffUsers = createServerFn({ method: "GET" })
     if (rErr) throw new Error(rErr.message);
     if (pErr) throw new Error(pErr.message);
 
+    // Optional auth metadata lookup (non-blocking)
+    const authUserMap = new Map<string, any>();
+    try {
+      const { data: usersRes } = await admin.auth.admin.listUsers({
+        page: 1,
+        perPage: 500,
+      });
+      (usersRes?.users ?? []).forEach((u) => authUserMap.set(u.id, u));
+    } catch (authErr) {
+      console.warn("[listStaffUsers] auth.admin.listUsers failed, falling back to profile records:", authErr);
+    }
+
     const roleMap = new Map<string, string[]>();
+    const staffRoleUserIds = new Set<string>();
     (roles ?? []).forEach((r) => {
       const list = roleMap.get(r.user_id) ?? [];
       list.push(r.role as string);
       roleMap.set(r.user_id, list);
+      staffRoleUserIds.add(r.user_id);
     });
 
     const poolMap = new Map<string, any>();
@@ -96,9 +106,6 @@ export const listStaffUsers = createServerFn({ method: "GET" })
         activeLeavesMap.set(lv.employee_id, lv);
       }
     });
-
-    const profMap = new Map<string, any>();
-    (profiles ?? []).forEach((p: any) => profMap.set(p.id, p));
 
     // Performance aggregates keyed by user_id
     type Perf = {
@@ -155,11 +162,21 @@ export const listStaffUsers = createServerFn({ method: "GET" })
       p.avgTurnaroundHours = v.n ? Math.round((v.sum / v.n) * 10) / 10 : null;
     });
 
-    const rows = usersRes.users.map((u) => {
-      const p = profMap.get(u.id);
-      const pool = poolMap.get(u.id);
-      const leave = activeLeavesMap.get(u.id);
-      const stats = perf.get(u.id) ?? {
+    // Determine target profiles: Include profiles with user_roles or profiles in assignment pool/all active profiles
+    const targetProfiles = (profiles ?? []).filter((p: any) => {
+      if (!p.id) return false;
+      if (staffRoleUserIds.size > 0 && staffRoleUserIds.has(p.id)) return true;
+      if (poolMap.has(p.id)) return true;
+      // Also include any profile if roles table has not been fully mapped
+      return staffRoleUserIds.size === 0;
+    });
+
+    const rows = targetProfiles.map((p: any) => {
+      const uid = p.id;
+      const uAuth = authUserMap.get(uid);
+      const pool = poolMap.get(uid);
+      const leave = activeLeavesMap.get(uid);
+      const stats = perf.get(uid) ?? {
         assignedLeads: 0,
         openLeads: 0,
         assignedApps: 0,
@@ -176,10 +193,12 @@ export const listStaffUsers = createServerFn({ method: "GET" })
       const isInPool = pool?.is_active ?? false;
       const maxWorkload = Number(p?.max_workload || 50);
 
+      const resolvedName = p?.full_name?.trim() || p?.display_name?.trim() || null;
+
       return {
-        id: u.id,
-        email: u.email ?? "",
-        full_name: p?.full_name ?? p?.display_name ?? null,
+        id: uid,
+        email: p?.email || uAuth?.email || "",
+        full_name: resolvedName,
         mobile: p?.mobile ?? null,
         is_active: isActive,
         employment_status: employmentStatus,
@@ -189,11 +208,11 @@ export const listStaffUsers = createServerFn({ method: "GET" })
         work_schedule: (p?.work_schedule as WorkSchedule) || null,
         is_on_leave: !!leave,
         active_leave: leave ? { leave_type: leave.leave_type, reason: leave.reason, start_time: leave.start_time, end_time: leave.end_time } : null,
-        created_at: u.created_at,
-        last_sign_in_at: u.last_sign_in_at,
+        created_at: uAuth?.created_at || p?.created_at || new Date().toISOString(),
+        last_sign_in_at: uAuth?.last_sign_in_at || null,
         archived_at: p?.archived_at ?? null,
         terminated_at: p?.terminated_at ?? null,
-        roles: roleMap.get(u.id) ?? [],
+        roles: roleMap.get(uid) ?? [],
         employee_code: p?.employee_code ?? null,
         department: p?.department ?? null,
         joining_date: p?.joining_date ?? null,
