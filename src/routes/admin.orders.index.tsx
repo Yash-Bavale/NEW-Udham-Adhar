@@ -574,20 +574,10 @@ async function handleBulkReassign(targetStaffId: string) {
 const colCount = 6 + (isAdmin ? 2 : 0) + (hideMoney ? 0 : 1);
 
 const groups = useMemo(() => {
-  const hotRows = rows.filter((r) => r.is_hot);
-  const regularRows = rows.filter((r) => !r.is_hot);
-
   const g = new Map<string, any[]>();
-  const todayKey = new Date().toDateString();
 
-  // Hot orders directly come on top on today's date regardless of creation date
-  if (hotRows.length > 0) {
-    g.set(todayKey, [...hotRows]);
-  }
-
-  for (const r of regularRows) {
-    const d = new Date(r.created_at);
-    const key = d.toDateString();
+  for (const r of rows) {
+    const key = istDateKey(r.created_at) || "Unknown";
     const arr = g.get(key) ?? [];
     arr.push(r);
     g.set(key, arr);
@@ -1464,14 +1454,14 @@ function formatOrderAge(ms: number): string {
   return `${d}d ago`;
 }
 
-function formatDayHeader(day: string): string {
-  const d = new Date(day);
-  const today = new Date(); today.setHours(0, 0, 0, 0);
-  const yest = new Date(today); yest.setDate(today.getDate() - 1);
-  const target = new Date(d); target.setHours(0, 0, 0, 0);
-  const base = d.toLocaleDateString("en-IN", { weekday: "short", day: "2-digit", month: "short", year: "numeric" }).toUpperCase();
-  if (target.getTime() === today.getTime()) return `${base} · TODAY`;
-  if (target.getTime() === yest.getTime()) return `${base} · YESTERDAY`;
+function formatDayHeader(dayKey: string): string {
+  if (!dayKey || dayKey === "Unknown") return "UNKNOWN DATE";
+  const todayKey = istDateKey(new Date());
+  const yestKey = istDateKey(new Date(Date.now() - 86400000));
+  const d = new Date(dayKey.includes("T") ? dayKey : `${dayKey}T00:00:00+05:30`);
+  const base = d.toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata", weekday: "short", day: "2-digit", month: "short", year: "numeric" }).toUpperCase();
+  if (dayKey === todayKey) return `${base} · TODAY`;
+  if (dayKey === yestKey) return `${base} · YESTERDAY`;
   return base;
 }
 
