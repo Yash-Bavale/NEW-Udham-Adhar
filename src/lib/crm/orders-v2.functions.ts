@@ -636,6 +636,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
             hot_orders: 0,
             technical_delay: 0,
             customer_delay: 0,
+            totalAll: 0,
           },
           ageBuckets: parsed.ageBuckets ?? { d1: 0, d2: 0, d3: 0, d7: 0, older: 0 },
           page: parsed.page ?? data.page,
@@ -959,10 +960,12 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       exception: 0,
       actionRequired: 0,
       processed: 0,
+      totalAll: 0,
     };
     const ageBuckets = { d1: 0, d2: 0, d3: 0, d7: 0, older: 0 };
 
     for (const r of allRows) {
+      counts.totalAll++;
       const b = bucketOfRow(r, todayIst);
       if (b === "completed") {
         counts.completed++;
@@ -1027,12 +1030,10 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
           filtered = filtered.filter((r) => bucketOfRow(r, todayIst) === "pending");
           break;
         case "completed":
-          // Completed: show count only, do not display their orders in the list
-          filtered = [];
+          filtered = filtered.filter((r) => bucketOfRow(r, todayIst) === "completed");
           break;
         case "closed":
-          // Closed: show count only, do not display their orders in the list
-          filtered = [];
+          filtered = filtered.filter((r) => bucketOfRow(r, todayIst) === "closed");
           break;
         case "exception":
           filtered = filtered.filter((r) => bucketOfRow(r, todayIst) === "exception");
@@ -1133,8 +1134,8 @@ export const getOrderDetailV2 = createServerFn({ method: "POST" })
       .maybeSingle();
     if (error || !app) throw new Error("Order not found");
 
-    // Core Data: Load essential display & workflow data immediately
-    const [leadRes, custRes, svcRes, paysRes, docsRes, statusEventsRes, staffRes, wfRes, refundRes] = await Promise.all([
+    // Core Data: Load essential display & workflow data concurrently in parallel
+    const [leadRes, custRes, svcRes, paysRes, docsRes, statusEventsRes, staffRes, refundRes] = await Promise.all([
       app.lead_id
         ? admin.from("leads").select("id, lead_code, name, email, mobile, total_amount, base_amount, gst_amount, lead_status_v2, status, lead_source, service, language, state").eq("id", app.lead_id).maybeSingle()
         : Promise.resolve({ data: null }),
@@ -1162,10 +1163,7 @@ export const getOrderDetailV2 = createServerFn({ method: "POST" })
         .order("created_at", { ascending: false })
         .limit(50),
       app.assigned_to
-        ? admin.from("profiles").select("id, display_name, email").eq("id", app.assigned_to).maybeSingle()
-        : Promise.resolve({ data: null }),
-      app.service_id
-        ? admin.from("services").select("service_code").eq("id", app.service_id).maybeSingle()
+        ? admin.from("profiles").select("id, display_name, full_name, email").eq("id", app.assigned_to).maybeSingle()
         : Promise.resolve({ data: null }),
       admin
         .from("refund_requests")
@@ -1185,32 +1183,33 @@ export const getOrderDetailV2 = createServerFn({ method: "POST" })
       }
     }
 
+    const svcData = (svcRes as any)?.data;
     let workflowStages: string[] = FULFILLMENT_STAGES;
-    if ((wfRes as any).data?.service_code) {
-      const { data: wf } = await admin
-        .from("service_workflows")
-        .select("application_statuses")
-        .eq("service_code", (wfRes as any).data.service_code)
-        .maybeSingle();
-      const arr = (wf?.application_statuses as any[] | null) ?? null;
-      if (Array.isArray(arr) && arr.length) {
-        workflowStages = arr.map((s) => (typeof s === "string" ? s : s?.code ?? s?.id ?? "")).filter(Boolean);
-      }
+    const workflowPromise = svcData?.service_code
+      ? admin.from("service_workflows").select("application_statuses").eq("service_code", svcData.service_code).maybeSingle()
+      : Promise.resolve({ data: null });
+
+    let payments = (paysRes.data ?? []) as any[];
+    const payIds = payments.map((p) => p.id);
+    const invoicePromise = payIds.length > 0
+      ? admin.from("invoices").select("id, payment_id, invoice_number, pdf_path, issued_at, last_emailed_at, email_attempts, last_email_status, delivery_status, replaced_at").in("payment_id", payIds)
+      : Promise.resolve({ data: [] });
+
+    const [wfRes, invsRes] = await Promise.all([workflowPromise, invoicePromise]);
+
+    const arr = ((wfRes as any)?.data?.application_statuses as any[] | null) ?? null;
+    if (Array.isArray(arr) && arr.length) {
+      workflowStages = arr.map((s) => (typeof s === "string" ? s : s?.code ?? s?.id ?? "")).filter(Boolean);
     }
 
     const lead = (leadRes as any).data;
-    let payments = (paysRes.data ?? []) as any[];
     const paidSum = payments
       .filter((p: any) => ["paid", "success", "successful"].includes(String(p.status)))
       .reduce((s: number, p: any) => s + Number(p.amount || 0), 0);
     const total = paidSum > 0 ? paidSum : Number(lead?.total_amount || 0);
 
     if (payments.length > 0) {
-      const payIds = payments.map((p) => p.id);
-      const { data: invs } = await admin
-        .from("invoices")
-        .select("id, payment_id, invoice_number, pdf_path, issued_at, last_emailed_at, email_attempts, last_email_status, delivery_status, replaced_at")
-        .in("payment_id", payIds);
+      const invs = (invsRes as any)?.data ?? [];
       const map = new Map((invs ?? []).map((i: any) => [i.payment_id, i]));
       payments = payments.map((p) => {
         const inv: any = map.get(p.id);

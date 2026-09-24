@@ -137,8 +137,8 @@ interface BucketCardItem {
 const BUCKET_CARDS: BucketCardItem[] = [
   {
     id: "all",
-    label: "ALL",
-    subtitle: "Full Active Portfolio",
+    label: "ALL ACTIVE",
+    subtitle: "Active Portfolio",
     icon: LayoutGrid,
     adminOnly: true,
   },
@@ -206,14 +206,14 @@ const BUCKET_CARDS: BucketCardItem[] = [
   {
     id: "completed",
     label: "COMPLETED",
-    subtitle: "Fulfilled (Count Only)",
+    subtitle: "Fulfilled in range",
     icon: CheckCircle2,
     tone: "emerald",
   },
   {
     id: "closed",
     label: "CLOSED",
-    subtitle: "Archived (Count Only)",
+    subtitle: "Archived in range",
     icon: CheckCheck,
   },
 ];
@@ -387,35 +387,21 @@ function OrdersListPage() {
   const { data: assignStaffData } = useQuery({
     queryKey: ["admin.staff.assignment"],
     queryFn: () => assignStaffFn(),
-    staleTime: 60 * 1000,
+    staleTime: 30 * 1000,
   });
-  const assignStaffProfiles: Array<{ id: string; display_name?: string; email?: string; name?: string; is_eligible?: boolean; is_on_leave?: boolean; unavailability_reason?: string }> = useMemo(() => {
+  const assignStaffProfiles: Array<{
+    id: string;
+    display_name?: string;
+    email?: string;
+    name?: string;
+    full_name?: string;
+    is_eligible?: boolean;
+    is_on_leave?: boolean;
+    presence_status?: string;
+    unavailability_reason?: string;
+  }> = useMemo(() => {
     return (assignStaffData?.profiles ?? []) as any[];
   }, [assignStaffData]);
-
-  const { data: historicalStaffData } = useQuery({
-    queryKey: ["admin.staff.historical"],
-    queryFn: () => historicalStaffFn(),
-    staleTime: 5 * 60 * 1000,
-  });
-  const historicalStaffProfiles: Array<{ id: string; display_name?: string; email?: string; name?: string }> = useMemo(() => {
-    return (historicalStaffData?.profiles ?? []) as any[];
-  }, [historicalStaffData]);
-
-  const allAssigneeProfiles: Array<{ id: string; display_name?: string; email?: string; name?: string }> = useMemo(() => {
-    const map = new Map<string, { id: string; display_name?: string; email?: string; name?: string }>();
-    (historicalStaffProfiles ?? []).forEach((p) => {
-      if (p.id) map.set(p.id, p);
-    });
-    (assignStaffProfiles ?? []).forEach((p) => {
-      if (p.id && !map.has(p.id)) map.set(p.id, p);
-    });
-    return Array.from(map.values()).sort((a, b) => {
-      const nameA = a.display_name || a.name || a.email || "";
-      const nameB = b.display_name || b.name || b.email || "";
-      return nameA.localeCompare(nameB);
-    });
-  }, [historicalStaffProfiles, assignStaffProfiles]);
   const { data: svcData } = useQuery({
     queryKey: ["admin.services.list"],
     queryFn: () => svcFn(),
@@ -487,6 +473,7 @@ function OrdersListPage() {
     hot_orders: 0,
     technical_delay: 0,
     customer_delay: 0,
+    totalAll: 0,
   };
   const ageBuckets = data?.ageBuckets ?? { d1: 0, d2: 0, d3: 0, d7: 0, older: 0 };
 
@@ -507,6 +494,10 @@ const scheduleDebouncedInvalidation = () => {
 useRealtimeTable("applications", scheduleDebouncedInvalidation);
 useRealtimeTable("payments", scheduleDebouncedInvalidation);
 useRealtimeTable("order_schedulers", scheduleDebouncedInvalidation);
+useRealtimeTable("assignment_pool", () => {
+  qc.invalidateQueries({ queryKey: ["admin.staff.assignment"] });
+  qc.invalidateQueries({ queryKey: ["admin.orders.v2"] });
+});
 
 // Background prefetch for next page
 useEffect(() => {
@@ -669,7 +660,16 @@ return (
           )}
         </div>
         <p className="text-xs text-slate-500 mt-0.5">
-          {total.toLocaleString("en-IN")} total · payment-successful customers only · times in IST
+          {isLoading ? (
+            "Loading orders…"
+          ) : (
+            <>
+              <span className="font-semibold text-slate-800">{(counts.all ?? 0).toLocaleString("en-IN")}</span> active portfolio ·{" "}
+              <span className="font-semibold text-emerald-700">{(counts.completed ?? 0).toLocaleString("en-IN")}</span> completed ·{" "}
+              <span className="font-semibold text-slate-600">{(counts.closed ?? 0).toLocaleString("en-IN")}</span> closed ·{" "}
+              <span className="text-slate-600 font-medium">({(counts.totalAll ?? ((counts.all ?? 0) + (counts.completed ?? 0) + (counts.closed ?? 0))).toLocaleString("en-IN")} total in period)</span> · times in IST
+            </>
+          )}
         </p>
       </div>
       {isFilterActive && (
@@ -768,12 +768,22 @@ return (
         {/* Assignees Filter (Admin & Staff) */}
         {role.hasAny(["admin", "super_admin", "operations", "manager", "executive", "support"]) && (
           <Select value={assignedTo} onValueChange={setAssignedTo}>
-            <SelectTrigger className="h-9 w-[150px] text-xs bg-slate-50/50 border-slate-200"><SelectValue placeholder="All assignees" /></SelectTrigger>
+            <SelectTrigger className="h-9 w-[170px] text-xs bg-slate-50/50 border-slate-200"><SelectValue placeholder="All assignees" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All assignees</SelectItem>
               <SelectItem value="unassigned">Unassigned</SelectItem>
-              {allAssigneeProfiles.map((s: any) => (
-                <SelectItem key={s.id} value={s.id}>{s.display_name || s.name || s.email}</SelectItem>
+              {assignStaffProfiles.map((s: any) => (
+                <SelectItem key={s.id} value={s.id}>
+                  <div className="flex items-center justify-between gap-1.5 w-full">
+                    <span>{s.display_name || s.name || s.email}</span>
+                    {s.presence_status === "OFFLINE" && (
+                      <span className="text-[9px] text-slate-400 font-mono ml-1">● OFFLINE</span>
+                    )}
+                    {s.presence_status === "ON_LEAVE" && (
+                      <span className="text-[9px] text-amber-500 font-mono ml-1">● ON LEAVE</span>
+                    )}
+                  </div>
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>

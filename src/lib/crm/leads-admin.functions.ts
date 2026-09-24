@@ -712,30 +712,76 @@ export const listStaff = createServerFn({ method: "GET" })
   });
 
 /**
- * Returns staff formatted for assignment dropdowns with live leave and auto-assign eligibility metadata.
+/**
+ * Returns staff formatted for operational assignment dropdowns:
+ * Strictly requires ACTIVE employee in profiles AND active in assignment_pool (is_active = true).
  */
 export const listAssignmentStaff = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     await assertRole(context.supabase, STAFF_MANAGEMENT_ROLES);
+    const admin = await getAdmin();
+    const adminAny = admin as any;
+
+    // 1. Fetch active pool records (assignment_pool.is_active = true)
+    const { data: poolRows, error: poolErr } = await adminAny
+      .from("assignment_pool")
+      .select("user_id, service_id, is_active")
+      .eq("is_active", true);
+
+    if (poolErr) console.error("[listAssignmentStaff] pool error:", poolErr);
+
+    const activePoolUserIds = Array.from(
+      new Set((poolRows ?? []).map((r: any) => String(r.user_id)).filter(Boolean))
+    );
+
+    if (!activePoolUserIds.length) {
+      return { profiles: [] };
+    }
+
+    // 2. Fetch profiles for active pool members (strictly is_active = true and employment_status = 'ACTIVE')
+    const { data: activeProfiles, error: profErr } = await adminAny
+      .from("profiles")
+      .select("id, full_name, display_name, email, is_active, employment_status")
+      .in("id", activePoolUserIds)
+      .eq("is_active", true)
+      .eq("employment_status", "ACTIVE")
+      .order("full_name", { ascending: true });
+
+    if (profErr) console.error("[listAssignmentStaff] profiles error:", profErr);
+
+    if (!activeProfiles || !activeProfiles.length) {
+      return { profiles: [] };
+    }
+
+    // 3. Attach live presence / workload metadata
     const { calculateStaffWorkloads } = await import("./assignment-engine.server");
     const workloads = await calculateStaffWorkloads();
+    const workloadMap = new Map(workloads.map((w) => [String(w.employeeId), w]));
 
-    return {
-      profiles: workloads.map((w) => ({
-        id: w.employeeId,
-        display_name: w.name,
-        email: w.email,
-        role: w.role,
-        employment_status: w.employmentStatus,
-        is_active: w.employmentStatus === "ACTIVE",
-        is_eligible: w.isAutoAssignEligible,
-        is_on_leave: w.presenceStatus === "ON_LEAVE",
-        presence_status: w.presenceStatus,
-        effective_workload: w.effectiveWorkload,
-        unavailability_reason: w.unavailabilityReason,
-      })),
-    };
+    const result = (activeProfiles ?? []).map((p: any) => {
+      const w = workloadMap.get(String(p.id));
+      const displayName = p.full_name || p.display_name || p.email?.split("@")[0] || "Staff";
+      return {
+        id: p.id,
+        display_name: displayName,
+        name: displayName,
+        full_name: p.full_name,
+        email: p.email,
+        role: w?.role || "operations",
+        employment_status: p.employment_status,
+        is_active: true,
+        is_eligible: w?.isAutoAssignEligible ?? true,
+        is_on_leave: w?.presenceStatus === "ON_LEAVE",
+        presence_status: w?.presenceStatus || "AVAILABLE",
+        effective_workload: w?.effectiveWorkload ?? 0,
+        unavailability_reason: w?.unavailabilityReason,
+      };
+    });
+
+    result.sort((a, b) => a.display_name.localeCompare(b.display_name));
+
+    return { profiles: result };
   });
 
 /**
