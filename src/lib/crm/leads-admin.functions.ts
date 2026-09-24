@@ -700,9 +700,13 @@ export const listStaff = createServerFn({ method: "GET" })
     if (profilesErr) throw new Error(profilesErr.message);
 
     // Active workforce only (exclude archived/inactive/terminated)
-    const activeStaff = (profiles ?? []).filter((p: any) => 
-      p.is_active !== false && (p.employment_status === "ACTIVE" || !p.employment_status)
-    );
+    const activeStaff = (profiles ?? [])
+      .filter((p: any) => p.is_active !== false && (p.employment_status === "ACTIVE" || !p.employment_status))
+      .map((p: any) => ({
+        ...p,
+        display_name: p.full_name || p.display_name || p.email?.split("@")[0] || "Unknown Employee",
+        name: p.full_name || p.display_name || p.email?.split("@")[0] || "Unknown Employee",
+      }));
 
     return { profiles: activeStaff };
   });
@@ -742,18 +746,23 @@ export const listAllHistoricalStaff = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     await assertRole(context.supabase, STAFF_READ_ROLES);
     const admin = await getAdmin();
+    const adminAny = admin as any;
 
-    const { data: profiles, error } = await admin
-      .from("profiles")
-      .select("id, display_name, full_name, email, is_active, employment_status")
-      .order("display_name", { ascending: true });
+    const [rolesRes, profilesRes] = await Promise.all([
+      admin.from("user_roles").select("user_id, role").in("role", ["super_admin", "admin", "operations", "manager", "executive", "support", "finance", "accounts"]),
+      adminAny.from("profiles").select("id, display_name, full_name, email, is_active, employment_status").order("display_name", { ascending: true }),
+    ]);
 
-    if (error) throw new Error(error.message);
+    const staffUserIds = new Set((rolesRes.data ?? []).map((r: any) => r.user_id));
+    const allProfiles = profilesRes.data ?? [];
+    const staffProfiles = staffUserIds.size > 0 ? allProfiles.filter((p: any) => staffUserIds.has(p.id)) : allProfiles;
 
     return {
-      profiles: (profiles ?? []).map((p: any) => ({
+      profiles: (staffProfiles.length > 0 ? staffProfiles : allProfiles).map((p: any) => ({
         id: p.id,
-        display_name: p.display_name || p.full_name || p.email || "Staff",
+        display_name: p.full_name || p.display_name || p.email?.split("@")[0] || "Unknown Employee",
+        name: p.full_name || p.display_name || p.email?.split("@")[0] || "Unknown Employee",
+        full_name: p.full_name || p.display_name || p.email?.split("@")[0] || "Unknown Employee",
         email: p.email,
         is_active: p.is_active !== false && p.employment_status === "ACTIVE",
         employment_status: p.employment_status || (p.is_active === false ? "INACTIVE" : "ACTIVE"),

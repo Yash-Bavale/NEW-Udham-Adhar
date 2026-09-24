@@ -401,6 +401,21 @@ function OrdersListPage() {
   const historicalStaffProfiles: Array<{ id: string; display_name?: string; email?: string; name?: string }> = useMemo(() => {
     return (historicalStaffData?.profiles ?? []) as any[];
   }, [historicalStaffData]);
+
+  const allAssigneeProfiles: Array<{ id: string; display_name?: string; email?: string; name?: string }> = useMemo(() => {
+    const map = new Map<string, { id: string; display_name?: string; email?: string; name?: string }>();
+    (historicalStaffProfiles ?? []).forEach((p) => {
+      if (p.id) map.set(p.id, p);
+    });
+    (assignStaffProfiles ?? []).forEach((p) => {
+      if (p.id && !map.has(p.id)) map.set(p.id, p);
+    });
+    return Array.from(map.values()).sort((a, b) => {
+      const nameA = a.display_name || a.name || a.email || "";
+      const nameB = b.display_name || b.name || b.email || "";
+      return nameA.localeCompare(nameB);
+    });
+  }, [historicalStaffProfiles, assignStaffProfiles]);
   const { data: svcData } = useQuery({
     queryKey: ["admin.services.list"],
     queryFn: () => svcFn(),
@@ -546,7 +561,7 @@ async function handleBulkReassign(targetStaffId: string) {
   try {
     const assignedTo = targetStaffId === "unassign" ? null : targetStaffId;
     await bulkAssignFn({ data: { applicationIds: selectedOrderIds, assignedTo } });
-    const staffObj = assignStaffProfiles.find((s) => s.id === targetStaffId) || historicalStaffProfiles.find((s) => s.id === targetStaffId);
+    const staffObj = allAssigneeProfiles.find((s) => s.id === targetStaffId);
     const name = targetStaffId === "unassign" ? "Unassigned" : (staffObj?.display_name || staffObj?.name || staffObj?.email || "staff");
     toast.success(`Successfully reassigned ${selectedOrderIds.length} order(s) to ${name}`);
     setSelectedOrderIds([]);
@@ -750,14 +765,14 @@ return (
           </SelectContent>
         </Select>
 
-        {/* Assignees Filter (Admin only) */}
-        {role.hasAny(["admin", "super_admin"]) && (
+        {/* Assignees Filter (Admin & Staff) */}
+        {role.hasAny(["admin", "super_admin", "operations", "manager", "executive", "support"]) && (
           <Select value={assignedTo} onValueChange={setAssignedTo}>
             <SelectTrigger className="h-9 w-[150px] text-xs bg-slate-50/50 border-slate-200"><SelectValue placeholder="All assignees" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All assignees</SelectItem>
               <SelectItem value="unassigned">Unassigned</SelectItem>
-              {historicalStaffProfiles.map((s: any) => (
+              {allAssigneeProfiles.map((s: any) => (
                 <SelectItem key={s.id} value={s.id}>{s.display_name || s.name || s.email}</SelectItem>
               ))}
             </SelectContent>
