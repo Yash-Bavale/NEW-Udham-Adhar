@@ -2,6 +2,7 @@ import "./lib/error-capture";
 
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
+import { isAbortError } from "./lib/abort-error";
 
 type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
@@ -31,6 +32,10 @@ async function normalizeCatastrophicSsrResponse(response: Response): Promise<Res
   }
 
   const captured = consumeLastCapturedError();
+  if (!captured || isAbortError(captured)) {
+    return response;
+  }
+
   const stack = captured instanceof Error ? captured.stack : undefined;
   console.error("[ssr-500]", stack ?? captured ?? `h3 swallowed SSR error: ${body}`);
   return new Response(renderErrorPage(), {
@@ -83,6 +88,9 @@ export default {
       const normalized = await normalizeCatastrophicSsrResponse(response);
       return await rewriteHostInHtml(request, normalized);
     } catch (error) {
+      if (isAbortError(error)) {
+        return new Response(null, { status: 499, statusText: "Client Closed Request" });
+      }
       console.error(error);
       return new Response(renderErrorPage(), {
         status: 500,

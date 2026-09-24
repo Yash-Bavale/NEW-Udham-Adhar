@@ -329,7 +329,9 @@ export async function calculateStaffWorkloads(): Promise<StaffWorkloadSummary[]>
     .select("user_id, role")
     .in("role", ORDER_ACCESS_ROLES);
 
-  const staffUserIds = Array.from(new Set((roleRows ?? []).map((r: any) => String(r.user_id))));
+  const staffUserIds: string[] = Array.from(
+    new Set<string>((roleRows ?? []).map((r: any) => String(r.user_id))),
+  );
   if (!staffUserIds.length) return [];
 
   const nowIso = new Date().toISOString();
@@ -794,13 +796,13 @@ export async function distributeOrdersEquallyCanonical(input: {
   // Dispatch batched notifications
   for (const [empId, count] of notificationsByStaff.entries()) {
     try {
-      await createInAppNotification({
-        userId: empId,
-        type: "ORDER_ASSIGNED",
+      await emitToUsers([empId], {
+        kind: "order_assigned",
         title: `${count} New Order(s) Assigned (Auto-Balanced)`,
         body: `You received ${count} order(s) via automated workload redistribution.`,
-        actionUrl: `/admin/orders`,
-        metadata: { batchAssignedCount: count },
+        href: "/admin/orders",
+        entityKind: "application",
+        entityId: assignments.find((item) => item.newEmployeeId === empId)?.orderId || "",
       });
     } catch (err) {
       console.warn("[distributeOrdersEquallyCanonical] Notification error:", err);

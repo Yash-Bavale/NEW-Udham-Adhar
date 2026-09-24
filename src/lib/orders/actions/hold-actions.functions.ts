@@ -193,7 +193,7 @@ export const resumeFromHold = createServerFn({ method: "POST" })
         ? supabaseAdmin.from("leads").select("email, name, mobile, service, assigned_to").eq("id", preRow.lead_id).maybeSingle()
         : Promise.resolve({ data: null, error: null }),
       preRow.customer_id
-        ? supabaseAdmin.from("customers").select("primary_email, primary_phone, name").eq("id", preRow.customer_id).maybeSingle()
+        ? supabaseAdmin.from("customers").select("primary_email, primary_mobile, name").eq("id", preRow.customer_id).maybeSingle()
         : Promise.resolve({ data: null, error: null }),
     ]);
     if (leadError) throw new Error(`Unable to read the order recipient: ${leadError.message}`);
@@ -308,8 +308,8 @@ export const resumeFromHold = createServerFn({ method: "POST" })
           resolvedAt: resolvedAt,
           customer_email: email,
           customerEmail: email,
-          customer_mobile: lead?.mobile || customer?.primary_phone || "—",
-          customerMobile: lead?.mobile || customer?.primary_phone || "—",
+          customer_mobile: lead?.mobile || customer?.primary_mobile || "—",
+          customerMobile: lead?.mobile || customer?.primary_mobile || "—",
           executive_name: executiveName,
           executiveName: executiveName,
           fromName: process.env.ZOHO_FROM_NAME || "Care | Business Help Services",

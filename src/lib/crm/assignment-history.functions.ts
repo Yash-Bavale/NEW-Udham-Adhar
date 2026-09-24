@@ -171,7 +171,7 @@ export const listAssignmentHistoryAdmin = createServerFn({ method: "POST" })
       nameMap.set(p.id, p.full_name ?? p.display_name ?? p.email ?? "Staff"),
     );
 
-    let mappedRows = (rows ?? []).map((r: any) => {
+    let mappedRows: any[] = (rows ?? []).map((r: any) => {
       const app = appMap.get(r.order_id);
       return {
         id: r.id,
@@ -196,7 +196,7 @@ export const listAssignmentHistoryAdmin = createServerFn({ method: "POST" })
     if (data.search && data.search.trim()) {
       const q = data.search.trim().toLowerCase();
       mappedRows = mappedRows.filter(
-        (r) =>
+        (r: any) =>
           r.applicationCode.toLowerCase().includes(q) ||
           r.customerName.toLowerCase().includes(q) ||
           r.previousEmployeeName.toLowerCase().includes(q) ||

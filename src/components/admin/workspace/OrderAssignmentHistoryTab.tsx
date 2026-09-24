@@ -17,7 +17,11 @@ export function OrderAssignmentHistoryTab({ orderId }: Props) {
     staleTime: 10_000,
   });
 
-  const rows = data?.rows ?? [];
+  const rows: Array<{
+    id: string; changeType: string; changedByName: string; source: string;
+    createdAt: string; previousEmployeeId: string | null; previousEmployeeName: string;
+    newEmployeeId: string | null; newEmployeeName: string; reason: string | null;
+  }> = data?.rows ?? [];
 
   if (isLoading) {
     return (
