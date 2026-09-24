@@ -14,6 +14,7 @@ import {
   getAllowedFulfillmentTransitions,
 } from "./fulfillment-transitions";
 import { computeOrderStage, type OrderStage } from "./computeOrderStage";
+import { istDateKey } from "@/lib/datetime";
 
 async function getAdmin() {
   const m = await import("@/integrations/supabase/client.server");
@@ -353,8 +354,6 @@ async function ensurePaidOrdersIntegrated(admin: any) {
   }
 }
 
-export type Bucket = "all" | "needs_action" | "pending" | "completed" | "closed" | "exception" | "reminders" | "hot_orders" | "technical_delay" | "customer_delay";
-
 const CLOSED_FS = new Set<string>([
   "application_rejected", "certificate_rejected", "order_closed", "cancelled",
 ]);
@@ -364,25 +363,70 @@ const COMPLETED_FS = new Set<string>([
 const EXCEPTION_STAGES: OrderStage[] = ["refund_requested", "refunded", "uninterested"];
 const NEEDS_ACTION_STAGES: OrderStage[] = ["lead_received", "payment_done", "form_submitted", "order_reopened"];
 
-export function bucketOfRow(row: {
-  fulfillment_status?: string | null;
-  stage: OrderStage;
-  is_hot?: boolean;
-  is_callback_scheduled?: boolean;
-}): Exclude<Bucket, "all" | "reminders" | "hot_orders"> {
-  const fs = row.fulfillment_status ?? "";
+export type Bucket =
+  | "all"
+  | "needs_action"
+  | "hot_orders"
+  | "reminders" // Call Back Scheduled (Active only)
+  | "technical_delay" // Technical Delay
+  | "backlog" // Backlog (Untouched orders from previous days)
+  | "customer_delay" // Customer Delay
+  | "pending" // Action Taken
+  | "completed" // Completed (Count only)
+  | "closed" // Closed (Count only)
+  | "exception";
+
+export function bucketOfRow(
+  row: {
+    fulfillment_status?: string | null;
+    stage: OrderStage;
+    created_at?: string | null;
+    is_hot?: boolean;
+    is_callback_scheduled?: boolean;
+  },
+  todayIst?: string,
+): Exclude<Bucket, "all"> {
+  const fs = String(row.fulfillment_status ?? "").toLowerCase();
   if (EXCEPTION_STAGES.includes(row.stage)) return "exception";
   if (CLOSED_FS.has(fs) || row.stage === "closed") return "closed";
   if (COMPLETED_FS.has(fs) || row.stage === "completed") return "completed";
-  if (row.is_hot) return "needs_action";
-  if (row.is_callback_scheduled) return "pending";
-  if (NEEDS_ACTION_STAGES.includes(row.stage)) return "needs_action";
-  return "pending";
+
+  // Hot Orders: strictly under Hot Orders ONLY, never duplicate anywhere else
+  if (row.is_hot) return "hot_orders";
+
+  // Call Back Scheduled: only active/future callbacks (fires_at > now)
+  if (row.is_callback_scheduled) return "reminders";
+
+  // Technical Delay (full name)
+  if (row.stage === "technical_delay" || fs === "technical_delay") return "technical_delay";
+
+  // Customer Delay
+  if (row.stage === "customer_delay" || fs === "customer_delay") return "customer_delay";
+
+  // Action-required untouched orders (Needs Action vs Backlog)
+  const isActionStage = ["lead_received", "payment_done", "form_submitted", "form_not_submitted"].includes(row.stage);
+  if (isActionStage) {
+    const curToday = todayIst || istDateKey(new Date());
+    const rowDate = istDateKey(row.created_at);
+    if (rowDate && rowDate < curToday) {
+      return "backlog";
+    }
+    return "needs_action";
+  }
+
+  // All other active in-progress stages where action has been taken (e.g. submitted to govt)
+  return "pending"; // Action Taken
 }
 
-export function isPendingRow(row: { fulfillment_status?: string | null; stage: OrderStage; is_hot?: boolean }): boolean {
+export function isPendingRow(row: {
+  fulfillment_status?: string | null;
+  stage: OrderStage;
+  created_at?: string | null;
+  is_hot?: boolean;
+  is_callback_scheduled?: boolean;
+}): boolean {
   const b = bucketOfRow(row);
-  return b === "pending" || b === "needs_action";
+  return b === "pending" || b === "needs_action" || b === "backlog";
 }
 
 export function getOrderActionStatus(order: {
@@ -863,7 +907,8 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         );
 
       const is_hot = !isTerminal && (is_due || is_reopened);
-      const is_callback_scheduled = !isTerminal && (!!cb || is_reopened);
+      // Call Back Scheduled: only active/future callbacks; once expired, moves directly to Hot Orders
+      const is_callback_scheduled = !isTerminal && !is_hot && !!cb && firesAtTime > now;
       const callback_reminder = !isTerminal && cb
         ? {
             id: cb.id,
@@ -899,45 +944,55 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       };
     });
 
+    const todayIst = istDateKey(new Date());
     const counts = {
-      all: allRows.length,
+      all: 0,
       needs_action: 0,
-      pending: 0,
+      hot_orders: 0,
+      reminders: 0, // Call Back Scheduled
+      technical_delay: 0,
+      backlog: 0,
+      customer_delay: 0,
+      pending: 0, // Action Taken
       completed: 0,
       closed: 0,
       exception: 0,
       actionRequired: 0,
       processed: 0,
-      reminders: 0,
-      hot_orders: 0,
-      technical_delay: 0,
-      customer_delay: 0,
     };
     const ageBuckets = { d1: 0, d2: 0, d3: 0, d7: 0, older: 0 };
 
     for (const r of allRows) {
-      if (r.is_callback_scheduled) counts.reminders++;
-      if (r.is_hot) counts.hot_orders++;
-      if (r.stage === "technical_delay" || r.fulfillment_status === "technical_delay") counts.technical_delay++;
-      if (r.stage === "customer_delay" || r.fulfillment_status === "customer_delay") counts.customer_delay++;
-
-      const b = bucketOfRow(r);
-      if (b === "needs_action") {
-        counts.needs_action++;
-        counts.actionRequired++;
-      } else if (b === "pending") {
-        counts.pending++;
-      } else if (b === "completed") {
+      const b = bucketOfRow(r, todayIst);
+      if (b === "completed") {
         counts.completed++;
         counts.processed++;
       } else if (b === "closed") {
         counts.closed++;
         counts.processed++;
-      } else if (b === "exception") {
-        counts.exception++;
+      } else {
+        counts.all++;
+        if (b === "needs_action") {
+          counts.needs_action++;
+          counts.actionRequired++;
+        } else if (b === "hot_orders") {
+          counts.hot_orders++;
+        } else if (b === "reminders") {
+          counts.reminders++;
+        } else if (b === "technical_delay") {
+          counts.technical_delay++;
+        } else if (b === "backlog") {
+          counts.backlog++;
+        } else if (b === "customer_delay") {
+          counts.customer_delay++;
+        } else if (b === "pending") {
+          counts.pending++;
+        } else if (b === "exception") {
+          counts.exception++;
+        }
       }
 
-      if (b === "pending" || b === "needs_action") {
+      if (b === "pending" || b === "needs_action" || b === "backlog") {
         const d = Math.max(0, Math.floor((now - new Date(r.created_at).getTime()) / 86_400_000));
         if (d < 1) ageBuckets.d1++;
         else if (d === 1) ageBuckets.d2++;
@@ -951,33 +1006,44 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
     if (data.bucket && data.bucket !== "all") {
       switch (data.bucket) {
         case "needs_action":
-          filtered = filtered.filter((r) => bucketOfRow(r) === "needs_action");
-          break;
-        case "reminders":
-          filtered = filtered.filter((r) => r.is_callback_scheduled);
+          filtered = filtered.filter((r) => bucketOfRow(r, todayIst) === "needs_action");
           break;
         case "hot_orders":
           filtered = filtered.filter((r) => r.is_hot);
           break;
-        case "completed":
-          filtered = filtered.filter((r) => bucketOfRow(r) === "completed");
-          break;
-        case "closed":
-          filtered = filtered.filter((r) => bucketOfRow(r) === "closed");
-          break;
-        case "pending":
-          filtered = filtered.filter((r) => bucketOfRow(r) === "pending");
-          break;
-        case "exception":
-          filtered = filtered.filter((r) => bucketOfRow(r) === "exception");
+        case "reminders":
+          filtered = filtered.filter((r) => bucketOfRow(r, todayIst) === "reminders");
           break;
         case "technical_delay":
-          filtered = filtered.filter((r) => r.stage === "technical_delay" || r.fulfillment_status === "technical_delay");
+          filtered = filtered.filter((r) => bucketOfRow(r, todayIst) === "technical_delay");
+          break;
+        case "backlog":
+          filtered = filtered.filter((r) => bucketOfRow(r, todayIst) === "backlog");
           break;
         case "customer_delay":
-          filtered = filtered.filter((r) => r.stage === "customer_delay" || r.fulfillment_status === "customer_delay");
+          filtered = filtered.filter((r) => bucketOfRow(r, todayIst) === "customer_delay");
+          break;
+        case "pending":
+          filtered = filtered.filter((r) => bucketOfRow(r, todayIst) === "pending");
+          break;
+        case "completed":
+          // Completed: show count only, do not display their orders in the list
+          filtered = [];
+          break;
+        case "closed":
+          // Closed: show count only, do not display their orders in the list
+          filtered = [];
+          break;
+        case "exception":
+          filtered = filtered.filter((r) => bucketOfRow(r, todayIst) === "exception");
           break;
       }
+    } else {
+      // Bucket is "all" or default: active orders only (exclude completed & closed from active list)
+      filtered = filtered.filter((r) => {
+        const b = bucketOfRow(r, todayIst);
+        return b !== "completed" && b !== "closed";
+      });
     }
 
     if (data.stage && data.stage !== "all" && data.stage.trim() !== "") {
@@ -988,13 +1054,13 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
     }
     if (data.actionStatus && data.actionStatus !== "all") {
       if (data.actionStatus === "action_required") {
-        filtered = filtered.filter((r) => bucketOfRow(r) === "needs_action");
+        filtered = filtered.filter((r) => bucketOfRow(r, todayIst) === "needs_action" || bucketOfRow(r, todayIst) === "backlog");
       } else if (data.actionStatus === "processed") {
-        filtered = filtered.filter((r) => bucketOfRow(r) !== "needs_action");
+        filtered = filtered.filter((r) => bucketOfRow(r, todayIst) !== "needs_action" && bucketOfRow(r, todayIst) !== "backlog");
       } else if (data.actionStatus === "hot_orders") {
         filtered = filtered.filter((r) => r.is_hot);
       } else if (data.actionStatus === "scheduled_callback") {
-        filtered = filtered.filter((r) => r.is_callback_scheduled && !r.is_hot);
+        filtered = filtered.filter((r) => bucketOfRow(r, todayIst) === "reminders");
       }
     }
     if (data.paymentStatus && data.paymentStatus !== "all") {
@@ -1013,7 +1079,14 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       }
     }
 
-    if (data.sortField === "stage") {
+    if (data.bucket === "backlog" && (!data.sortField || data.sortField === "created_at")) {
+      // Backlog — orders from previous days that are still untouched/no action taken, sorted oldest first.
+      filtered.sort((a, b) => {
+        const tA = new Date(a.created_at).getTime();
+        const tB = new Date(b.created_at).getTime();
+        return data.sortOrder === "desc" ? tB - tA : tA - tB;
+      });
+    } else if (data.sortField === "stage") {
       filtered.sort((a, b) => {
         if (a.is_hot !== b.is_hot) return a.is_hot ? -1 : 1;
         const cmp = a.stage.localeCompare(b.stage);

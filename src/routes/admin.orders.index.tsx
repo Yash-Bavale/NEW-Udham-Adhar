@@ -48,7 +48,18 @@ export const Route = createFileRoute("/admin/orders/")({
   component: OrdersListPage,
 });
 
-type Bucket = "all" | "needs_action" | "pending" | "completed" | "closed" | "exception" | "reminders" | "hot_orders" | "technical_delay" | "customer_delay";
+type Bucket =
+  | "all"
+  | "needs_action"
+  | "hot_orders"
+  | "reminders" // Call Back Scheduled
+  | "technical_delay"
+  | "backlog"
+  | "customer_delay"
+  | "pending" // Action Taken
+  | "completed"
+  | "closed"
+  | "exception";
 
 const CLOSED_FS = new Set<string>([
   "application_rejected", "certificate_rejected", "order_closed", "cancelled",
@@ -62,27 +73,51 @@ const NEEDS_ACTION_STAGES: OrderStage[] = ["lead_received", "payment_done", "for
 function bucketOfRow(row: {
   fulfillment_status?: string | null;
   stage: OrderStage;
+  created_at?: string | null;
   is_hot?: boolean;
   is_callback_scheduled?: boolean;
-}): Exclude<Bucket, "all" | "reminders" | "hot_orders"> {
-  const fs = row.fulfillment_status ?? "";
+}, todayIst?: string): Exclude<Bucket, "all"> {
+  const fs = String(row.fulfillment_status ?? "").toLowerCase();
   if (EXCEPTION_STAGES.includes(row.stage)) return "exception";
   if (CLOSED_FS.has(fs) || row.stage === "closed") return "closed";
   if (COMPLETED_FS.has(fs) || row.stage === "completed") return "completed";
-  if (row.is_hot) return "needs_action";
-  if (row.is_callback_scheduled) return "pending";
-  if (NEEDS_ACTION_STAGES.includes(row.stage)) return "needs_action";
-  return "pending";
+
+  // Hot Orders: strictly isolated under Hot Orders ONLY
+  if (row.is_hot) return "hot_orders";
+
+  // Call Back Scheduled: active/future callbacks only (fires_at > now)
+  if (row.is_callback_scheduled) return "reminders";
+
+  // Technical Delay (show full name)
+  if (row.stage === "technical_delay" || fs === "technical_delay") return "technical_delay";
+
+  // Customer Delay
+  if (row.stage === "customer_delay" || fs === "customer_delay") return "customer_delay";
+
+  // Action-required untouched orders (Needs Action vs Backlog)
+  const isActionStage = ["lead_received", "payment_done", "form_submitted", "form_not_submitted"].includes(row.stage);
+  if (isActionStage) {
+    const curToday = todayIst || istDateKey(new Date());
+    const rowDate = istDateKey(row.created_at);
+    if (rowDate && rowDate < curToday) {
+      return "backlog";
+    }
+    return "needs_action";
+  }
+
+  // All other active in-progress stages where action has been taken (e.g. submitted to govt)
+  return "pending"; // Action Taken
 }
 
 function isPendingRow(row: {
   fulfillment_status?: string | null;
   stage: OrderStage;
+  created_at?: string | null;
   is_hot?: boolean;
   is_callback_scheduled?: boolean;
 }): boolean {
   const b = bucketOfRow(row);
-  return b === "pending" || b === "needs_action";
+  return b === "pending" || b === "needs_action" || b === "backlog";
 }
 
 interface BucketCardItem {
@@ -96,31 +131,23 @@ interface BucketCardItem {
     pillClass: string;
   };
   tone?: "default" | "rose" | "indigo" | "emerald" | "amber" | "sky";
+  adminOnly?: boolean;
 }
 
 const BUCKET_CARDS: BucketCardItem[] = [
   {
     id: "all",
     label: "ALL",
-    subtitle: "Full Intake Portfolio",
+    subtitle: "Full Active Portfolio",
     icon: LayoutGrid,
+    adminOnly: true,
   },
   {
     id: "needs_action",
     label: "NEEDS ACTION",
     subtitle: "Touch SLA Pending",
     icon: Inbox,
-  },
-  {
-    id: "reminders",
-    label: "REMINDERS",
-    subtitle: "Follow-ups set",
-    icon: Bell,
-    badge: {
-      text: "Active",
-      pillClass: "bg-blue-600 text-white font-bold",
-    },
-    tone: "indigo",
+    tone: "rose",
   },
   {
     id: "hot_orders",
@@ -134,46 +161,60 @@ const BUCKET_CARDS: BucketCardItem[] = [
     tone: "rose",
   },
   {
+    id: "reminders",
+    label: "CALL BACK SCHEDULED",
+    subtitle: "Active Callbacks",
+    icon: PhoneForwarded,
+    badge: {
+      text: "Active",
+      pillClass: "bg-blue-600 text-white font-bold",
+    },
+    tone: "indigo",
+  },
+  {
+    id: "technical_delay",
+    label: "TECHNICAL DELAY",
+    subtitle: "NIC/Gov Portal Down",
+    icon: Server,
+    tone: "sky",
+  },
+  {
+    id: "backlog",
+    label: "BACKLOG",
+    subtitle: "Oldest Untouched",
+    icon: Clock,
+    badge: {
+      text: "Oldest First",
+      pillClass: "bg-amber-600 text-white font-bold",
+    },
+    tone: "amber",
+  },
+  {
+    id: "customer_delay",
+    label: "CUSTOMER DELAY",
+    subtitle: "Pending OTP/Docs",
+    icon: UserX,
+    tone: "amber",
+  },
+  {
     id: "pending",
-    label: "PENDING",
-    subtitle: "Pipeline Queued",
+    label: "ACTION TAKEN",
+    subtitle: "Pipeline In-Flight",
     icon: Hourglass,
+    tone: "amber",
   },
   {
     id: "completed",
     label: "COMPLETED",
-    subtitle: "Fulfilled Today",
+    subtitle: "Fulfilled (Count Only)",
     icon: CheckCircle2,
     tone: "emerald",
   },
   {
     id: "closed",
     label: "CLOSED",
-    subtitle: "Archived & Settled",
+    subtitle: "Archived (Count Only)",
     icon: CheckCheck,
-  },
-  {
-    id: "exception",
-    label: "EXCEPTION",
-    subtitle: "Supervisor Audit",
-    icon: AlertTriangle,
-    tone: "amber",
-  },
-  {
-    id: "technical_delay",
-    label: "TECH DELAY",
-    shortLabel: "TECH D...",
-    subtitle: "NIC/Gov Down...",
-    icon: Server,
-    tone: "sky",
-  },
-  {
-    id: "customer_delay",
-    label: "CUST DELAY",
-    shortLabel: "CUST D...",
-    subtitle: "Pending OTP/Docs",
-    icon: UserX,
-    tone: "amber",
   },
 ];
 
@@ -842,8 +883,13 @@ return (
     )}
 
     {/* KPI Cards Row */}
-    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-10 gap-2 w-full">
-      {BUCKET_CARDS.map((b) => {
+    <div className={cn(
+      "grid gap-2 w-full",
+      isAdmin
+        ? "grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-10"
+        : "grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-9"
+    )}>
+      {(isAdmin ? BUCKET_CARDS : BUCKET_CARDS.filter((b) => !b.adminOnly)).map((b) => {
         const active = bucket === b.id;
         const countVal = Number((counts as any)[b.id] ?? 0);
         const IconComponent = b.icon;
@@ -870,6 +916,42 @@ return (
           iconCls = "text-rose-600";
           countCls = "text-rose-700";
           subtitleCls = "text-rose-500/80";
+        } else if (b.id === "reminders") {
+          cardContainerCls = active
+            ? "bg-indigo-50 border-indigo-400 text-indigo-950 shadow-sm ring-2 ring-indigo-300"
+            : countVal > 0
+              ? "bg-indigo-50/40 border-indigo-200/90 text-indigo-950 hover:bg-indigo-50/80 hover:border-indigo-300"
+              : "bg-white border-slate-200 text-slate-800 hover:border-slate-300 hover:bg-slate-50/70";
+          headerCls = active || countVal > 0 ? "text-indigo-600 font-bold" : "text-slate-500";
+          iconCls = active || countVal > 0 ? "text-indigo-600" : "text-slate-400";
+          countCls = active || countVal > 0 ? "text-indigo-950" : "text-slate-900";
+          subtitleCls = active || countVal > 0 ? "text-indigo-600/70" : "text-slate-400";
+        } else if (b.id === "technical_delay") {
+          cardContainerCls = active
+            ? "bg-sky-100/80 border-sky-500 text-sky-950 shadow-sm ring-2 ring-sky-300"
+            : "bg-sky-50/60 border-sky-200/90 text-sky-950 hover:bg-sky-100/60 hover:border-sky-300";
+          headerCls = "text-sky-700 font-bold";
+          iconCls = "text-sky-600";
+          countCls = "text-sky-900";
+          subtitleCls = "text-sky-600/80";
+        } else if (b.id === "backlog") {
+          cardContainerCls = active
+            ? "bg-amber-100 border-amber-500 text-amber-950 shadow-sm ring-2 ring-amber-300"
+            : countVal > 0
+              ? "bg-amber-50/60 border-amber-200/90 text-amber-950 hover:bg-amber-100/60 hover:border-amber-300"
+              : "bg-white border-slate-200 text-slate-800 hover:border-slate-300 hover:bg-slate-50/70";
+          headerCls = active || countVal > 0 ? "text-amber-800 font-bold" : "text-slate-500";
+          iconCls = active || countVal > 0 ? "text-amber-700" : "text-slate-400";
+          countCls = active || countVal > 0 ? "text-amber-950" : "text-slate-900";
+          subtitleCls = active || countVal > 0 ? "text-amber-700/80" : "text-slate-400";
+        } else if (b.id === "customer_delay") {
+          cardContainerCls = active
+            ? "bg-orange-50 border-orange-500 text-orange-950 shadow-sm ring-2 ring-orange-300"
+            : "bg-orange-50/40 border-orange-200/80 text-orange-950 hover:bg-orange-50 hover:border-orange-300";
+          headerCls = "text-orange-700 font-bold";
+          iconCls = "text-orange-600";
+          countCls = "text-orange-950";
+          subtitleCls = "text-orange-600/70";
         } else if (b.id === "pending") {
           cardContainerCls = active
             ? "bg-amber-50 border-amber-500 text-amber-950 shadow-sm ring-2 ring-amber-300"
@@ -886,42 +968,14 @@ return (
           iconCls = "text-emerald-600";
           countCls = "text-emerald-900";
           subtitleCls = "text-emerald-600/80";
-        } else if (b.id === "technical_delay") {
+        } else if (b.id === "closed") {
           cardContainerCls = active
-            ? "bg-sky-100/80 border-sky-500 text-sky-950 shadow-sm ring-2 ring-sky-300"
-            : "bg-sky-50/60 border-sky-200/90 text-sky-950 hover:bg-sky-100/60 hover:border-sky-300";
-          headerCls = "text-sky-700 font-bold";
-          iconCls = "text-sky-600";
-          countCls = "text-sky-900";
-          subtitleCls = "text-sky-600/80";
-        } else if (b.id === "customer_delay") {
-          cardContainerCls = active
-            ? "bg-orange-50 border-orange-500 text-orange-950 shadow-sm ring-2 ring-orange-300"
-            : "bg-orange-50/40 border-orange-200/80 text-orange-950 hover:bg-orange-50 hover:border-orange-300";
-          headerCls = "text-orange-700 font-bold";
-          iconCls = "text-orange-600";
-          countCls = "text-orange-950";
-          subtitleCls = "text-orange-600/70";
-        } else if (b.id === "reminders") {
-          cardContainerCls = active
-            ? "bg-indigo-50 border-indigo-400 text-indigo-950 shadow-sm ring-2 ring-indigo-300"
-            : countVal > 0
-              ? "bg-indigo-50/40 border-indigo-200/90 text-indigo-950 hover:bg-indigo-50/80 hover:border-indigo-300"
-              : "bg-white border-slate-200 text-slate-800 hover:border-slate-300 hover:bg-slate-50/70";
-          headerCls = active || countVal > 0 ? "text-indigo-600 font-bold" : "text-slate-500";
-          iconCls = active || countVal > 0 ? "text-indigo-600" : "text-slate-400";
-          countCls = active || countVal > 0 ? "text-indigo-950" : "text-slate-900";
-          subtitleCls = active || countVal > 0 ? "text-indigo-600/70" : "text-slate-400";
-        } else if (b.id === "exception") {
-          cardContainerCls = active
-            ? "bg-amber-50 border-amber-400 text-amber-950 shadow-sm ring-2 ring-amber-300"
-            : countVal > 0
-              ? "bg-amber-50/40 border-amber-200/90 text-amber-950 hover:bg-amber-50/80 hover:border-amber-300"
-              : "bg-white border-slate-200 text-slate-800 hover:border-slate-300 hover:bg-slate-50/70";
-          headerCls = active || countVal > 0 ? "text-amber-600 font-bold" : "text-slate-500";
-          iconCls = active || countVal > 0 ? "text-amber-600" : "text-slate-400";
-          countCls = active || countVal > 0 ? "text-amber-950" : "text-slate-900";
-          subtitleCls = active || countVal > 0 ? "text-amber-600/70" : "text-slate-400";
+            ? "bg-slate-200 border-slate-400 text-slate-900 shadow-sm ring-2 ring-slate-300"
+            : "bg-slate-50/60 border-slate-200 text-slate-700 hover:bg-slate-100 hover:border-slate-300";
+          headerCls = "text-slate-600 font-bold";
+          iconCls = "text-slate-500";
+          countCls = "text-slate-800";
+          subtitleCls = "text-slate-500";
         } else if (active) {
           cardContainerCls = "bg-slate-900 text-white border-slate-900 shadow-sm";
           headerCls = "text-slate-300";
