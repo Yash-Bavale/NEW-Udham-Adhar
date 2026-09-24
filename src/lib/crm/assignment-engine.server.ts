@@ -3,13 +3,20 @@ import { computeOrderStage, type OrderStage } from "./computeOrderStage";
 import { logEmployeeOrderAction } from "@/lib/orders/order-action-logger.server";
 import { emitToUsers } from "@/lib/notifications/emit.server";
 
+export type EmploymentStatus = "ACTIVE" | "INACTIVE" | "SUSPENDED" | "TERMINATED" | "ARCHIVED";
+
+export type PresenceStatus = "AVAILABLE" | "IDLE" | "AWAY" | "OFFLINE" | "UNAVAILABLE" | "ON_LEAVE";
+
 export type AssignmentChangeType =
   | "MANUAL"
   | "MANUAL_BULK"
   | "AUTO_LEAVE"
   | "AUTO_UNAVAILABLE"
   | "AUTO_INACTIVITY"
+  | "AUTO_OFFLINE"
   | "AUTO_CAPACITY"
+  | "AUTO_TERMINATED"
+  | "AUTO_DISABLED"
   | "AUTO_INITIAL_POOL"
   | "SYSTEM";
 
@@ -23,7 +30,7 @@ export interface CanonicalAssignInput {
   source?: AssignmentSource;
   actorId?: string | null;
   actorName?: string | null;
-  expectedPreviousEmployeeId?: string | null; // For concurrency / optimistic lock
+  expectedPreviousEmployeeId?: string | null; // Concurrency & optimistic lock protection
   skipNotification?: boolean;
   metadata?: Record<string, any>;
 }
@@ -38,19 +45,70 @@ export interface CanonicalAssignResult {
   error?: string;
 }
 
+export interface WorkSchedule {
+  days: number[]; // 0=Sun, 1=Mon, ..., 6=Sat
+  start_time: string; // "09:30"
+  end_time: string;   // "18:30"
+  timezone: string;   // "Asia/Kolkata"
+}
+
+export interface EmployeeWorkforceRecord {
+  id: string;
+  displayName: string;
+  fullName: string;
+  email: string;
+  mobile?: string | null;
+  role: string;
+  department?: string | null;
+  employmentStatus: EmploymentStatus;
+  isActive: boolean;
+  autoAssignEnabled: boolean;
+  isInAssignmentPool: boolean;
+  maxWorkload: number;
+  currentWorkload: number;
+  remainingCapacity: number;
+  workSchedule: WorkSchedule;
+  presenceStatus: PresenceStatus;
+  isOnLeave: boolean;
+  activeLeaveDetails?: {
+    leaveType: string;
+    startTime: string;
+    endTime: string;
+    reason?: string | null;
+  } | null;
+  isWithinSchedule: boolean;
+  isEligibleForAutoAssign: boolean;
+  ineligibilityReasons: string[];
+}
+
 export interface StaffWorkloadSummary {
   employeeId: string;
   name: string;
   email: string;
   role: string;
+  employmentStatus: EmploymentStatus;
   effectiveWorkload: number;
   activeActionOrders: number;
   hotOrders: number;
+  maxWorkload: number;
+  remainingCapacity: number;
   isAvailable: boolean;
+  isAutoAssignEligible: boolean;
+  ineligibilityReasons: string[];
   unavailabilityReason?: string;
+  presenceStatus: PresenceStatus;
 }
 
-const TERMINAL_STAGES: Set<string> = new Set([
+export const ORDER_ACCESS_ROLES = [
+  "operations",
+  "executive",
+  "manager",
+  "admin",
+  "super_admin",
+  "support",
+] as const;
+
+export const TERMINAL_STAGES: Set<string> = new Set([
   "completed",
   "closed",
   "order_closed",
@@ -63,10 +121,11 @@ const TERMINAL_STAGES: Set<string> = new Set([
   "consultation_completed",
 ]);
 
-const ACTION_REQUIRED_STAGES: Set<OrderStage> = new Set([
+export const ACTION_REQUIRED_STAGES: Set<OrderStage> = new Set([
   "lead_received",
   "payment_done",
   "form_submitted",
+  "form_not_submitted",
   "order_reopened",
   "technical_delay",
   "under_review",
@@ -74,60 +133,141 @@ const ACTION_REQUIRED_STAGES: Set<OrderStage> = new Set([
   "submitted_to_govt",
 ]);
 
-/**
- * Self-healing helper to ensure assignment history and leave tables exist in Supabase
- */
-let tablesVerified = false;
-async function ensureTablesExist() {
-  if (tablesVerified) return;
-  try {
-    const { error: testErr } = await (supabaseAdmin as any)
-      .from("order_assignment_history")
-      .select("id")
-      .limit(1);
+export const WORKFORCE_THRESHOLDS = {
+  IDLE_THRESHOLD_MINUTES: 5,        // 5 min inactivity -> IDLE (still eligible for new orders, no reassignment)
+  AWAY_THRESHOLD_MINUTES: 15,       // 15 min inactivity -> AWAY (blocked from new automatic orders)
+  HEARTBEAT_TIMEOUT_MINUTES: 5,     // 5 min without heartbeat -> OFFLINE (blocked from new automatic orders)
+  PROLONGED_OFFLINE_REASSIGN_MINUTES: 30, // 30 min offline during working hours -> trigger automatic reassignment of action orders
+  PROLONGED_AWAY_REASSIGN_MINUTES: 60,    // 60 min away during working hours -> trigger automatic reassignment of action orders
+} as const;
 
-    if (testErr && testErr.code === "42P01") {
-      // Table doesn't exist yet, create schema
-      await (supabaseAdmin as any).rpc("exec_sql", {
-        sql: `
-          CREATE TABLE IF NOT EXISTS public.order_assignment_history (
-            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            order_id UUID NOT NULL,
-            lead_id UUID,
-            previous_employee_id UUID,
-            new_employee_id UUID,
-            change_type TEXT NOT NULL,
-            reason TEXT,
-            source TEXT NOT NULL DEFAULT 'system',
-            changed_by UUID,
-            created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-            metadata JSONB DEFAULT '{}'::jsonb
-          );
-          CREATE TABLE IF NOT EXISTS public.employee_leaves (
-            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            employee_id UUID NOT NULL,
-            start_time TIMESTAMPTZ NOT NULL,
-            end_time TIMESTAMPTZ NOT NULL,
-            reason TEXT,
-            status TEXT NOT NULL DEFAULT 'ACTIVE',
-            auto_reassign BOOLEAN NOT NULL DEFAULT true,
-            reassigned_count INT NOT NULL DEFAULT 0,
-            created_by UUID,
-            created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-            updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-          );
-        `,
-      });
+/**
+ * Check if the given date/time falls within the employee's working hours (IST timezone)
+ */
+export function isWithinWorkingSchedule(schedule?: Partial<WorkSchedule> | null, checkDate: Date = new Date()): boolean {
+  if (!schedule) return true; // Default to available if unconfigured
+
+  try {
+    const formatter = new Intl.DateTimeFormat("en-IN", {
+      timeZone: schedule.timezone || "Asia/Kolkata",
+      hour12: false,
+      weekday: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+
+    const parts = formatter.formatToParts(checkDate);
+    const dayName = parts.find((p) => p.type === "weekday")?.value?.toLowerCase() ?? "";
+    const hour = parts.find((p) => p.type === "hour")?.value ?? "00";
+    const minute = parts.find((p) => p.type === "minute")?.value ?? "00";
+    const curTime = `${hour}:${minute}`;
+
+    const dayMap: Record<string, number> = {
+      sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6,
+    };
+    const curDay = dayMap[dayName.slice(0, 3)] ?? checkDate.getDay();
+
+    if (schedule.days && schedule.days.length > 0) {
+      if (!schedule.days.includes(curDay)) return false;
     }
-    tablesVerified = true;
+
+    const start = schedule.start_time || "09:00";
+    const end = schedule.end_time || "19:00";
+
+    if (curTime < start || curTime > end) {
+      return false;
+    }
+
+    return true;
   } catch {
-    // Ignore RPC not found, assume tables exist or fallback
-    tablesVerified = true;
+    return true;
   }
 }
 
 /**
- * 1. Record single Assignment History entry
+ * Authoritative Single Source of Truth: Evaluates whether an employee is eligible for auto-assignment.
+ * Enforces: Active Lifecycle + Role + Auto Assign ON + Pool ON + No Leave + Within Shift + Under Capacity + Available/Idle Presence
+ */
+export function isEmployeeEligibleForAutoAssignment(
+  emp: {
+    employmentStatus?: string | null;
+    isActive?: boolean | null;
+    autoAssignEnabled?: boolean | null;
+    isInAssignmentPool?: boolean | null;
+    role?: string | null;
+    isOnLeave?: boolean;
+    workSchedule?: Partial<WorkSchedule> | null;
+    currentWorkload?: number;
+    maxWorkload?: number;
+    presenceStatus?: PresenceStatus;
+  },
+  options: { checkSchedule?: boolean; checkCapacity?: boolean; checkPresence?: boolean } = {
+    checkSchedule: true,
+    checkCapacity: true,
+    checkPresence: true,
+  },
+): { isEligible: boolean; reasons: string[] } {
+  const reasons: string[] = [];
+
+  const empStatus = (emp.employmentStatus ?? (emp.isActive === false ? "INACTIVE" : "ACTIVE")).toUpperCase();
+  if (empStatus !== "ACTIVE") {
+    reasons.push(`Employment status is ${empStatus}`);
+  }
+
+  if (emp.isActive === false) {
+    reasons.push("Account is disabled / deactivated");
+  }
+
+  if (emp.autoAssignEnabled === false) {
+    reasons.push("Auto-assignment is toggled OFF");
+  }
+
+  if (emp.isInAssignmentPool === false) {
+    reasons.push("Not an active member of Assignment Pool");
+  }
+
+  if (emp.role && !ORDER_ACCESS_ROLES.includes(emp.role as any)) {
+    reasons.push(`Role (${emp.role}) is not eligible for order assignments`);
+  }
+
+  if (emp.isOnLeave) {
+    reasons.push("Employee is currently on approved leave");
+  }
+
+  if (options.checkSchedule && emp.workSchedule) {
+    if (!isWithinWorkingSchedule(emp.workSchedule)) {
+      reasons.push("Outside configured working schedule/hours");
+    }
+  }
+
+  if (options.checkPresence !== false && emp.presenceStatus) {
+    if (emp.presenceStatus === "OFFLINE") {
+      reasons.push("Employee is OFFLINE (no active session / heartbeat lost)");
+    } else if (emp.presenceStatus === "AWAY") {
+      reasons.push("Employee is AWAY (inactive > 15 mins)");
+    } else if (emp.presenceStatus === "ON_LEAVE") {
+      reasons.push("Employee is ON LEAVE");
+    } else if (emp.presenceStatus === "UNAVAILABLE") {
+      reasons.push("Employee is UNAVAILABLE");
+    }
+  }
+
+  if (options.checkCapacity) {
+    const cur = Number(emp.currentWorkload ?? 0);
+    const max = Number(emp.maxWorkload ?? 50);
+    if (cur >= max) {
+      reasons.push(`At maximum workload capacity (${cur}/${max})`);
+    }
+  }
+
+  return {
+    isEligible: reasons.length === 0,
+    reasons,
+  };
+}
+
+/**
+ * 1. Record single Assignment History entry (Immutable audit record)
  */
 export async function recordAssignmentHistory(entry: {
   orderId: string;
@@ -140,7 +280,6 @@ export async function recordAssignmentHistory(entry: {
   changedBy?: string | null;
   metadata?: Record<string, any>;
 }) {
-  await ensureTablesExist();
   const nowIso = new Date().toISOString();
 
   try {
@@ -160,7 +299,7 @@ export async function recordAssignmentHistory(entry: {
     console.warn("[recordAssignmentHistory] Failed to insert history row:", err);
   }
 
-  // Also log into order_action_logs for comprehensive timeline audit
+  // Also log into order_action_logs for order-level timeline
   try {
     await logEmployeeOrderAction({
       orderId: entry.orderId,
@@ -184,7 +323,7 @@ export async function recordAssignmentHistory(entry: {
 }
 
 /**
- * 2. Canonical single order assignment function (The single source of truth for all assignment changes)
+ * 2. Canonical single order assignment function (The single authoritative gateway for all order assignment mutations)
  */
 export async function assignOrderCanonical(
   input: CanonicalAssignInput,
@@ -214,7 +353,7 @@ export async function assignOrderCanonical(
 
   const currentAssignee = (app.assigned_to as string | null) ?? null;
 
-  // Optimistic concurrency check: if caller expected a specific previous assignee and it changed, skip to prevent race condition
+  // Concurrency check: if caller expected a specific previous assignee and it changed, skip to prevent race conditions
   if (
     expectedPreviousEmployeeId !== undefined &&
     currentAssignee !== expectedPreviousEmployeeId
@@ -253,7 +392,6 @@ export async function assignOrderCanonical(
     })
     .eq("id", orderId);
 
-  // If expectedPreviousEmployeeId was given, bind it in the WHERE clause for strict row-level concurrency lock
   if (expectedPreviousEmployeeId !== undefined) {
     if (expectedPreviousEmployeeId === null) {
       updateQ = updateQ.is("assigned_to", null);
@@ -279,7 +417,7 @@ export async function assignOrderCanonical(
       .eq("id", app.lead_id);
   }
 
-  // 4. Record permanent assignment history
+  // 4. Record permanent immutable assignment history
   await recordAssignmentHistory({
     orderId,
     leadId: app.lead_id,
@@ -292,14 +430,14 @@ export async function assignOrderCanonical(
     metadata,
   });
 
-  // 5. Emit in-app notification to new assignee if assigned
+  // 5. Emit in-app notification to new assignee
   if (newEmployeeId && !skipNotification) {
     try {
       await emitToUsers([newEmployeeId], {
         kind: "order_assigned",
         title: changeType.startsWith("AUTO") ? "🎯 Order Reassigned" : "🎯 Order Assigned",
         body: `Order ${app.application_code || orderId} has been assigned to your queue (${reason || changeType}).`,
-        href: `/admin/orders/${orderId}`,
+        href: `/admin/orders`,
         entityKind: "application",
         entityId: orderId,
       });
@@ -318,12 +456,9 @@ export async function assignOrderCanonical(
 }
 
 /**
- * 3. Calculate dynamic live workloads across all active eligible staff members
+ * 3. Calculate dynamic live workloads & eligibility across staff members
  */
 export async function calculateStaffWorkloads(): Promise<StaffWorkloadSummary[]> {
-  const ORDER_ACCESS_ROLES = ["operations", "executive", "manager", "admin", "super_admin", "support"] as const;
-
-  // 1. Get staff profiles & roles
   const { data: roleRows } = await (supabaseAdmin as any)
     .from("user_roles")
     .select("user_id, role")
@@ -336,18 +471,28 @@ export async function calculateStaffWorkloads(): Promise<StaffWorkloadSummary[]>
 
   const nowIso = new Date().toISOString();
 
-  // 2. Fetch profiles, active leaves, and open action orders concurrently
-  const [profilesRes, leavesRes, appsRes, schedulersRes] = await Promise.all([
+  // Concurrently fetch profiles, pool memberships, leaves, sessions, open applications & schedulers
+  const [profilesRes, poolRes, leavesRes, sessionsRes, appsRes, schedulersRes] = await Promise.all([
     (supabaseAdmin as any)
       .from("profiles")
-      .select("id, display_name, full_name, email, is_active")
+      .select("id, display_name, full_name, email, is_active, employment_status, auto_assign_enabled, max_workload, work_schedule")
       .in("id", staffUserIds),
+    (supabaseAdmin as any)
+      .from("assignment_pool")
+      .select("user_id, is_active")
+      .in("user_id", staffUserIds),
     (supabaseAdmin as any)
       .from("employee_leaves")
       .select("employee_id, start_time, end_time, status, reason")
       .eq("status", "ACTIVE")
       .lte("start_time", nowIso)
       .gte("end_time", nowIso),
+    (supabaseAdmin as any)
+      .from("employee_sessions")
+      .select("employee_id, is_active, last_heartbeat_at, last_activity_at")
+      .in("employee_id", staffUserIds)
+      .eq("is_active", true)
+      .order("last_heartbeat_at", { ascending: false }),
     (supabaseAdmin as any)
       .from("applications")
       .select("id, assigned_to, fulfillment_status, application_status, workflow_status, closure_stage, form_submitted_at, certificate_uploaded_at, created_at")
@@ -362,8 +507,19 @@ export async function calculateStaffWorkloads(): Promise<StaffWorkloadSummary[]>
   const profileMap = new Map<string, any>();
   (profilesRes.data ?? []).forEach((p: any) => profileMap.set(String(p.id), p));
 
+  const poolActiveMap = new Map<string, boolean>();
+  (poolRes.data ?? []).forEach((ap: any) => {
+    if (ap.is_active) poolActiveMap.set(String(ap.user_id), true);
+  });
+
   const activeLeavesMap = new Map<string, any>();
   (leavesRes.data ?? []).forEach((l: any) => activeLeavesMap.set(String(l.employee_id), l));
+
+  const latestSessionByEmp = new Map<string, any>();
+  (sessionsRes.data ?? []).forEach((s: any) => {
+    const uid = String(s.employee_id);
+    if (!latestSessionByEmp.has(uid)) latestSessionByEmp.set(uid, s);
+  });
 
   const roleMap = new Map<string, string>();
   (roleRows ?? []).forEach((r: any) => {
@@ -377,9 +533,14 @@ export async function calculateStaffWorkloads(): Promise<StaffWorkloadSummary[]>
 
   const nowMs = Date.now();
 
-  // Map counts per employee
-  const workloadByEmp = new Map<string, { activeActionOrders: number; hotOrders: number }>();
-  staffUserIds.forEach((uid) => workloadByEmp.set(uid, { activeActionOrders: 0, hotOrders: 0 }));
+  // Aggregate weighted workloads
+  const workloadByEmp = new Map<
+    string,
+    { activeActionOrders: number; hotOrders: number; techDelayOrders: number; weightedWorkload: number }
+  >();
+  staffUserIds.forEach((uid) =>
+    workloadByEmp.set(uid, { activeActionOrders: 0, hotOrders: 0, techDelayOrders: 0, weightedWorkload: 0 }),
+  );
 
   for (const app of appsRes.data ?? []) {
     const uid = String(app.assigned_to);
@@ -397,99 +558,262 @@ export async function calculateStaffWorkloads(): Promise<StaffWorkloadSummary[]>
     const isDue = firesAt > 0 && firesAt <= nowMs;
     const isReopened = stage === "order_reopened" || fs === "order_reopened";
     const isHot = isDue || isReopened;
+    const isTechDelay = stage === "technical_delay" || fs === "technical_delay";
 
     const counts = workloadByEmp.get(uid)!;
     if (isHot) {
       counts.hotOrders += 1;
+      counts.weightedWorkload += 2.0;
+    } else if (isTechDelay) {
+      counts.techDelayOrders += 1;
+      counts.weightedWorkload += 1.5;
+    } else {
+      counts.weightedWorkload += 1.0;
     }
-    if (ACTION_REQUIRED_STAGES.has(stage) || isHot || !!cb) {
+
+    if (ACTION_REQUIRED_STAGES.has(stage) || isHot || !!cb || isTechDelay) {
       counts.activeActionOrders += 1;
     }
   }
 
-  // Construct summaries
-  const results: StaffWorkloadSummary[] = staffUserIds.map((uid) => {
+  // Construct StaffWorkloadSummary records
+  const summaries: StaffWorkloadSummary[] = staffUserIds.map((uid) => {
     const prof = profileMap.get(uid);
     const leave = activeLeavesMap.get(uid);
-    const counts = workloadByEmp.get(uid) || { activeActionOrders: 0, hotOrders: 0 };
-    const isActiveAcc = prof?.is_active !== false;
-    const isOnLeave = !!leave;
-    const isAvailable = isActiveAcc && !isOnLeave;
+    const session = latestSessionByEmp.get(uid);
+    const counts = workloadByEmp.get(uid) || { activeActionOrders: 0, hotOrders: 0, techDelayOrders: 0, weightedWorkload: 0 };
 
-    // Formula: Effective Workload = Active Action Orders + (2 * Hot Orders)
-    const effectiveWorkload = counts.activeActionOrders + 2 * counts.hotOrders;
+    const empStatus: EmploymentStatus = prof?.employment_status ?? (prof?.is_active === false ? "INACTIVE" : "ACTIVE");
+    const isActiveAcc = prof?.is_active !== false && empStatus === "ACTIVE";
+    const isOnLeave = !!leave;
+    const isPoolActive = poolActiveMap.get(uid) ?? false;
+    const autoAssignEnabled = prof?.auto_assign_enabled ?? false;
+    const maxWorkload = Number(prof?.max_workload || 50);
+    const effectiveWorkload = Math.round(counts.weightedWorkload * 10) / 10;
+    const remainingCapacity = Math.max(0, maxWorkload - counts.activeActionOrders);
+
+    // Presence evaluation
+    let presence: PresenceStatus = "AVAILABLE";
+    if (isOnLeave) presence = "ON_LEAVE";
+    else if (!isActiveAcc) presence = "UNAVAILABLE";
+    else if (!session) presence = "OFFLINE";
+    else {
+      const lastAct = session.last_activity_at ? new Date(session.last_activity_at).getTime() : 0;
+      const lastHb  = session.last_heartbeat_at ? new Date(session.last_heartbeat_at).getTime() : 0;
+      const minsSinceAct = (nowMs - lastAct) / 60000;
+      const minsSinceHb  = (nowMs - lastHb) / 60000;
+      if (minsSinceHb > WORKFORCE_THRESHOLDS.HEARTBEAT_TIMEOUT_MINUTES || session.status === "logged_out" || session.status === "force_logged_out" || session.status === "expired") {
+        presence = "OFFLINE";
+      } else if (minsSinceAct > WORKFORCE_THRESHOLDS.AWAY_THRESHOLD_MINUTES || session.status === "away") {
+        presence = "AWAY";
+      } else if (minsSinceAct > WORKFORCE_THRESHOLDS.IDLE_THRESHOLD_MINUTES || session.status === "idle") {
+        presence = "IDLE";
+      } else {
+        presence = "AVAILABLE";
+      }
+    }
+
+    const { isEligible, reasons } = isEmployeeEligibleForAutoAssignment({
+      employmentStatus: empStatus,
+      isActive: isActiveAcc,
+      autoAssignEnabled,
+      isInAssignmentPool: isPoolActive,
+      role: roleMap.get(uid),
+      isOnLeave,
+      workSchedule: prof?.work_schedule,
+      currentWorkload: counts.activeActionOrders,
+      maxWorkload,
+      presenceStatus: presence,
+    });
+
+    let unavailReason: string | undefined;
+    if (isOnLeave) unavailReason = `On Leave (${leave.reason || "Scheduled Leave"})`;
+    else if (empStatus !== "ACTIVE") unavailReason = `Account ${empStatus}`;
+    else if (!isPoolActive || !autoAssignEnabled) unavailReason = "Auto-assign OFF";
+    else if (presence === "OFFLINE") unavailReason = "Staff Offline";
+    else if (presence === "AWAY") unavailReason = "Staff Away (>15m)";
+    else if (!isEligible && reasons.length > 0) unavailReason = reasons[0];
 
     return {
       employeeId: uid,
       name: prof?.full_name ?? prof?.display_name ?? prof?.email ?? "Staff",
       email: prof?.email ?? "",
       role: roleMap.get(uid) ?? "executive",
+      employmentStatus: empStatus,
       effectiveWorkload,
       activeActionOrders: counts.activeActionOrders,
       hotOrders: counts.hotOrders,
-      isAvailable,
-      unavailabilityReason: isOnLeave
-        ? `On Leave (${leave.reason || "Scheduled Leave"})`
-        : !isActiveAcc
-          ? "Account Deactivated"
-          : undefined,
+      maxWorkload,
+      remainingCapacity,
+      isAvailable: isEligible,
+      isAutoAssignEligible: isEligible,
+      ineligibilityReasons: reasons,
+      unavailabilityReason: unavailReason,
+      presenceStatus: presence,
     };
   });
 
-  return results;
+  return summaries;
 }
 
 /**
- * 4. Automatic Order Redistribution Engine
- * Identifies action-required orders belonging to an unavailable employee and
- * redistributes them to active eligible employees in a balanced, workload-aware manner.
+ * 4. Get list of currently active, eligible assignment employees
+ */
+export async function getEligibleAssignmentEmployees(options?: {
+  checkSchedule?: boolean;
+  checkCapacity?: boolean;
+  checkPresence?: boolean;
+}): Promise<StaffWorkloadSummary[]> {
+  const workloads = await calculateStaffWorkloads();
+  return workloads.filter((w) => w.isAutoAssignEligible);
+}
+
+/**
+ * 5. Automatic Workload-Aware Order Redistribution
+ * Evenly balances orders across eligible active staff according to lowest effective workload.
+ */
+export async function distributeOrdersEquallyCanonical(
+  orderIds: string[],
+  actorId?: string | null,
+  reason: string = "Equally distributed across eligible staff",
+): Promise<{
+  success: boolean;
+  totalOrders: number;
+  distributedCount: number;
+  unassignedCount: number;
+  distributionMap: Record<string, number>;
+  summaryMessage: string;
+}> {
+  if (!orderIds || orderIds.length === 0) {
+    return {
+      success: true,
+      totalOrders: 0,
+      distributedCount: 0,
+      unassignedCount: 0,
+      distributionMap: {},
+      summaryMessage: "No orders to distribute.",
+    };
+  }
+
+  // 1. Fetch eligible candidates (Strictly active, online, within shift, within capacity)
+  const candidates = await getEligibleAssignmentEmployees();
+  if (candidates.length === 0) {
+    return {
+      success: false,
+      totalOrders: orderIds.length,
+      distributedCount: 0,
+      unassignedCount: orderIds.length,
+      distributionMap: {},
+      summaryMessage: "No active, available employees currently eligible for auto-assignment.",
+    };
+  }
+
+  // Track dynamic simulated workloads during the distribution batch
+  const dynamicWorkloads = candidates.map((c) => ({
+    ...c,
+    simulatedWorkload: c.effectiveWorkload,
+    simulatedActiveCount: c.activeActionOrders,
+    assignedInBatch: 0,
+  }));
+
+  const distributionMap: Record<string, number> = {};
+  let distributedCount = 0;
+  let unassignedCount = 0;
+
+  for (const orderId of orderIds) {
+    // Filter out candidates who have reached max capacity during this batch
+    const availableNow = dynamicWorkloads.filter(
+      (c) => c.simulatedActiveCount < c.maxWorkload,
+    );
+
+    if (availableNow.length === 0) {
+      // All eligible employees reached capacity
+      unassignedCount += 1;
+      continue;
+    }
+
+    // Pick candidate with minimum simulated workload (fair workload balancing)
+    availableNow.sort((a, b) => a.simulatedWorkload - b.simulatedWorkload);
+    const chosen = availableNow[0];
+
+    const res = await assignOrderCanonical({
+      orderId,
+      newEmployeeId: chosen.employeeId,
+      changeType: "AUTO_INITIAL_POOL",
+      reason,
+      source: actorId ? "admin" : "system",
+      actorId,
+    });
+
+    if (res.success) {
+      chosen.simulatedWorkload += 1.0;
+      chosen.simulatedActiveCount += 1;
+      chosen.assignedInBatch += 1;
+      distributedCount += 1;
+      distributionMap[chosen.name] = (distributionMap[chosen.name] || 0) + 1;
+    } else {
+      unassignedCount += 1;
+    }
+  }
+
+  const parts = Object.entries(distributionMap).map(([name, count]) => `${name}: ${count}`);
+  const summaryMessage = distributedCount > 0
+    ? `Distributed ${distributedCount} order(s) successfully (${parts.join(", ")})`
+    : "No orders were distributed.";
+
+  return {
+    success: true,
+    totalOrders: orderIds.length,
+    distributedCount,
+    unassignedCount,
+    distributionMap,
+    summaryMessage,
+  };
+}
+
+/**
+ * 6. Automatic Order Reassignment Engine for Unavailable Employees
+ * Finds action-required orders belonging to an unavailable employee and redistributes them.
  */
 export async function reassignOrdersFromUnavailableEmployee(params: {
   unavailableEmployeeId: string;
   reason: string;
   changeType?: AssignmentChangeType;
   actorId?: string | null;
-  maxWorkloadCapacity?: number;
 }): Promise<{
   success: boolean;
+  totalFound: number;
   reassignedCount: number;
-  overflowCount: number;
   skippedCount: number;
-  assignments: Array<{ orderId: string; applicationCode: string; newEmployeeId: string | null }>;
   summaryMessage: string;
 }> {
   const {
     unavailableEmployeeId,
     reason,
     changeType = "AUTO_UNAVAILABLE",
-    actorId = null,
-    maxWorkloadCapacity = 50,
+    actorId,
   } = params;
 
-  // 1. Fetch all non-terminal orders assigned to the unavailable employee
-  const { data: rawApps, error: fetchErr } = await (supabaseAdmin as any)
+  // 1. Fetch all non-deleted orders currently assigned to the unavailable employee
+  const { data: apps, error: fetchErr } = await (supabaseAdmin as any)
     .from("applications")
-    .select(
-      "id, application_code, lead_id, customer_id, fulfillment_status, application_status, workflow_status, closure_stage, form_submitted_at, certificate_uploaded_at, created_at, assigned_to",
-    )
+    .select("id, application_code, fulfillment_status, application_status, workflow_status, closure_stage, form_submitted_at, certificate_uploaded_at, created_at")
     .eq("assigned_to", unavailableEmployeeId)
     .eq("is_deleted", false);
 
-  if (fetchErr) throw new Error(fetchErr.message);
-
-  if (!rawApps || rawApps.length === 0) {
+  if (fetchErr || !apps || apps.length === 0) {
     return {
       success: true,
+      totalFound: 0,
       reassignedCount: 0,
-      overflowCount: 0,
       skippedCount: 0,
-      assignments: [],
-      summaryMessage: "No orders found currently assigned to this employee.",
+      summaryMessage: "No orders found assigned to this employee.",
     };
   }
 
-  // 2. Fetch schedulers for priority calculation
-  const appIds = rawApps.map((a: any) => String(a.id));
+  const appIds = apps.map((a: any) => a.id);
+
+  // Fetch active schedulers to detect due callbacks
   const { data: schedulers } = await (supabaseAdmin as any)
     .from("order_schedulers")
     .select("application_id, status, fires_at")
@@ -497,371 +821,301 @@ export async function reassignOrdersFromUnavailableEmployee(params: {
     .eq("status", "active");
 
   const schedulerMap = new Map<string, any>();
-  (schedulers ?? []).forEach((s: any) => schedulerMap.set(String(s.application_id), s));
+  (schedulers ?? []).forEach((s: any) => schedulerMap.set(s.application_id, s));
 
   const nowMs = Date.now();
 
-  // 3. Filter strictly for ACTION-REQUIRED orders and calculate urgency priority
-  interface PrioritizedOrder {
-    app: any;
-    priorityRank: number; // 1 = Highest (Hot/Due), 2 = Action Required, 3 = Tech Delay, 4 = Reminders
-    isHot: boolean;
-    stage: OrderStage;
-  }
+  // 2. Filter ONLY action-required orders. Exclude terminal stages and pure customer waiting states.
+  const actionOrders: Array<{ id: string; code: string; priorityScore: number }> = [];
 
-  const eligibleOrders: PrioritizedOrder[] = [];
+  for (const a of apps) {
+    const fs = String(a.fulfillment_status ?? "").toLowerCase();
+    const as = String(a.application_status ?? "").toLowerCase();
 
-  for (const app of rawApps) {
-    const fs = String(app.fulfillment_status ?? "").toLowerCase();
-    const as = String(app.application_status ?? "").toLowerCase();
-
-    // Skip terminal orders
+    // Exclude terminal stages
     if (TERMINAL_STAGES.has(fs) || TERMINAL_STAGES.has(as)) continue;
 
-    const stage = computeOrderStage(null, app);
+    const stage = computeOrderStage(null, a);
     if (TERMINAL_STAGES.has(stage)) continue;
 
-    // Skip pure customer delay without pending employee action
-    if (stage === "customer_delay" && !schedulerMap.has(String(app.id))) {
+    // Exclude Customer Delay when purely waiting on customer submission
+    if (stage === "customer_delay" || fs === "customer_delay" || fs === "waiting_for_customer_submission") {
       continue;
     }
 
-    const cb = schedulerMap.get(String(app.id));
+    const cb = schedulerMap.get(a.id);
     const firesAt = cb?.fires_at ? new Date(cb.fires_at).getTime() : 0;
     const isDue = firesAt > 0 && firesAt <= nowMs;
     const isReopened = stage === "order_reopened" || fs === "order_reopened";
     const isHot = isDue || isReopened;
 
-    let priorityRank = 5;
-    if (isHot) {
-      priorityRank = 1; // Priority 1: Hot / Due Now / Reopened
-    } else if (stage === "payment_done" || stage === "form_submitted" || stage === "lead_received") {
-      priorityRank = 2; // Priority 2: New paid intake & submitted forms
-    } else if (stage === "technical_delay" || fs === "technical_delay") {
-      priorityRank = 3; // Priority 3: NIC/Portal delay requiring follow-up
-    } else if (cb) {
-      priorityRank = 4; // Priority 4: Scheduled reminders
-    } else if (ACTION_REQUIRED_STAGES.has(stage)) {
-      priorityRank = 5;
-    }
+    // Priority Score (Higher = Reassigned First)
+    let priorityScore = 1;
+    if (isHot) priorityScore = 10;
+    else if (stage === "technical_delay" || fs === "technical_delay") priorityScore = 5;
+    else if (stage === "payment_done" || stage === "form_submitted") priorityScore = 4;
+    else if (cb && firesAt > nowMs) priorityScore = 3;
 
-    eligibleOrders.push({ app, priorityRank, isHot, stage });
+    actionOrders.push({ id: a.id, code: a.application_code, priorityScore });
   }
 
-  // Sort orders by urgency: Rank 1 first, then oldest created_at first
-  eligibleOrders.sort((a, b) => {
-    if (a.priorityRank !== b.priorityRank) return a.priorityRank - b.priorityRank;
-    const tA = new Date(a.app.created_at).getTime();
-    const tB = new Date(b.app.created_at).getTime();
-    return tA - tB;
-  });
-
-  if (eligibleOrders.length === 0) {
+  if (actionOrders.length === 0) {
     return {
       success: true,
+      totalFound: apps.length,
       reassignedCount: 0,
-      overflowCount: 0,
-      skippedCount: 0,
-      assignments: [],
-      summaryMessage: "All orders assigned to this employee are already resolved or awaiting customer.",
+      skippedCount: apps.length,
+      summaryMessage: `Found ${apps.length} order(s), but none required active staff intervention.`,
     };
   }
 
-  // 4. Fetch available staff and their workloads (excluding the unavailable staff)
-  const allStaffWorkloads = await calculateStaffWorkloads();
-  const availableStaff = allStaffWorkloads.filter(
-    (s) => s.isAvailable && s.employeeId !== unavailableEmployeeId,
+  // Sort urgent orders first
+  actionOrders.sort((a, b) => b.priorityScore - a.priorityScore);
+
+  // 3. Redistribute to eligible active employees (excluding the unavailable employee)
+  const candidates = (await getEligibleAssignmentEmployees()).filter(
+    (c) => c.employeeId !== unavailableEmployeeId,
   );
 
-  // In-memory dynamic workload tracking pool for balanced distribution
-  const staffPool = availableStaff.map((s) => ({
-    employeeId: s.employeeId,
-    name: s.name,
-    email: s.email,
-    workload: s.effectiveWorkload,
-    reassignedCount: 0,
+  if (candidates.length === 0) {
+    return {
+      success: false,
+      totalFound: actionOrders.length,
+      reassignedCount: 0,
+      skippedCount: actionOrders.length,
+      summaryMessage: "No other active, eligible employees available to take over these orders.",
+    };
+  }
+
+  const dynamicWorkloads = candidates.map((c) => ({
+    ...c,
+    simulatedWorkload: c.effectiveWorkload,
+    simulatedActiveCount: c.activeActionOrders,
+    assignedInBatch: 0,
   }));
 
-  const assignments: Array<{ orderId: string; applicationCode: string; newEmployeeId: string | null }> = [];
   let reassignedCount = 0;
-  let overflowCount = 0;
   let skippedCount = 0;
+  const distributionMap: Record<string, number> = {};
 
-  // Track per-recipient batch notifications to avoid notification spam
-  const notificationsByStaff = new Map<string, number>();
+  for (const ord of actionOrders) {
+    const availableNow = dynamicWorkloads.filter(
+      (c) => c.simulatedActiveCount < c.maxWorkload,
+    );
 
-  // 5. Iteratively assign each priority order to the currently least-loaded staff
-  for (const { app, isHot } of eligibleOrders) {
-    const orderId = String(app.id);
-
-    // Find the eligible staff member with the lowest effective workload
-    let targetStaff = staffPool.length > 0
-      ? staffPool.reduce((min, cur) => (cur.workload < min.workload ? cur : min), staffPool[0])
-      : null;
-
-    // Capacity check: If even the least loaded staff exceeds maxWorkloadCapacity
-    if (targetStaff && targetStaff.workload >= maxWorkloadCapacity) {
-      targetStaff = null; // Overflow safety: do not overload staff
-    }
-
-    const newEmpId = targetStaff ? targetStaff.employeeId : null;
-
-    // Execute canonical assignment with optimistic locking (prevents duplicate reassignment if worker B intervened)
-    const result = await assignOrderCanonical({
-      orderId,
-      newEmployeeId: newEmpId,
-      changeType: newEmpId ? changeType : "AUTO_CAPACITY",
-      reason: newEmpId
-        ? reason
-        : "Unassigned — All active employees reached maximum workload capacity",
-      source: "system",
-      actorId,
-      expectedPreviousEmployeeId: unavailableEmployeeId,
-      skipNotification: true, // We emit grouped notifications below
-    });
-
-    if (result.skippedDueToConflict) {
+    if (availableNow.length === 0) {
       skippedCount += 1;
       continue;
     }
 
-    if (result.success) {
-      if (newEmpId && targetStaff) {
-        reassignedCount += 1;
-        // Dynamically increment workload in pool to balance next iteration
-        targetStaff.workload += isHot ? 3 : 1;
-        targetStaff.reassignedCount += 1;
-        notificationsByStaff.set(newEmpId, (notificationsByStaff.get(newEmpId) || 0) + 1);
-      } else {
-        overflowCount += 1;
-      }
+    availableNow.sort((a, b) => a.simulatedWorkload - b.simulatedWorkload);
+    const chosen = availableNow[0];
 
-      assignments.push({
-        orderId,
-        applicationCode: app.application_code || orderId,
-        newEmployeeId: newEmpId,
-      });
-    }
-  }
-
-  // 6. Emit single grouped notification per recipient
-  for (const [staffId, count] of notificationsByStaff.entries()) {
-    try {
-      await emitToUsers([staffId], {
-        kind: "order_assigned",
-        title: "🎯 Orders Reassigned to You",
-        body: `${count} order(s) were automatically reassigned to your queue (${reason}).`,
-        href: "/admin/orders",
-        entityKind: "application",
-        entityId: assignments[0]?.orderId || "",
-      });
-    } catch (e) {
-      console.warn("[reassignOrdersFromUnavailableEmployee] Notification emit warning:", e);
-    }
-  }
-
-  // 7. Update leave table reassigned_count if this was triggered by active leave
-  try {
-    await (supabaseAdmin as any)
-      .from("employee_leaves")
-      .update({
-        reassigned_count: reassignedCount,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("employee_id", unavailableEmployeeId)
-      .eq("status", "ACTIVE");
-  } catch {}
-
-  const summary = `Redistributed ${reassignedCount} action-required order(s) across ${availableStaff.length} active employee(s).${
-    overflowCount > 0 ? ` ⚠ ${overflowCount} order(s) could not be assigned due to employee capacity limits.` : ""
-  }`;
-
-  return {
-    success: true,
-    reassignedCount,
-    overflowCount,
-    skippedCount,
-    assignments,
-    summaryMessage: summary,
-  };
-}
-
-/**
- * 4b. Canonical Equal Workload Distribution across active eligible staff
- */
-export async function distributeOrdersEquallyCanonical(input: {
-  applicationIds: string[];
-  actorId?: string;
-  source?: "super_admin" | "admin" | "system";
-  reason?: string;
-  targetEmployeeIds?: string[];
-}): Promise<{
-  success: boolean;
-  distributedCount: number;
-  overflowCount: number;
-  skippedCount: number;
-  assignments: Array<{ orderId: string; applicationCode: string; newEmployeeId: string | null }>;
-  summaryMessage: string;
-}> {
-  await ensureTablesExist();
-  const { applicationIds, actorId, source = "super_admin", reason = "Equally distributed by Admin", targetEmployeeIds } = input;
-  if (!applicationIds || !applicationIds.length) {
-    return { success: true, distributedCount: 0, overflowCount: 0, skippedCount: 0, assignments: [], summaryMessage: "No orders selected." };
-  }
-
-  // 1. Fetch orders
-  const { data: rawApps, error: fetchErr } = await (supabaseAdmin as any)
-    .from("applications")
-    .select("id, application_code, assigned_to, lead_id, customer_id, fulfillment_status, application_status, created_at")
-    .in("id", applicationIds);
-
-  if (fetchErr || !rawApps || rawApps.length === 0) {
-    return { success: false, distributedCount: 0, overflowCount: 0, skippedCount: 0, assignments: [], summaryMessage: "Selected orders not found." };
-  }
-
-  // 2. Fetch available staff and workloads
-  const allStaffWorkloads = await calculateStaffWorkloads();
-  let availableStaff = allStaffWorkloads.filter((s) => s.isAvailable);
-  if (targetEmployeeIds && targetEmployeeIds.length > 0) {
-    availableStaff = availableStaff.filter((s) => targetEmployeeIds.includes(s.employeeId));
-  }
-
-  if (availableStaff.length === 0) {
-    return {
-      success: false,
-      distributedCount: 0,
-      overflowCount: 0,
-      skippedCount: 0,
-      assignments: [],
-      summaryMessage: "No active eligible staff available to receive orders.",
-    };
-  }
-
-  // Workload pool for dynamic in-memory balancing
-  const staffPool = availableStaff.map((s) => ({
-    employeeId: s.employeeId,
-    name: s.name,
-    email: s.email,
-    workload: s.effectiveWorkload,
-    assignedCount: 0,
-  }));
-
-  const assignments: Array<{ orderId: string; applicationCode: string; newEmployeeId: string | null }> = [];
-  let distributedCount = 0;
-  let skippedCount = 0;
-  const notificationsByStaff = new Map<string, number>();
-
-  for (const app of rawApps) {
-    const orderId = String(app.id);
-    const prevAssignee = app.assigned_to;
-
-    // Pick staff with lowest effective workload
-    const targetStaff = staffPool.reduce((min, cur) => (cur.workload < min.workload ? cur : min), staffPool[0]);
-
-    const assignRes = await assignOrderCanonical({
-      orderId,
-      newEmployeeId: targetStaff.employeeId,
-      changeType: "AUTO_CAPACITY",
+    const res = await assignOrderCanonical({
+      orderId: ord.id,
+      newEmployeeId: chosen.employeeId,
+      changeType,
       reason,
-      source,
+      source: actorId ? "admin" : "system",
       actorId,
-      expectedPreviousEmployeeId: prevAssignee,
-      skipNotification: true,
-      metadata: {
-        batchReassignment: true,
-        distributionStrategy: "EQUAL_WORKLOAD_BALANCE",
-        targetStaffWorkloadBefore: targetStaff.workload,
-      },
+      expectedPreviousEmployeeId: unavailableEmployeeId, // Strict optimistic lock
     });
 
-    if (assignRes.success && !assignRes.skippedDueToConflict) {
-      targetStaff.workload += 1;
-      targetStaff.assignedCount += 1;
-      distributedCount += 1;
-      assignments.push({
-        orderId,
-        applicationCode: assignRes.applicationCode || orderId,
-        newEmployeeId: targetStaff.employeeId,
-      });
-
-      notificationsByStaff.set(
-        targetStaff.employeeId,
-        (notificationsByStaff.get(targetStaff.employeeId) || 0) + 1,
-      );
+    if (res.success) {
+      chosen.simulatedWorkload += (ord.priorityScore >= 10 ? 2.0 : 1.0);
+      chosen.simulatedActiveCount += 1;
+      chosen.assignedInBatch += 1;
+      reassignedCount += 1;
+      distributionMap[chosen.name] = (distributionMap[chosen.name] || 0) + 1;
     } else {
       skippedCount += 1;
     }
   }
 
-  // Dispatch batched notifications
-  for (const [empId, count] of notificationsByStaff.entries()) {
-    try {
-      await emitToUsers([empId], {
-        kind: "order_assigned",
-        title: `${count} New Order(s) Assigned (Auto-Balanced)`,
-        body: `You received ${count} order(s) via automated workload redistribution.`,
-        href: "/admin/orders",
-        entityKind: "application",
-        entityId: assignments.find((item) => item.newEmployeeId === empId)?.orderId || "",
-      });
-    } catch (err) {
-      console.warn("[distributeOrdersEquallyCanonical] Notification error:", err);
-    }
-  }
-
-  const summary = `Equally distributed ${distributedCount} order(s) across ${staffPool.filter(s => s.assignedCount > 0).length} active staff members.`;
+  const parts = Object.entries(distributionMap).map(([name, count]) => `${name}: ${count}`);
+  const summaryMessage = `Reassigned ${reassignedCount} of ${actionOrders.length} action order(s) successfully (${parts.join(", ") || "none"}).`;
 
   return {
     success: true,
-    distributedCount,
-    overflowCount: 0,
+    totalFound: actionOrders.length,
+    reassignedCount,
     skippedCount,
-    assignments,
-    summaryMessage: summary,
+    summaryMessage,
   };
 }
 
 /**
- * 5. SuperAdmin Operational Dashboard Metrics
+ * 7. Background Autonomous Cron Runner for Prolonged Unavailable / Offline Staff
+ * Automatically detects staff who have been offline (> 30m) or away (> 60m) during their shift
+ * and redistributes their action-required orders to eligible active colleagues.
  */
-export async function getReassignmentOperationalMetrics() {
-  await ensureTablesExist();
-  const nowIso = new Date().toISOString();
-  const todayStartIso = new Date(new Date().setHours(0, 0, 0, 0)).toISOString();
+export async function reassignProlongedUnavailableStaff(): Promise<{
+  processedEmployeesCount: number;
+  totalOrdersReassigned: number;
+  results: Array<{
+    employeeId: string;
+    employeeName: string;
+    reason: string;
+    reassignedCount: number;
+  }>;
+}> {
+  const workloads = await calculateStaffWorkloads();
+  const now = new Date();
+  const nowMs = now.getTime();
 
-  const [leavesRes, historyTodayRes, overflowRes, staffWorkloads] = await Promise.all([
-    (supabaseAdmin as any)
-      .from("employee_leaves")
-      .select("id, employee_id, start_time, end_time, status, reason, reassigned_count")
-      .eq("status", "ACTIVE")
-      .lte("start_time", nowIso)
-      .gte("end_time", nowIso),
-    (supabaseAdmin as any)
-      .from("order_assignment_history")
-      .select("id, change_type, created_at")
-      .gte("created_at", todayStartIso),
-    (supabaseAdmin as any)
-      .from("applications")
-      .select("id")
-      .is("assigned_to", null)
-      .eq("is_deleted", false)
-      .not("fulfillment_status", "in", "(completed,order_closed,cancelled,refunded)"),
-    calculateStaffWorkloads(),
-  ]);
+  const results: Array<{
+    employeeId: string;
+    employeeName: string;
+    reason: string;
+    reassignedCount: number;
+  }> = [];
 
-  const historyRows = historyTodayRes.data ?? [];
-  const autoCount = historyRows.filter((r: any) => String(r.change_type || "").startsWith("AUTO")).length;
-  const manualCount = historyRows.filter((r: any) => String(r.change_type || "").startsWith("MANUAL")).length;
+  let totalOrdersReassigned = 0;
 
-  const unavailableStaff = staffWorkloads.filter((s) => !s.isAvailable);
+  for (const w of workloads) {
+    if (w.employmentStatus !== "ACTIVE") continue;
+
+    // Check if within working schedule
+    const { data: prof } = await (supabaseAdmin as any)
+      .from("profiles")
+      .select("work_schedule")
+      .eq("id", w.employeeId)
+      .maybeSingle();
+
+    const isWithinShift = isWithinWorkingSchedule(prof?.work_schedule, now);
+    if (!isWithinShift) continue; // Do not reassign outside working shift
+
+    // If employee is on active leave, check for unassigned action orders
+    if (w.presenceStatus === "ON_LEAVE" && w.activeActionOrders > 0) {
+      const res = await reassignOrdersFromUnavailableEmployee({
+        unavailableEmployeeId: w.employeeId,
+        reason: "Automatic leave redistribution",
+        changeType: "AUTO_LEAVE",
+      });
+      if (res.reassignedCount > 0) {
+        totalOrdersReassigned += res.reassignedCount;
+        results.push({
+          employeeId: w.employeeId,
+          employeeName: w.name,
+          reason: "AUTO_LEAVE",
+          reassignedCount: res.reassignedCount,
+        });
+      }
+      continue;
+    }
+
+    // Check sessions for prolonged offline / away
+    const { data: session } = await (supabaseAdmin as any)
+      .from("employee_sessions")
+      .select("last_heartbeat_at, last_activity_at, is_active, status")
+      .eq("employee_id", w.employeeId)
+      .eq("is_active", true)
+      .order("last_heartbeat_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    let isProlongedOffline = false;
+    let isProlongedAway = false;
+
+    if (!session) {
+      isProlongedOffline = true;
+    } else {
+      const lastHb = session.last_heartbeat_at ? new Date(session.last_heartbeat_at).getTime() : 0;
+      const lastAct = session.last_activity_at ? new Date(session.last_activity_at).getTime() : 0;
+      const minsSinceHb = (nowMs - lastHb) / 60000;
+      const minsSinceAct = (nowMs - lastAct) / 60000;
+
+      if (minsSinceHb >= WORKFORCE_THRESHOLDS.PROLONGED_OFFLINE_REASSIGN_MINUTES) {
+        isProlongedOffline = true;
+      } else if (minsSinceAct >= WORKFORCE_THRESHOLDS.PROLONGED_AWAY_REASSIGN_MINUTES) {
+        isProlongedAway = true;
+      }
+    }
+
+    if ((isProlongedOffline || isProlongedAway) && w.activeActionOrders > 0) {
+      const changeType: AssignmentChangeType = isProlongedOffline ? "AUTO_OFFLINE" : "AUTO_INACTIVITY";
+      const reason = isProlongedOffline
+        ? `Employee offline for > ${WORKFORCE_THRESHOLDS.PROLONGED_OFFLINE_REASSIGN_MINUTES} mins during shift`
+        : `Employee away for > ${WORKFORCE_THRESHOLDS.PROLONGED_AWAY_REASSIGN_MINUTES} mins during shift`;
+
+      const res = await reassignOrdersFromUnavailableEmployee({
+        unavailableEmployeeId: w.employeeId,
+        reason,
+        changeType,
+      });
+
+      if (res.reassignedCount > 0) {
+        totalOrdersReassigned += res.reassignedCount;
+        results.push({
+          employeeId: w.employeeId,
+          employeeName: w.name,
+          reason: changeType,
+          reassignedCount: res.reassignedCount,
+        });
+      }
+    }
+  }
 
   return {
-    employeesUnavailableCount: unavailableStaff.length,
-    ordersReassignedToday: historyRows.length,
-    autoReassignmentsToday: autoCount,
-    manualReassignmentsToday: manualCount,
-    ordersNeedingAssignment: overflowRes.data?.length ?? 0,
-    unavailableEmployees: unavailableStaff,
-    activeLeaves: leavesRes.data ?? [],
+    processedEmployeesCount: results.length,
+    totalOrdersReassigned,
+    results,
+  };
+}
+
+/**
+ * 8. Aggregate Live Operational Metrics for Assignment & Reassignment Dashboard
+ */
+export async function getReassignmentOperationalMetrics() {
+  const workloads = await calculateStaffWorkloads();
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const todayIso = todayStart.toISOString();
+
+  const [autoAssignedRes, autoReassignedRes, manualAssignedRes, unassignedRes] = await Promise.all([
+    (supabaseAdmin as any)
+      .from("order_assignment_history")
+      .select("id", { count: "exact", head: true })
+      .gte("created_at", todayIso)
+      .in("change_type", ["AUTO_INITIAL_POOL"]),
+    (supabaseAdmin as any)
+      .from("order_assignment_history")
+      .select("id", { count: "exact", head: true })
+      .gte("created_at", todayIso)
+      .in("change_type", [
+        "AUTO_LEAVE",
+        "AUTO_UNAVAILABLE",
+        "AUTO_INACTIVITY",
+        "AUTO_OFFLINE",
+        "AUTO_CAPACITY",
+        "AUTO_TERMINATED",
+        "AUTO_DISABLED",
+      ]),
+    (supabaseAdmin as any)
+      .from("order_assignment_history")
+      .select("id", { count: "exact", head: true })
+      .gte("created_at", todayIso)
+      .in("change_type", ["MANUAL", "MANUAL_BULK"]),
+    (supabaseAdmin as any)
+      .from("applications")
+      .select("id", { count: "exact", head: true })
+      .is("assigned_to", null)
+      .eq("is_deleted", false)
+      .not(
+        "fulfillment_status",
+        "in",
+        '("completed","order_completed","order_closed","cancelled")',
+      ),
+  ]);
+
+  const unavailableEmployees = workloads.filter((w) => !w.isAvailable);
+
+  return {
+    employeesUnavailableCount: unavailableEmployees.length,
+    ordersReassignedToday: (autoReassignedRes.count ?? 0) + (manualAssignedRes.count ?? 0),
+    autoReassignmentsToday: autoReassignedRes.count ?? 0,
+    manualReassignmentsToday: manualAssignedRes.count ?? 0,
+    ordersNeedingAssignment: unassignedRes.count ?? 0,
+    unavailableEmployees,
   };
 }

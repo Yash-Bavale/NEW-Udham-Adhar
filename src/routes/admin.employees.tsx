@@ -2,11 +2,24 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import { UserCog, UserPlus, Pencil, Power, Search, KeyRound, Eye, EyeOff, ShieldCheck } from "lucide-react";
+import {
+  UserCog, UserPlus, Pencil, Search, ShieldCheck,
+  Archive, RotateCcw, AlertTriangle, Users, Shuffle, CalendarOff,
+  Activity, Zap, KeyRound, Eye, EyeOff, Copy, Check, Power,
+} from "lucide-react";
 import { toast } from "sonner";
 import {
-  listStaffUsers, inviteEmployee, updateEmployee, setEmployeeActive, resetEmployeePassword,
-  getEmployeeWorkAccess, setEmployeeWorkAccess, deleteEmployee,
+  listStaffUsers,
+  getWorkforceDashboardMetrics,
+  inviteEmployee,
+  updateEmployee,
+  setEmploymentStatus,
+  toggleEmployeeAutoAssign,
+  archiveEmployee,
+  deleteEmployee,
+  resetEmployeePassword,
+  getEmployeeWorkAccess,
+  setEmployeeWorkAccess,
 } from "@/lib/crm/users-admin.functions";
 
 import { ASSIGNABLE_ROLES, ROLE_LABELS, type Role } from "@/lib/roles";
@@ -15,6 +28,7 @@ import { SectionCard } from "@/components/admin/ui";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -22,13 +36,12 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { LeadAssignmentTab } from "@/components/admin/LeadAssignmentTab";
 import { AssignmentManagementView } from "@/components/admin/reassignment/AssignmentManagementView";
-import { Trash2, Copy, Check } from "lucide-react";
+import { LeadAssignmentTab } from "@/components/admin/LeadAssignmentTab";
 
 export const Route = createFileRoute("/admin/employees")({
-  head: () => ({ meta: [{ title: "Employees — Udyam Ops OS" }, { name: "robots", content: "noindex,nofollow" }] }),
-  component: EmployeesPage,
+  head: () => ({ meta: [{ title: "Workforce Management — Udyam Ops OS" }, { name: "robots", content: "noindex,nofollow" }] }),
+  component: WorkforcePage,
 });
 
 type RoleColorMap = Record<string, string>;
@@ -46,23 +59,34 @@ const ROLE_COLOR: RoleColorMap = {
 function RoleBadge({ role }: { role: string }) {
   const c = ROLE_COLOR[role] ?? "#64748b";
   return (
-    <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium"
-      style={{ background: `${c}1a`, color: c }}>
+    <span
+      className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium"
+      style={{ background: `${c}1a`, color: c }}
+    >
       <span className="size-1.5 rounded-full" style={{ background: c }} />
       {ROLE_LABELS[role as Role] ?? role.replace(/_/g, " ")}
     </span>
   );
 }
 
-function StatusPill({ active }: { active: boolean }) {
+function EmploymentStatusBadge({ status }: { status: string }) {
+  let bg = "bg-slate-100 text-slate-700 border-slate-200";
+  let dot = "bg-slate-400";
+  if (status === "ACTIVE") {
+    bg = "bg-emerald-50 text-emerald-700 border-emerald-200";
+    dot = "bg-emerald-500";
+  } else if (status === "INACTIVE" || status === "SUSPENDED") {
+    bg = "bg-amber-50 text-amber-700 border-amber-200";
+    dot = "bg-amber-500";
+  } else if (status === "ARCHIVED" || status === "TERMINATED") {
+    bg = "bg-rose-50 text-rose-700 border-rose-200";
+    dot = "bg-rose-500";
+  }
+
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium"
-      style={{
-        background: active ? "rgba(16,185,129,0.12)" : "rgba(100,116,139,0.12)",
-        color: active ? "#047857" : "#475569",
-      }}>
-      <span className="size-1.5 rounded-full" style={{ background: active ? "#10b981" : "#94a3b8" }} />
-      {active ? "Active" : "Inactive"}
+    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold border ${bg}`}>
+      <span className={`size-1.5 rounded-full ${dot}`} />
+      {status}
     </span>
   );
 }
@@ -81,59 +105,59 @@ function formatIST(iso: string | null | undefined): string {
   } catch { return "—"; }
 }
 
-type Perf = {
-  assignedLeads: number;
-  openLeads: number;
-  assignedApps: number;
-  openApps: number;
-  completedThisMonth: number;
-  avgTurnaroundHours: number | null;
-};
-type Row = {
-  id: string; email: string; full_name: string | null; mobile: string | null;
-  is_active: boolean; created_at: string; last_sign_in_at: string | null | undefined; roles: string[];
-  employee_code?: string | null; department?: string | null; joining_date?: string | null;
-  perf?: Perf;
-};
-
-
-function EmployeesPage() {
+function WorkforcePage() {
   const role = useRole();
   const qc = useQueryClient();
   const listFn = useServerFn(listStaffUsers);
+  const metricsFn = useServerFn(getWorkforceDashboardMetrics);
 
-  const { data, isLoading } = useQuery({ queryKey: ["admin.employees"], queryFn: () => listFn() });
+  const { data, isLoading } = useQuery({ queryKey: ["admin.workforce.users"], queryFn: () => listFn() });
+  const { data: metricsData } = useQuery({ queryKey: ["admin.workforce.metrics"], queryFn: () => metricsFn() });
 
   const [query, setQuery] = useState("");
-  const rows: Row[] = data?.rows ?? [];
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return rows;
-    return rows.filter((r) =>
-      (r.full_name ?? "").toLowerCase().includes(q) ||
-      (r.email ?? "").toLowerCase().includes(q) ||
-      (r.mobile ?? "").toLowerCase().includes(q) ||
-      r.roles.some((x) => x.toLowerCase().includes(q)),
-    );
-  }, [rows, query]);
+  const rows = data?.rows ?? [];
+
+  // Filter into discrete lifecycle tabs
+  const activeWorkforce = useMemo(() => {
+    return rows.filter((r) => r.employment_status === "ACTIVE" && r.is_active);
+  }, [rows]);
+
+  const poolMembers = useMemo(() => {
+    return rows.filter((r) => r.is_in_pool || r.auto_assign_enabled);
+  }, [rows]);
+
+  const onLeaveOrUnavailable = useMemo(() => {
+    return rows.filter((r) => r.is_on_leave || !r.is_active || r.employment_status === "SUSPENDED");
+  }, [rows]);
+
+  const archivedOrInactive = useMemo(() => {
+    return rows.filter((r) => r.employment_status === "ARCHIVED" || r.employment_status === "TERMINATED" || r.employment_status === "INACTIVE");
+  }, [rows]);
 
   const [addOpen, setAddOpen] = useState(false);
-  const [editRow, setEditRow] = useState<Row | null>(null);
-  const [deactivateRow, setDeactivateRow] = useState<Row | null>(null);
-  const [deleteRow, setDeleteRow] = useState<Row | null>(null);
-  const [resetPwRow, setResetPwRow] = useState<Row | null>(null);
-  const [accessRow, setAccessRow] = useState<Row | null>(null);
-
+  const [editRow, setEditRow] = useState<any | null>(null);
+  const [archiveRow, setArchiveRow] = useState<any | null>(null);
+  const [deleteRow, setDeleteRow] = useState<any | null>(null);
+  const [resetPwRow, setResetPwRow] = useState<any | null>(null);
+  const [accessRow, setAccessRow] = useState<any | null>(null);
 
   const canManage = role.access("employees") === "full";
   const canSee = role.access("employees") !== "none";
   const isSuper = role.has("super_admin");
+
+  const refreshAll = () => {
+    qc.invalidateQueries({ queryKey: ["admin.workforce.users"] });
+    qc.invalidateQueries({ queryKey: ["admin.workforce.metrics"] });
+    qc.invalidateQueries({ queryKey: ["admin.employees"] });
+    qc.invalidateQueries({ queryKey: ["admin.assignment.metrics"] });
+  };
+
   if (!role.loading && !canSee) {
     return (
       <SectionCard>
         <div className="p-8 text-center">
           <UserCog className="size-10 mx-auto mb-3" style={{ color: "var(--admin-fg-subtle)" }} />
-          <div className="text-sm font-medium">You don't have access to Employees.</div>
+          <div className="text-sm font-medium">You don't have access to Workforce Management.</div>
           <div className="text-xs mt-1" style={{ color: "var(--admin-fg-muted)" }}>
             Ask a super admin to grant you access.
           </div>
@@ -142,809 +166,788 @@ function EmployeesPage() {
     );
   }
 
+  const m = metricsData?.workforce || { total: 0, active: 0, onLeave: 0, available: 0, idle: 0, offline: 0, inactive: 0 };
+  const p = metricsData?.pool || { totalMembers: 0, available: 0, unavailable: 0, totalCapacity: 0, usedCapacity: 0, remainingCapacity: 0 };
+  const t = metricsData?.today || { autoAssignedToday: 0, autoReassignedToday: 0, unassignedOrders: 0 };
+
   return (
     <div className="space-y-6">
+      {/* Top Header */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
-          <h1 className="text-2xl font-medium tracking-tight" style={{ color: "var(--admin-fg)" }}>Employees</h1>
-          <p className="text-sm" style={{ color: "var(--admin-fg-muted)" }}>
-            Staff directory and lead-assignment pool.
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
+            <Users className="size-6 text-indigo-600" /> Workforce & Assignment Management
+          </h1>
+          <p className="text-xs text-slate-500 mt-1">
+            Authoritative source for employee lifecycle, live availability, assignment pool, capacity, and workload balancing.
           </p>
+        </div>
+        {canManage && (
+          <Button onClick={() => setAddOpen(true)} className="gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold shadow-xs">
+            <UserPlus className="size-4" /> Add Employee
+          </Button>
+        )}
+      </div>
+
+      {/* SuperAdmin Live Operational Overview Dashboard Bar */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2.5">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3 shadow-2xs">
+          <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500 flex items-center justify-between">
+            <span>Workforce</span>
+            <Users className="size-3.5 text-slate-400" />
+          </div>
+          <div className="text-xl font-black text-slate-900 dark:text-white mt-1">{m.active}</div>
+          <div className="text-[10px] text-slate-400 font-medium truncate mt-0.5">{m.total} total accounts</div>
+        </div>
+
+        <div className="bg-emerald-50/60 border border-emerald-200 rounded-xl p-3 shadow-2xs">
+          <div className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 flex items-center justify-between">
+            <span>Available</span>
+            <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
+          </div>
+          <div className="text-xl font-black text-emerald-950 mt-1">{m.available}</div>
+          <div className="text-[10px] text-emerald-700/80 font-medium truncate mt-0.5">Online & active</div>
+        </div>
+
+        <div className="bg-amber-50/60 border border-amber-200 rounded-xl p-3 shadow-2xs">
+          <div className="text-[10px] font-bold uppercase tracking-wider text-amber-700 flex items-center justify-between">
+            <span>On Leave / Away</span>
+            <CalendarOff className="size-3.5 text-amber-600" />
+          </div>
+          <div className="text-xl font-black text-amber-950 mt-1">{m.onLeave + m.idle + m.away}</div>
+          <div className="text-[10px] text-amber-700/80 font-medium truncate mt-0.5">{m.onLeave} scheduled leave</div>
+        </div>
+
+        <div className="bg-indigo-50/60 border border-indigo-200 rounded-xl p-3 shadow-2xs">
+          <div className="text-[10px] font-bold uppercase tracking-wider text-indigo-700 flex items-center justify-between">
+            <span>Auto Pool</span>
+            <Shuffle className="size-3.5 text-indigo-600" />
+          </div>
+          <div className="text-xl font-black text-indigo-950 mt-1">{p.available}</div>
+          <div className="text-[10px] text-indigo-700/80 font-medium truncate mt-0.5">{p.totalMembers} in pool config</div>
+        </div>
+
+        <div className="bg-sky-50/60 border border-sky-200 rounded-xl p-3 shadow-2xs">
+          <div className="text-[10px] font-bold uppercase tracking-wider text-sky-700 flex items-center justify-between">
+            <span>Capacity</span>
+            <Activity className="size-3.5 text-sky-600" />
+          </div>
+          <div className="text-xl font-black text-sky-950 mt-1">{p.usedCapacity} <span className="text-xs font-semibold text-sky-700">/ {p.totalCapacity}</span></div>
+          <div className="text-[10px] text-sky-700/80 font-medium truncate mt-0.5">{p.remainingCapacity} slots remaining</div>
+        </div>
+
+        <div className="bg-purple-50/60 border border-purple-200 rounded-xl p-3 shadow-2xs">
+          <div className="text-[10px] font-bold uppercase tracking-wider text-purple-700 flex items-center justify-between">
+            <span>Assigned Today</span>
+            <Zap className="size-3.5 text-purple-600" />
+          </div>
+          <div className="text-xl font-black text-purple-950 mt-1">{t.autoAssignedToday + t.autoReassignedToday}</div>
+          <div className="text-[10px] text-purple-700/80 font-medium truncate mt-0.5">{t.autoReassignedToday} auto-reassigned</div>
         </div>
       </div>
 
-      <Tabs defaultValue="directory">
-        <TabsList>
-          <TabsTrigger value="directory">Directory</TabsTrigger>
-          <TabsTrigger value="performance">Performance</TabsTrigger>
-          <TabsTrigger value="assignment">Auto-Assignment Pool</TabsTrigger>
-          <TabsTrigger value="leaves">Leaves & Reassignment</TabsTrigger>
+      {/* 5 Distinct Workforce Tabs */}
+      <Tabs defaultValue="workforce" className="w-full">
+        <TabsList className="bg-slate-100 p-1 border border-slate-200 rounded-xl flex flex-wrap gap-1">
+          <TabsTrigger value="workforce" className="rounded-lg text-xs font-semibold data-[state=active]:bg-white data-[state=active]:shadow-xs">
+            🏢 Active Workforce ({activeWorkforce.length})
+          </TabsTrigger>
+          <TabsTrigger value="pool" className="rounded-lg text-xs font-semibold data-[state=active]:bg-white data-[state=active]:shadow-xs">
+            ⚖️ Assignment Pool ({poolMembers.length})
+          </TabsTrigger>
+          <TabsTrigger value="leaves" className="rounded-lg text-xs font-semibold data-[state=active]:bg-white data-[state=active]:shadow-xs">
+            🌴 On Leave / Reassignment ({onLeaveOrUnavailable.length})
+          </TabsTrigger>
+          <TabsTrigger value="performance" className="rounded-lg text-xs font-semibold data-[state=active]:bg-white data-[state=active]:shadow-xs">
+            📊 Workload & Performance
+          </TabsTrigger>
+          <TabsTrigger value="archived" className="rounded-lg text-xs font-semibold data-[state=active]:bg-white data-[state=active]:shadow-xs text-slate-500">
+            📦 Inactive / Archived ({archivedOrInactive.length})
+          </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="directory" className="space-y-4 mt-4">
+        {/* TAB 1: ACTIVE WORKFORCE */}
+        <TabsContent value="workforce" className="space-y-4 mt-4">
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <div className="relative max-w-md flex-1">
-              <Search className="size-4 absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--admin-fg-subtle)" }} />
-              <Input value={query} onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search name, email, mobile, role…" className="pl-9" />
+              <Search className="size-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <Input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search active employees by name, email, mobile, role…"
+                className="pl-9 text-xs bg-white"
+              />
             </div>
-            {canManage && (
-              <Button onClick={() => setAddOpen(true)} className="gap-1.5">
-                <UserPlus className="size-4" /> Add Employee
-              </Button>
-            )}
           </div>
 
           <SectionCard>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-[11px] uppercase tracking-wide" style={{ color: "var(--admin-fg-muted)" }}>
-                <th className="px-4 py-2">Emp ID</th>
-                <th className="px-4 py-2">Name</th>
-                <th className="px-4 py-2">Email</th>
-                <th className="px-4 py-2">Mobile</th>
-                <th className="px-4 py-2">Role</th>
-                <th className="px-4 py-2">Status</th>
-                <th className="px-4 py-2">Last Login</th>
-                <th className="px-4 py-2 text-right">Actions</th>
-              </tr>
-
-            </thead>
-            <tbody>
-              {isLoading && Array.from({ length: 5 }).map((_, i) => (
-                <tr key={`sk-${i}`} className="border-t" style={{ borderColor: "var(--admin-border)" }}>
-                  {Array.from({ length: 8 }).map((__, j) => (
-                    <td key={j} className="px-4 py-3">
-                      <div className="h-3 rounded animate-pulse" style={{ background: "var(--admin-surface-2)" }} />
-                    </td>
-                  ))}
-                </tr>
-              ))}
-              {!isLoading && filtered.length === 0 && (
-                <tr><td colSpan={8} className="px-4 py-10 text-center">
-                  <UserCog className="size-8 mx-auto mb-2" style={{ color: "var(--admin-fg-subtle)" }} />
-                  <div className="text-sm">No employees match.</div>
-                  <Button size="sm" className="mt-3 gap-1.5" onClick={() => setAddOpen(true)}>
-                    <UserPlus className="size-3.5" /> Add Employee
-                  </Button>
-                </td></tr>
-              )}
-              {!isLoading && filtered.map((u, i) => (
-                <tr key={u.id} className="border-t" style={{ borderColor: "var(--admin-border)", background: i % 2 ? "var(--admin-surface-2)" : "transparent" }}>
-                  <td className="px-4 py-2.5 font-mono text-xs" style={{ color: "var(--admin-fg-muted)" }}>
-                    {u.employee_code ?? <span style={{ color: "var(--admin-fg-subtle)" }}>—</span>}
-                  </td>
-                  <td className="px-4 py-2.5">{u.full_name ?? <span style={{ color: "var(--admin-fg-subtle)" }}>—</span>}</td>
-
-                  <td className="px-4 py-2.5">{u.email}</td>
-                  <td className="px-4 py-2.5">{u.mobile ?? <span style={{ color: "var(--admin-fg-subtle)" }}>—</span>}</td>
-                  <td className="px-4 py-2.5">
-                    <div className="flex flex-wrap gap-1">
-                      {u.roles.length === 0 ? <span className="text-xs" style={{ color: "var(--admin-fg-subtle)" }}>—</span>
-                        : u.roles.map((r) => <RoleBadge key={r} role={r} />)}
-                    </div>
-                  </td>
-                  <td className="px-4 py-2.5"><StatusPill active={u.is_active && u.roles.length > 0} /></td>
-                  <td className="px-4 py-2.5 text-xs" style={{ color: "var(--admin-fg-muted)" }}>
-                    {formatIST(u.last_sign_in_at)}
-                  </td>
-                  <td className="px-4 py-2.5 text-right">
-                    <div className="inline-flex gap-1">
-                      {canManage && (
-                        <Button size="sm" variant="ghost" className="h-7 gap-1" onClick={() => setEditRow(u)}>
-                          <Pencil className="size-3.5" /> Edit
-                        </Button>
-                      )}
-                      {canManage && (
-                        <Button size="sm" variant="ghost" className="h-7 gap-1"
-                          style={{ color: "#7c3aed" }}
-                          onClick={() => setAccessRow(u)}>
-                          <ShieldCheck className="size-3.5" /> Work Access
-                        </Button>
-                      )}
-
-                      {isSuper && (
-                        <Button size="sm" variant="ghost" className="h-7 gap-1"
-                          style={{ color: "#1d4ed8" }}
-                          onClick={() => setResetPwRow(u)}>
-                          <KeyRound className="size-3.5" /> Password
-                        </Button>
-                      )}
-                      {canManage && (
-                        <Button size="sm" variant="ghost" className="h-7 gap-1"
-                          style={{ color: u.is_active ? "#b91c1c" : "#047857" }}
-                          onClick={() => setDeactivateRow(u)}>
-                          <Power className="size-3.5" /> {u.is_active ? "Deactivate" : "Activate"}
-                        </Button>
-                      )}
-                      {canManage && (
-                        <Button size="sm" variant="ghost" className="h-7 gap-1 text-red-600 hover:text-red-700 hover:bg-red-50"
-                          onClick={() => setDeleteRow(u)}>
-                          <Trash2 className="size-3.5" /> Delete
-                        </Button>
-                      )}
-                      {!canManage && !isSuper && (
-                        <span className="text-xs" style={{ color: "var(--admin-fg-subtle)" }}>—</span>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-[11px] uppercase tracking-wider text-slate-500 border-b border-slate-200 bg-slate-50/50">
+                    <th className="px-4 py-2.5">Emp ID</th>
+                    <th className="px-4 py-2.5">Name & Email</th>
+                    <th className="px-4 py-2.5">Role</th>
+                    <th className="px-4 py-2.5">Department</th>
+                    <th className="px-4 py-2.5">Auto Pool</th>
+                    <th className="px-4 py-2.5">Capacity</th>
+                    <th className="px-4 py-2.5">Status</th>
+                    <th className="px-4 py-2.5 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {isLoading && (
+                    <tr><td colSpan={8} className="px-4 py-8 text-center text-xs text-slate-500">Loading workforce records…</td></tr>
+                  )}
+                  {!isLoading && activeWorkforce.length === 0 && (
+                    <tr><td colSpan={8} className="px-4 py-10 text-center text-slate-500">No active employees found.</td></tr>
+                  )}
+                  {activeWorkforce
+                    .filter((u) => !query || (u.full_name || "").toLowerCase().includes(query.toLowerCase()) || u.email.toLowerCase().includes(query.toLowerCase()))
+                    .map((u) => (
+                      <tr key={u.id} className="hover:bg-slate-50/70 transition-colors">
+                        <td className="px-4 py-2.5 font-mono text-xs font-semibold text-slate-600">
+                          {u.employee_code || "—"}
+                        </td>
+                        <td className="px-4 py-2.5">
+                          <div className="font-semibold text-slate-900">{u.full_name || "—"}</div>
+                          <div className="text-xs text-slate-400 font-mono">{u.email}</div>
+                        </td>
+                        <td className="px-4 py-2.5">
+                          <div className="flex flex-wrap gap-1">
+                            {u.roles.map((r: string) => <RoleBadge key={r} role={r} />)}
+                          </div>
+                        </td>
+                        <td className="px-4 py-2.5 text-xs text-slate-600">{u.department || "General"}</td>
+                        <td className="px-4 py-2.5">
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold ${u.auto_assign_enabled ? "bg-indigo-50 text-indigo-700 border border-indigo-200" : "bg-slate-100 text-slate-500"}`}>
+                            {u.auto_assign_enabled ? "POOL ON" : "OFF"}
+                          </span>
+                        </td>
+                        <td className="px-4 py-2.5 text-xs font-semibold text-slate-700">
+                          {u.max_workload} max
+                        </td>
+                        <td className="px-4 py-2.5">
+                          {u.is_on_leave ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                              🌴 ON LEAVE
+                            </span>
+                          ) : (
+                            <EmploymentStatusBadge status={u.employment_status} />
+                          )}
+                        </td>
+                        <td className="px-4 py-2.5 text-right">
+                          <div className="inline-flex items-center gap-1">
+                            {canManage && (
+                              <Button size="sm" variant="ghost" className="h-7 text-xs gap-1" onClick={() => setEditRow(u)}>
+                                <Pencil className="size-3.5 text-slate-500" /> Edit
+                              </Button>
+                            )}
+                            {canManage && (
+                              <Button size="sm" variant="ghost" className="h-7 text-xs text-purple-600 gap-1" onClick={() => setAccessRow(u)}>
+                                <ShieldCheck className="size-3.5" /> Work Access
+                              </Button>
+                            )}
+                            {isSuper && (
+                              <Button size="sm" variant="ghost" className="h-7 text-xs text-indigo-600 gap-1" onClick={() => setResetPwRow(u)}>
+                                <KeyRound className="size-3.5" /> Password
+                              </Button>
+                            )}
+                            {canManage && (
+                              <Button size="sm" variant="ghost" className="h-7 text-xs text-amber-600 gap-1" onClick={() => setArchiveRow(u)}>
+                                <Archive className="size-3.5" /> Archive
+                              </Button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
           </SectionCard>
-
-          {addOpen && (
-            <AddEmployeeDialog open={addOpen} onOpenChange={setAddOpen}
-              onCreated={() => qc.invalidateQueries({ queryKey: ["admin.employees"] })} />
-          )}
-
-          {editRow && (
-            <EditEmployeeDialog row={editRow} onClose={() => setEditRow(null)}
-              onSaved={() => qc.invalidateQueries({ queryKey: ["admin.employees"] })} />
-          )}
-
-          {deactivateRow && (
-            <DeactivateDialog row={deactivateRow} onClose={() => setDeactivateRow(null)}
-              onDone={() => qc.invalidateQueries({ queryKey: ["admin.employees"] })} />
-          )}
-
-          {deleteRow && (
-            <DeleteEmployeeDialog row={deleteRow} onClose={() => setDeleteRow(null)}
-              onDone={() => qc.invalidateQueries({ queryKey: ["admin.employees"] })} />
-          )}
-
-          {resetPwRow && (
-            <ResetPasswordDialog row={resetPwRow} onClose={() => setResetPwRow(null)} />
-          )}
-
-          {accessRow && (
-            <WorkAccessDialog row={accessRow} onClose={() => setAccessRow(null)} />
-          )}
-
         </TabsContent>
 
-        <TabsContent value="performance" className="mt-4">
-          <PerformanceTab rows={filtered} loading={isLoading} />
-        </TabsContent>
-
-        <TabsContent value="assignment" className="mt-4">
+        {/* TAB 2: ASSIGNMENT POOL MANAGEMENT */}
+        <TabsContent value="pool" className="mt-4">
           <LeadAssignmentTab />
         </TabsContent>
 
+        {/* TAB 3: LEAVES & REASSIGNMENT */}
         <TabsContent value="leaves" className="mt-4">
           <AssignmentManagementView />
         </TabsContent>
-      </Tabs>
-    </div>
-  );
-}
 
-function PerformanceTab({ rows, loading }: { rows: Row[]; loading: boolean }) {
-  // Staff only (must have at least one role), then sort by month completions desc.
-  const staff = useMemo(
-    () => rows.filter((r) => r.roles.length > 0).slice().sort((a, b) =>
-      (b.perf?.completedThisMonth ?? 0) - (a.perf?.completedThisMonth ?? 0),
-    ),
-    [rows],
-  );
-  const totals = useMemo(() => {
-    return staff.reduce(
-      (acc, r) => {
-        const p = r.perf;
-        if (!p) return acc;
-        acc.assignedLeads += p.assignedLeads;
-        acc.openLeads += p.openLeads;
-        acc.completedThisMonth += p.completedThisMonth;
-        return acc;
-      },
-      { assignedLeads: 0, openLeads: 0, completedThisMonth: 0 },
-    );
-  }, [staff]);
-
-  return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <KpiCard label="Active staff" value={staff.filter((s) => s.is_active).length} />
-        <KpiCard label="Open leads (team)" value={totals.openLeads} />
-        <KpiCard label="Assigned leads (team)" value={totals.assignedLeads} />
-        <KpiCard label="Completed this month" value={totals.completedThisMonth} />
-      </div>
-
-      <SectionCard>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-[11px] uppercase tracking-wide" style={{ color: "var(--admin-fg-muted)" }}>
-                <th className="px-4 py-2">Employee</th>
-                <th className="px-4 py-2">Role</th>
-                <th className="px-4 py-2 text-right">Open Leads</th>
-                <th className="px-4 py-2 text-right">Open Apps</th>
-                <th className="px-4 py-2 text-right">Assigned Leads</th>
-                <th className="px-4 py-2 text-right">Completed (month)</th>
-                <th className="px-4 py-2 text-right">Avg Turnaround</th>
-                <th className="px-4 py-2">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading && Array.from({ length: 5 }).map((_, i) => (
-                <tr key={`pf-sk-${i}`} className="border-t" style={{ borderColor: "var(--admin-border)" }}>
-                  {Array.from({ length: 8 }).map((__, j) => (
-                    <td key={j} className="px-4 py-3">
-                      <div className="h-3 rounded animate-pulse" style={{ background: "var(--admin-surface-2)" }} />
-                    </td>
-                  ))}
-                </tr>
-              ))}
-              {!loading && staff.length === 0 && (
-                <tr><td colSpan={8} className="px-4 py-10 text-center text-sm" style={{ color: "var(--admin-fg-muted)" }}>
-                  No staff with roles yet.
-                </td></tr>
-              )}
-              {!loading && staff.map((u, i) => {
-                const p = u.perf ?? { assignedLeads: 0, openLeads: 0, assignedApps: 0, openApps: 0, completedThisMonth: 0, avgTurnaroundHours: null };
-                return (
-                  <tr key={u.id} className="border-t" style={{ borderColor: "var(--admin-border)", background: i % 2 ? "var(--admin-surface-2)" : "transparent" }}>
-                    <td className="px-4 py-2.5">
-                      <div className="font-medium">{u.full_name ?? u.email}</div>
-                      <div className="text-xs" style={{ color: "var(--admin-fg-muted)" }}>{u.email}</div>
-                    </td>
-                    <td className="px-4 py-2.5">
-                      <div className="flex flex-wrap gap-1">
-                        {u.roles.map((r) => <RoleBadge key={r} role={r} />)}
-                      </div>
-                    </td>
-                    <td className="px-4 py-2.5 text-right font-mono">{p.openLeads}</td>
-                    <td className="px-4 py-2.5 text-right font-mono">{p.openApps}</td>
-                    <td className="px-4 py-2.5 text-right font-mono">{p.assignedLeads}</td>
-                    <td className="px-4 py-2.5 text-right font-mono font-semibold" style={{ color: p.completedThisMonth > 0 ? "#047857" : undefined }}>
-                      {p.completedThisMonth}
-                    </td>
-                    <td className="px-4 py-2.5 text-right font-mono">
-                      {p.avgTurnaroundHours == null ? "—" : `${p.avgTurnaroundHours}h`}
-                    </td>
-                    <td className="px-4 py-2.5"><StatusPill active={u.is_active} /></td>
+        {/* TAB 4: WORKLOAD & PERFORMANCE */}
+        <TabsContent value="performance" className="mt-4 space-y-4">
+          <SectionCard>
+            <div className="p-4 border-b border-slate-200">
+              <h3 className="font-bold text-sm text-slate-900">Workforce Workload & Capacity Utilization</h3>
+              <p className="text-xs text-slate-500 mt-0.5">Live view of effective weighted workloads, hot orders, and turnaround metrics.</p>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-[11px] uppercase tracking-wider text-slate-500 border-b border-slate-200 bg-slate-50/50">
+                    <th className="px-4 py-2.5">Employee</th>
+                    <th className="px-4 py-2.5">Auto Pool</th>
+                    <th className="px-4 py-2.5">Live Presence</th>
+                    <th className="px-4 py-2.5">Active Action Orders</th>
+                    <th className="px-4 py-2.5">Hot Orders</th>
+                    <th className="px-4 py-2.5">Weighted Workload</th>
+                    <th className="px-4 py-2.5">Capacity Remaining</th>
+                    <th className="px-4 py-2.5">Avg Turnaround</th>
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </SectionCard>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {(metricsData?.workloads ?? []).map((w: any) => (
+                    <tr key={w.employeeId} className="hover:bg-slate-50/70">
+                      <td className="px-4 py-2.5">
+                        <div className="font-semibold text-slate-900">{w.name}</div>
+                        <div className="text-xs text-slate-400 font-mono">{w.email}</div>
+                      </td>
+                      <td className="px-4 py-2.5">
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold ${w.isAutoAssignEligible ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-slate-100 text-slate-500"}`}>
+                          {w.isAutoAssignEligible ? "ELIGIBLE" : "INELIGIBLE"}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2.5">
+                        <span className="text-xs font-semibold text-slate-700">{w.presenceStatus}</span>
+                      </td>
+                      <td className="px-4 py-2.5 font-bold text-slate-900">{w.activeActionOrders}</td>
+                      <td className="px-4 py-2.5">
+                        {w.hotOrders > 0 ? (
+                          <span className="font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded border border-rose-200">
+                            {w.hotOrders} Hot
+                          </span>
+                        ) : (
+                          <span className="text-slate-400">0</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-2.5 font-bold text-indigo-600">{w.effectiveWorkload}</td>
+                      <td className="px-4 py-2.5">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-semibold">{w.remainingCapacity} / {w.maxWorkload}</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-2.5 text-xs text-slate-600">
+                        {w.perf?.avgTurnaroundHours ? `${w.perf.avgTurnaroundHours}h` : "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </SectionCard>
+        </TabsContent>
 
-      <p className="text-xs" style={{ color: "var(--admin-fg-muted)" }}>
-        Performance is computed live from assigned leads and applications. "Avg turnaround" is the mean time
-        from application creation to completion across all completed work for each employee.
-      </p>
+        {/* TAB 5: INACTIVE / ARCHIVED (HISTORICAL RECORDS PRESERVED) */}
+        <TabsContent value="archived" className="space-y-4 mt-4">
+          <SectionCard>
+            <div className="p-4 border-b border-slate-200 flex items-center justify-between">
+              <div>
+                <h3 className="font-bold text-sm text-slate-900">Archived & Inactive Employees</h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Historical staff accounts are safely preserved to maintain foreign keys, audit logs, and past order history.
+                </p>
+              </div>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-[11px] uppercase tracking-wider text-slate-500 border-b border-slate-200 bg-slate-50/50">
+                    <th className="px-4 py-2.5">Name & Email</th>
+                    <th className="px-4 py-2.5">Past Role</th>
+                    <th className="px-4 py-2.5">Employment Status</th>
+                    <th className="px-4 py-2.5">Archived Date</th>
+                    <th className="px-4 py-2.5 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {archivedOrInactive.length === 0 && (
+                    <tr><td colSpan={5} className="px-4 py-8 text-center text-xs text-slate-500">No archived employees.</td></tr>
+                  )}
+                  {archivedOrInactive.map((u) => (
+                    <tr key={u.id} className="hover:bg-slate-50/70">
+                      <td className="px-4 py-2.5">
+                        <div className="font-semibold text-slate-700">{u.full_name || "—"}</div>
+                        <div className="text-xs text-slate-400 font-mono">{u.email}</div>
+                      </td>
+                      <td className="px-4 py-2.5">
+                        <div className="flex flex-wrap gap-1">
+                          {u.roles.map((r: string) => <RoleBadge key={r} role={r} />)}
+                        </div>
+                      </td>
+                      <td className="px-4 py-2.5">
+                        <EmploymentStatusBadge status={u.employment_status} />
+                      </td>
+                      <td className="px-4 py-2.5 text-xs text-slate-500">
+                        {formatIST(u.archived_at || u.terminated_at || u.created_at)}
+                      </td>
+                      <td className="px-4 py-2.5 text-right">
+                        <div className="inline-flex items-center gap-1">
+                          {canManage && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 text-xs gap-1 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+                              onClick={async () => {
+                                try {
+                                  await setEmploymentStatus({
+                                    data: { user_id: u.id, status: "ACTIVE", reason: "Restored from archive by Admin" },
+                                  });
+                                  toast.success(`Restored ${u.full_name || u.email} to Active Workforce`);
+                                  refreshAll();
+                                } catch (e) {
+                                  toast.error((e as Error).message);
+                                }
+                              }}
+                            >
+                              <RotateCcw className="size-3.5" /> Restore to Active
+                            </Button>
+                          )}
+                          {isSuper && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 text-xs text-rose-600 gap-1 hover:bg-rose-50"
+                              onClick={() => setDeleteRow(u)}
+                            >
+                              Delete Account
+                            </Button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </SectionCard>
+        </TabsContent>
+      </Tabs>
+
+      {/* DIALOG: ADD EMPLOYEE */}
+      <AddEmployeeModal open={addOpen} onOpenChange={setAddOpen} onCreated={refreshAll} />
+
+      {/* DIALOG: EDIT EMPLOYEE */}
+      {editRow && (
+        <EditEmployeeModal row={editRow} open={!!editRow} onOpenChange={(o) => !o && setEditRow(null)} onSaved={refreshAll} />
+      )}
+
+      {/* DIALOG: WORK ACCESS */}
+      {accessRow && (
+        <WorkAccessModal row={accessRow} open={!!accessRow} onOpenChange={(o) => !o && setAccessRow(null)} onSaved={refreshAll} />
+      )}
+
+      {/* DIALOG: RESET PASSWORD */}
+      {resetPwRow && (
+        <ResetPasswordModal row={resetPwRow} open={!!resetPwRow} onOpenChange={(o) => !o && setResetPwRow(null)} />
+      )}
+
+      {/* DIALOG: ARCHIVE EMPLOYEE */}
+      {archiveRow && (
+        <AlertDialog open={!!archiveRow} onOpenChange={(o) => !o && setArchiveRow(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Archive Employee Account?</AlertDialogTitle>
+              <AlertDialogDescription className="space-y-2 text-xs text-slate-600">
+                <p>
+                  Archiving <strong>{archiveRow.full_name || archiveRow.email}</strong> will:
+                </p>
+                <ul className="list-disc pl-4 space-y-1">
+                  <li>Remove them from the Active Workforce and Auto-Assignment Pool.</li>
+                  <li>Automatically redistribute any currently pending action-required orders to eligible staff.</li>
+                  <li><strong>Preserve all historical order assignments, completed orders, and audit logs.</strong></li>
+                </ul>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-amber-600 hover:bg-amber-700 text-white font-semibold"
+                onClick={async () => {
+                  try {
+                    await archiveEmployee({ data: { user_id: archiveRow.id, reason: "Archived by Admin" } });
+                    toast.success(`Archived ${archiveRow.full_name || archiveRow.email}`);
+                    setArchiveRow(null);
+                    refreshAll();
+                  } catch (e) {
+                    toast.error((e as Error).message);
+                  }
+                }}
+              >
+                Archive & Reassign Open Orders
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
+
+      {/* DIALOG: SAFE DELETE */}
+      {deleteRow && (
+        <AlertDialog open={!!deleteRow} onOpenChange={(o) => !o && setDeleteRow(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Permanently Delete Account?</AlertDialogTitle>
+              <AlertDialogDescription className="text-xs text-slate-600">
+                If <strong>{deleteRow.full_name || deleteRow.email}</strong> has historical orders, they will be safely archived instead to prevent breaking historical records.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-rose-600 hover:bg-rose-700 text-white font-semibold"
+                onClick={async () => {
+                  try {
+                    const res = await deleteEmployee({ data: { user_id: deleteRow.id } });
+                    if (res.mode === "archived") {
+                      toast.info(res.message);
+                    } else {
+                      toast.success("Account permanently deleted.");
+                    }
+                    setDeleteRow(null);
+                    refreshAll();
+                  } catch (e) {
+                    toast.error((e as Error).message);
+                  }
+                }}
+              >
+                Confirm Delete / Archive
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
     </div>
   );
 }
 
-function KpiCard({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="rounded-xl border p-4" style={{ borderColor: "var(--admin-border)", background: "var(--admin-surface)" }}>
-      <div className="text-[11px] uppercase tracking-wider" style={{ color: "var(--admin-fg-muted)" }}>{label}</div>
-      <div className="text-2xl font-semibold mt-1" style={{ color: "var(--admin-fg)" }}>
-        {new Intl.NumberFormat("en-IN").format(value)}
-      </div>
-    </div>
-  );
-}
+// ------------------------------------------------------------------------------------------------
+// SUBMODALS
+// ------------------------------------------------------------------------------------------------
 
-function AddEmployeeDialog({ open, onOpenChange, onCreated }:
-  { open: boolean; onOpenChange: (v: boolean) => void; onCreated: () => void }) {
+function AddEmployeeModal({ open, onOpenChange, onCreated }: { open: boolean; onOpenChange: (o: boolean) => void; onCreated: () => void }) {
   const inviteFn = useServerFn(inviteEmployee);
-  const [full_name, setName] = useState("");
+  const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [mobile, setMobile] = useState("");
-  const [password, setPassword] = useState("");
-  const [showPw, setShowPw] = useState(false);
-  const [role, setRoleVal] = useState<Role>("executive");
-  const [errs, setErrs] = useState<Record<string, string>>({});
+  const [role, setRole] = useState<Role>("executive");
+  const [department, setDepartment] = useState("Operations");
+  const [maxWorkload, setMaxWorkload] = useState(50);
+  const [autoAssignEnabled, setAutoAssignEnabled] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [createdInfo, setCreatedInfo] = useState<{ email: string; temp_password: string } | null>(null);
-  const [copied, setCopied] = useState(false);
 
-  function reset() {
-    setName(""); setEmail(""); setMobile(""); setPassword(""); setShowPw(false);
-    setRoleVal("executive"); setErrs({}); setCreatedInfo(null); setCopied(false);
-  }
-
-  async function submit() {
-    const e: Record<string, string> = {};
-    if (!full_name.trim()) e.full_name = "Full name is required.";
-    if (!/^\S+@\S+\.\S+$/.test(email)) e.email = "Valid email is required.";
-    if (password && password.length < 8) e.password = "Password must be at least 8 characters.";
-    setErrs(e);
-    if (Object.keys(e).length) return;
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     setBusy(true);
     try {
-      const res = await inviteFn({ data: { full_name, email, mobile: mobile || null, role, password: password || undefined } });
-      toast.success(`Employee account created for ${email}`);
-      setCreatedInfo({ email, temp_password: res.temp_password });
+      await inviteFn({
+        data: {
+          full_name: fullName,
+          email,
+          mobile: mobile || null,
+          role,
+          department,
+          max_workload: maxWorkload,
+          auto_assign_enabled: autoAssignEnabled,
+        },
+      });
+      toast.success("Employee invited successfully!");
+      onOpenChange(false);
       onCreated();
     } catch (err) {
       toast.error((err as Error).message);
-    } finally { setBusy(false); }
-  }
-
-  const handleCopy = () => {
-    if (!createdInfo) return;
-    const text = `Udyam Ops Login Credentials:\nEmail: ${createdInfo.email}\nPassword: ${createdInfo.temp_password}\nLogin URL: ${window.location.origin}/login`;
-    navigator.clipboard.writeText(text);
-    setCopied(true);
-    toast.success("Login credentials copied to clipboard!");
-    setTimeout(() => setCopied(false), 3000);
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { if (!v) reset(); onOpenChange(v); }}>
-      <DialogContent className="max-w-md">
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[480px]">
         <DialogHeader>
-          <DialogTitle>{createdInfo ? "Employee Account Created" : "Add Employee"}</DialogTitle>
+          <DialogTitle className="text-base font-bold">Add New Employee</DialogTitle>
         </DialogHeader>
-
-        {createdInfo ? (
-          <div className="space-y-4 py-2">
-            <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-800 text-xs space-y-1">
-              <div className="font-semibold text-emerald-900">✔ Account Activated Instantly</div>
-              <p>Email verification is bypassed. The employee can sign in right now with the credentials below:</p>
-            </div>
-
-            <div className="space-y-2 bg-slate-50 p-3 rounded-lg border text-sm font-mono">
-              <div><span className="text-xs text-slate-500 font-sans uppercase">Email:</span> <span className="font-bold">{createdInfo.email}</span></div>
-              <div><span className="text-xs text-slate-500 font-sans uppercase">Password:</span> <span className="font-bold text-indigo-600">{createdInfo.temp_password}</span></div>
-            </div>
-
-            <Button onClick={handleCopy} className="w-full gap-2">
-              {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
-              {copied ? "Copied to Clipboard!" : "Copy Login Credentials"}
-            </Button>
+        <form onSubmit={handleSubmit} className="space-y-3.5 text-xs">
+          <div>
+            <Label className="text-xs">Full Name</Label>
+            <Input required value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="e.g. Rahul Sharma" className="mt-1" />
           </div>
-        ) : (
-          <div className="space-y-3">
-            <Field label="Full Name" error={errs.full_name}>
-              <Input value={full_name} onChange={(e) => setName(e.target.value)} placeholder="Asha Sharma" />
-            </Field>
-            <Field label="Email" error={errs.email}>
-              <Input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="asha@udyamadhar.in" type="email" />
-            </Field>
-            <Field label="Password (Manual)" error={errs.password}>
-              <div className="relative">
-                <Input
-                  type={showPw ? "text" : "password"}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Set custom password (or leave blank for auto)"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPw((s) => !s)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-700"
-                  aria-label={showPw ? "Hide password" : "Show password"}
-                >
-                  {showPw ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-                </button>
+          <div>
+            <Label className="text-xs">Email Address</Label>
+            <Input required type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="rahul@company.com" className="mt-1" />
+          </div>
+          <div>
+            <Label className="text-xs">Mobile Number</Label>
+            <Input value={mobile} onChange={(e) => setMobile(e.target.value)} placeholder="+91 9876543210" className="mt-1" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label className="text-xs">Role</Label>
+              <Select value={role} onValueChange={(v) => setRole(v as Role)}>
+                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {ASSIGNABLE_ROLES.map((r) => <SelectItem key={r} value={r}>{ROLE_LABELS[r]}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-xs">Department</Label>
+              <Input value={department} onChange={(e) => setDepartment(e.target.value)} placeholder="Operations" className="mt-1" />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label className="text-xs">Max Workload Capacity</Label>
+              <Input type="number" min={5} max={200} value={maxWorkload} onChange={(e) => setMaxWorkload(Number(e.target.value))} className="mt-1" />
+            </div>
+            <div className="flex flex-col justify-end">
+              <div className="flex items-center gap-2">
+                <Switch checked={autoAssignEnabled} onCheckedChange={setAutoAssignEnabled} />
+                <Label className="text-xs font-medium">Auto-Assign Pool</Label>
               </div>
-            </Field>
-            <Field label="Mobile">
-              <Input value={mobile} onChange={(e) => setMobile(e.target.value)} placeholder="9876543210" />
-            </Field>
-            <Field label="Role">
-              <Select value={role} onValueChange={(v) => setRoleVal(v as Role)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {ASSIGNABLE_ROLES.map((r) => (
-                    <SelectItem key={r} value={r}>{ROLE_LABELS[r]}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </Field>
-            <p className="text-xs text-muted-foreground">
-              Account will be created directly without email verification required.
-            </p>
-          </div>
-        )}
-
-        <DialogFooter>
-          {createdInfo ? (
-            <Button onClick={() => { reset(); onOpenChange(false); }}>Done</Button>
-          ) : (
-            <>
-              <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-              <Button onClick={submit} disabled={busy}>{busy ? "Creating…" : "Create Employee Account"}</Button>
-            </>
-          )}
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function EditEmployeeDialog({ row, onClose, onSaved }:
-  { row: Row; onClose: () => void; onSaved: () => void }) {
-  const updateFn = useServerFn(updateEmployee);
-  const [full_name, setName] = useState(row.full_name ?? "");
-  const [mobile, setMobile] = useState(row.mobile ?? "");
-  const [role, setRoleVal] = useState<Role>((row.roles[0] as Role) ?? "executive");
-  const [department, setDepartment] = useState(row.department ?? "");
-  const [joiningDate, setJoiningDate] = useState(row.joining_date ?? "");
-  const [busy, setBusy] = useState(false);
-
-  async function submit() {
-    if (!row) return;
-    setBusy(true);
-    try {
-      await updateFn({ data: {
-        user_id: row.id, full_name, mobile: mobile || null, role,
-        department: department || null,
-        joining_date: joiningDate || null,
-      } });
-      toast.success("Employee updated.");
-      onSaved();
-      onClose();
-    } catch (e) { toast.error((e as Error).message); }
-    finally { setBusy(false); }
-  }
-
-  return (
-    <Dialog open onOpenChange={(v) => { if (!v) onClose(); }}>
-      <DialogContent>
-        <DialogHeader><DialogTitle>Edit Employee</DialogTitle></DialogHeader>
-        <div className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Employee ID">
-              <Input value={row.employee_code ?? "—"} disabled />
-            </Field>
-            <Field label="Email"><Input value={row.email} disabled /></Field>
-          </div>
-          <Field label="Full Name">
-            <Input value={full_name} onChange={(e) => setName(e.target.value)} />
-          </Field>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Mobile">
-              <Input value={mobile} onChange={(e) => setMobile(e.target.value)} />
-            </Field>
-            <Field label="Department">
-              <Input value={department} onChange={(e) => setDepartment(e.target.value)} placeholder="Operations, Sales…" />
-            </Field>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Joining Date">
-              <Input type="date" value={joiningDate} onChange={(e) => setJoiningDate(e.target.value)} />
-            </Field>
-            <Field label="Role">
-              <Select value={role} onValueChange={(v) => setRoleVal(v as Role)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {ASSIGNABLE_ROLES.map((r) => (
-                    <SelectItem key={r} value={r}>{ROLE_LABELS[r]}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </Field>
-          </div>
-        </div>
-        <DialogFooter>
-
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button onClick={submit} disabled={busy}>{busy ? "Saving…" : "Save Changes"}</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function DeactivateDialog({ row, onClose, onDone }:
-  { row: Row | null; onClose: () => void; onDone: () => void }) {
-  const fn = useServerFn(setEmployeeActive);
-  const [busy, setBusy] = useState(false);
-  if (!row) return null;
-  const willActivate = !row.is_active;
-  async function go() {
-    if (!row) return;
-    setBusy(true);
-    try {
-      await fn({ data: { user_id: row.id, is_active: willActivate } });
-      toast.success(willActivate ? "Employee activated." : "Employee deactivated.");
-      onDone();
-      onClose();
-    } catch (e) { toast.error((e as Error).message); }
-    finally { setBusy(false); }
-  }
-  return (
-    <AlertDialog open onOpenChange={(v) => { if (!v) onClose(); }}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>{willActivate ? "Activate" : "Deactivate"} {row.full_name ?? row.email}?</AlertDialogTitle>
-          <AlertDialogDescription>
-            {willActivate
-              ? <>This will restore login access for <b>{row.email}</b>. Their previous roles remain assigned.</>
-              : <>This will block <b>{row.email}</b> from signing in. Their roles stay assigned and can be restored anytime.</>}
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
-          <AlertDialogAction onClick={go} disabled={busy}
-            style={willActivate ? undefined : { background: "#b91c1c" }}>
-            {busy ? "Working…" : willActivate ? "Activate" : "Deactivate"}
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
-  );
-}
-
-function DeleteEmployeeDialog({ row, onClose, onDone }:
-  { row: Row | null; onClose: () => void; onDone: () => void }) {
-  const deleteFn = useServerFn(deleteEmployee);
-  const [busy, setBusy] = useState(false);
-  if (!row) return null;
-
-  async function go() {
-    if (!row) return;
-    setBusy(true);
-    try {
-      await deleteFn({ data: { user_id: row.id } });
-      toast.success(`Employee ${row.full_name ?? row.email} permanently deleted.`);
-      onDone();
-      onClose();
-    } catch (e) { toast.error((e as Error).message); }
-    finally { setBusy(false); }
-  }
-
-  return (
-    <AlertDialog open onOpenChange={(v) => { if (!v) onClose(); }}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Delete {row.full_name ?? row.email} permanently?</AlertDialogTitle>
-          <AlertDialogDescription>
-            This will permanently delete the user account for <b>{row.email}</b>, including their profile, assigned roles, and module permissions. <b>This action cannot be undone.</b>
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
-          <AlertDialogAction onClick={go} disabled={busy} className="bg-red-600 hover:bg-red-700">
-            {busy ? "Deleting…" : "Delete Employee"}
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
-  );
-}
-
-function Field({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
-  return (
-    <div className="space-y-1">
-      <Label className="text-xs">{label}</Label>
-      {children}
-      {error && <div className="text-[11px]" style={{ color: "#b91c1c" }}>{error}</div>}
-    </div>
-  );
-}
-
-// Tiny helper to seed form state when row changes.
-import { useEffect } from "react";
-function useMemoOnRow(row: Row | null, cb: (r: Row) => void) {
-  useEffect(() => { if (row) cb(row); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [row?.id]);
-}
-
-function ResetPasswordDialog({ row, onClose }: { row: Row | null; onClose: () => void }) {
-  const fn = useServerFn(resetEmployeePassword);
-  const [pw, setPw] = useState("");
-  const [confirm, setConfirm] = useState("");
-  const [show, setShow] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-
-  if (!row) return null;
-
-  function reset() { setPw(""); setConfirm(""); setShow(false); setErr(null); }
-
-  async function submit() {
-    if (!row) return;
-    setErr(null);
-    if (pw.length < 8) { setErr("Password must be at least 8 characters."); return; }
-    if (pw !== confirm) { setErr("Passwords do not match."); return; }
-    setBusy(true);
-    try {
-      await fn({ data: { user_id: row.id, new_password: pw } });
-      toast.success(`Password reset for ${row.email}. Share it with the employee securely.`);
-      reset();
-      onClose();
-    } catch (e) {
-      toast.error((e as Error).message);
-    } finally { setBusy(false); }
-  }
-
-  return (
-    <Dialog open onOpenChange={(v) => { if (!v) { reset(); onClose(); } }}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Reset password — {row.full_name ?? row.email}</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-3">
-          <Field label="Email"><Input value={row.email} disabled /></Field>
-          <Field label="New password">
-            <div className="relative">
-              <Input
-                type={show ? "text" : "password"}
-                value={pw}
-                onChange={(e) => setPw(e.target.value)}
-                placeholder="At least 8 characters"
-                autoComplete="new-password"
-              />
-              <button
-                type="button"
-                onClick={() => setShow((s) => !s)}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-700"
-                aria-label={show ? "Hide password" : "Show password"}
-              >
-                {show ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-              </button>
             </div>
-          </Field>
-          <Field label="Confirm new password">
-            <Input
-              type={show ? "text" : "password"}
-              value={confirm}
-              onChange={(e) => setConfirm(e.target.value)}
-              placeholder="Re-enter password"
-              autoComplete="new-password"
-            />
-          </Field>
-          {err && <div className="text-[12px]" style={{ color: "#b91c1c" }}>{err}</div>}
-          <p className="text-xs" style={{ color: "var(--admin-fg-muted)" }}>
-            The employee will be able to sign in immediately with the new password. No email is sent — share it through a secure channel.
-          </p>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => { reset(); onClose(); }} disabled={busy}>Cancel</Button>
-          <Button onClick={submit} disabled={busy}>{busy ? "Resetting…" : "Set Password"}</Button>
-        </DialogFooter>
+          </div>
+          <DialogFooter className="mt-4">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+            <Button type="submit" disabled={busy} className="bg-indigo-600 hover:bg-indigo-700 text-white">
+              {busy ? "Saving…" : "Add Employee"}
+            </Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   );
 }
 
-const WORK_MODULES = [
-  { key: "work.leads", label: "Leads" },
-  { key: "work.orders", label: "Orders" },
-  { key: "work.support", label: "Support" },
-  { key: "work.finance", label: "Finance" },
-] as const;
+function EditEmployeeModal({ row, open, onOpenChange, onSaved }: { row: any; open: boolean; onOpenChange: (o: boolean) => void; onSaved: () => void }) {
+  const updateFn = useServerFn(updateEmployee);
+  const [fullName, setFullName] = useState(row.full_name || "");
+  const [mobile, setMobile] = useState(row.mobile || "");
+  const [role, setRole] = useState<Role>((row.roles[0] as Role) || "executive");
+  const [department, setDepartment] = useState(row.department || "Operations");
+  const [maxWorkload, setMaxWorkload] = useState(row.max_workload || 50);
+  const [autoAssignEnabled, setAutoAssignEnabled] = useState(row.auto_assign_enabled ?? false);
+  const [busy, setBusy] = useState(false);
 
-function WorkAccessDialog({ row, onClose }: { row: Row | null; onClose: () => void }) {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    try {
+      await updateFn({
+        data: {
+          user_id: row.id,
+          full_name: fullName,
+          mobile: mobile || null,
+          role,
+          department,
+          max_workload: maxWorkload,
+          auto_assign_enabled: autoAssignEnabled,
+        },
+      });
+      toast.success("Employee updated successfully!");
+      onOpenChange(false);
+      onSaved();
+    } catch (err) {
+      toast.error((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[480px]">
+        <DialogHeader>
+          <DialogTitle className="text-base font-bold">Edit Employee: {row.email}</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-3.5 text-xs">
+          <div>
+            <Label className="text-xs">Full Name</Label>
+            <Input required value={fullName} onChange={(e) => setFullName(e.target.value)} className="mt-1" />
+          </div>
+          <div>
+            <Label className="text-xs">Mobile Number</Label>
+            <Input value={mobile} onChange={(e) => setMobile(e.target.value)} className="mt-1" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label className="text-xs">Role</Label>
+              <Select value={role} onValueChange={(v) => setRole(v as Role)}>
+                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {ASSIGNABLE_ROLES.map((r) => <SelectItem key={r} value={r}>{ROLE_LABELS[r]}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-xs">Department</Label>
+              <Input value={department} onChange={(e) => setDepartment(e.target.value)} className="mt-1" />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label className="text-xs">Max Workload Capacity</Label>
+              <Input type="number" min={5} max={200} value={maxWorkload} onChange={(e) => setMaxWorkload(Number(e.target.value))} className="mt-1" />
+            </div>
+            <div className="flex flex-col justify-end">
+              <div className="flex items-center gap-2">
+                <Switch checked={autoAssignEnabled} onCheckedChange={setAutoAssignEnabled} />
+                <Label className="text-xs font-medium">Auto-Assign Pool</Label>
+              </div>
+            </div>
+          </div>
+          <DialogFooter className="mt-4">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+            <Button type="submit" disabled={busy} className="bg-indigo-600 hover:bg-indigo-700 text-white">
+              {busy ? "Saving…" : "Save Changes"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function WorkAccessModal({ row, open, onOpenChange, onSaved }: { row: any; open: boolean; onOpenChange: (o: boolean) => void; onSaved: () => void }) {
   const getFn = useServerFn(getEmployeeWorkAccess);
-  const saveFn = useServerFn(setEmployeeWorkAccess);
-  const qc = useQueryClient();
-  const enabled = !!row;
-  const { data, isLoading } = useQuery({
-    queryKey: ["admin.employee.workAccess", row?.id],
-    queryFn: () => getFn({ data: { user_id: row!.id } }),
-    enabled,
+  const setFn = useServerFn(setEmployeeWorkAccess);
+  const { data: accessData, isLoading } = useQuery({
+    queryKey: ["admin.workaccess", row.id],
+    queryFn: () => getFn({ data: { user_id: row.id } }),
+    enabled: open,
   });
 
-  const [work, setWork] = useState<Record<string, boolean>>({});
-  const [websites, setWebsites] = useState<string[]>([]);
-  const [services, setServices] = useState<string[]>([]);
+  const [leads, setLeads] = useState(false);
+  const [orders, setOrders] = useState(false);
+  const [support, setSupport] = useState(false);
+  const [finance, setFinance] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  useEffect(() => {
-    if (!data) return;
-    setWork({ ...(data.permissions as Record<string, boolean>) });
-    // Union of website scopes across enabled modules → shown as one set (Phase 4 simple model)
-    const w = new Set<string>();
-    const s = new Set<string>();
-    for (const m of WORK_MODULES) {
-      for (const id of (data.websiteScopes as Record<string, string[]>)[m.key] ?? []) w.add(id);
-      for (const id of (data.serviceScopes as Record<string, string[]>)[m.key] ?? []) s.add(id);
+  useMemo(() => {
+    if (accessData?.permissions) {
+      setLeads(!!accessData.permissions["work.leads"]);
+      setOrders(!!accessData.permissions["work.orders"]);
+      setSupport(!!accessData.permissions["work.support"]);
+      setFinance(!!accessData.permissions["work.finance"]);
     }
-    setWebsites(Array.from(w));
-    setServices(Array.from(s));
-  }, [data]);
+  }, [accessData]);
 
-  if (!row) return null;
-
-  const websitesList: Array<{ id: string; name: string; domain: string; is_active: boolean }> =
-    (data?.websites as never) ?? [];
-  const servicesList: Array<{ id: string; service_code: string; service_name: string; website_id: string; is_active: boolean }> =
-    (data?.services as never) ?? [];
-  const filteredServices = websites.length
-    ? servicesList.filter((s) => websites.includes(s.website_id))
-    : servicesList;
-
-  function toggle(list: string[], id: string): string[] {
-    return list.includes(id) ? list.filter((x) => x !== id) : [...list, id];
-  }
-
-  async function save() {
+  const handleSave = async () => {
     setBusy(true);
     try {
-      await saveFn({ data: {
-        user_id: row!.id,
-        work: {
-          "work.leads":   !!work["work.leads"],
-          "work.orders":  !!work["work.orders"],
-          "work.support": !!work["work.support"],
-          "work.finance": !!work["work.finance"],
+      await setFn({
+        data: {
+          user_id: row.id,
+          work: {
+            "work.leads": leads,
+            "work.orders": orders,
+            "work.support": support,
+            "work.finance": finance,
+          },
+          websites: [],
+          services: [],
         },
-        websites, services,
-      } });
-      toast.success("Work access updated.");
-      qc.invalidateQueries({ queryKey: ["admin.employee.workAccess", row!.id] });
-      onClose();
-    } catch (e) { toast.error((e as Error).message); }
-    finally { setBusy(false); }
-  }
+      });
+      toast.success("Work access permissions updated!");
+      onOpenChange(false);
+      onSaved();
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
-    <Dialog open onOpenChange={(v) => { if (!v) onClose(); }}>
-      <DialogContent className="max-w-2xl">
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[420px]">
         <DialogHeader>
-          <DialogTitle>Work Access — {row.full_name ?? row.email}</DialogTitle>
+          <DialogTitle className="text-base font-bold">Work Access: {row.full_name || row.email}</DialogTitle>
         </DialogHeader>
         {isLoading ? (
-          <div className="py-6 text-center text-sm" style={{ color: "var(--admin-fg-muted)" }}>Loading…</div>
+          <div className="py-6 text-center text-xs text-slate-500">Loading access rules…</div>
         ) : (
-          <div className="space-y-5 max-h-[70vh] overflow-y-auto pr-1">
-            <section>
-              <div className="text-xs uppercase tracking-wide mb-2" style={{ color: "var(--admin-fg-muted)" }}>Work types they can receive</div>
-              <div className="grid grid-cols-2 gap-2">
-                {WORK_MODULES.map((m) => (
-                  <label key={m.key} className="flex items-center gap-2 rounded border px-3 py-2 text-sm cursor-pointer hover:bg-slate-50">
-                    <input type="checkbox" checked={!!work[m.key]} onChange={() => setWork({ ...work, [m.key]: !work[m.key] })} />
-                    {m.label}
-                  </label>
-                ))}
+          <div className="space-y-3 text-xs py-2">
+            <div className="flex items-center justify-between p-2 rounded-lg bg-slate-50 border">
+              <div>
+                <div className="font-semibold text-slate-900">Orders Module</div>
+                <div className="text-slate-500 text-[11px]">Process & fulfill customer orders</div>
               </div>
-            </section>
-
-            <section>
-              <div className="flex items-center justify-between mb-2">
-                <div className="text-xs uppercase tracking-wide" style={{ color: "var(--admin-fg-muted)" }}>Websites</div>
-                <div className="text-[11px]" style={{ color: "var(--admin-fg-subtle)" }}>Empty = all websites</div>
+              <Switch checked={orders} onCheckedChange={setOrders} />
+            </div>
+            <div className="flex items-center justify-between p-2 rounded-lg bg-slate-50 border">
+              <div>
+                <div className="font-semibold text-slate-900">Leads Module</div>
+                <div className="text-slate-500 text-[11px]">Manage customer leads & follow-ups</div>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {websitesList.map((w) => (
-                  <label key={w.id} className="flex items-center gap-2 rounded border px-3 py-2 text-sm cursor-pointer hover:bg-slate-50">
-                    <input type="checkbox" checked={websites.includes(w.id)} onChange={() => setWebsites(toggle(websites, w.id))} />
-                    <span className="truncate">{w.name} <span className="text-xs text-slate-400">{w.domain}</span></span>
-                  </label>
-                ))}
+              <Switch checked={leads} onCheckedChange={setLeads} />
+            </div>
+            <div className="flex items-center justify-between p-2 rounded-lg bg-slate-50 border">
+              <div>
+                <div className="font-semibold text-slate-900">Support & Tickets</div>
+                <div className="text-slate-500 text-[11px]">Handle complaints & tickets</div>
               </div>
-            </section>
-
-            <section>
-              <div className="flex items-center justify-between mb-2">
-                <div className="text-xs uppercase tracking-wide" style={{ color: "var(--admin-fg-muted)" }}>Services</div>
-                <div className="text-[11px]" style={{ color: "var(--admin-fg-subtle)" }}>Empty = all services in selected websites</div>
+              <Switch checked={support} onCheckedChange={setSupport} />
+            </div>
+            <div className="flex items-center justify-between p-2 rounded-lg bg-slate-50 border">
+              <div>
+                <div className="font-semibold text-slate-900">Finance & Invoices</div>
+                <div className="text-slate-500 text-[11px]">View payments, invoices & revenue</div>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-64 overflow-y-auto">
-                {filteredServices.map((s) => (
-                  <label key={s.id} className="flex items-center gap-2 rounded border px-3 py-2 text-sm cursor-pointer hover:bg-slate-50">
-                    <input type="checkbox" checked={services.includes(s.id)} onChange={() => setServices(toggle(services, s.id))} />
-                    <span className="truncate">{s.service_name} <span className="text-[11px] font-mono text-slate-400">{s.service_code}</span></span>
-                  </label>
-                ))}
-                {filteredServices.length === 0 && (
-                  <div className="col-span-full text-xs italic" style={{ color: "var(--admin-fg-subtle)" }}>No services in selected websites.</div>
-                )}
-              </div>
-            </section>
-
-            <p className="text-[11px]" style={{ color: "var(--admin-fg-muted)" }}>
-              Auto-assignment will only route new items to this employee when the item's website and service match their scopes.
-              Employees with no work types enabled will keep receiving assignments the same way they do today.
-            </p>
+              <Switch checked={finance} onCheckedChange={setFinance} />
+            </div>
           </div>
         )}
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button onClick={save} disabled={busy || isLoading}>{busy ? "Saving…" : "Save Access"}</Button>
+        <DialogFooter className="mt-4">
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button onClick={handleSave} disabled={busy} className="bg-purple-600 hover:bg-purple-700 text-white">
+            {busy ? "Saving…" : "Save Access"}
+          </Button>
         </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function ResetPasswordModal({ row, open, onOpenChange }: { row: any; open: boolean; onOpenChange: (o: boolean) => void }) {
+  const resetFn = useServerFn(resetEmployeePassword);
+  const [password, setPassword] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    try {
+      await resetFn({ data: { user_id: row.id, new_password: password } });
+      toast.success(`Password reset for ${row.email}`);
+      onOpenChange(false);
+    } catch (err) {
+      toast.error((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[400px]">
+        <DialogHeader>
+          <DialogTitle className="text-base font-bold">Reset Password: {row.email}</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-3 text-xs">
+          <div>
+            <Label className="text-xs">New Password</Label>
+            <Input required type="password" minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Minimum 8 characters" className="mt-1" />
+          </div>
+          <DialogFooter className="mt-4">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+            <Button type="submit" disabled={busy} className="bg-indigo-600 hover:bg-indigo-700 text-white">
+              {busy ? "Resetting…" : "Set New Password"}
+            </Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   );

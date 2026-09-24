@@ -7,7 +7,7 @@ import { formatIST, istDateKey } from "@/lib/datetime";
 import { toast } from "sonner";
 
 import { listOrdersV2 } from "@/lib/crm/orders-v2.functions";
-import { listStaff } from "@/lib/crm/leads-admin.functions";
+import { listAssignmentStaff, listAllHistoricalStaff } from "@/lib/crm/leads-admin.functions";
 import { listServices } from "@/lib/crm/services-admin.functions";
 import { bulkAssignOrders } from "@/lib/crm/orders.functions";
 import { autoDistributeSelectedOrders } from "@/lib/crm/assignment-history.functions";
@@ -251,7 +251,8 @@ function daysSince(iso: string | null | undefined): number {
 
 function OrdersListPage() {
   const listFn = useServerFn(listOrdersV2);
-  const staffFn = useServerFn(listStaff);
+  const assignStaffFn = useServerFn(listAssignmentStaff);
+  const historicalStaffFn = useServerFn(listAllHistoricalStaff);
   const svcFn = useServerFn(listServices);
   const role = useRole();
   const userPerms = usePermissions();
@@ -383,17 +384,23 @@ function OrdersListPage() {
     if (routeSearch.search) setSearch(routeSearch.search);
   }, [routeSearch]);
 
-  const { data: staffData } = useQuery({
-    queryKey: ["admin.staff"],
-    queryFn: () => staffFn(),
+  const { data: assignStaffData } = useQuery({
+    queryKey: ["admin.staff.assignment"],
+    queryFn: () => assignStaffFn(),
+    staleTime: 60 * 1000,
+  });
+  const assignStaffProfiles: Array<{ id: string; display_name?: string; email?: string; name?: string; is_eligible?: boolean; is_on_leave?: boolean; unavailability_reason?: string }> = useMemo(() => {
+    return (assignStaffData?.profiles ?? []) as any[];
+  }, [assignStaffData]);
+
+  const { data: historicalStaffData } = useQuery({
+    queryKey: ["admin.staff.historical"],
+    queryFn: () => historicalStaffFn(),
     staleTime: 5 * 60 * 1000,
   });
-  const staffProfiles: Array<{ id: string; display_name?: string; email?: string; name?: string }> = useMemo(() => {
-    if (Array.isArray(staffData)) return staffData;
-    if (Array.isArray((staffData as any)?.profiles)) return (staffData as any).profiles;
-    if (Array.isArray((staffData as any)?.staff)) return (staffData as any).staff;
-    return [];
-  }, [staffData]);
+  const historicalStaffProfiles: Array<{ id: string; display_name?: string; email?: string; name?: string }> = useMemo(() => {
+    return (historicalStaffData?.profiles ?? []) as any[];
+  }, [historicalStaffData]);
   const { data: svcData } = useQuery({
     queryKey: ["admin.services.list"],
     queryFn: () => svcFn(),
@@ -539,7 +546,7 @@ async function handleBulkReassign(targetStaffId: string) {
   try {
     const assignedTo = targetStaffId === "unassign" ? null : targetStaffId;
     await bulkAssignFn({ data: { applicationIds: selectedOrderIds, assignedTo } });
-    const staffObj = staffProfiles.find((s) => s.id === targetStaffId);
+    const staffObj = assignStaffProfiles.find((s) => s.id === targetStaffId) || historicalStaffProfiles.find((s) => s.id === targetStaffId);
     const name = targetStaffId === "unassign" ? "Unassigned" : (staffObj?.display_name || staffObj?.name || staffObj?.email || "staff");
     toast.success(`Successfully reassigned ${selectedOrderIds.length} order(s) to ${name}`);
     setSelectedOrderIds([]);
@@ -750,7 +757,7 @@ return (
             <SelectContent>
               <SelectItem value="all">All assignees</SelectItem>
               <SelectItem value="unassigned">Unassigned</SelectItem>
-              {staffProfiles.map((s: any) => (
+              {historicalStaffProfiles.map((s: any) => (
                 <SelectItem key={s.id} value={s.id}>{s.display_name || s.name || s.email}</SelectItem>
               ))}
             </SelectContent>
@@ -1072,11 +1079,19 @@ return (
                 ⚖️ Auto-Balance / Equally Distribute
               </SelectItem>
               <SelectItem value="unassign">❌ Unassign Order</SelectItem>
-              {staffProfiles.map((s: any) => (
-                <SelectItem key={s.id} value={s.id}>
-                  👤 {s.display_name || s.name || s.email}
-                </SelectItem>
-              ))}
+              {assignStaffProfiles.map((s: any) => {
+                const statusTag = s.is_on_leave
+                  ? " [🌴 On Leave]"
+                  : !s.is_eligible
+                    ? ` [⚠️ ${s.unavailability_reason || "Unavailable"}]`
+                    : " [⚡ Available]";
+                return (
+                  <SelectItem key={s.id} value={s.id}>
+                    👤 {s.display_name || s.name || s.email}
+                    <span className="text-[10px] opacity-75 font-mono ml-1">{statusTag}</span>
+                  </SelectItem>
+                );
+              })}
             </SelectContent>
           </Select>
 

@@ -681,25 +681,84 @@ export const listStaff = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     await assertRole(context.supabase, STAFF_MANAGEMENT_ROLES);
+    const admin = await getAdmin();
     
-    const { data: staffRoles, error: rolesErr } = await (await getAdmin())
+    const { data: staffRoles, error: rolesErr } = await admin
       .from("user_roles")
       .select("user_id, role")
       .in("role", ["super_admin", "admin", "operations", "manager", "executive", "support", "finance", "accounts"]);
 
     if (rolesErr) throw new Error(rolesErr.message);
     const userIds = Array.from(new Set((staffRoles ?? []).map(r => r.user_id)));
-
     if (userIds.length === 0) return { profiles: [] };
 
-    const { data: profiles, error: profilesErr } = await (await getAdmin())
+    const { data: profiles, error: profilesErr } = await admin
       .from("profiles")
-      .select("id, display_name, email, is_active")
+      .select("id, display_name, full_name, email, is_active, employment_status, auto_assign_enabled")
       .in("id", userIds);
 
     if (profilesErr) throw new Error(profilesErr.message);
 
-    return { profiles: (profiles ?? []).filter((p: any) => p.is_active !== false) };
+    // Active workforce only (exclude archived/inactive/terminated)
+    const activeStaff = (profiles ?? []).filter((p: any) => 
+      p.is_active !== false && (p.employment_status === "ACTIVE" || !p.employment_status)
+    );
+
+    return { profiles: activeStaff };
+  });
+
+/**
+ * Returns staff formatted for assignment dropdowns with live leave and auto-assign eligibility metadata.
+ */
+export const listAssignmentStaff = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertRole(context.supabase, STAFF_MANAGEMENT_ROLES);
+    const { calculateStaffWorkloads } = await import("./assignment-engine.server");
+    const workloads = await calculateStaffWorkloads();
+
+    return {
+      profiles: workloads.map((w) => ({
+        id: w.employeeId,
+        display_name: w.name,
+        email: w.email,
+        role: w.role,
+        employment_status: w.employmentStatus,
+        is_active: w.employmentStatus === "ACTIVE",
+        is_eligible: w.isAutoAssignEligible,
+        is_on_leave: w.presenceStatus === "ON_LEAVE",
+        presence_status: w.presenceStatus,
+        effective_workload: w.effectiveWorkload,
+        unavailability_reason: w.unavailabilityReason,
+      })),
+    };
+  });
+
+/**
+ * Returns all historical staff (including archived and former employees) for historical filters and past order lookups.
+ */
+export const listAllHistoricalStaff = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertRole(context.supabase, STAFF_READ_ROLES);
+    const admin = await getAdmin();
+
+    const { data: profiles, error } = await admin
+      .from("profiles")
+      .select("id, display_name, full_name, email, is_active, employment_status")
+      .order("display_name", { ascending: true });
+
+    if (error) throw new Error(error.message);
+
+    return {
+      profiles: (profiles ?? []).map((p: any) => ({
+        id: p.id,
+        display_name: p.display_name || p.full_name || p.email || "Staff",
+        email: p.email,
+        is_active: p.is_active !== false && p.employment_status === "ACTIVE",
+        employment_status: p.employment_status || (p.is_active === false ? "INACTIVE" : "ACTIVE"),
+      })),
+    };
   });
 
 export const getLeadCounts = createServerFn({ method: "GET" })

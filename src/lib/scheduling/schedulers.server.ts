@@ -297,7 +297,6 @@ export async function fireDueSchedulers(now = new Date()) {
       } else if (s.scheduler_type === SCHEDULER_FEEDBACK_FOLLOWUP && s.application_id) {
         await fireFeedbackFollowup({ id: s.id, application_id: s.application_id, reason_id: s.reason_id, remarks: s.remarks });
         fired++;
-      } else {
         await supabaseAdmin
           .from("order_schedulers")
           .update({ status: "stopped", stopped_at: now.toISOString(), stop_reason: "unknown_type_or_missing_app" } as never)
@@ -307,6 +306,15 @@ export async function fireDueSchedulers(now = new Date()) {
       console.error("[schedulers] fire failed", s.id, e);
     }
   }
+
+  // Autonomous workforce check: periodically redistribute action orders from prolonged offline/away staff
+  try {
+    const { reassignProlongedUnavailableStaff } = await import("@/lib/crm/assignment-engine.server");
+    await reassignProlongedUnavailableStaff();
+  } catch (reassignErr) {
+    console.warn("[schedulers] workforce reassignment tick warning:", reassignErr);
+  }
+
   return { fired };
 }
 
