@@ -606,7 +606,7 @@ export async function calculateStaffWorkloads(): Promise<StaffWorkloadSummary[]>
     const isActiveAcc = prof?.is_active !== false && empStatus === "ACTIVE";
     const isOnLeave = !!leave;
     const isPoolActive = poolActiveMap.get(uid) ?? false;
-    const autoAssignEnabled = prof?.auto_assign_enabled ?? false;
+    const autoAssignEnabled = isPoolActive;
     const maxWorkload = Number(prof?.max_workload || 50);
     const effectiveWorkload = Math.round(counts.weightedWorkload * 10) / 10;
     const remainingCapacity = Math.max(0, maxWorkload - counts.activeActionOrders);

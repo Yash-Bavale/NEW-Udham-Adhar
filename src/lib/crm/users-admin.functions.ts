@@ -190,8 +190,8 @@ export const listStaffUsers = createServerFn({ method: "GET" })
         p?.employment_status ?? (p?.is_active === false ? "INACTIVE" : "ACTIVE");
 
       const isActive = p?.is_active !== false && employmentStatus === "ACTIVE";
-      const autoAssignEnabled = p?.auto_assign_enabled ?? false;
       const isInPool = pool?.is_active ?? false;
+      const autoAssignEnabled = isInPool;
       const maxWorkload = Number(p?.max_workload || 50);
 
       const resolvedName = p?.full_name?.trim() || p?.display_name?.trim() || null;
@@ -341,7 +341,7 @@ export const inviteEmployee = createServerFn({ method: "POST" })
     const newUser = created.user;
     if (!newUser) throw new Error("User creation did not return a user.");
 
-    // Upsert profile with Employment Status ACTIVE, but auto_assign_enabled OFF
+    // Upsert profile
     const { error: pErr } = await (admin as any).from("profiles").upsert({
       id: newUser.id,
       email: data.email,
@@ -349,12 +349,14 @@ export const inviteEmployee = createServerFn({ method: "POST" })
       full_name: data.full_name,
       mobile: data.mobile ?? null,
       is_active: true,
-      employment_status: "ACTIVE",
-      department: data.department ?? null,
-      auto_assign_enabled: data.auto_assign_enabled,
-      max_workload: data.max_workload,
     }, { onConflict: "id" });
     if (pErr) throw new Error(pErr.message);
+
+    // Create entry in assignment_pool
+    await admin.from("assignment_pool").upsert({
+      user_id: newUser.id,
+      is_active: data.auto_assign_enabled ?? false,
+    } as any, { onConflict: "user_id" });
 
     // Grant role
     const { error: rErr } = await admin.from("user_roles").upsert(
@@ -389,15 +391,31 @@ export const updateEmployee = createServerFn({ method: "POST" })
       patch.display_name = data.full_name;
     }
     if (data.mobile !== undefined) patch.mobile = data.mobile;
-    if (data.department !== undefined) patch.department = data.department;
-    if (data.joining_date !== undefined) patch.joining_date = data.joining_date || null;
-    if (data.max_workload !== undefined) patch.max_workload = data.max_workload;
-    if (data.auto_assign_enabled !== undefined) patch.auto_assign_enabled = data.auto_assign_enabled;
 
     if (Object.keys(patch).length) {
       const { error } = await admin.from("profiles").update(patch).eq("id", data.user_id);
-      if (error) throw new Error(error.message);
+      if (error) console.warn("[updateEmployee] profile update notice:", error.message);
     }
+
+    if (data.auto_assign_enabled !== undefined) {
+      const { data: existingPool } = await admin
+        .from("assignment_pool")
+        .select("id")
+        .eq("user_id", data.user_id)
+        .limit(1);
+
+      if (existingPool && existingPool.length > 0) {
+        await admin
+          .from("assignment_pool")
+          .update({ is_active: data.auto_assign_enabled })
+          .eq("user_id", data.user_id);
+      } else {
+        await admin
+          .from("assignment_pool")
+          .insert({ user_id: data.user_id, is_active: data.auto_assign_enabled } as any);
+      }
+    }
+
     if (data.role) {
       const { error: dErr } = await admin.from("user_roles").delete().eq("user_id", data.user_id);
       if (dErr) throw new Error(dErr.message);
@@ -424,26 +442,9 @@ export const setEmploymentStatus = createServerFn({ method: "POST" })
     const admin = await getAdmin();
 
     const isNowActive = data.status === "ACTIVE";
-    const nowIso = new Date().toISOString();
 
-    const patch: any = {
-      employment_status: data.status,
-      is_active: isNowActive,
-    };
-
-    if (data.status === "ARCHIVED") {
-      patch.archived_at = nowIso;
-      patch.auto_assign_enabled = false;
-    } else if (data.status === "TERMINATED") {
-      patch.terminated_at = nowIso;
-      patch.auto_assign_enabled = false;
-    } else if (data.status === "ACTIVE") {
-      patch.archived_at = null;
-      patch.terminated_at = null;
-    }
-
-    const { error: pErr } = await admin.from("profiles").update(patch).eq("id", data.user_id);
-    if (pErr) throw new Error(pErr.message);
+    // Update profile is_active
+    await admin.from("profiles").update({ is_active: isNowActive }).eq("id", data.user_id);
 
     // Sync auth ban
     await admin.auth.admin.updateUserById(data.user_id, {
@@ -480,17 +481,25 @@ export const toggleEmployeeAutoAssign = createServerFn({ method: "POST" })
     await assertAdmin(context.userId);
     const admin = await getAdmin();
 
-    const { error: pErr } = await (admin as any)
-      .from("profiles")
-      .update({ auto_assign_enabled: data.enabled })
-      .eq("id", data.user_id);
-    if (pErr) throw new Error(pErr.message);
-
-    // Also update assignment_pool table
-    await admin
+    // Update or insert assignment_pool table (authoritative source of pool state)
+    const { data: existingPool } = await admin
       .from("assignment_pool")
-      .update({ is_active: data.enabled })
-      .eq("user_id", data.user_id);
+      .select("id")
+      .eq("user_id", data.user_id)
+      .limit(1);
+
+    if (existingPool && existingPool.length > 0) {
+      const { error: poolErr } = await admin
+        .from("assignment_pool")
+        .update({ is_active: data.enabled })
+        .eq("user_id", data.user_id);
+      if (poolErr) throw new Error(poolErr.message);
+    } else {
+      const { error: poolErr } = await admin
+        .from("assignment_pool")
+        .insert({ user_id: data.user_id, is_active: data.enabled } as any);
+      if (poolErr) throw new Error(poolErr.message);
+    }
 
     return { ok: true };
   });
@@ -511,13 +520,8 @@ export const archiveEmployee = createServerFn({ method: "POST" })
 
     const nowIso = new Date().toISOString();
 
-    // 1. Mark profile as ARCHIVED
-    await (admin as any).from("profiles").update({
-      employment_status: "ARCHIVED",
-      is_active: false,
-      auto_assign_enabled: false,
-      archived_at: nowIso,
-    }).eq("id", data.user_id);
+    // 1. Mark profile is_active false
+    await admin.from("profiles").update({ is_active: false }).eq("id", data.user_id);
 
     // 2. Disable assignment pool membership
     await admin.from("assignment_pool").update({ is_active: false }).eq("user_id", data.user_id);
@@ -566,13 +570,7 @@ export const deleteEmployee = createServerFn({ method: "POST" })
 
     if (totalRefs > 0) {
       // User has historical records. Do NOT destructively delete! Safely archive instead.
-      await (admin as any).from("profiles").update({
-        employment_status: "ARCHIVED",
-        is_active: false,
-        auto_assign_enabled: false,
-        archived_at: new Date().toISOString(),
-      }).eq("id", data.user_id);
-
+      await admin.from("profiles").update({ is_active: false }).eq("id", data.user_id);
       await admin.from("assignment_pool").update({ is_active: false }).eq("user_id", data.user_id);
       await admin.auth.admin.updateUserById(data.user_id, { ban_duration: "876000h" } as never);
 

@@ -779,7 +779,7 @@ export const listAssignmentStaff = createServerFn({ method: "GET" })
         };
       });
 
-    result.sort((a, b) => a.display_name.localeCompare(b.display_name));
+    result.sort((a: any, b: any) => (a.display_name || "").localeCompare(b.display_name || ""));
 
     return { profiles: result };
   });
