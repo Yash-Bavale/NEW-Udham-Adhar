@@ -692,7 +692,7 @@ export const listStaff = createServerFn({ method: "GET" })
     const userIds = Array.from(new Set((staffRoles ?? []).map(r => r.user_id)));
     if (userIds.length === 0) return { profiles: [] };
 
-    const { data: profiles, error: profilesErr } = await admin
+    const { data: profiles, error: profilesErr } = await (admin as any)
       .from("profiles")
       .select("id, display_name, full_name, email, is_active, employment_status, auto_assign_enabled")
       .in("id", userIds);

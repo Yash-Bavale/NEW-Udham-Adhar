@@ -166,7 +166,7 @@ function WorkforcePage() {
     );
   }
 
-  const m = metricsData?.workforce || { total: 0, active: 0, onLeave: 0, available: 0, idle: 0, offline: 0, inactive: 0 };
+  const m = metricsData?.workforce || { total: 0, active: 0, onLeave: 0, available: 0, idle: 0, away: 0, offline: 0, inactive: 0 };
   const p = metricsData?.pool || { totalMembers: 0, available: 0, unavailable: 0, totalCapacity: 0, usedCapacity: 0, remainingCapacity: 0 };
   const t = metricsData?.today || { autoAssignedToday: 0, autoReassignedToday: 0, unassignedOrders: 0 };
 

@@ -38,6 +38,7 @@ export const listStaffUsers = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     await assertAdmin(context.userId);
     const admin = await getAdmin();
+    const adminAny = admin as any;
 
     const monthStart = new Date();
     monthStart.setUTCDate(1);
@@ -56,9 +57,9 @@ export const listStaffUsers = createServerFn({ method: "GET" })
       { data: appsCompletedAll, error: caErr },
     ] = await Promise.all([
       admin.from("user_roles").select("user_id, role"),
-      admin.from("profiles").select("id, full_name, display_name, mobile, is_active, email, employee_code, department, joining_date, employment_status, auto_assign_enabled, max_workload, work_schedule, archived_at, terminated_at, created_at, updated_at"),
+      adminAny.from("profiles").select("id, full_name, display_name, mobile, is_active, email, employee_code, department, joining_date, employment_status, auto_assign_enabled, max_workload, work_schedule, archived_at, terminated_at, created_at, updated_at"),
       admin.from("assignment_pool").select("user_id, is_active, total_assigned, last_assigned_at"),
-      admin.from("employee_leaves").select("employee_id, start_time, end_time, status, reason, leave_type").eq("status", "ACTIVE"),
+      adminAny.from("employee_leaves").select("employee_id, start_time, end_time, status, reason, leave_type").eq("status", "ACTIVE"),
       admin.from("leads").select("assigned_to, status, created_at, updated_at"),
       admin.from("applications").select("assigned_to, application_status, fulfillment_status"),
       admin
@@ -232,18 +233,19 @@ export const getWorkforceDashboardMetrics = createServerFn({ method: "GET" })
     await assertAdmin(context.userId);
     const workloads = await calculateStaffWorkloads();
     const admin = await getAdmin();
+    const adminAny = admin as any;
 
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
     const todayIso = todayStart.toISOString();
 
     const [todayAssignedRes, todayReassignedRes, unassignedRes] = await Promise.all([
-      admin
+      adminAny
         .from("order_assignment_history")
         .select("id", { count: "exact", head: true })
         .gte("created_at", todayIso)
         .in("change_type", ["AUTO_INITIAL_POOL"]),
-      admin
+      adminAny
         .from("order_assignment_history")
         .select("id", { count: "exact", head: true })
         .gte("created_at", todayIso)
@@ -340,7 +342,7 @@ export const inviteEmployee = createServerFn({ method: "POST" })
     if (!newUser) throw new Error("User creation did not return a user.");
 
     // Upsert profile with Employment Status ACTIVE, but auto_assign_enabled OFF
-    const { error: pErr } = await admin.from("profiles").upsert({
+    const { error: pErr } = await (admin as any).from("profiles").upsert({
       id: newUser.id,
       email: data.email,
       display_name: data.full_name,
@@ -478,7 +480,7 @@ export const toggleEmployeeAutoAssign = createServerFn({ method: "POST" })
     await assertAdmin(context.userId);
     const admin = await getAdmin();
 
-    const { error: pErr } = await admin
+    const { error: pErr } = await (admin as any)
       .from("profiles")
       .update({ auto_assign_enabled: data.enabled })
       .eq("id", data.user_id);
@@ -510,7 +512,7 @@ export const archiveEmployee = createServerFn({ method: "POST" })
     const nowIso = new Date().toISOString();
 
     // 1. Mark profile as ARCHIVED
-    await admin.from("profiles").update({
+    await (admin as any).from("profiles").update({
       employment_status: "ARCHIVED",
       is_active: false,
       auto_assign_enabled: false,
@@ -557,14 +559,14 @@ export const deleteEmployee = createServerFn({ method: "POST" })
     const [appCount, leadCount, historyCount] = await Promise.all([
       admin.from("applications").select("id", { count: "exact", head: true }).eq("assigned_to", data.user_id),
       admin.from("leads").select("id", { count: "exact", head: true }).eq("assigned_to", data.user_id),
-      admin.from("order_assignment_history").select("id", { count: "exact", head: true }).or(`new_employee_id.eq.${data.user_id},previous_employee_id.eq.${data.user_id}`),
+      (admin as any).from("order_assignment_history").select("id", { count: "exact", head: true }).or(`new_employee_id.eq.${data.user_id},previous_employee_id.eq.${data.user_id}`),
     ]);
 
     const totalRefs = (appCount.count ?? 0) + (leadCount.count ?? 0) + (historyCount.count ?? 0);
 
     if (totalRefs > 0) {
       // User has historical records. Do NOT destructively delete! Safely archive instead.
-      await admin.from("profiles").update({
+      await (admin as any).from("profiles").update({
         employment_status: "ARCHIVED",
         is_active: false,
         auto_assign_enabled: false,
