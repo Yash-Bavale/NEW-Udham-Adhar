@@ -50,12 +50,26 @@ function NotFoundComponent() {
 }
 
 function ErrorComponent({ error, reset }: { error: any; reset: () => void }) {
-  console.error(error);
-  if (isAbortError(error)) return;
   const router = useRouter();
+  const expectedDisconnect = isAbortError(error);
   useEffect(() => {
+    if (expectedDisconnect) {
+      // Navigation and refreshes routinely cancel an in-flight SSR request.
+      // Reset the boundary instead of reporting it or leaving a blank page.
+      router.invalidate().finally(reset);
+      return;
+    }
+    console.error(error);
     reportLovableError(error, { boundary: "tanstack_root_error_component" });
-  }, [error]);
+  }, [error, expectedDisconnect, reset, router]);
+
+  if (expectedDisconnect) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background px-4">
+        <p className="text-sm text-muted-foreground">Restoring page…</p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
