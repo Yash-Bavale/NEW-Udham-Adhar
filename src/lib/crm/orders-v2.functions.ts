@@ -15,6 +15,7 @@ import {
 } from "./fulfillment-transitions";
 import { computeOrderStage, type OrderStage } from "./computeOrderStage";
 import { istDateKey } from "@/lib/datetime";
+import { normalizeOrdersFilter, getOrdersDateRange } from "@/lib/orders/orders-filter";
 
 async function getAdmin() {
   const m = await import("@/integrations/supabase/client.server");
@@ -503,23 +504,7 @@ export function daysSince(iso: string | null | undefined): number {
 }
 
 function parseDateBounds(dateFrom?: string, dateTo?: string) {
-  let fromIso: string | undefined;
-  let toIso: string | undefined;
-  if (dateFrom) {
-    if (dateFrom.includes("T")) {
-      fromIso = new Date(dateFrom).toISOString();
-    } else {
-      fromIso = new Date(`${dateFrom}T00:00:00+05:30`).toISOString();
-    }
-  }
-  if (dateTo) {
-    if (dateTo.includes("T")) {
-      toIso = new Date(dateTo).toISOString();
-    } else {
-      toIso = new Date(`${dateTo}T23:59:59.999+05:30`).toISOString();
-    }
-  }
-  return { fromIso, toIso };
+  return getOrdersDateRange({ from: dateFrom, to: dateTo, timezone: "Asia/Kolkata" });
 }
 
 async function fetchInChunks<T>(
@@ -581,7 +566,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       return {
         rows: [],
         total: 0,
-        counts: { all: 0, needs_action: 0, pending: 0, completed: 0, closed: 0, exception: 0, actionRequired: 0, processed: 0, reminders: 0, hot_orders: 0, technical_delay: 0, customer_delay: 0 },
+        counts: { all: 0, needs_action: 0, pending: 0, completed: 0, closed: 0, exception: 0, actionRequired: 0, processed: 0, reminders: 0, hot_orders: 0, technical_delay: 0, customer_delay: 0, totalAll: 0 },
         ageBuckets: { d1: 0, d2: 0, d3: 0, d7: 0, older: 0 },
         page: data.page,
         pageSize: data.pageSize,
@@ -593,27 +578,27 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       console.error("[listOrdersV2] background reconciliation error:", err);
     });
 
-    const { fromIso, toIso } = parseDateBounds(data.dateFrom, data.dateTo);
+    const normalized = normalizeOrdersFilter(data);
 
     // Primary fast path: Execute single database-side aggregation & pagination RPC
     try {
       const { data: rpcRes, error: rpcErr } = await (admin as any).rpc("get_orders_v3_paged", {
         p_page: data.page,
         p_page_size: data.pageSize,
-        p_search: data.search?.trim() || null,
-        p_date_from: fromIso || null,
-        p_date_to: toIso || null,
-        p_bucket: data.bucket || "all",
-        p_stage: data.stage && data.stage !== "all" ? data.stage : null,
-        p_fulfillment_status: data.fulfillmentStatus && data.fulfillmentStatus !== "all" ? data.fulfillmentStatus : null,
-        p_action_status: data.actionStatus || "all",
-        p_service_id: data.serviceId && data.serviceId !== "all" ? data.serviceId : null,
-        p_assigned_to: data.assignedTo && data.assignedTo !== "all" ? data.assignedTo : null,
-        p_payment_status: data.paymentStatus && data.paymentStatus !== "all" ? data.paymentStatus : null,
-        p_pending_age: data.pendingAge && data.pendingAge !== "any" ? data.pendingAge : null,
-        p_custom_days: data.customDays ? parseInt(data.customDays, 10) : null,
-        p_sort_field: data.sortField || "created_at",
-        p_sort_order: data.sortOrder || "desc",
+        p_search: normalized.search,
+        p_date_from: normalized.fromIso,
+        p_date_to: normalized.toIso,
+        p_bucket: normalized.bucket,
+        p_stage: normalized.stage,
+        p_fulfillment_status: normalized.fulfillmentStatus,
+        p_action_status: normalized.actionStatus,
+        p_service_id: normalized.serviceId,
+        p_assigned_to: normalized.assignedTo,
+        p_payment_status: normalized.paymentStatus,
+        p_pending_age: normalized.pendingAge,
+        p_custom_days: normalized.customDays,
+        p_sort_field: normalized.sortField,
+        p_sort_order: normalized.sortOrder,
         p_user_id: context.userId || null,
         p_is_admin: isAdmin,
       });
@@ -682,8 +667,8 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
           query = query.eq("assigned_to", data.assignedTo);
         }
       }
-      if (fromIso) query = query.gte("created_at", fromIso);
-      if (toIso) query = query.lte("created_at", toIso);
+      if (normalized.fromIso) query = query.gte("created_at", normalized.fromIso);
+      if (normalized.toIso) query = query.lte("created_at", normalized.toIso);
 
       if (data.search && data.search.trim()) {
         const term = `%${data.search.trim()}%`;
@@ -946,6 +931,51 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
     });
 
     const todayIst = istDateKey(new Date());
+
+    // 1. Filter dimensions (Stage, Fulfillment, Action Status, Payment, Pending Age)
+    // to obtain the baseFilteredRows used as the single source of truth for ALL KPIs
+    let baseFilteredRows = allRows;
+
+    if (normalized.stage) {
+      baseFilteredRows = baseFilteredRows.filter((r) => r.stage === normalized.stage);
+    }
+    if (normalized.fulfillmentStatus) {
+      baseFilteredRows = baseFilteredRows.filter((r) => r.fulfillment_status === normalized.fulfillmentStatus);
+    }
+    if (normalized.actionStatus && normalized.actionStatus !== "all") {
+      if (normalized.actionStatus === "action_required") {
+        baseFilteredRows = baseFilteredRows.filter((r) => {
+          const b = bucketOfRow(r, todayIst);
+          return b === "needs_action" || b === "backlog";
+        });
+      } else if (normalized.actionStatus === "processed") {
+        baseFilteredRows = baseFilteredRows.filter((r) => {
+          const b = bucketOfRow(r, todayIst);
+          return b !== "needs_action" && b !== "backlog";
+        });
+      } else if (normalized.actionStatus === "hot_orders") {
+        baseFilteredRows = baseFilteredRows.filter((r) => r.is_hot);
+      } else if (normalized.actionStatus === "scheduled_callback") {
+        baseFilteredRows = baseFilteredRows.filter((r) => bucketOfRow(r, todayIst) === "reminders");
+      }
+    }
+    if (normalized.paymentStatus) {
+      baseFilteredRows = baseFilteredRows.filter((r) => r.payment_status === normalized.paymentStatus);
+    }
+    if (normalized.pendingAge) {
+      let days = 0;
+      if (normalized.pendingAge === "custom" && normalized.customDays) {
+        days = normalized.customDays || 0;
+      } else {
+        days = parseInt(normalized.pendingAge, 10) || 0;
+      }
+      if (days > 0) {
+        const thresholdMs = Date.now() - days * 86_400_000;
+        baseFilteredRows = baseFilteredRows.filter((r) => new Date(r.created_at).getTime() <= thresholdMs);
+      }
+    }
+
+    // 2. Compute KPI counts strictly from baseFilteredRows
     const counts = {
       all: 0,
       needs_action: 0,
@@ -964,7 +994,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
     };
     const ageBuckets = { d1: 0, d2: 0, d3: 0, d7: 0, older: 0 };
 
-    for (const r of allRows) {
+    for (const r of baseFilteredRows) {
       counts.totalAll++;
       const b = bucketOfRow(r, todayIst);
       if (b === "completed") {
@@ -974,7 +1004,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         counts.closed++;
         counts.processed++;
       } else {
-        counts.all++;
+        counts.all++; // ALL ACTIVE
         if (b === "needs_action") {
           counts.needs_action++;
           counts.actionRequired++;
@@ -1005,9 +1035,10 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       }
     }
 
-    let filtered = allRows;
-    if (data.bucket && data.bucket !== "all") {
-      switch (data.bucket) {
+    // 3. Apply bucket tab filter to obtain the table rows
+    let filtered = baseFilteredRows;
+    if (normalized.bucket && normalized.bucket !== "all") {
+      switch (normalized.bucket) {
         case "needs_action":
           filtered = filtered.filter((r) => bucketOfRow(r, todayIst) === "needs_action");
           break;
@@ -1047,58 +1078,24 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       });
     }
 
-    if (data.stage && data.stage !== "all" && data.stage.trim() !== "") {
-      filtered = filtered.filter((r) => r.stage === data.stage);
-    }
-    if (data.fulfillmentStatus && data.fulfillmentStatus !== "all" && data.fulfillmentStatus.trim() !== "") {
-      filtered = filtered.filter((r) => r.fulfillment_status === data.fulfillmentStatus);
-    }
-    if (data.actionStatus && data.actionStatus !== "all") {
-      if (data.actionStatus === "action_required") {
-        filtered = filtered.filter((r) => bucketOfRow(r, todayIst) === "needs_action" || bucketOfRow(r, todayIst) === "backlog");
-      } else if (data.actionStatus === "processed") {
-        filtered = filtered.filter((r) => bucketOfRow(r, todayIst) !== "needs_action" && bucketOfRow(r, todayIst) !== "backlog");
-      } else if (data.actionStatus === "hot_orders") {
-        filtered = filtered.filter((r) => r.is_hot);
-      } else if (data.actionStatus === "scheduled_callback") {
-        filtered = filtered.filter((r) => bucketOfRow(r, todayIst) === "reminders");
-      }
-    }
-    if (data.paymentStatus && data.paymentStatus !== "all") {
-      filtered = filtered.filter((r) => r.payment_status === data.paymentStatus);
-    }
-    if (data.pendingAge && data.pendingAge !== "any") {
-      let days = 0;
-      if (data.pendingAge === "custom" && data.customDays) {
-        days = parseInt(data.customDays, 10) || 0;
-      } else {
-        days = parseInt(data.pendingAge, 10) || 0;
-      }
-      if (days > 0) {
-        const thresholdMs = Date.now() - days * 86_400_000;
-        filtered = filtered.filter((r) => new Date(r.created_at).getTime() <= thresholdMs);
-      }
-    }
-
-    if (data.bucket === "backlog" && (!data.sortField || data.sortField === "created_at")) {
-      // Backlog — orders from previous days that are still untouched/no action taken, sorted oldest first.
+    if (normalized.bucket === "backlog" && (!normalized.sortField || normalized.sortField === "created_at")) {
       filtered.sort((a, b) => {
         const tA = new Date(a.created_at).getTime();
         const tB = new Date(b.created_at).getTime();
-        return data.sortOrder === "desc" ? tB - tA : tA - tB;
+        return normalized.sortOrder === "desc" ? tB - tA : tA - tB;
       });
-    } else if (data.sortField === "stage") {
+    } else if (normalized.sortField === "stage") {
       filtered.sort((a, b) => {
         if (a.is_hot !== b.is_hot) return a.is_hot ? -1 : 1;
         const cmp = a.stage.localeCompare(b.stage);
-        return data.sortOrder === "asc" ? cmp : -cmp;
+        return normalized.sortOrder === "asc" ? cmp : -cmp;
       });
     } else {
       filtered.sort((a, b) => {
         if (a.is_hot !== b.is_hot) return a.is_hot ? -1 : 1;
         const tA = new Date(a.created_at).getTime();
         const tB = new Date(b.created_at).getTime();
-        return data.sortOrder === "asc" ? tA - tB : tB - tA;
+        return normalized.sortOrder === "asc" ? tA - tB : tB - tA;
       });
     }
 

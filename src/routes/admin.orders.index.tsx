@@ -7,6 +7,7 @@ import { formatIST, istDateKey } from "@/lib/datetime";
 import { toast } from "sonner";
 
 import { listOrdersV2 } from "@/lib/crm/orders-v2.functions";
+import { normalizeOrdersFilter, getOrdersQueryKey } from "@/lib/orders/orders-filter";
 import { listAssignmentStaff, listAllHistoricalStaff } from "@/lib/crm/leads-admin.functions";
 import { listServices } from "@/lib/crm/services-admin.functions";
 import { bulkAssignOrders } from "@/lib/crm/orders.functions";
@@ -450,8 +451,10 @@ function OrdersListPage() {
     sortOrder,
   }), [page, pageSize, fulfillmentStatus, serviceId, assignedTo, paymentStatus, dateFrom, dateTo, debouncedSearch, bucket, stageFilter, actionStatusFilter, pendingAge, customDays, sortField, sortOrder]);
 
+  const normalizedFilter = useMemo(() => normalizeOrdersFilter(queryPayload), [queryPayload]);
+
   const { data, isLoading, isFetching } = useQuery({
-    queryKey: ["admin.orders.v2", page, debouncedSearch, fulfillmentStatus, serviceId, assignedTo, paymentStatus, dateFrom, dateTo, bucket, stageFilter, actionStatusFilter, pendingAge, customDays, sortField, sortOrder],
+    queryKey: getOrdersQueryKey(normalizedFilter, page),
     queryFn: () => listFn({ data: queryPayload }),
     placeholderData: keepPreviousData,
     staleTime: 30_000,
@@ -505,12 +508,12 @@ useEffect(() => {
   if (page < totalPages) {
     const nextPagePayload = { ...queryPayload, page: page + 1 };
     qc.prefetchQuery({
-      queryKey: ["admin.orders.v2", page + 1, debouncedSearch, fulfillmentStatus, serviceId, assignedTo, paymentStatus, dateFrom, dateTo, bucket, stageFilter, actionStatusFilter, pendingAge, customDays, sortField, sortOrder],
+      queryKey: getOrdersQueryKey(normalizedFilter, page + 1),
       queryFn: () => listFn({ data: nextPagePayload }),
       staleTime: 30 * 1000,
     });
   }
-}, [page, total, queryPayload, debouncedSearch, fulfillmentStatus, serviceId, assignedTo, paymentStatus, dateFrom, dateTo, bucket, stageFilter, actionStatusFilter, pendingAge, customDays, sortField, sortOrder, qc, listFn, pageSize]);
+}, [page, total, queryPayload, normalizedFilter, qc, listFn, pageSize]);
 
 const bulkAssignFn = useServerFn(bulkAssignOrders);
 const autoDistributeFn = useServerFn(autoDistributeSelectedOrders);
