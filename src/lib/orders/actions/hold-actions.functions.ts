@@ -412,7 +412,7 @@ export const resumeReopenedOrder = createServerFn({ method: "POST" })
 
     const { error: rpcError } = await context.supabase.rpc("transition_order_status", {
       _order_id: data.orderId,
-      _new_status: preRow.form_submitted_at ? "FORM_RECEIVED" : "NEW",
+      _new_status: preRow.form_submitted_at ? "FORM_RECEIVED" : "FORM_PENDING",
     });
     if (rpcError) console.warn("[resumeReopenedOrder] transition skipped:", rpcError.message);
 

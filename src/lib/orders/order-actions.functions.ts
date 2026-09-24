@@ -1106,17 +1106,17 @@ export const reopenOrder = createServerFn({ method: "POST" })
       console.warn("[reopenOrder] audit log warning:", auditErr);
     }
 
-    if (app?.lead_id) {
+    if (preApp?.lead_id) {
       const [{ data: lead }, { data: paidPayment }] = await Promise.all([
         supabaseAdmin
           .from("leads")
           .select("id, lead_status_v2, status")
-          .eq("id", app.lead_id)
+          .eq("id", preApp.lead_id)
           .maybeSingle(),
         supabaseAdmin
           .from("payments")
           .select("id")
-          .eq("lead_id", app.lead_id)
+          .eq("lead_id", preApp.lead_id)
           .eq("status", "paid")
           .limit(1)
           .maybeSingle(),
@@ -1139,7 +1139,19 @@ export const reopenOrder = createServerFn({ method: "POST" })
       }
     }
 
-    return { ok: true, order: result };
+    return {
+      ok: true,
+      order: preApp
+        ? {
+            ...preApp,
+            order_status: "REOPENED",
+            fulfillment_status: "order_reopened",
+            workflow_status: "order_reopened",
+            application_status: "order_reopened",
+            updated_at: now,
+          }
+        : null,
+    };
   });
 
 // ─────────────────────── Close Order (manual) ───────────────────────
