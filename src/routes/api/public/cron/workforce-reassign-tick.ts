@@ -4,7 +4,7 @@
 
 import { createFileRoute } from "@tanstack/react-router";
 
-export const Route = createFileRoute("/api/public/cron/workforce-reassign-tick" as any)({
+export const Route = createFileRoute("/api/public/cron/workforce-reassign-tick")({
   server: {
     handlers: {
       POST: async ({ request }) => {

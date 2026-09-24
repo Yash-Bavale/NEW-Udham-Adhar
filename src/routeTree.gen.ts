@@ -143,6 +143,7 @@ import { Route as ApiPublicCronProcessEmailsRouteImport } from './routes/api/pub
 import { Route as ApiPublicCronSchedulersTickRouteImport } from './routes/api/public/cron/schedulers-tick'
 import { Route as ApiPublicCronWorkflowRemindersRouteImport } from './routes/api/public/cron/workflow-reminders'
 import { Route as ApiPublicCronWorkflowTickRouteImport } from './routes/api/public/cron/workflow-tick'
+import { Route as ApiPublicCronWorkforceReassignTickRouteImport } from './routes/api/public/cron/workforce-reassign-tick'
 import { Route as ApiPublicCronZohoDiagnoseRouteImport } from './routes/api/public/cron/zoho-diagnose'
 import { Route as ApiPublicFormAssetSplatRouteImport } from './routes/api/public/form-asset.$'
 import { Route as ApiPublicGstLeadRouteImport } from './routes/api/public/gst/lead'
@@ -854,6 +855,12 @@ const ApiPublicCronWorkflowTickRoute =
     path: '/api/public/cron/workflow-tick',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicCronWorkforceReassignTickRoute =
+  ApiPublicCronWorkforceReassignTickRouteImport.update({
+    id: '/api/public/cron/workforce-reassign-tick',
+    path: '/api/public/cron/workforce-reassign-tick',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicCronZohoDiagnoseRoute =
   ApiPublicCronZohoDiagnoseRouteImport.update({
     id: '/api/public/cron/zoho-diagnose',
@@ -1051,6 +1058,7 @@ export interface FileRoutesByFullPath {
   '/api/public/cron/schedulers-tick': typeof ApiPublicCronSchedulersTickRoute
   '/api/public/cron/workflow-reminders': typeof ApiPublicCronWorkflowRemindersRoute
   '/api/public/cron/workflow-tick': typeof ApiPublicCronWorkflowTickRoute
+  '/api/public/cron/workforce-reassign-tick': typeof ApiPublicCronWorkforceReassignTickRoute
   '/api/public/cron/zoho-diagnose': typeof ApiPublicCronZohoDiagnoseRoute
   '/api/public/form-asset/$': typeof ApiPublicFormAssetSplatRoute
   '/api/public/gst/lead': typeof ApiPublicGstLeadRoute
@@ -1193,6 +1201,7 @@ export interface FileRoutesByTo {
   '/api/public/cron/schedulers-tick': typeof ApiPublicCronSchedulersTickRoute
   '/api/public/cron/workflow-reminders': typeof ApiPublicCronWorkflowRemindersRoute
   '/api/public/cron/workflow-tick': typeof ApiPublicCronWorkflowTickRoute
+  '/api/public/cron/workforce-reassign-tick': typeof ApiPublicCronWorkforceReassignTickRoute
   '/api/public/cron/zoho-diagnose': typeof ApiPublicCronZohoDiagnoseRoute
   '/api/public/form-asset/$': typeof ApiPublicFormAssetSplatRoute
   '/api/public/gst/lead': typeof ApiPublicGstLeadRoute
@@ -1341,6 +1350,7 @@ export interface FileRoutesById {
   '/api/public/cron/schedulers-tick': typeof ApiPublicCronSchedulersTickRoute
   '/api/public/cron/workflow-reminders': typeof ApiPublicCronWorkflowRemindersRoute
   '/api/public/cron/workflow-tick': typeof ApiPublicCronWorkflowTickRoute
+  '/api/public/cron/workforce-reassign-tick': typeof ApiPublicCronWorkforceReassignTickRoute
   '/api/public/cron/zoho-diagnose': typeof ApiPublicCronZohoDiagnoseRoute
   '/api/public/form-asset/$': typeof ApiPublicFormAssetSplatRoute
   '/api/public/gst/lead': typeof ApiPublicGstLeadRoute
@@ -1490,6 +1500,7 @@ export interface FileRouteTypes {
     | '/api/public/cron/schedulers-tick'
     | '/api/public/cron/workflow-reminders'
     | '/api/public/cron/workflow-tick'
+    | '/api/public/cron/workforce-reassign-tick'
     | '/api/public/cron/zoho-diagnose'
     | '/api/public/form-asset/$'
     | '/api/public/gst/lead'
@@ -1632,6 +1643,7 @@ export interface FileRouteTypes {
     | '/api/public/cron/schedulers-tick'
     | '/api/public/cron/workflow-reminders'
     | '/api/public/cron/workflow-tick'
+    | '/api/public/cron/workforce-reassign-tick'
     | '/api/public/cron/zoho-diagnose'
     | '/api/public/form-asset/$'
     | '/api/public/gst/lead'
@@ -1779,6 +1791,7 @@ export interface FileRouteTypes {
     | '/api/public/cron/schedulers-tick'
     | '/api/public/cron/workflow-reminders'
     | '/api/public/cron/workflow-tick'
+    | '/api/public/cron/workforce-reassign-tick'
     | '/api/public/cron/zoho-diagnose'
     | '/api/public/form-asset/$'
     | '/api/public/gst/lead'
@@ -1866,6 +1879,7 @@ export interface RootRouteChildren {
   ApiPublicCronSchedulersTickRoute: typeof ApiPublicCronSchedulersTickRoute
   ApiPublicCronWorkflowRemindersRoute: typeof ApiPublicCronWorkflowRemindersRoute
   ApiPublicCronWorkflowTickRoute: typeof ApiPublicCronWorkflowTickRoute
+  ApiPublicCronWorkforceReassignTickRoute: typeof ApiPublicCronWorkforceReassignTickRoute
   ApiPublicCronZohoDiagnoseRoute: typeof ApiPublicCronZohoDiagnoseRoute
   ApiPublicFormAssetSplatRoute: typeof ApiPublicFormAssetSplatRoute
   ApiPublicGstLeadRoute: typeof ApiPublicGstLeadRoute
@@ -2819,6 +2833,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicCronWorkflowTickRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/cron/workforce-reassign-tick': {
+      id: '/api/public/cron/workforce-reassign-tick'
+      path: '/api/public/cron/workforce-reassign-tick'
+      fullPath: '/api/public/cron/workforce-reassign-tick'
+      preLoaderRoute: typeof ApiPublicCronWorkforceReassignTickRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/cron/zoho-diagnose': {
       id: '/api/public/cron/zoho-diagnose'
       path: '/api/public/cron/zoho-diagnose'
@@ -3193,6 +3214,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicCronSchedulersTickRoute: ApiPublicCronSchedulersTickRoute,
   ApiPublicCronWorkflowRemindersRoute: ApiPublicCronWorkflowRemindersRoute,
   ApiPublicCronWorkflowTickRoute: ApiPublicCronWorkflowTickRoute,
+  ApiPublicCronWorkforceReassignTickRoute:
+    ApiPublicCronWorkforceReassignTickRoute,
   ApiPublicCronZohoDiagnoseRoute: ApiPublicCronZohoDiagnoseRoute,
   ApiPublicFormAssetSplatRoute: ApiPublicFormAssetSplatRoute,
   ApiPublicGstLeadRoute: ApiPublicGstLeadRoute,
