@@ -694,7 +694,7 @@ export const listStaff = createServerFn({ method: "GET" })
 
     const { data: profiles, error: profilesErr } = await (admin as any)
       .from("profiles")
-      .select("id, display_name, full_name, email, is_active, employment_status, auto_assign_enabled")
+      .select("*")
       .in("id", userIds);
 
     if (profilesErr) throw new Error(profilesErr.message);
@@ -706,12 +706,12 @@ export const listStaff = createServerFn({ method: "GET" })
         ...p,
         display_name: p.full_name || p.display_name || p.email?.split("@")[0] || "Unknown Employee",
         name: p.full_name || p.display_name || p.email?.split("@")[0] || "Unknown Employee",
+        employment_status: p.employment_status || (p.is_active === false ? "INACTIVE" : "ACTIVE"),
       }));
 
     return { profiles: activeStaff };
   });
 
-/**
 /**
  * Returns staff formatted for operational assignment dropdowns:
  * Strictly requires ACTIVE employee in profiles AND active in assignment_pool (is_active = true).
@@ -739,14 +739,12 @@ export const listAssignmentStaff = createServerFn({ method: "GET" })
       return { profiles: [] };
     }
 
-    // 2. Fetch profiles for active pool members (strictly is_active = true and employment_status = 'ACTIVE')
+    // 2. Fetch profiles for active pool members (strictly is_active = true)
     const { data: activeProfiles, error: profErr } = await adminAny
       .from("profiles")
-      .select("id, full_name, display_name, email, is_active, employment_status")
+      .select("*")
       .in("id", activePoolUserIds)
-      .eq("is_active", true)
-      .eq("employment_status", "ACTIVE")
-      .order("full_name", { ascending: true });
+      .eq("is_active", true);
 
     if (profErr) console.error("[listAssignmentStaff] profiles error:", profErr);
 
@@ -759,25 +757,27 @@ export const listAssignmentStaff = createServerFn({ method: "GET" })
     const workloads = await calculateStaffWorkloads();
     const workloadMap = new Map(workloads.map((w) => [String(w.employeeId), w]));
 
-    const result = (activeProfiles ?? []).map((p: any) => {
-      const w = workloadMap.get(String(p.id));
-      const displayName = p.full_name || p.display_name || p.email?.split("@")[0] || "Staff";
-      return {
-        id: p.id,
-        display_name: displayName,
-        name: displayName,
-        full_name: p.full_name,
-        email: p.email,
-        role: w?.role || "operations",
-        employment_status: p.employment_status,
-        is_active: true,
-        is_eligible: w?.isAutoAssignEligible ?? true,
-        is_on_leave: w?.presenceStatus === "ON_LEAVE",
-        presence_status: w?.presenceStatus || "AVAILABLE",
-        effective_workload: w?.effectiveWorkload ?? 0,
-        unavailability_reason: w?.unavailabilityReason,
-      };
-    });
+    const result = (activeProfiles ?? [])
+      .filter((p: any) => p.is_active !== false && (p.employment_status === "ACTIVE" || !p.employment_status))
+      .map((p: any) => {
+        const w = workloadMap.get(String(p.id));
+        const displayName = p.full_name || p.display_name || p.email?.split("@")[0] || "Staff";
+        return {
+          id: p.id,
+          display_name: displayName,
+          name: displayName,
+          full_name: p.full_name,
+          email: p.email,
+          role: w?.role || "operations",
+          employment_status: p.employment_status || "ACTIVE",
+          is_active: true,
+          is_eligible: w?.isAutoAssignEligible ?? true,
+          is_on_leave: w?.presenceStatus === "ON_LEAVE",
+          presence_status: w?.presenceStatus || "AVAILABLE",
+          effective_workload: w?.effectiveWorkload ?? 0,
+          unavailability_reason: w?.unavailabilityReason,
+        };
+      });
 
     result.sort((a, b) => a.display_name.localeCompare(b.display_name));
 
@@ -796,7 +796,7 @@ export const listAllHistoricalStaff = createServerFn({ method: "GET" })
 
     const [rolesRes, profilesRes] = await Promise.all([
       admin.from("user_roles").select("user_id, role").in("role", ["super_admin", "admin", "operations", "manager", "executive", "support", "finance", "accounts"]),
-      adminAny.from("profiles").select("id, display_name, full_name, email, is_active, employment_status").order("display_name", { ascending: true }),
+      adminAny.from("profiles").select("*"),
     ]);
 
     const staffUserIds = new Set((rolesRes.data ?? []).map((r: any) => r.user_id));
@@ -810,7 +810,7 @@ export const listAllHistoricalStaff = createServerFn({ method: "GET" })
         name: p.full_name || p.display_name || p.email?.split("@")[0] || "Unknown Employee",
         full_name: p.full_name || p.display_name || p.email?.split("@")[0] || "Unknown Employee",
         email: p.email,
-        is_active: p.is_active !== false && p.employment_status === "ACTIVE",
+        is_active: p.is_active !== false && (p.employment_status === "ACTIVE" || !p.employment_status),
         employment_status: p.employment_status || (p.is_active === false ? "INACTIVE" : "ACTIVE"),
       })),
     };

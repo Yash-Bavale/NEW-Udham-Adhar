@@ -472,7 +472,7 @@ export async function calculateStaffWorkloads(): Promise<StaffWorkloadSummary[]>
       .in("role", ORDER_ACCESS_ROLES),
     (supabaseAdmin as any)
       .from("profiles")
-      .select("id, display_name, full_name, email, is_active, employment_status, auto_assign_enabled, max_workload, work_schedule")
+      .select("*")
       .not("id", "is", null),
   ]);
 
@@ -483,7 +483,8 @@ export async function calculateStaffWorkloads(): Promise<StaffWorkloadSummary[]>
     }
   });
   (activeProfiles ?? []).forEach((p: any) => {
-    if (p.id && UUID_REGEX.test(String(p.id)) && p.employment_status !== "ARCHIVED" && p.employment_status !== "TERMINATED") {
+    const status = p.employment_status || (p.is_active === false ? "INACTIVE" : "ACTIVE");
+    if (p.id && UUID_REGEX.test(String(p.id)) && status !== "ARCHIVED" && status !== "TERMINATED") {
       rawUserIds.add(String(p.id));
     }
   });
