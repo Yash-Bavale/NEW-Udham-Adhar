@@ -298,38 +298,21 @@ export const bulkAssignOrders = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => BulkAssignInput.parse(i))
   .handler(async ({ data, context }) => {
     await assertRole(context.supabase, ["super_admin", "admin"]);
-    const admin = await getAdmin();
+    const { assignOrderCanonical } = await import("./assignment-engine.server");
 
-    // 1. Update assigned_to on applications
-    const { error: appErr } = await admin
-      .from("applications")
-      .update({ assigned_to: data.assignedTo, updated_at: new Date().toISOString() } as never)
-      .in("id", data.applicationIds);
-    if (appErr) throw new Error(appErr.message);
-
-    // 2. Also update assigned_to on corresponding leads
-    const { data: apps } = await admin
-      .from("applications")
-      .select("lead_id")
-      .in("id", data.applicationIds);
-    const leadIds = Array.from(new Set((apps ?? []).map((a: any) => a.lead_id).filter(Boolean))) as string[];
-    if (leadIds.length) {
-      await admin
-        .from("leads")
-        .update({ assigned_to: data.assignedTo, updated_at: new Date().toISOString() } as never)
-        .in("id", leadIds);
+    for (const orderId of data.applicationIds) {
+      await assignOrderCanonical({
+        orderId,
+        newEmployeeId: data.assignedTo,
+        changeType: "MANUAL_BULK",
+        reason: `Bulk reassigned by admin (${data.applicationIds.length} orders in batch)`,
+        source: "admin",
+        actorId: context.userId,
+        skipNotification: true, // We emit one batch notification below
+      });
     }
 
-    // 3. Write audit log
-    await writeAudit({
-      supabase: context.supabase,
-      entityType: "application",
-      entityId: data.applicationIds[0],
-      action: "bulk_reassign",
-      newValue: { application_ids: data.applicationIds, assigned_to: data.assignedTo },
-      actorId: context.userId,
-    });
-
+    // Emit single grouped notification to recipient
     if (data.assignedTo) {
       try {
         const { emitToUsers } = await import("@/lib/notifications/emit.server");
@@ -343,21 +326,6 @@ export const bulkAssignOrders = createServerFn({ method: "POST" })
         });
       } catch (notifErr) {
         console.warn("[bulkAssignOrders] Failed to emit notification:", notifErr);
-      }
-
-      try {
-        const { logEmployeeOrderAction } = await import("@/lib/orders/order-action-logger.server");
-        for (const appId of data.applicationIds) {
-          await logEmployeeOrderAction({
-            orderId: appId,
-            employeeId: data.assignedTo,
-            actionType: "ORDER_ASSIGNED",
-            source: "admin",
-            supabase: admin,
-          });
-        }
-      } catch (auditErr) {
-        console.warn("[bulkAssignOrders] Action log warning:", auditErr);
       }
     }
 

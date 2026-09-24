@@ -6,8 +6,9 @@ import {
   ArrowLeft, Copy, Phone, Mail, User2,
   FileText, Workflow, Activity, LifeBuoy, ExternalLink, BadgeDollarSign,
   ShieldAlert, ShieldOff, Clock, AlertTriangle, XCircle, CheckCircle2, RotateCcw,
-  Link2, Send, Loader2, VolumeX,
+  Link2, Send, Loader2, VolumeX, History,
 } from "lucide-react";
+import { OrderAssignmentHistoryTab } from "@/components/admin/workspace/OrderAssignmentHistoryTab";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
@@ -77,6 +78,7 @@ interface Props {
 const TAB_DEFS = [
   { id: "form" as const, label: "Forms & Docs", icon: FileText, tooltip: "View the submitted service form and uploaded documents" },
   { id: "workflow" as const, label: "Employee Task", icon: Workflow, tooltip: "Move the order through its workflow stages" },
+  { id: "assignment" as const, label: "Assignment History", icon: History, tooltip: "View employee assignment transitions and history" },
   { id: "emails" as const, label: "Emails", icon: Mail, tooltip: "All emails sent or received for this order" },
   { id: "invoices" as const, label: "Invoices", icon: BadgeDollarSign, tooltip: "View, download, resend, or replace invoices for this order", moneyOnly: true },
   { id: "activity" as const, label: "Timeline / Activity Log", icon: Activity, tooltip: "Full chronological activity log for this order" },
@@ -1002,6 +1004,10 @@ export function WorkspaceShell(p: Props) {
                 deletedReason={application.documents_deleted_reason}
                 hideMoney={p.hideAmount}
               />
+            </TabsContent>
+
+            <TabsContent value="assignment" className="space-y-4 mt-0 animate-fade-in">
+              <OrderAssignmentHistoryTab orderId={p.orderId} />
             </TabsContent>
 
             <TabsContent value="emails" className="space-y-4 mt-0 animate-fade-in">

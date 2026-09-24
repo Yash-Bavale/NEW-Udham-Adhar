@@ -321,7 +321,7 @@ export const NEXT_STEP_HINT: Record<OrderStatus, NextStepHint> = {
 
 // ─────────────────────────── TAB AVAILABILITY ───────────────────────────
 
-export type WorkspaceTabId = "workflow" | "form" | "emails" | "activity" | "support" | "invoices";
+export type WorkspaceTabId = "workflow" | "form" | "emails" | "activity" | "support" | "invoices" | "assignment";
 
 export type TabAvailability = Record<WorkspaceTabId, { enabled: boolean; reason: string }>;
 
@@ -345,6 +345,6 @@ export function tabAvailability(
     activity: { enabled: true, reason: "" },
     support: { enabled: !locked, reason: locked ? "Order is closed — no new tickets" : "" },
     invoices: { enabled: true, reason: "" },
+    assignment: { enabled: true, reason: "" },
   };
-
 }

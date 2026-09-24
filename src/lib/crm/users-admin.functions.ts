@@ -418,6 +418,21 @@ export const setEmployeeActive = createServerFn({ method: "POST" })
     } as never);
     if (bErr) throw new Error(bErr.message);
 
+    // If account deactivated, automatically redistribute active orders
+    if (!data.is_active) {
+      try {
+        const { reassignOrdersFromUnavailableEmployee } = await import("./assignment-engine.server");
+        await reassignOrdersFromUnavailableEmployee({
+          unavailableEmployeeId: data.user_id,
+          reason: "Employee account deactivated by administrator",
+          changeType: "AUTO_UNAVAILABLE",
+          actorId: context.userId,
+        });
+      } catch (reassignErr) {
+        console.warn("[setEmployeeActive] Auto-reassign warning:", reassignErr);
+      }
+    }
+
     return { ok: true };
   });
 

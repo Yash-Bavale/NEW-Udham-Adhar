@@ -23,6 +23,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { LeadAssignmentTab } from "@/components/admin/LeadAssignmentTab";
+import { AssignmentManagementView } from "@/components/admin/reassignment/AssignmentManagementView";
 import { Trash2, Copy, Check } from "lucide-react";
 
 export const Route = createFileRoute("/admin/employees")({
@@ -157,6 +158,7 @@ function EmployeesPage() {
           <TabsTrigger value="directory">Directory</TabsTrigger>
           <TabsTrigger value="performance">Performance</TabsTrigger>
           <TabsTrigger value="assignment">Auto-Assignment Pool</TabsTrigger>
+          <TabsTrigger value="leaves">Leaves & Reassignment</TabsTrigger>
         </TabsList>
 
         <TabsContent value="directory" className="space-y-4 mt-4">
@@ -310,6 +312,10 @@ function EmployeesPage() {
 
         <TabsContent value="assignment" className="mt-4">
           <LeadAssignmentTab />
+        </TabsContent>
+
+        <TabsContent value="leaves" className="mt-4">
+          <AssignmentManagementView />
         </TabsContent>
       </Tabs>
     </div>

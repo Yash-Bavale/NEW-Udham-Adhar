@@ -1273,32 +1273,22 @@ export const updateOrderAssignee = createServerFn({ method: "POST" })
     z.object({ orderId: z.string().uuid(), assignedTo: z.string().uuid().nullable() }).parse(i),
   )
   .handler(async ({ data, context }) => {
-    await assertStaff(context.supabase);
-    const admin = await getAdmin();
-    const { data: app } = await admin
-      .from("applications")
-      .select("lead_id, application_code")
-      .eq("id", data.orderId)
-      .maybeSingle();
-    const { error } = await admin
-      .from("applications")
-      .update({ assigned_to: data.assignedTo } as never)
-      .eq("id", data.orderId);
-    if (error) throw new Error(error.message);
-    if (app?.lead_id && data.assignedTo) {
-      await admin.from("leads").update({ assigned_to: data.assignedTo } as never).eq("id", app.lead_id);
+    await assertStaff(context.supabase, context.userId);
+    const { assignOrderCanonical } = await import("./assignment-engine.server");
+
+    const res = await assignOrderCanonical({
+      orderId: data.orderId,
+      newEmployeeId: data.assignedTo,
+      changeType: "MANUAL",
+      reason: "Manual reassignment by operator/admin",
+      source: "manual",
+      actorId: context.userId,
+    });
+
+    if (!res.success && res.error) {
+      throw new Error(res.error);
     }
-    if (data.assignedTo) {
-      const { emitToUsers } = await import("@/lib/notifications/emit.server");
-      await emitToUsers([data.assignedTo], {
-        kind: "order_assigned",
-        title: "New Order Assigned",
-        body: `Order ${app?.application_code || ""} has been assigned to your queue.`,
-        href: `/admin/orders/${data.orderId}`,
-        entityKind: "application",
-        entityId: data.orderId,
-      });
-    }
+
     return { ok: true };
   });
 
