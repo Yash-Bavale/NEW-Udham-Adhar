@@ -786,9 +786,16 @@ export const getActiveOrderCallback = createServerFn({ method: "POST" })
       const { count } = await (admin
         .from("order_callback_history" as any) as any)
         .select("id", { count: "exact", head: true })
-        .eq("order_id", data.orderId)
-        .in("action_type", ["CALLBACK_SCHEDULED", "CALLBACK_RESCHEDULED"]);
+        .eq("order_id", data.orderId);
       historyCount = count ?? 0;
+      if (historyCount === 0) {
+        const { count: sCount } = await admin
+          .from("order_schedulers")
+          .select("id", { count: "exact", head: true })
+          .eq("application_id", data.orderId)
+          .in("scheduler_type", ["our_side_reminder", "callback_reminder"]);
+        historyCount = sCount ?? 0;
+      }
     } catch {
       historyCount = 0;
     }

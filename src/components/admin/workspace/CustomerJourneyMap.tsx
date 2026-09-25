@@ -240,9 +240,11 @@ export function CustomerJourneyMap(p: Props) {
     staleTime: 5_000,
   });
   const callbackHistory = (callbackHistoryQ.data ?? []) as CallbackHistoryItem[];
-  const historyCount =
-    activeCallback?.historyCount ??
-    callbackHistory.filter((h) => h.action_type === "CALLBACK_SCHEDULED" || h.action_type === "CALLBACK_RESCHEDULED").length;
+  const historyCount = Math.max(
+    callbackHistory.length,
+    activeCallback?.historyCount ?? 0,
+    callbackHistory.filter((h) => h.action_type === "CALLBACK_SCHEDULED" || h.action_type === "CALLBACK_RESCHEDULED").length
+  );
 
   const fnCompleteCallback = useServerFn(completeOrderCallback);
   const mutCompleteCallback = useMutation({
@@ -719,17 +721,15 @@ export function CustomerJourneyMap(p: Props) {
           </button>
 
           {/* View Callback History Button */}
-          {callbackHistory.length > 0 && !activeCallback && (
-            <button
-              type="button"
-              onClick={() => setDialog({ kind: "callback_history" })}
-              className="inline-flex items-center gap-1.5 rounded-md border border-indigo-200 bg-white px-3 py-1.5 text-xs font-bold text-indigo-700 shadow-xs hover:bg-indigo-50 hover:border-indigo-300 transition cursor-pointer"
-              title="View full callback scheduling & completion history"
-            >
-              <History className="size-3.5 text-indigo-600" />
-              VIEW ({callbackHistory.length})
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={() => setDialog({ kind: "callback_history" })}
+            className="inline-flex items-center gap-1.5 rounded-md border border-indigo-200 bg-white px-3 py-1.5 text-xs font-bold text-indigo-700 shadow-xs hover:bg-indigo-50 hover:border-indigo-300 transition cursor-pointer"
+            title="View complete callback scheduling & audit history"
+          >
+            <History className="size-3.5 text-indigo-600" />
+            VIEW HISTORY {historyCount > 0 ? `(${historyCount})` : ""}
+          </button>
         </div>
 
         {/* Banner 1: Active Scheduled Callback (Due or Upcoming) */}
@@ -777,17 +777,16 @@ export function CustomerJourneyMap(p: Props) {
             </div>
 
             <div className="flex items-center gap-2 ml-auto flex-wrap">
-              {(historyCount ?? 0) > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setDialog({ kind: "callback_history" })}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-white px-2.5 py-1.5 text-xs font-bold text-indigo-700 hover:bg-indigo-50 hover:border-indigo-300 transition cursor-pointer shadow-2xs"
-                  title="View callback scheduling & rescheduling history"
-                >
-                  <History className="size-3.5 text-indigo-600" />
-                  VIEW ({historyCount})
-                </button>
-              )}
+              {/* Primary Action: View History Modal */}
+              <button
+                type="button"
+                onClick={() => setDialog({ kind: "callback_history" })}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-300 bg-white px-3 py-1.5 text-xs font-bold text-indigo-700 hover:bg-indigo-50 hover:border-indigo-400 transition cursor-pointer shadow-xs"
+                title="View callback scheduling & rescheduling history"
+              >
+                <History className="size-3.5 text-indigo-600" />
+                VIEW {historyCount > 0 ? `(${historyCount})` : ""}
+              </button>
 
               {/* Primary Action 1: Call Completed */}
               <button
@@ -828,17 +827,15 @@ export function CustomerJourneyMap(p: Props) {
             </div>
 
             <div className="flex items-center gap-2 ml-auto flex-wrap">
-              {(historyCount ?? 0) > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setDialog({ kind: "callback_history" })}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-white px-2.5 py-1.5 text-xs font-bold text-indigo-700 hover:bg-indigo-50 hover:border-indigo-300 transition cursor-pointer shadow-2xs"
-                  title="View callback scheduling & rescheduling history"
-                >
-                  <History className="size-3.5 text-indigo-600" />
-                  VIEW ({historyCount})
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={() => setDialog({ kind: "callback_history" })}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-300 bg-white px-3 py-1.5 text-xs font-bold text-indigo-700 hover:bg-indigo-50 hover:border-indigo-400 transition cursor-pointer shadow-xs"
+                title="View callback scheduling & rescheduling history"
+              >
+                <History className="size-3.5 text-indigo-600" />
+                VIEW {historyCount > 0 ? `(${historyCount})` : ""}
+              </button>
 
               <button
                 type="button"
