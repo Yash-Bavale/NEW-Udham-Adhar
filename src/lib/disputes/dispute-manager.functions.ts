@@ -404,6 +404,7 @@ export const searchDisputeOrder = createServerFn({ method: "POST" })
 
 const GenerateDisputePackageSchema = z.object({
   orderId: z.string().uuid(),
+  disputeId: z.string().optional().nullable(),
   selectedEmailIds: z.array(z.string()),
   includeInvoice: z.boolean(),
   includeCertificate: z.boolean(),
@@ -593,8 +594,10 @@ export const generateDisputeEvidencePackage = createServerFn({ method: "POST" })
 
     // 7. Assemble package ID & render merged PDF
     const packageId = crypto.randomUUID();
+    const disputeIdClean = data.disputeId?.trim() || null;
     const pkgData: DisputePackageData = {
       packageId,
+      disputeId: disputeIdClean,
       order: {
         id: app.id,
         applicationCode,
@@ -672,6 +675,7 @@ export const generateDisputeEvidencePackage = createServerFn({ method: "POST" })
         certificate_included: Boolean(certificateData),
         item_count: totalItemCount,
         metadata: {
+          disputeId: disputeIdClean,
           staffRole,
           totalPdfBytes: finalPdfBytes.length,
           orderTotalAmount: lead.total_amount,

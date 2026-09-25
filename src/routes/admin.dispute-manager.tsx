@@ -93,6 +93,7 @@ function DisputeManagerPage() {
   const [orderQuery, setOrderQuery] = useState("");
   const [currentOrder, setCurrentOrder] = useState<DisputeOrderSummary | null>(null);
   const [isSearching, setIsSearching] = useState(false);
+  const [disputeId, setDisputeId] = useState("");
 
   // Evidence Selection State
   const [selectedEmailIds, setSelectedEmailIds] = useState<string[]>([]);
@@ -122,6 +123,7 @@ function DisputeManagerPage() {
     setIsSearching(true);
     setCurrentOrder(null);
     setSelectedEmailIds([]);
+    setDisputeId("");
     try {
       const res = await searchFn({ data: { orderQuery: q } });
       if (!res) {
@@ -148,6 +150,7 @@ function DisputeManagerPage() {
       return await generateFn({
         data: {
           orderId: currentOrder.applicationId,
+          disputeId: disputeId.trim() || undefined,
           selectedEmailIds,
           includeInvoice: includeInvoice && Boolean(currentOrder.invoice),
           includeCertificate: includeCertificate && Boolean(currentOrder.certificate),
@@ -372,6 +375,30 @@ function DisputeManagerPage() {
               </CardContent>
             </Card>
           </div>
+
+          {/* Dispute ID / Chargeback Case ID (Optional) */}
+          <Card className="border-slate-200 shadow-xs bg-white">
+            <CardContent className="p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className="space-y-0.5">
+                <label htmlFor="dispute-id-input" className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                  <ShieldAlert className="size-3.5 text-amber-600" />
+                  Dispute ID / Gateway Case Reference (Optional)
+                </label>
+                <p className="text-[11px] text-slate-500">
+                  Enter bank / payment gateway chargeback reference ID to stamp on the cover page and running footer.
+                </p>
+              </div>
+              <div className="w-full sm:w-80">
+                <Input
+                  id="dispute-id-input"
+                  value={disputeId}
+                  onChange={(e) => setDisputeId(e.target.value)}
+                  placeholder="e.g. DISP-2026-98102 / CASE-4401"
+                  className="h-9 text-xs font-mono bg-slate-50 border-slate-300 focus:bg-white focus:border-indigo-500"
+                />
+              </div>
+            </CardContent>
+          </Card>
 
           {/* 2. Evidence Selection Checklist */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
@@ -766,7 +793,7 @@ function DisputeManagerPage() {
                     <span className="text-slate-400 font-medium">Sent:</span> {formatDateTime(activeEmailPreview.sent_at)}
                   </div>
                   <div>
-                    <span className="text-slate-400 font-medium">Template:</span> {activeEmailPreview.template_code || "—"}
+                    <span className="text-slate-400 font-medium">Message ID:</span> {activeEmailPreview.message_id || `msg_${activeEmailPreview.id.slice(0, 12)}`}
                   </div>
                 </div>
               </div>
@@ -838,6 +865,12 @@ function DisputeManagerPage() {
                   <div>
                     <span className="text-slate-400 font-medium">Payment Status:</span> {currentOrder.payment?.status ?? "PAID"}
                   </div>
+                  {disputeId.trim() && (
+                    <div className="col-span-2 pt-1 border-t border-slate-100">
+                      <span className="text-slate-400 font-medium">Dispute ID:</span>{" "}
+                      <span className="font-bold text-amber-700 font-mono">{disputeId.trim()}</span>
+                    </div>
+                  )}
                 </div>
               </div>
 
