@@ -351,35 +351,48 @@ async function ensurePaidOrdersIntegrated(admin: any) {
       }
     }
 
-    // 5. Check if any active (non-terminal) orders are assigned to archived or inactive staff, and reassign them
+    // 5. Check if any active (non-terminal) orders are assigned to archived/inactive staff OR non-pool super_admins
     try {
-      const { data: inactiveProfiles } = await admin
-        .from("profiles")
-        .select("id")
-        .or("is_active.eq.false,employment_status.eq.ARCHIVED,employment_status.eq.TERMINATED");
-      if (inactiveProfiles && inactiveProfiles.length > 0) {
-        const inactiveIds = inactiveProfiles.map((p: any) => p.id);
+      const [inactiveProfilesRes, superAdminRolesRes, poolRes] = await Promise.all([
+        admin.from("profiles").select("id").or("is_active.eq.false,employment_status.eq.ARCHIVED,employment_status.eq.TERMINATED"),
+        admin.from("user_roles").select("user_id, role").in("role", ["super_admin", "admin", "finance", "accounts", "support"]),
+        admin.from("assignment_pool").select("user_id, is_active").eq("is_active", true),
+      ]);
+
+      const activePoolUserIds = new Set((poolRes.data ?? []).map((p: any) => String(p.user_id)));
+      const excludedUserIds = new Set<string>();
+
+      (inactiveProfilesRes.data ?? []).forEach((p: any) => excludedUserIds.add(String(p.id)));
+      (superAdminRolesRes.data ?? []).forEach((r: any) => {
+        if (!activePoolUserIds.has(String(r.user_id))) {
+          excludedUserIds.add(String(r.user_id));
+        }
+      });
+
+      if (excludedUserIds.size > 0) {
+        const excludedIdsArr = Array.from(excludedUserIds);
         const { data: orphanedApps } = await admin
           .from("applications")
           .select("id, assigned_to")
-          .in("assigned_to", inactiveIds)
+          .in("assigned_to", excludedIdsArr)
           .eq("is_deleted", false)
           .not("fulfillment_status", "in", '("completed","order_completed","order_closed","closed","rejected","cancelled","application_rejected","certificate_rejected")')
-          .limit(50);
+          .limit(100);
+
         if (orphanedApps && orphanedApps.length > 0) {
           const { reassignOrdersFromUnavailableEmployee } = await import("@/lib/crm/assignment-engine.server");
           const uniqueInactiveAssigned = Array.from(new Set(orphanedApps.map((a: any) => a.assigned_to).filter(Boolean)));
           for (const unavailId of uniqueInactiveAssigned) {
             await reassignOrdersFromUnavailableEmployee({
               unavailableEmployeeId: String(unavailId),
-              reason: "Auto-reassigned from archived/inactive staff",
+              reason: "Auto-reassigned from non-operational / inactive staff",
               changeType: "AUTO_TERMINATED",
             });
           }
         }
       }
     } catch (err) {
-      console.warn("[ensurePaidOrdersIntegrated] Inactive staff orders self-heal warning:", err);
+      console.warn("[ensurePaidOrdersIntegrated] Non-pool / inactive staff orders self-heal warning:", err);
     }
   } catch (err) {
     console.error("[ensurePaidOrdersIntegrated] error:", err);

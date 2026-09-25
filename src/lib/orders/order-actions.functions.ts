@@ -1040,6 +1040,30 @@ export const reopenOrder = createServerFn({ method: "POST" })
       console.warn("[reopenOrder] hot order scheduler insert warning:", schedErr);
     }
 
+    // 4b. If order was assigned to an inactive/exited employee (or unassigned), instantly assign to an active operations employee
+    try {
+      let isAssigneeActive = false;
+      if (preApp?.assigned_to) {
+        const { data: assigneeProf } = await supabaseAdmin
+          .from("profiles")
+          .select("id, is_active, employment_status")
+          .eq("id", preApp.assigned_to)
+          .maybeSingle();
+        isAssigneeActive = assigneeProf?.is_active !== false && (assigneeProf?.employment_status === "ACTIVE" || !assigneeProf?.employment_status);
+      }
+      if (!isAssigneeActive) {
+        const { assignOrderToNextEligibleEmployee } = await import("@/lib/crm/assignment-engine.server");
+        await assignOrderToNextEligibleEmployee({
+          orderId: data.orderId,
+          changeType: preApp?.assigned_to ? "AUTO_TERMINATED" : "AUTO_INITIAL_POOL",
+          reason: preApp?.assigned_to ? "Order reopened: Previous assignee is inactive/exited" : "Order reopened: Assigned to active pool staff",
+          actorId: context.userId,
+        });
+      }
+    } catch (assignErr) {
+      console.warn("[reopenOrder] auto-reassign warning:", assignErr);
+    }
+
     // 5. Audit logs: workflow_events, application_events, and employee order action log
     await supabaseAdmin.from("workflow_events").insert({
       application_id: data.orderId,

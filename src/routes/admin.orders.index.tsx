@@ -334,6 +334,11 @@ function OrdersListPage() {
     queryFn: () => assignStaffFn(),
     staleTime: 30 * 1000,
   });
+  const { data: historicalStaffData } = useQuery({
+    queryKey: ["admin.staff.historical"],
+    queryFn: () => historicalStaffFn(),
+    staleTime: 60 * 1000,
+  });
   const assignStaffProfiles: Array<{
     id: string;
     display_name?: string;
@@ -347,6 +352,42 @@ function OrdersListPage() {
   }> = useMemo(() => {
     return (assignStaffData?.profiles ?? []) as any[];
   }, [assignStaffData]);
+
+  const { activeStaffList, inactiveStaffList } = useMemo(() => {
+    const hist = (historicalStaffData?.profiles ?? []) as any[];
+    const liveMap = new Map((assignStaffProfiles ?? []).map((s: any) => [s.id, s]));
+
+    const active: any[] = [];
+    const inactive: any[] = [];
+
+    for (const h of hist) {
+      const live = liveMap.get(h.id);
+      const isAct = h.is_active !== false && h.employment_status !== "ARCHIVED" && h.employment_status !== "TERMINATED" && h.employment_status !== "INACTIVE";
+      if (isAct) {
+        active.push({
+          ...h,
+          presence_status: live?.presence_status ?? "OFFLINE",
+          is_on_leave: live?.is_on_leave ?? false,
+          is_eligible: live?.is_eligible ?? true,
+          unavailability_reason: live?.unavailability_reason,
+        });
+      } else {
+        inactive.push(h);
+      }
+    }
+
+    // Also include any in liveMap not in hist
+    for (const s of assignStaffProfiles) {
+      if (!active.some((a) => a.id === s.id) && !inactive.some((i) => i.id === s.id)) {
+        active.push(s);
+      }
+    }
+
+    active.sort((a, b) => (a.display_name || a.name || "").localeCompare(b.display_name || b.name || ""));
+    inactive.sort((a, b) => (a.display_name || a.name || "").localeCompare(b.display_name || b.name || ""));
+
+    return { activeStaffList: active, inactiveStaffList: inactive };
+  }, [historicalStaffData, assignStaffProfiles]);
   const { data: svcData } = useQuery({
     queryKey: ["admin.services.list"],
     queryFn: () => svcFn(),
@@ -721,23 +762,52 @@ return (
         {/* Assignees Filter (Admin & Staff) */}
         {role.hasAny(["admin", "super_admin", "operations", "manager", "executive", "support"]) && (
           <Select value={assignedTo} onValueChange={setAssignedTo}>
-            <SelectTrigger className="h-9 w-[170px] text-xs bg-slate-50/50 border-slate-200"><SelectValue placeholder="All assignees" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All assignees</SelectItem>
-              <SelectItem value="unassigned">Unassigned</SelectItem>
-              {assignStaffProfiles.map((s: any) => (
-                <SelectItem key={s.id} value={s.id}>
-                  <div className="flex items-center justify-between gap-1.5 w-full">
-                    <span>{s.display_name || s.name || s.email}</span>
-                    {s.presence_status === "OFFLINE" && (
-                      <span className="text-[9px] text-slate-400 font-mono ml-1">● OFFLINE</span>
-                    )}
-                    {s.presence_status === "ON_LEAVE" && (
-                      <span className="text-[9px] text-amber-500 font-mono ml-1">● ON LEAVE</span>
-                    )}
-                  </div>
-                </SelectItem>
-              ))}
+            <SelectTrigger className="h-9 w-[190px] text-xs bg-slate-50/50 border-slate-200">
+              <SelectValue placeholder="All assignees" />
+            </SelectTrigger>
+            <SelectContent className="max-h-[380px]">
+              <SelectItem value="all" className="font-bold text-slate-800">All assignees</SelectItem>
+              <SelectItem value="unassigned" className="text-slate-600">Unassigned</SelectItem>
+              
+              {activeStaffList.length > 0 && (
+                <SelectGroup>
+                  <SelectLabel className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-emerald-700 bg-emerald-50/80 rounded-md my-1 flex items-center gap-1">
+                    🟢 Active Workforce ({activeStaffList.length})
+                  </SelectLabel>
+                  {activeStaffList.map((s: any) => (
+                    <SelectItem key={s.id} value={s.id} className="pl-3 text-xs">
+                      <div className="flex items-center justify-between gap-1.5 w-full">
+                        <span>{s.display_name || s.name || s.email}</span>
+                        {s.presence_status === "AVAILABLE" && (
+                          <span className="text-[9px] text-emerald-600 font-mono ml-1">● ONLINE</span>
+                        )}
+                        {s.presence_status === "OFFLINE" && (
+                          <span className="text-[9px] text-slate-400 font-mono ml-1">● OFFLINE</span>
+                        )}
+                        {s.presence_status === "ON_LEAVE" && (
+                          <span className="text-[9px] text-amber-500 font-mono ml-1">● ON LEAVE</span>
+                        )}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              )}
+
+              {inactiveStaffList.length > 0 && (
+                <SelectGroup>
+                  <SelectLabel className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-rose-700 bg-rose-50/80 rounded-md my-1 flex items-center gap-1">
+                    ⚪ Inactive / Exited Staff ({inactiveStaffList.length})
+                  </SelectLabel>
+                  {inactiveStaffList.map((s: any) => (
+                    <SelectItem key={s.id} value={s.id} className="pl-3 text-xs text-slate-600">
+                      <div className="flex items-center justify-between gap-1.5 w-full">
+                        <span>{s.display_name || s.name || s.email}</span>
+                        <span className="text-[9px] text-rose-500 font-mono ml-1 uppercase">[{s.employment_status || "INACTIVE"}]</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              )}
             </SelectContent>
           </Select>
         )}

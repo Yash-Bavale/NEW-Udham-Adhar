@@ -234,6 +234,13 @@ export function isEmployeeEligibleForAutoAssignment(
     reasons.push(`Role (${emp.role}) is not eligible for order assignments`);
   }
 
+  const NON_OPS_ROLES = new Set(["super_admin", "admin", "finance", "accounts", "support"]);
+  if (emp.role && NON_OPS_ROLES.has(emp.role)) {
+    if (!emp.isInAssignmentPool || emp.autoAssignEnabled === false) {
+      reasons.push(`Role (${emp.role}) is not an active member of assignment pool`);
+    }
+  }
+
   if (emp.isOnLeave) {
     reasons.push("Employee is currently on approved leave");
   }
@@ -796,6 +803,59 @@ export async function distributeOrdersEquallyCanonical(
 }
 
 /**
+ * Assign an individual order (e.g. reopened order or new incoming order) to the next eligible active operations employee.
+ * Strictly avoids super_admins/admins unless enrolled in the pool.
+ */
+export async function assignOrderToNextEligibleEmployee(params: {
+  orderId: string;
+  changeType?: AssignmentChangeType;
+  reason?: string;
+  actorId?: string | null;
+}): Promise<{ success: boolean; newEmployeeId?: string; error?: string }> {
+  const { orderId, changeType = "AUTO_INITIAL_POOL", reason = "Assigned to next eligible staff", actorId } = params;
+
+  let candidates = (await getEligibleAssignmentEmployees()).filter(
+    (c) =>
+      c.role !== "super_admin" &&
+      c.role !== "admin" &&
+      c.role !== "support" &&
+      c.role !== "finance" &&
+      c.role !== "accounts",
+  );
+
+  if (candidates.length === 0) {
+    const allWorkloads = await calculateStaffWorkloads();
+    candidates = allWorkloads.filter(
+      (c) =>
+        c.employmentStatus === "ACTIVE" &&
+        c.role !== "super_admin" &&
+        c.role !== "admin" &&
+        c.role !== "support" &&
+        c.role !== "finance" &&
+        c.role !== "accounts",
+    );
+  }
+
+  if (candidates.length === 0) {
+    return { success: false, error: "No eligible active operations staff available" };
+  }
+
+  candidates.sort((a, b) => a.effectiveWorkload - b.effectiveWorkload);
+  const chosen = candidates[0];
+
+  const res = await assignOrderCanonical({
+    orderId,
+    newEmployeeId: chosen.employeeId,
+    changeType,
+    reason,
+    source: actorId ? "admin" : "system",
+    actorId,
+  });
+
+  return { success: res.success, newEmployeeId: chosen.employeeId, error: res.error };
+}
+
+/**
  * 6. Automatic Order Reassignment Engine for Unavailable Employees
  * Finds action-required orders belonging to an unavailable employee and redistributes them.
  */
@@ -908,20 +968,47 @@ export async function reassignOrdersFromUnavailableEmployee(params: {
   // Sort urgent orders first
   actionOrders.sort((a, b) => b.priorityScore - a.priorityScore);
 
-  // 3. Redistribute to eligible active employees (excluding the unavailable employee)
+  // 3. Redistribute to eligible active employees (excluding the unavailable employee and non-ops super_admins)
   let candidates = (await getEligibleAssignmentEmployees()).filter(
-    (c) => c.employeeId !== unavailableEmployeeId,
+    (c) =>
+      c.employeeId !== unavailableEmployeeId &&
+      c.role !== "super_admin" &&
+      c.role !== "admin" &&
+      c.role !== "support" &&
+      c.role !== "finance" &&
+      c.role !== "accounts",
   );
 
   // Fallback: If no currently online/pool staff found (e.g. outside shift hours or offline presence),
-  // fallback to all active workforce members so orders are never orphaned!
+  // fallback to active operations workforce members so orders are never orphaned!
+  // NEVER assign to super_admin or admin!
   if (candidates.length === 0) {
     const allWorkloads = await calculateStaffWorkloads();
     candidates = allWorkloads.filter(
       (c) =>
         c.employeeId !== unavailableEmployeeId &&
         c.employmentStatus === "ACTIVE" &&
-        c.role !== "support",
+        c.role !== "super_admin" &&
+        c.role !== "admin" &&
+        c.role !== "support" &&
+        c.role !== "finance" &&
+        c.role !== "accounts" &&
+        !c.ineligibilityReasons.some((r) => r.includes("Auto-assignment is toggled OFF") || r.includes("Not an active member of Assignment Pool")),
+    );
+  }
+
+  // Final fallback to any active operations employee
+  if (candidates.length === 0) {
+    const allWorkloads = await calculateStaffWorkloads();
+    candidates = allWorkloads.filter(
+      (c) =>
+        c.employeeId !== unavailableEmployeeId &&
+        c.employmentStatus === "ACTIVE" &&
+        c.role !== "super_admin" &&
+        c.role !== "admin" &&
+        c.role !== "support" &&
+        c.role !== "finance" &&
+        c.role !== "accounts",
     );
   }
 
