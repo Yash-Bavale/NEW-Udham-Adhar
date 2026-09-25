@@ -1,7 +1,7 @@
 -- Migration: 20260925131500_repair_completed_closed_event_dates.sql
--- Description: Orders Module - Completed & Closed Event Date Reflection
--- 1. Completed & Closed counts and tab queues now evaluate when the order was fulfilled/completed (fulfilled_at / certificate_uploaded_at / updated_at) or closed (updated_at) against the selected date range, regardless of when the order was originally created.
--- 2. "All Orders", "Action Taken" (Pending), and "Exception" continue to evaluate against creation date range.
+-- Description: Orders Module - Completed, Closed & Action Taken Logic
+-- 1. Completed & Closed counts and tab queues evaluate when the order was fulfilled/completed (application_events completion event, fulfilled_at, certificate_uploaded_at, updated_at) or closed (application_events closure event, updated_at) against the selected date range in IST, regardless of original created_at date.
+-- 2. Action Taken (Pending) represents orders in Technical Delay, Customer Delay, Scheduled Callback (Reminders), and Completed.
 -- 3. Live operational queues (Needs Action, Hot Orders, Backlog, Callbacks, Delays) remain live all-time portfolio views.
 
 CREATE OR REPLACE FUNCTION public.get_orders_v3_paged(
@@ -89,7 +89,9 @@ BEGIN
       os.fires_at AS scheduler_fires_at,
       os.remarks AS scheduler_remarks,
       os.created_at AS scheduler_created_at,
-      os.scheduler_type
+      os.scheduler_type,
+      ev_comp.event_completed_at,
+      ev_close.event_closed_at
     FROM applications a
     LEFT JOIN leads l ON a.lead_id = l.id
     LEFT JOIN customers c ON a.customer_id = c.id
@@ -121,6 +123,29 @@ BEGIN
       ORDER BY sch.created_at DESC
       LIMIT 1
     ) os ON TRUE
+    LEFT JOIN LATERAL (
+      SELECT MAX(ev.created_at) AS event_completed_at
+      FROM application_events ev
+      WHERE ev.application_id = a.id
+        AND (
+          ev.new_value ILIKE '%complete%'
+          OR ev.event_type ILIKE '%complete%'
+          OR ev.event_type = 'certificate_uploaded'
+          OR ev.event_type = 'order_completed'
+        )
+    ) ev_comp ON TRUE
+    LEFT JOIN LATERAL (
+      SELECT MAX(ev.created_at) AS event_closed_at
+      FROM application_events ev
+      WHERE ev.application_id = a.id
+        AND (
+          ev.new_value ILIKE '%close%'
+          OR ev.new_value ILIKE '%cancel%'
+          OR ev.event_type ILIKE '%close%'
+          OR ev.event_type ILIKE '%cancel%'
+          OR ev.event_type = 'order_closed'
+        )
+    ) ev_close ON TRUE
     WHERE a.is_deleted = false
       -- User authorization / assignee scope
       AND (
@@ -141,8 +166,8 @@ BEGIN
       )
       -- Candidate Selection:
       -- 1. Created in date range
-      -- 2. Completed in date range
-      -- 3. Closed in date range
+      -- 2. Completed in date range (via event or fulfillment timestamp)
+      -- 3. Closed in date range (via event or update timestamp)
       -- 4. Currently active non-terminal order (live operational portfolio)
       AND (
         (
@@ -150,22 +175,12 @@ BEGIN
           AND (p_date_to IS NULL OR a.created_at <= p_date_to)
         )
         OR (
-          (
-            COALESCE(a.fulfillment_status::text, '') IN ('completed', 'order_completed', 'application_approved', 'consultation_completed')
-            OR a.certificate_uploaded_at IS NOT NULL
-            OR a.fulfilled_at IS NOT NULL
-          )
-          AND (p_date_from IS NULL OR COALESCE(a.fulfilled_at, a.certificate_uploaded_at, a.updated_at, a.created_at) >= p_date_from)
-          AND (p_date_to IS NULL OR COALESCE(a.fulfilled_at, a.certificate_uploaded_at, a.updated_at, a.created_at) <= p_date_to)
+          (p_date_from IS NULL OR COALESCE(ev_comp.event_completed_at, a.fulfilled_at, a.certificate_uploaded_at, a.updated_at, a.created_at) >= p_date_from)
+          AND (p_date_to IS NULL OR COALESCE(ev_comp.event_completed_at, a.fulfilled_at, a.certificate_uploaded_at, a.updated_at, a.created_at) <= p_date_to)
         )
         OR (
-          (
-            (a.closure_stage IS NOT NULL AND a.closure_stage::text <> 'none')
-            OR COALESCE(a.fulfillment_status::text, '') IN ('order_closed', 'cancelled', 'application_rejected', 'certificate_rejected')
-            OR COALESCE(a.application_status::text, '') IN ('closed', 'cancelled')
-          )
-          AND (p_date_from IS NULL OR COALESCE(a.updated_at, a.created_at) >= p_date_from)
-          AND (p_date_to IS NULL OR COALESCE(a.updated_at, a.created_at) <= p_date_to)
+          (p_date_from IS NULL OR COALESCE(ev_close.event_closed_at, a.updated_at, a.created_at) >= p_date_from)
+          AND (p_date_to IS NULL OR COALESCE(ev_close.event_closed_at, a.updated_at, a.created_at) <= p_date_to)
         )
         OR (
           COALESCE(a.fulfillment_status::text, '') NOT IN ('completed', 'order_completed', 'order_closed', 'cancelled', 'application_rejected', 'certificate_rejected', 'consultation_completed')
@@ -316,13 +331,13 @@ BEGIN
       ) AS in_range_created,
 
       (
-        (p_date_from IS NULL OR COALESCE(bc.fulfilled_at, bc.certificate_uploaded_at, bc.updated_at, bc.created_at) >= p_date_from)
-        AND (p_date_to IS NULL OR COALESCE(bc.fulfilled_at, bc.certificate_uploaded_at, bc.updated_at, bc.created_at) <= p_date_to)
+        (p_date_from IS NULL OR COALESCE(bc.event_completed_at, bc.fulfilled_at, bc.certificate_uploaded_at, bc.updated_at, bc.created_at) >= p_date_from)
+        AND (p_date_to IS NULL OR COALESCE(bc.event_completed_at, bc.fulfilled_at, bc.certificate_uploaded_at, bc.updated_at, bc.created_at) <= p_date_to)
       ) AS in_range_completed,
 
       (
-        (p_date_from IS NULL OR COALESCE(bc.updated_at, bc.created_at) >= p_date_from)
-        AND (p_date_to IS NULL OR COALESCE(bc.updated_at, bc.created_at) <= p_date_to)
+        (p_date_from IS NULL OR COALESCE(bc.event_closed_at, bc.updated_at, bc.created_at) >= p_date_from)
+        AND (p_date_to IS NULL OR COALESCE(bc.event_closed_at, bc.updated_at, bc.created_at) <= p_date_to)
       ) AS in_range_closed
     FROM base_candidates bc
   ),
@@ -361,15 +376,17 @@ BEGIN
           THEN 'Order Closed'
         WHEN co.fulfillment_status::text IN ('application_approved', 'consultation_completed', 'order_completed', 'completed') OR co.stage = 'completed'
           THEN 'Completed'
+        WHEN co.stage = 'technical_delay' OR co.fulfillment_status::text = 'technical_delay'
+          THEN 'Technical Delay'
+        WHEN co.stage = 'customer_delay' OR co.fulfillment_status::text = 'customer_delay'
+          THEN 'Customer Delay'
         WHEN co.fulfillment_status::text IN (
-          'government_processing', 'technical_delay', 'customer_delay', 'application_rejected',
-          'certificate_rejected', 'under_processing', 'application_submitted', 'verification_pending',
+          'government_processing', 'under_processing', 'application_submitted', 'verification_pending',
           'documents_received', 'waiting_for_customer_submission', 'awaiting_customer_form',
           'form_link_sent', 'form_pending'
         )
         OR co.stage IN (
-          'technical_delay', 'customer_delay', 'consultation_completed', 'under_review',
-          'in_progress', 'submitted_to_govt', 'under_processing', 'certificate_ready',
+          'under_review', 'in_progress', 'submitted_to_govt', 'under_processing', 'certificate_ready',
           'refunded', 'refund_requested'
         )
         OR co.form_link_sent_at IS NOT NULL
@@ -396,7 +413,11 @@ BEGIN
       AND (
         p_action_status IS NULL OR p_action_status = 'all'
         OR (p_action_status = 'action_required' AND co.bucket IN ('needs_action', 'backlog'))
-        OR (p_action_status = 'processed' AND co.bucket NOT IN ('needs_action', 'backlog'))
+        OR (p_action_status IN ('processed', 'action_taken') AND (
+          co.stage IN ('technical_delay', 'customer_delay', 'completed')
+          OR co.fulfillment_status::text IN ('technical_delay', 'customer_delay', 'consultation_completed', 'order_completed', 'completed')
+          OR co.is_callback_scheduled = true
+        ))
         OR (p_action_status = 'hot_orders' AND co.bucket = 'hot_orders')
         OR (p_action_status = 'scheduled_callback' AND co.bucket = 'reminders')
       )
@@ -422,8 +443,16 @@ BEGIN
       COUNT(CASE WHEN NOT is_terminal AND stage = 'technical_delay' THEN 1 END)::int AS technical_delay_count,
       COUNT(CASE WHEN NOT is_terminal AND stage IN ('lead_received', 'payment_done', 'form_submitted', 'form_not_submitted') AND is_older_than_today THEN 1 END)::int AS backlog_count,
       COUNT(CASE WHEN NOT is_terminal AND stage = 'customer_delay' THEN 1 END)::int AS customer_delay_count,
-      COUNT(CASE WHEN bucket = 'pending' AND in_range_created = true THEN 1 END)::int AS pending_count,
+      -- Action Taken: orders in technical delay, customer delay, scheduled callback, or completed
+      COUNT(CASE WHEN (
+        stage = 'technical_delay'
+        OR stage = 'customer_delay'
+        OR is_callback_scheduled = true
+        OR (in_range_completed = true AND (fulfillment_status::text IN ('consultation_completed', 'order_completed', 'completed') OR stage = 'completed'))
+      ) THEN 1 END)::int AS pending_count,
+      -- Completed in range
       COUNT(CASE WHEN in_range_completed = true AND (fulfillment_status::text IN ('consultation_completed', 'order_completed', 'completed') OR stage = 'completed') THEN 1 END)::int AS completed_count,
+      -- Closed in range
       COUNT(CASE WHEN in_range_closed = true AND (fulfillment_status::text IN ('application_rejected', 'certificate_rejected', 'order_closed', 'cancelled') OR stage = 'closed') THEN 1 END)::int AS closed_count,
       COUNT(CASE WHEN in_range_created = true AND stage IN ('refund_requested', 'refunded', 'uninterested') THEN 1 END)::int AS exception_count,
       COUNT(CASE WHEN NOT is_terminal AND stage IN ('lead_received', 'payment_done', 'form_submitted', 'form_not_submitted') THEN 1 END)::int AS action_required_count,
@@ -470,8 +499,13 @@ BEGIN
         p_bucket = 'customer_delay' AND NOT bfo.is_terminal AND bfo.stage = 'customer_delay'
       )
       OR (
-        -- 8. Action Taken tab: in-range in-flight orders
-        p_bucket = 'pending' AND bfo.in_range_created = true AND bfo.bucket = 'pending'
+        -- 8. Action Taken tab: orders in technical delay, customer delay, scheduled callback, or completed
+        p_bucket = 'pending' AND (
+          bfo.stage = 'technical_delay'
+          OR bfo.stage = 'customer_delay'
+          OR bfo.is_callback_scheduled = true
+          OR (bfo.in_range_completed = true AND (bfo.fulfillment_status::text IN ('consultation_completed', 'order_completed', 'completed') OR bfo.stage = 'completed'))
+        )
       )
       OR (
         -- 9. Completed tab: in-range completed orders (completed in date range regardless of created_at)

@@ -200,7 +200,7 @@ const BUCKET_CARDS: BucketCardItem[] = [
   {
     id: "pending",
     label: "ACTION TAKEN",
-    subtitle: "Pipeline In-Flight",
+    subtitle: "Delays, Calls & Completed",
     icon: Hourglass,
     tone: "amber",
   },

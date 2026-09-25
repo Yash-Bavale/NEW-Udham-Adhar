@@ -726,12 +726,37 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
 
     const ids = appList.map((a) => a.id);
 
-    const { data: globalActiveSchedulers } = await admin
-      .from("order_schedulers")
-      .select("id, application_id, status, scheduler_type, fires_at, remarks, created_at, created_by")
-      .in("application_id", ids)
-      .eq("status", "active")
-      .order("created_at", { ascending: false });
+    const [eventsRes, globalActiveSchedulersRes] = await Promise.all([
+      admin
+        .from("application_events")
+        .select("application_id, event_type, old_value, new_value, created_at")
+        .in("application_id", ids)
+        .or("new_value.ilike.%complete%,new_value.ilike.%close%,new_value.ilike.%cancel%,event_type.ilike.%complete%,event_type.ilike.%close%,event_type.ilike.%cancel%")
+        .order("created_at", { ascending: false }),
+      admin
+        .from("order_schedulers")
+        .select("id, application_id, status, scheduler_type, fires_at, remarks, created_at, created_by")
+        .in("application_id", ids)
+        .eq("status", "active")
+        .order("created_at", { ascending: false }),
+    ]);
+
+    const globalActiveSchedulers = globalActiveSchedulersRes.data;
+    const eventCompletedMap = new Map<string, string>();
+    const eventClosedMap = new Map<string, string>();
+    for (const ev of (eventsRes.data ?? [])) {
+      const et = String(ev.event_type || "").toLowerCase();
+      const nv = String(ev.new_value || "").toLowerCase();
+      const isComp = nv.includes("complete") || et.includes("complete") || et === "certificate_uploaded";
+      const isClose = nv.includes("close") || nv.includes("cancel") || et.includes("close") || et.includes("cancel");
+      if (isComp && ev.application_id && ev.created_at && !eventCompletedMap.has(ev.application_id)) {
+        eventCompletedMap.set(ev.application_id, ev.created_at);
+      }
+      if (isClose && ev.application_id && ev.created_at && !eventClosedMap.has(ev.application_id)) {
+        eventClosedMap.set(ev.application_id, ev.created_at);
+      }
+    }
+
     const leadIds = Array.from(new Set(appList.map((a) => a.lead_id).filter(Boolean))) as string[];
     const customerIds = Array.from(new Set(appList.map((a) => a.customer_id).filter(Boolean))) as string[];
     const serviceIds = Array.from(new Set(appList.map((a) => a.service_id).filter(Boolean))) as string[];
@@ -879,13 +904,13 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         (!normalized.fromIso || createdTime >= new Date(normalized.fromIso).getTime()) &&
         (!normalized.toIso || createdTime <= new Date(normalized.toIso).getTime());
 
-      const completionRaw = a.fulfilled_at || a.certificate_uploaded_at || a.updated_at || a.created_at;
+      const completionRaw = eventCompletedMap.get(a.id) || a.fulfilled_at || a.certificate_uploaded_at || a.updated_at || a.created_at;
       const completionTime = completionRaw ? new Date(completionRaw).getTime() : createdTime;
       const inRangeCompleted =
         (!normalized.fromIso || completionTime >= new Date(normalized.fromIso).getTime()) &&
         (!normalized.toIso || completionTime <= new Date(normalized.toIso).getTime());
 
-      const closureRaw = a.updated_at || a.created_at;
+      const closureRaw = eventClosedMap.get(a.id) || a.updated_at || a.created_at;
       const closureTime = closureRaw ? new Date(closureRaw).getTime() : createdTime;
       const inRangeClosed =
         (!normalized.fromIso || closureTime >= new Date(normalized.fromIso).getTime()) &&
@@ -938,10 +963,17 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
           const b = bucketOfRow(r, todayIst);
           return b === "needs_action" || b === "backlog";
         });
-      } else if (normalized.actionStatus === "processed") {
+      } else if (normalized.actionStatus === "processed" || normalized.actionStatus === "action_taken") {
         baseFilteredRows = baseFilteredRows.filter((r) => {
-          const b = bucketOfRow(r, todayIst);
-          return b !== "needs_action" && b !== "backlog";
+          return (
+            r.stage === "technical_delay" ||
+            r.fulfillment_status === "technical_delay" ||
+            r.stage === "customer_delay" ||
+            r.fulfillment_status === "customer_delay" ||
+            r.is_callback_scheduled ||
+            r.stage === "completed" ||
+            COMPLETED_FS.has(String(r.fulfillment_status).toLowerCase())
+          );
         });
       } else if (normalized.actionStatus === "hot_orders") {
         baseFilteredRows = baseFilteredRows.filter((r) => r.is_hot);
@@ -991,11 +1023,22 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       if (r.in_range_created) {
         counts.totalAll++;
         counts.all++;
-        if (b === "pending") {
-          counts.pending++;
-        } else if (b === "exception") {
+        if (b === "exception") {
           counts.exception++;
         }
+      }
+
+      // Action Taken (Pending): orders in technical delay, customer delay, scheduled callback, or completed
+      const isActionTaken =
+        r.stage === "technical_delay" ||
+        r.fulfillment_status === "technical_delay" ||
+        r.stage === "customer_delay" ||
+        r.fulfillment_status === "customer_delay" ||
+        r.is_callback_scheduled ||
+        (r.in_range_completed && (r.stage === "completed" || COMPLETED_FS.has(String(r.fulfillment_status).toLowerCase())));
+
+      if (isActionTaken) {
+        counts.pending++;
       }
 
       if (b === "completed" && r.in_range_completed) {
@@ -1063,7 +1106,16 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
     } else if (bucket === "customer_delay") {
       filtered = filtered.filter((r) => !r.is_terminal && r.stage === "customer_delay");
     } else if (bucket === "pending") {
-      filtered = filtered.filter((r) => r.in_range_created && bucketOfRow(r, todayIst) === "pending");
+      filtered = filtered.filter((r) => {
+        return (
+          r.stage === "technical_delay" ||
+          r.fulfillment_status === "technical_delay" ||
+          r.stage === "customer_delay" ||
+          r.fulfillment_status === "customer_delay" ||
+          r.is_callback_scheduled ||
+          (r.in_range_completed && (r.stage === "completed" || COMPLETED_FS.has(String(r.fulfillment_status).toLowerCase())))
+        );
+      });
     } else if (bucket === "completed") {
       filtered = filtered.filter((r) => r.in_range_completed && bucketOfRow(r, todayIst) === "completed");
     } else if (bucket === "closed") {
