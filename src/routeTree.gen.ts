@@ -62,6 +62,7 @@ import { Route as AdminCertificatesRouteImport } from './routes/admin.certificat
 import { Route as AdminComplaintsRouteImport } from './routes/admin.complaints'
 import { Route as AdminCustomersRouteImport } from './routes/admin.customers'
 import { Route as AdminDashboardRouteImport } from './routes/admin.dashboard'
+import { Route as AdminDisputeManagerRouteImport } from './routes/admin.dispute-manager'
 import { Route as AdminDocumentsRouteImport } from './routes/admin.documents'
 import { Route as AdminEmailTemplatesRouteImport } from './routes/admin.email-templates'
 import { Route as AdminEmailsRouteImport } from './routes/admin.emails'
@@ -427,6 +428,11 @@ const AdminCustomersRoute = AdminCustomersRouteImport.update({
 const AdminDashboardRoute = AdminDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminDisputeManagerRoute = AdminDisputeManagerRouteImport.update({
+  id: '/dispute-manager',
+  path: '/dispute-manager',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminDocumentsRoute = AdminDocumentsRouteImport.update({
@@ -977,6 +983,7 @@ export interface FileRoutesByFullPath {
   '/admin/complaints': typeof AdminComplaintsRouteWithChildren
   '/admin/customers': typeof AdminCustomersRouteWithChildren
   '/admin/dashboard': typeof AdminDashboardRoute
+  '/admin/dispute-manager': typeof AdminDisputeManagerRoute
   '/admin/documents': typeof AdminDocumentsRoute
   '/admin/email-templates': typeof AdminEmailTemplatesRoute
   '/admin/emails': typeof AdminEmailsRoute
@@ -1124,6 +1131,7 @@ export interface FileRoutesByTo {
   '/admin/complaints': typeof AdminComplaintsRouteWithChildren
   '/admin/customers': typeof AdminCustomersRouteWithChildren
   '/admin/dashboard': typeof AdminDashboardRoute
+  '/admin/dispute-manager': typeof AdminDisputeManagerRoute
   '/admin/documents': typeof AdminDocumentsRoute
   '/admin/email-templates': typeof AdminEmailTemplatesRoute
   '/admin/emails': typeof AdminEmailsRoute
@@ -1269,6 +1277,7 @@ export interface FileRoutesById {
   '/admin/complaints': typeof AdminComplaintsRouteWithChildren
   '/admin/customers': typeof AdminCustomersRouteWithChildren
   '/admin/dashboard': typeof AdminDashboardRoute
+  '/admin/dispute-manager': typeof AdminDisputeManagerRoute
   '/admin/documents': typeof AdminDocumentsRoute
   '/admin/email-templates': typeof AdminEmailTemplatesRoute
   '/admin/emails': typeof AdminEmailsRoute
@@ -1419,6 +1428,7 @@ export interface FileRouteTypes {
     | '/admin/complaints'
     | '/admin/customers'
     | '/admin/dashboard'
+    | '/admin/dispute-manager'
     | '/admin/documents'
     | '/admin/email-templates'
     | '/admin/emails'
@@ -1566,6 +1576,7 @@ export interface FileRouteTypes {
     | '/admin/complaints'
     | '/admin/customers'
     | '/admin/dashboard'
+    | '/admin/dispute-manager'
     | '/admin/documents'
     | '/admin/email-templates'
     | '/admin/emails'
@@ -1710,6 +1721,7 @@ export interface FileRouteTypes {
     | '/admin/complaints'
     | '/admin/customers'
     | '/admin/dashboard'
+    | '/admin/dispute-manager'
     | '/admin/documents'
     | '/admin/email-templates'
     | '/admin/emails'
@@ -2264,6 +2276,13 @@ declare module '@tanstack/react-router' {
       path: '/dashboard'
       fullPath: '/admin/dashboard'
       preLoaderRoute: typeof AdminDashboardRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/dispute-manager': {
+      id: '/admin/dispute-manager'
+      path: '/dispute-manager'
+      fullPath: '/admin/dispute-manager'
+      preLoaderRoute: typeof AdminDisputeManagerRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/documents': {
@@ -3047,6 +3066,7 @@ interface AdminRouteChildren {
   AdminComplaintsRoute: typeof AdminComplaintsRouteWithChildren
   AdminCustomersRoute: typeof AdminCustomersRouteWithChildren
   AdminDashboardRoute: typeof AdminDashboardRoute
+  AdminDisputeManagerRoute: typeof AdminDisputeManagerRoute
   AdminDocumentsRoute: typeof AdminDocumentsRoute
   AdminEmailTemplatesRoute: typeof AdminEmailTemplatesRoute
   AdminEmailsRoute: typeof AdminEmailsRoute
@@ -3097,6 +3117,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminComplaintsRoute: AdminComplaintsRouteWithChildren,
   AdminCustomersRoute: AdminCustomersRouteWithChildren,
   AdminDashboardRoute: AdminDashboardRoute,
+  AdminDisputeManagerRoute: AdminDisputeManagerRoute,
   AdminDocumentsRoute: AdminDocumentsRoute,
   AdminEmailTemplatesRoute: AdminEmailTemplatesRoute,
   AdminEmailsRoute: AdminEmailsRoute,
