@@ -50,6 +50,13 @@
       "when": 1790320534897,
       "tag": "0006_repair_orders_v3_plain_payment_enum_values",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1790320569844,
+      "tag": "0007_repair_orders_v3_empty_enum_comparisons",
+      "breakpoints": true
     }
   ]
 }
