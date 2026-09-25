@@ -64,6 +64,13 @@
       "when": 1790320594659,
       "tag": "0008_repair_orders_v3_refund_status_comparison",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1790320623175,
+      "tag": "0009_normalize_orders_v3_statuses_to_text",
+      "breakpoints": true
     }
   ]
 }
