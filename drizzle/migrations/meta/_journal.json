@@ -71,6 +71,13 @@
       "when": 1790320623175,
       "tag": "0009_normalize_orders_v3_statuses_to_text",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1790320716545,
+      "tag": "0010_repair_orders_v3_closure_none_stage",
+      "breakpoints": true
     }
   ]
 }
