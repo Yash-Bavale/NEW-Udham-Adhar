@@ -647,7 +647,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       matchingLeadIds = (matchedLeads ?? []).map((l: any) => l.id);
     }
 
-    function buildBaseQuery() {
+    function buildBaseQuery(onlyInRange = false) {
       let query = admin
         .from("applications")
         .select(
@@ -667,8 +667,10 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
           query = query.eq("assigned_to", data.assignedTo);
         }
       }
-      if (normalized.fromIso) query = query.gte("created_at", normalized.fromIso);
-      if (normalized.toIso) query = query.lte("created_at", normalized.toIso);
+      if (onlyInRange) {
+        if (normalized.fromIso) query = query.gte("created_at", normalized.fromIso);
+        if (normalized.toIso) query = query.lte("created_at", normalized.toIso);
+      }
 
       if (data.search && data.search.trim()) {
         const term = `%${data.search.trim()}%`;
@@ -681,21 +683,23 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       return query;
     }
 
-    let baseQ = buildBaseQuery();
-    if (data.fulfillmentStatus && data.fulfillmentStatus !== "all" && data.fulfillmentStatus.trim() !== "") {
-      baseQ = baseQ.eq("fulfillment_status", data.fulfillmentStatus as any);
-    }
+    // Fetch both in-range applications and active portfolio applications
+    const [inRangeRes, activePortfolioRes] = await Promise.all([
+      buildBaseQuery(true).order("created_at", { ascending: false }).limit(5000),
+      buildBaseQuery(false)
+        .is("closure_stage", null)
+        .not("fulfillment_status", "in", "(completed,order_completed,order_closed,cancelled,application_rejected,certificate_rejected,consultation_completed)")
+        .order("created_at", { ascending: false })
+        .limit(5000),
+    ]);
 
-    if (data.sortField === "stage") {
-      baseQ = baseQ.order("fulfillment_status", { ascending: data.sortOrder === "asc" }).order("created_at", { ascending: false });
-    } else {
-      baseQ = baseQ.order("created_at", { ascending: data.sortOrder === "asc" });
-    }
+    if (inRangeRes.error) throw new Error(inRangeRes.error.message);
 
-    const { data: apps, error: appErr } = await baseQ.limit(5000);
-    if (appErr) throw new Error(appErr.message);
+    const mergedAppMap = new Map<string, any>();
+    (activePortfolioRes.data ?? []).forEach((a) => mergedAppMap.set(a.id, a));
+    (inRangeRes.data ?? []).forEach((a) => mergedAppMap.set(a.id, a));
 
-    const appList = apps ?? [];
+    const appList = Array.from(mergedAppMap.values());
 
     if (appList.length === 0) {
       return {
@@ -842,11 +846,11 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
           COMPLETED_FS.has(fsLower) ||
           ["completed", "closed", "cancelled"].includes(String(a.application_status ?? "").toLowerCase()) ||
           ["completed", "closed", "cancelled"].includes(String((a as any).order_status ?? "").toLowerCase()) ||
-          ["completed", "closed", "cancelled"].includes(String((a as any).workflow_status ?? "").toLowerCase())
+          ["completed", "closed", "cancelled"].includes(String((a as any).workflow_status ?? "").toLowerCase()) ||
+          Boolean((a as any).closure_stage)
         );
 
       const is_hot = !isTerminal && (is_due || is_reopened);
-      // Call Back Scheduled: only active/future callbacks; once expired, moves directly to Hot Orders
       const is_callback_scheduled = !isTerminal && !is_hot && !!cb && firesAtTime > now;
       const callback_reminder = !isTerminal && cb
         ? {
@@ -857,6 +861,11 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
             created_at: cb.created_at,
           }
         : null;
+
+      const createdTime = new Date(a.created_at).getTime();
+      const inRange =
+        (!normalized.fromIso || createdTime >= new Date(normalized.fromIso).getTime()) &&
+        (!normalized.toIso || createdTime <= new Date(normalized.toIso).getTime());
 
       return {
         id: a.id,
@@ -880,13 +889,14 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         is_hot,
         is_callback_scheduled,
         callback_reminder,
+        is_terminal: isTerminal,
+        in_range: inRange,
       };
     });
 
     const todayIst = istDateKey(new Date());
 
     // 1. Filter dimensions (Stage, Fulfillment, Action Status, Payment, Pending Age)
-    // to obtain the baseFilteredRows used as the single source of truth for ALL KPIs
     let baseFilteredRows = allRows;
 
     if (normalized.stage) {
@@ -928,7 +938,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       }
     }
 
-    // 2. Compute KPI counts strictly from baseFilteredRows
+    // 2. Compute KPI counts: In-Range Volume + All-Time Operational Queues
     const counts = {
       all: 0,
       needs_action: 0,
@@ -948,33 +958,47 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
     const ageBuckets = { d1: 0, d2: 0, d3: 0, d7: 0, older: 0 };
 
     for (const r of baseFilteredRows) {
-      counts.totalAll++;
-      counts.all++; // Total all orders matching active filters / date range
       const b = bucketOfRow(r, todayIst);
-      if (b === "completed") {
-        counts.completed++;
-        counts.processed++;
-      } else if (b === "closed") {
-        counts.closed++;
-        counts.processed++;
-      } else {
-        if (b === "needs_action") {
-          counts.needs_action++;
-          counts.actionRequired++;
-        } else if (b === "hot_orders") {
-          counts.hot_orders++;
-        } else if (b === "reminders") {
-          counts.reminders++;
-        } else if (b === "technical_delay") {
-          counts.technical_delay++;
-        } else if (b === "backlog") {
-          counts.backlog++;
-        } else if (b === "customer_delay") {
-          counts.customer_delay++;
+      const isActionStage = ["lead_received", "payment_done", "form_submitted", "form_not_submitted"].includes(r.stage);
+      const rowDate = istDateKey(r.created_at);
+      const isOlderThanToday = Boolean(rowDate && rowDate < todayIst);
+
+      if (r.in_range) {
+        counts.totalAll++;
+        counts.all++;
+        if (b === "completed") {
+          counts.completed++;
+          counts.processed++;
+        } else if (b === "closed") {
+          counts.closed++;
+          counts.processed++;
         } else if (b === "pending") {
           counts.pending++;
         } else if (b === "exception") {
           counts.exception++;
+        }
+      }
+
+      // Operational Queues (Live all-time active portfolio)
+      if (!r.is_terminal && isActionStage) {
+        counts.needs_action++;
+        counts.actionRequired++;
+        if (isOlderThanToday) {
+          counts.backlog++;
+        }
+      }
+
+      if (r.is_hot) {
+        counts.hot_orders++;
+      } else if (r.is_callback_scheduled) {
+        counts.reminders++;
+      }
+
+      if (!r.is_terminal) {
+        if (r.stage === "technical_delay") {
+          counts.technical_delay++;
+        } else if (r.stage === "customer_delay") {
+          counts.customer_delay++;
         }
       }
 
@@ -990,46 +1014,49 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
 
     // 3. Apply bucket tab filter to obtain the table rows
     let filtered = baseFilteredRows;
-    if (normalized.bucket && normalized.bucket !== "all") {
-      switch (normalized.bucket) {
-        case "needs_action":
-          filtered = filtered.filter((r) => bucketOfRow(r, todayIst) === "needs_action");
-          break;
-        case "hot_orders":
-          filtered = filtered.filter((r) => r.is_hot);
-          break;
-        case "reminders":
-          filtered = filtered.filter((r) => bucketOfRow(r, todayIst) === "reminders");
-          break;
-        case "technical_delay":
-          filtered = filtered.filter((r) => bucketOfRow(r, todayIst) === "technical_delay");
-          break;
-        case "backlog":
-          filtered = filtered.filter((r) => bucketOfRow(r, todayIst) === "backlog");
-          break;
-        case "customer_delay":
-          filtered = filtered.filter((r) => bucketOfRow(r, todayIst) === "customer_delay");
-          break;
-        case "pending":
-          filtered = filtered.filter((r) => bucketOfRow(r, todayIst) === "pending");
-          break;
-        case "completed":
-          filtered = filtered.filter((r) => bucketOfRow(r, todayIst) === "completed");
-          break;
-        case "closed":
-          filtered = filtered.filter((r) => bucketOfRow(r, todayIst) === "closed");
-          break;
-        case "exception":
-          filtered = filtered.filter((r) => bucketOfRow(r, todayIst) === "exception");
-          break;
-      }
+    const bucket = normalized.bucket || "all";
+
+    if (bucket === "needs_action") {
+      filtered = filtered.filter((r) => !r.is_terminal && ["lead_received", "payment_done", "form_submitted", "form_not_submitted"].includes(r.stage));
+    } else if (bucket === "hot_orders") {
+      filtered = filtered.filter((r) => r.is_hot);
+    } else if (bucket === "reminders") {
+      filtered = filtered.filter((r) => r.is_callback_scheduled);
+    } else if (bucket === "backlog") {
+      filtered = filtered.filter((r) => {
+        const isActionStage = ["lead_received", "payment_done", "form_submitted", "form_not_submitted"].includes(r.stage);
+        const rowDate = istDateKey(r.created_at);
+        return !r.is_terminal && isActionStage && rowDate && rowDate < todayIst;
+      });
+    } else if (bucket === "technical_delay") {
+      filtered = filtered.filter((r) => !r.is_terminal && r.stage === "technical_delay");
+    } else if (bucket === "customer_delay") {
+      filtered = filtered.filter((r) => !r.is_terminal && r.stage === "customer_delay");
+    } else if (bucket === "pending") {
+      filtered = filtered.filter((r) => r.in_range && bucketOfRow(r, todayIst) === "pending");
+    } else if (bucket === "completed") {
+      filtered = filtered.filter((r) => r.in_range && bucketOfRow(r, todayIst) === "completed");
+    } else if (bucket === "closed") {
+      filtered = filtered.filter((r) => r.in_range && bucketOfRow(r, todayIst) === "closed");
+    } else if (bucket === "exception") {
+      filtered = filtered.filter((r) => r.in_range && bucketOfRow(r, todayIst) === "exception");
+    } else {
+      // Default 'all': in-range active portfolio (excluding completed/closed)
+      filtered = filtered.filter((r) => r.in_range && !r.is_terminal);
     }
 
-    if (normalized.bucket === "backlog" && (!normalized.sortField || normalized.sortField === "created_at")) {
+    if (bucket === "backlog" && (!normalized.sortField || normalized.sortField === "created_at")) {
       filtered.sort((a, b) => {
         const tA = new Date(a.created_at).getTime();
         const tB = new Date(b.created_at).getTime();
         return normalized.sortOrder === "desc" ? tB - tA : tA - tB;
+      });
+    } else if (bucket === "hot_orders" && (!normalized.sortField || normalized.sortField === "created_at")) {
+      filtered.sort((a, b) => {
+        const fA = a.callback_reminder?.fires_at ? new Date(a.callback_reminder.fires_at).getTime() : Infinity;
+        const fB = b.callback_reminder?.fires_at ? new Date(b.callback_reminder.fires_at).getTime() : Infinity;
+        if (fA !== fB) return fA - fB;
+        return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
       });
     } else if (normalized.sortField === "stage") {
       filtered.sort((a, b) => {
