@@ -22,6 +22,12 @@ export const Route = createFileRoute("/api/public/cron/poll-zoho-inbox")({
         try {
           const { pollZohoInbox } = await import("@/lib/mail/inbox-matcher.server");
           const result = await pollZohoInbox({ limit: 50 });
+          if (result.errors > 0) {
+            return new Response(JSON.stringify({ ok: false, ...result }), {
+              status: 500,
+              headers: { "Content-Type": "application/json" },
+            });
+          }
           return Response.json({ ok: true, ...result });
         } catch (e) {
           const message = e instanceof Error ? e.message : "unknown";
