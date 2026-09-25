@@ -651,11 +651,11 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       matchingLeadIds = (matchedLeads ?? []).map((l: any) => l.id);
     }
 
-    function buildBaseQuery(onlyInRange = false) {
+    function buildBaseQuery() {
       let query = admin
         .from("applications")
         .select(
-          "id, application_code, fulfillment_status, application_status, created_at, assigned_to, lead_id, customer_id, service_id, form_submitted_at, certificate_uploaded_at, workflow_status, closure_stage, closure_reason_code, refund_approved_at, refund_processed_at",
+          "id, application_code, fulfillment_status, application_status, created_at, assigned_to, lead_id, customer_id, service_id, form_submitted_at, certificate_uploaded_at, fulfilled_at, updated_at, workflow_status, closure_stage, closure_reason_code, refund_approved_at, refund_processed_at",
         )
         .eq("is_deleted", false);
 
@@ -671,10 +671,6 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
           query = query.eq("assigned_to", data.assignedTo);
         }
       }
-      if (onlyInRange) {
-        if (normalized.fromIso) query = query.gte("created_at", normalized.fromIso);
-        if (normalized.toIso) query = query.lte("created_at", normalized.toIso);
-      }
 
       if (data.search && data.search.trim()) {
         const term = `%${data.search.trim()}%`;
@@ -687,21 +683,33 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       return query;
     }
 
-    // Fetch both in-range applications and active portfolio applications
-    const [inRangeRes, activePortfolioRes] = await Promise.all([
-      buildBaseQuery(true).order("created_at", { ascending: false }).limit(5000),
-      buildBaseQuery(false)
-        .is("closure_stage", null)
+    // Fetch in-range applications by creation date, event timestamps, and live active portfolio applications
+    const [inRangeCreatedRes, inRangeUpdatedRes, activePortfolioRes] = await Promise.all([
+      (() => {
+        let q = buildBaseQuery();
+        if (normalized.fromIso) q = q.gte("created_at", normalized.fromIso);
+        if (normalized.toIso) q = q.lte("created_at", normalized.toIso);
+        return q.order("created_at", { ascending: false }).limit(5000);
+      })(),
+      (() => {
+        let q = buildBaseQuery();
+        if (normalized.fromIso) q = q.gte("updated_at", normalized.fromIso);
+        if (normalized.toIso) q = q.lte("updated_at", normalized.toIso);
+        return q.order("updated_at", { ascending: false }).limit(5000);
+      })(),
+      buildBaseQuery()
+        .or("closure_stage.is.null,closure_stage.eq.none")
         .not("fulfillment_status", "in", "(completed,order_completed,order_closed,cancelled,application_rejected,certificate_rejected,consultation_completed)")
         .order("created_at", { ascending: false })
         .limit(5000),
     ]);
 
-    if (inRangeRes.error) throw new Error(inRangeRes.error.message);
+    if (inRangeCreatedRes.error) throw new Error(inRangeCreatedRes.error.message);
 
     const mergedAppMap = new Map<string, any>();
-    (activePortfolioRes.data ?? []).forEach((a) => mergedAppMap.set(a.id, a));
-    (inRangeRes.data ?? []).forEach((a) => mergedAppMap.set(a.id, a));
+    (activePortfolioRes.data ?? []).forEach((a: any) => mergedAppMap.set(a.id, a));
+    (inRangeCreatedRes.data ?? []).forEach((a: any) => mergedAppMap.set(a.id, a));
+    (inRangeUpdatedRes.data ?? []).forEach((a: any) => mergedAppMap.set(a.id, a));
 
     const appList = Array.from(mergedAppMap.values());
 
@@ -851,7 +859,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
           ["completed", "closed", "cancelled"].includes(String(a.application_status ?? "").toLowerCase()) ||
           ["completed", "closed", "cancelled"].includes(String((a as any).order_status ?? "").toLowerCase()) ||
           ["completed", "closed", "cancelled"].includes(String((a as any).workflow_status ?? "").toLowerCase()) ||
-          Boolean((a as any).closure_stage)
+          (Boolean((a as any).closure_stage) && (a as any).closure_stage !== "none")
         );
 
       const is_hot = !isTerminal && (is_due || is_reopened);
@@ -867,9 +875,21 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         : null;
 
       const createdTime = new Date(a.created_at).getTime();
-      const inRange =
+      const inRangeCreated =
         (!normalized.fromIso || createdTime >= new Date(normalized.fromIso).getTime()) &&
         (!normalized.toIso || createdTime <= new Date(normalized.toIso).getTime());
+
+      const completionRaw = a.fulfilled_at || a.certificate_uploaded_at || a.updated_at || a.created_at;
+      const completionTime = completionRaw ? new Date(completionRaw).getTime() : createdTime;
+      const inRangeCompleted =
+        (!normalized.fromIso || completionTime >= new Date(normalized.fromIso).getTime()) &&
+        (!normalized.toIso || completionTime <= new Date(normalized.toIso).getTime());
+
+      const closureRaw = a.updated_at || a.created_at;
+      const closureTime = closureRaw ? new Date(closureRaw).getTime() : createdTime;
+      const inRangeClosed =
+        (!normalized.fromIso || closureTime >= new Date(normalized.fromIso).getTime()) &&
+        (!normalized.toIso || closureTime <= new Date(normalized.toIso).getTime());
 
       return {
         id: a.id,
@@ -894,7 +914,10 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         is_callback_scheduled,
         callback_reminder,
         is_terminal: isTerminal,
-        in_range: inRange,
+        in_range: inRangeCreated,
+        in_range_created: inRangeCreated,
+        in_range_completed: inRangeCompleted,
+        in_range_closed: inRangeClosed,
       };
     });
 
@@ -965,20 +988,22 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       const b = bucketOfRow(r, todayIst);
       const isActionStage = isNeedsActionStage(r.stage);
 
-      if (r.in_range) {
+      if (r.in_range_created) {
         counts.totalAll++;
         counts.all++;
-        if (b === "completed") {
-          counts.completed++;
-          counts.processed++;
-        } else if (b === "closed") {
-          counts.closed++;
-          counts.processed++;
-        } else if (b === "pending") {
+        if (b === "pending") {
           counts.pending++;
         } else if (b === "exception") {
           counts.exception++;
         }
+      }
+
+      if (b === "completed" && r.in_range_completed) {
+        counts.completed++;
+        counts.processed++;
+      } else if (b === "closed" && r.in_range_closed) {
+        counts.closed++;
+        counts.processed++;
       }
 
       // Operational Queues (Live all-time active portfolio)
@@ -1038,16 +1063,16 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
     } else if (bucket === "customer_delay") {
       filtered = filtered.filter((r) => !r.is_terminal && r.stage === "customer_delay");
     } else if (bucket === "pending") {
-      filtered = filtered.filter((r) => r.in_range && bucketOfRow(r, todayIst) === "pending");
+      filtered = filtered.filter((r) => r.in_range_created && bucketOfRow(r, todayIst) === "pending");
     } else if (bucket === "completed") {
-      filtered = filtered.filter((r) => r.in_range && bucketOfRow(r, todayIst) === "completed");
+      filtered = filtered.filter((r) => r.in_range_completed && bucketOfRow(r, todayIst) === "completed");
     } else if (bucket === "closed") {
-      filtered = filtered.filter((r) => r.in_range && bucketOfRow(r, todayIst) === "closed");
+      filtered = filtered.filter((r) => r.in_range_closed && bucketOfRow(r, todayIst) === "closed");
     } else if (bucket === "exception") {
-      filtered = filtered.filter((r) => r.in_range && bucketOfRow(r, todayIst) === "exception");
+      filtered = filtered.filter((r) => r.in_range_created && bucketOfRow(r, todayIst) === "exception");
     } else {
       // Default 'all': in-range active portfolio (excluding completed/closed)
-      filtered = filtered.filter((r) => r.in_range && !r.is_terminal);
+      filtered = filtered.filter((r) => r.in_range_created && !r.is_terminal);
     }
 
     if (bucket === "backlog" && (!normalized.sortField || normalized.sortField === "created_at")) {

@@ -265,6 +265,8 @@ function OrdersListPage() {
 
   const savedState = useMemo(() => getModuleFilterState("admin.orders"), []);
 
+  const todayKey = useMemo(() => istDateKey(new Date()), []);
+
   const [search, setSearch] = useState<string>(savedState?.search ?? "");
   const [debouncedSearch, setDebouncedSearch] = useState<string>(savedState?.debouncedSearch ?? "");
   const [fulfillmentStatus, setFulfillmentStatus] = useState<string>(savedState?.fulfillmentStatus ?? "all");
@@ -273,8 +275,8 @@ function OrdersListPage() {
   const [paymentStatus, setPaymentStatus] = useState<string>(savedState?.paymentStatus ?? "all");
   const [actionStatusFilter, setActionStatusFilter] = useState<string>(savedState?.actionStatusFilter ?? "all");
   const [stageFilter, setStageFilter] = useState<string>(savedState?.stageFilter ?? "all");
-  const [dateFrom, setDateFrom] = useState<string>(savedState?.dateFrom ?? "");
-  const [dateTo, setDateTo] = useState<string>(savedState?.dateTo ?? "");
+  const [dateFrom, setDateFrom] = useState<string>(savedState?.dateFrom ?? todayKey);
+  const [dateTo, setDateTo] = useState<string>(savedState?.dateTo ?? todayKey);
   const [bucket, setBucket] = useState<Bucket>(savedState?.bucket ?? (isAdmin ? "all" : "needs_action"));
   const [pendingAge, setPendingAge] = useState<PendingAge>(savedState?.pendingAge ?? "any");
   const [customDays, setCustomDays] = useState<string>(savedState?.customDays ?? "");
@@ -562,46 +564,53 @@ const groups = useMemo(() => {
   return Array.from(g.entries());
 }, [rows]);
 
-const isFilterActive =
-  search !== "" ||
-  fulfillmentStatus !== "all" ||
-  serviceId !== "all" ||
-  assignedTo !== "all" ||
-  paymentStatus !== "all" ||
-  actionStatusFilter !== "all" ||
-  stageFilter !== "all" ||
-  dateFrom !== "" ||
-  dateTo !== "" ||
-  pendingAge !== "any" ||
-  bucket !== (isAdmin ? "all" : "needs_action");
+  const isFilterActive =
+    search !== "" ||
+    fulfillmentStatus !== "all" ||
+    serviceId !== "all" ||
+    assignedTo !== "all" ||
+    paymentStatus !== "all" ||
+    actionStatusFilter !== "all" ||
+    stageFilter !== "all" ||
+    (dateFrom !== "" && dateFrom !== todayKey) ||
+    (dateTo !== "" && dateTo !== todayKey) ||
+    pendingAge !== "any" ||
+    bucket !== (isAdmin ? "all" : "needs_action");
 
-const resetFilters = () => {
-  setSearch("");
-  setDebouncedSearch("");
-  setFulfillmentStatus("all");
-  setServiceId("all");
-  setAssignedTo("all");
-  setPaymentStatus("all");
-  setActionStatusFilter("all");
-  setStageFilter("all");
-  setDateFrom("");
-  setDateTo("");
-  setPendingAge("any");
-  setCustomDays("");
-  setSortField("created_at");
-  setSortOrder("desc");
-  setBucket(isAdmin ? "all" : "needs_action");
-  setPage(1);
-};
+  const resetFilters = () => {
+    const today = istDateKey(new Date());
+    setSearch("");
+    setDebouncedSearch("");
+    setFulfillmentStatus("all");
+    setServiceId("all");
+    setAssignedTo("all");
+    setPaymentStatus("all");
+    setActionStatusFilter("all");
+    setStageFilter("all");
+    setDateFrom(today);
+    setDateTo(today);
+    setPendingAge("any");
+    setCustomDays("");
+    setSortField("created_at");
+    setSortOrder("desc");
+    setBucket(isAdmin ? "all" : "needs_action");
+    setPage(1);
+  };
 
-const handleSortToggle = (field: "created_at" | "stage") => {
-  if (sortField === field) {
-    setSortOrder((prev) => (prev === "desc" ? "asc" : "desc"));
-  } else {
-    setSortField(field);
-    setSortOrder(field === "created_at" ? "desc" : "asc");
-  }
-};
+  useEffect(() => {
+    const handleReset = () => resetFilters();
+    window.addEventListener("reset-orders-filters", handleReset);
+    return () => window.removeEventListener("reset-orders-filters", handleReset);
+  }, [isAdmin]);
+
+  const handleSortToggle = (field: "created_at" | "stage") => {
+    if (sortField === field) {
+      setSortOrder((prev) => (prev === "desc" ? "asc" : "desc"));
+    } else {
+      setSortField(field);
+      setSortOrder(field === "created_at" ? "desc" : "asc");
+    }
+  };
 
 if (!userPerms.isLoading && !userPerms.can("orders", "view")) {
   return (
