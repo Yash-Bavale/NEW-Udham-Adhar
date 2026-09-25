@@ -1154,18 +1154,11 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       });
     } else if (normalized.sortField === "stage") {
       filtered.sort((a, b) => {
-        if (a.is_hot !== b.is_hot) return a.is_hot ? -1 : 1;
         const cmp = a.stage.localeCompare(b.stage);
         return normalized.sortOrder === "asc" ? cmp : -cmp;
       });
     } else {
       filtered.sort((a, b) => {
-        if (a.is_hot !== b.is_hot) return a.is_hot ? -1 : 1;
-        if (a.is_hot && b.is_hot) {
-          const fA = a.callback_reminder?.fires_at ? new Date(a.callback_reminder.fires_at).getTime() : new Date(a.created_at).getTime();
-          const fB = b.callback_reminder?.fires_at ? new Date(b.callback_reminder.fires_at).getTime() : new Date(b.created_at).getTime();
-          if (fA !== fB) return fA - fB;
-        }
         const tA = new Date(a.created_at).getTime();
         const tB = new Date(b.created_at).getTime();
         return normalized.sortOrder === "asc" ? tA - tB : tB - tA;
