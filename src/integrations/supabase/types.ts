@@ -4829,6 +4829,29 @@ export type Database = {
         Returns: string
       }
       get_dashboard_metrics: { Args: never; Returns: Json }
+      get_orders_v3_paged: {
+        Args: {
+          p_action_status?: string
+          p_assigned_to?: string
+          p_bucket?: string
+          p_custom_days?: number
+          p_date_from?: string
+          p_date_to?: string
+          p_fulfillment_status?: string
+          p_is_admin?: boolean
+          p_page?: number
+          p_page_size?: number
+          p_payment_status?: string
+          p_pending_age?: string
+          p_search?: string
+          p_service_id?: string
+          p_sort_field?: string
+          p_sort_order?: string
+          p_stage?: string
+          p_user_id?: string
+        }
+        Returns: Json
+      }
       has_any_staff_role: { Args: { _user_id: string }; Returns: boolean }
       has_permission: {
         Args: { _action: string; _module: string; _user_id: string }
