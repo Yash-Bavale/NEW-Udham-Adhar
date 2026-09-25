@@ -42,6 +42,24 @@ function AdminLayout() {
   // Background presence and heartbeat tracking
   useEmployeePresence();
 
+  // Microsoft Clarity Analytics for /admin
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if ((window as any).clarity) return;
+    (function (c: any, l: any, a: any, r: any, i: any, t?: any, y?: any) {
+      c[a] = c[a] || function () { (c[a].q = c[a].q || []).push(arguments); };
+      t = l.createElement(r);
+      t.async = 1;
+      t.src = "https://www.clarity.ms/tag/" + i;
+      y = l.getElementsByTagName(r)[0];
+      if (y && y.parentNode) {
+        y.parentNode.insertBefore(t, y);
+      } else {
+        l.head.appendChild(t);
+      }
+    })(window, document, "clarity", "script", "yntk765ksf");
+  }, []);
+
   useEffect(() => {
     void import("@/integrations/supabase/client").then(({ supabase }) =>
       supabase.auth.getUser().then(({ data }) => setEmail(data.user?.email ?? undefined)),
