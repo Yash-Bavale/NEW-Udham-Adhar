@@ -1166,8 +1166,8 @@ return (
                   )}
                 </div>
               </th>
-              {!hideMoney && <th className="text-right font-semibold px-3 py-2.5">Amount</th>}
               {isAdmin && <th className="text-left font-semibold px-3 py-2.5">Assigned</th>}
+              {!hideMoney && <th className="text-right font-semibold px-3 py-2.5">Amount</th>}
             </tr>
           </thead>
           <tbody>
@@ -1685,15 +1685,15 @@ function OrderRow({
         </div>
       </td>
 
-      {/* 7. Amount */}
+      {/* 7. Assigned */}
+      {isAdmin && <td className="px-2 py-2.5 text-slate-600 whitespace-nowrap text-[12px]">{order.assigned_name ?? "Unassigned"}</td>}
+
+      {/* 8. Amount */}
       {!hideMoney && (
         <td className="px-2 py-2.5 text-right font-semibold text-slate-900 whitespace-nowrap text-[13px]">
           {`₹${Number(order.total_amount ?? 0).toLocaleString("en-IN")}`}
         </td>
       )}
-
-      {/* 8. Assigned */}
-      {isAdmin && <td className="px-2 py-2.5 text-slate-600 whitespace-nowrap text-[12px]">{order.assigned_name ?? "Unassigned"}</td>}
     </tr>
   );
 }
