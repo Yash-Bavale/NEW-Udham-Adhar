@@ -552,17 +552,27 @@ async function handleBulkReassign(targetStaffId: string) {
 const colCount = 6 + (isAdmin ? 2 : 0) + (hideMoney ? 0 : 1);
 
 const groups = useMemo(() => {
+  const hotItems: any[] = [];
   const g = new Map<string, any[]>();
 
   for (const r of rows) {
-    const key = istDateKey(r.created_at) || "Unknown";
-    const arr = g.get(key) ?? [];
-    arr.push(r);
-    g.set(key, arr);
+    if (r.is_hot && bucket !== "hot_orders") {
+      hotItems.push(r);
+    } else {
+      const key = istDateKey(r.created_at) || "Unknown";
+      const arr = g.get(key) ?? [];
+      arr.push(r);
+      g.set(key, arr);
+    }
   }
 
-  return Array.from(g.entries());
-}, [rows]);
+  const result: Array<[string, any[]]> = [];
+  if (hotItems.length > 0) {
+    result.push(["__HOT_ORDERS__", hotItems]);
+  }
+  result.push(...Array.from(g.entries()));
+  return result;
+}, [rows, bucket]);
 
   const isFilterActive =
     search !== "" ||
@@ -898,7 +908,9 @@ return (
     )}>
       {(isAdmin ? BUCKET_CARDS : BUCKET_CARDS.filter((b) => !b.adminOnly)).map((b) => {
         const active = bucket === b.id;
-        const countVal = Number((counts as any)[b.id] ?? 0);
+        const countVal = b.id === "needs_action"
+          ? Number(counts.needs_action ?? 0) + Number(counts.technical_delay ?? 0)
+          : Number((counts as any)[b.id] ?? 0);
         const IconComponent = b.icon;
 
         let cardContainerCls = "bg-white border-slate-200 text-slate-800 hover:border-slate-300 hover:bg-slate-50/70";
@@ -1179,9 +1191,24 @@ return (
             )}
             {!isLoading && groups.map(([day, items]) => (
               <Fragment key={`g-${day}`}>
-                <tr className="bg-slate-900 text-white border-b border-slate-800">
+                <tr className={cn(
+                  "border-b",
+                  day === "__HOT_ORDERS__"
+                    ? "bg-gradient-to-r from-rose-950 via-rose-900 to-rose-950 text-rose-100 border-rose-800"
+                    : "bg-slate-900 text-white border-slate-800"
+                )}>
                   <td colSpan={colCount} className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wider">
-                    {formatDayHeader(day)}
+                    {day === "__HOT_ORDERS__" ? (
+                      <span className="flex items-center gap-1.5 text-rose-200 font-bold">
+                        <span className="relative flex h-2 w-2 shrink-0">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
+                        </span>
+                        🔥 CRITICAL ACTION · HOT ORDERS DUE NOW ({items.length})
+                      </span>
+                    ) : (
+                      formatDayHeader(day)
+                    )}
                   </td>
                 </tr>
                 {items.map((r) => (
@@ -1220,8 +1247,20 @@ return (
       )}
       {!isLoading && groups.map(([day, items]) => (
         <div key={`m-g-${day}`} className="space-y-2">
-          <div className="sticky top-0 z-10 bg-slate-900 text-white px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider rounded-lg shadow-xs">
-            {formatDayHeader(day)}
+          <div className={cn(
+            "sticky top-0 z-10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider rounded-lg shadow-xs",
+            day === "__HOT_ORDERS__"
+              ? "bg-rose-950 text-rose-200 border border-rose-800"
+              : "bg-slate-900 text-white"
+          )}>
+            {day === "__HOT_ORDERS__" ? (
+              <span className="flex items-center gap-1.5 font-bold">
+                <span className="size-2 rounded-full bg-rose-500 animate-pulse shrink-0" />
+                🔥 Hot Orders Due Now ({items.length})
+              </span>
+            ) : (
+              formatDayHeader(day)
+            )}
           </div>
           <div className="space-y-2.5">
             {items.map((r) => (
@@ -1437,6 +1476,7 @@ function formatOrderAge(ms: number): string {
 }
 
 function formatDayHeader(dayKey: string): string {
+  if (dayKey === "__HOT_ORDERS__") return "🔥 CRITICAL ACTION · HOT ORDERS DUE NOW";
   if (!dayKey || dayKey === "Unknown") return "UNKNOWN DATE";
   const todayKey = istDateKey(new Date());
   const yestKey = istDateKey(new Date(Date.now() - 86400000));
