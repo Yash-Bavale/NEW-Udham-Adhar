@@ -101,13 +101,13 @@ BEGIN
     LEFT JOIN profiles p ON a.assigned_to = p.id
     LEFT JOIN LATERAL (
       SELECT
-        COALESCE(SUM(CASE WHEN pay.status IN ('paid', 'success', 'successful') THEN pay.amount ELSE 0 END), 0) AS paid_sum,
+        COALESCE(SUM(CASE WHEN pay.status = 'paid' THEN pay.amount ELSE 0 END), 0) AS paid_sum,
         COUNT(pay.id) AS payment_count,
         COUNT(CASE WHEN pay.amount < 0 OR pay.status = 'refunded' THEN 1 END) AS refund_count,
         COUNT(CASE WHEN pay.amount >= 0 THEN 1 END) AS positive_count,
         COUNT(CASE WHEN pay.amount >= 0 AND pay.status = 'refunded' THEN 1 END) AS refunded_positive_count,
-        COUNT(CASE WHEN pay.amount >= 0 AND pay.status IN ('failed', 'cancelled') THEN 1 END) AS failed_positive_count,
-        MIN(CASE WHEN pay.status IN ('paid', 'success', 'successful') THEN pay.payment_date END) AS earliest_paid_at
+        COUNT(CASE WHEN pay.amount >= 0 AND pay.status = 'failed' THEN 1 END) AS failed_positive_count,
+        MIN(CASE WHEN pay.status = 'paid' THEN pay.payment_date END) AS earliest_paid_at
       FROM payments pay
       WHERE pay.application_id = a.id OR (a.lead_id IS NOT NULL AND pay.lead_id = a.lead_id)
     ) pmt ON TRUE
