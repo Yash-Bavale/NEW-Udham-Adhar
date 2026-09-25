@@ -889,7 +889,6 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         (!normalized.fromIso || createdTime >= new Date(normalized.fromIso).getTime()) &&
         (!normalized.toIso || createdTime <= new Date(normalized.toIso).getTime());
 
-      const fsLower = String(a.fulfillment_status ?? "").toLowerCase();
       const appStatusLower = String(a.application_status ?? "").toLowerCase();
       const isCompletedStage =
         stage === "completed" ||
