@@ -717,6 +717,19 @@ export function CustomerJourneyMap(p: Props) {
                 ? (activeCallback.parsedRemarks?.channel === "technical_delay" ? "Tech Delay Scheduled" : "Callback Scheduled")
                 : "Call Back / Reminder"}
           </button>
+
+          {/* View Callback History Button */}
+          {callbackHistory.length > 0 && !activeCallback && (
+            <button
+              type="button"
+              onClick={() => setDialog({ kind: "callback_history" })}
+              className="inline-flex items-center gap-1.5 rounded-md border border-indigo-200 bg-white px-3 py-1.5 text-xs font-bold text-indigo-700 shadow-xs hover:bg-indigo-50 hover:border-indigo-300 transition cursor-pointer"
+              title="View full callback scheduling & completion history"
+            >
+              <History className="size-3.5 text-indigo-600" />
+              VIEW ({callbackHistory.length})
+            </button>
+          )}
         </div>
 
         {/* Banner 1: Active Scheduled Callback (Due or Upcoming) */}
@@ -850,98 +863,7 @@ export function CustomerJourneyMap(p: Props) {
           </div>
         )}
 
-        {/* Section 3: Callback & Call History Audit below the flowchart */}
-        {callbackHistory.length > 0 && (
-          <div className="mt-4 rounded-xl border border-slate-200 bg-white/95 p-4 shadow-xs space-y-3">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-2.5 flex-wrap gap-2">
-              <div className="flex items-center gap-2">
-                <History className="size-4 text-indigo-600" />
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-800">
-                  Callback History
-                </span>
-                <span className="px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 text-[10px] font-bold border border-indigo-200">
-                  VIEW ({historyCount})
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setDialog({ kind: "callback_history" })}
-                className="text-xs font-bold text-indigo-600 hover:text-indigo-800 hover:underline inline-flex items-center gap-1 cursor-pointer"
-              >
-                <History className="size-3.5" /> Full Audit Log ({callbackHistory.length})
-              </button>
-            </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5">
-              {callbackHistory.slice(0, 6).map((item) => {
-                const isRescheduled = item.action_type === "CALLBACK_RESCHEDULED" || (item.action_type as string) === "RESCHEDULED";
-                const isScheduled = item.action_type === "CALLBACK_SCHEDULED" || (item.action_type as string) === "SCHEDULED";
-                const isCompleted = item.action_type === "CALLBACK_COMPLETED" || (item.action_type as string) === "CALL_COMPLETED";
-
-                return (
-                  <div
-                    key={item.id}
-                    className={cn(
-                      "rounded-lg border p-3 text-xs space-y-2 transition shadow-2xs",
-                      isCompleted
-                        ? "border-emerald-200 bg-emerald-50/40"
-                        : isRescheduled
-                        ? "border-amber-200 bg-amber-50/40"
-                        : "border-indigo-200 bg-indigo-50/30"
-                    )}
-                  >
-                    <div className="flex items-center justify-between gap-1.5 border-b border-slate-100 pb-1.5">
-                      <span
-                        className={cn(
-                          "px-2 py-0.5 rounded text-[10px] font-extrabold uppercase tracking-wider inline-flex items-center gap-1",
-                          isCompleted
-                            ? "bg-emerald-100 text-emerald-900 border border-emerald-300"
-                            : isRescheduled
-                            ? "bg-amber-100 text-amber-900 border border-amber-300"
-                            : "bg-indigo-100 text-indigo-900 border border-indigo-300"
-                        )}
-                      >
-                        {isCompleted && <CheckCircle2 className="size-2.5 text-emerald-700" />}
-                        {isRescheduled && <Clock className="size-2.5 text-amber-700" />}
-                        {isScheduled && <PhoneCall className="size-2.5 text-indigo-700" />}
-                        {isCompleted ? "CALL COMPLETED" : isRescheduled ? "CALLBACK RESCHEDULED" : isScheduled ? "CALLBACK SCHEDULED" : item.action_type.replace(/_/g, " ")}
-                      </span>
-                      <span className="text-[10px] text-slate-500 font-medium">
-                        {formatIST(item.created_at)}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center gap-1.5 text-slate-700">
-                      <span className="text-slate-400 font-medium text-[11px]">By:</span>
-                      <span className="font-bold text-slate-900 truncate">{item.actor_name || "Staff"}</span>
-                      {item.actor_role && (
-                        <span className="text-[9px] text-slate-500 uppercase font-semibold">({item.actor_role})</span>
-                      )}
-                    </div>
-
-                    {item.previous_fires_at && (
-                      <div className="text-[11px] text-slate-600">
-                        <span className="font-medium text-slate-400">Previous:</span> {formatIST(item.previous_fires_at)}
-                      </div>
-                    )}
-
-                    {item.new_fires_at && (
-                      <div className="text-[11px] font-semibold text-slate-800">
-                        <span className="font-medium text-slate-500">Scheduled:</span> {formatIST(item.new_fires_at)}
-                      </div>
-                    )}
-
-                    <div className="text-[11px] text-slate-800">
-                      <span className="font-medium text-slate-500">Reason:</span>{" "}
-                      <span className="font-semibold text-slate-900">{item.reason_label || item.reason}</span>
-                      {item.note && <span className="block text-slate-600 italic text-[10px] mt-0.5">"{item.note}"</span>}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
 
 
       </section>
