@@ -533,6 +533,21 @@ export const setExternalDelay = createServerFn({ method: "POST" })
       actorId: context.userId,
     });
 
+    // Automatically complete any active callback / Hot Order on this qualifying action
+    try {
+      const { completeHotOrderOnQualifyingAction } = await import("@/lib/orders/actions/callback-reminder.functions");
+      await completeHotOrderOnQualifyingAction({
+        orderId: app.id,
+        actorId: context.userId,
+        actorName: name,
+        actionName: side === "internal" ? "Technical Delay" : "Customer Delay",
+        actionReason: `${side === "internal" ? "Technical Delay" : "Customer Delay"} action performed: ${data.reasonLabel}`,
+        supabase: admin,
+      });
+    } catch (hotErr) {
+      console.warn("[setExternalDelay] completeHotOrderOnQualifyingAction warning:", hotErr);
+    }
+
     return { ok: true, side };
   });
 

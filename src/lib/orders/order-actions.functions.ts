@@ -396,8 +396,21 @@ export const sendFormLink = createServerFn({ method: "POST" })
         body: `Delivered to ${to}.`,
       });
     }
-    return { ok: true, order: updated, emailQueued };
 
+    // Automatically complete any active callback / Hot Order on this qualifying action
+    try {
+      const { completeHotOrderOnQualifyingAction } = await import("@/lib/orders/actions/callback-reminder.functions");
+      await completeHotOrderOnQualifyingAction({
+        orderId: order.id,
+        actorId: context.userId,
+        actionName: "Form Not Submitted",
+        actionReason: "Form link / reminder email sent",
+      });
+    } catch (hotErr) {
+      console.warn("[sendFormLink] completeHotOrderOnQualifyingAction warning:", hotErr);
+    }
+
+    return { ok: true, order: updated, emailQueued };
   });
 
 
@@ -456,6 +469,20 @@ export const markSubmittedToGovt = createServerFn({ method: "POST" })
       title: `${order.application_code || order.id.slice(0, 8)} submitted to authority`,
       body: data.referenceNumber ? `Ref: ${data.referenceNumber}` : undefined,
     });
+
+    // Automatically complete any active callback / Hot Order on this qualifying action
+    try {
+      const { completeHotOrderOnQualifyingAction } = await import("@/lib/orders/actions/callback-reminder.functions");
+      await completeHotOrderOnQualifyingAction({
+        orderId: data.orderId,
+        actorId: context.userId,
+        actionName: "Application Submitted",
+        actionReason: data.referenceNumber ? `Submitted to govt portal (Ref: ${data.referenceNumber})` : "Submitted to govt portal",
+      });
+    } catch (hotErr) {
+      console.warn("[markSubmittedToGovt] completeHotOrderOnQualifyingAction warning:", hotErr);
+    }
+
     return { ok: true, order: updated, emailQueued };
   });
 
@@ -509,6 +536,20 @@ export const completeOrder = createServerFn({ method: "POST" })
       title: `${order.application_code || order.id.slice(0, 8)} completed`,
       body: "Delivery email sent to customer.",
     });
+
+    // Automatically complete any active callback / Hot Order on this qualifying action
+    try {
+      const { completeHotOrderOnQualifyingAction } = await import("@/lib/orders/actions/callback-reminder.functions");
+      await completeHotOrderOnQualifyingAction({
+        orderId: data.orderId,
+        actorId: context.userId,
+        actionName: "Application Accepted",
+        actionReason: "Order completed with certificate delivery",
+      });
+    } catch (hotErr) {
+      console.warn("[completeOrder] completeHotOrderOnQualifyingAction warning:", hotErr);
+    }
+
     return { ok: true, order: updated, emailQueued };
   });
 
@@ -1043,20 +1084,21 @@ export const reopenOrder = createServerFn({ method: "POST" })
     // 4b. If order was assigned to an inactive/exited employee (or unassigned), instantly assign to an active operations employee
     try {
       let isAssigneeActive = false;
-      if (preApp?.assigned_to) {
-        const { data: assigneeProf } = await supabaseAdmin
-          .from("profiles")
+      const assignedToId = (preApp as any)?.assigned_to;
+      if (assignedToId) {
+        const { data: assigneeProf } = await (supabaseAdmin
+          .from("profiles" as any) as any)
           .select("id, is_active, employment_status")
-          .eq("id", preApp.assigned_to)
+          .eq("id", assignedToId)
           .maybeSingle();
-        isAssigneeActive = assigneeProf?.is_active !== false && (assigneeProf?.employment_status === "ACTIVE" || !assigneeProf?.employment_status);
+        isAssigneeActive = (assigneeProf as any)?.is_active !== false && ((assigneeProf as any)?.employment_status === "ACTIVE" || !(assigneeProf as any)?.employment_status);
       }
       if (!isAssigneeActive) {
         const { assignOrderToNextEligibleEmployee } = await import("@/lib/crm/assignment-engine.server");
         await assignOrderToNextEligibleEmployee({
           orderId: data.orderId,
-          changeType: preApp?.assigned_to ? "AUTO_TERMINATED" : "AUTO_INITIAL_POOL",
-          reason: preApp?.assigned_to ? "Order reopened: Previous assignee is inactive/exited" : "Order reopened: Assigned to active pool staff",
+          changeType: assignedToId ? "AUTO_TERMINATED" : "AUTO_INITIAL_POOL",
+          reason: assignedToId ? "Order reopened: Previous assignee is inactive/exited" : "Order reopened: Assigned to active pool staff",
           actorId: context.userId,
         });
       }

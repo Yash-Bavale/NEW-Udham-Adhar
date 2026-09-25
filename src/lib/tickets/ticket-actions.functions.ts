@@ -848,21 +848,22 @@ export const closeTicketRestartT001 = createServerFn({ method: "POST" })
         .maybeSingle();
 
       let isAssigneeActive = false;
-      if (currentApp?.assigned_to) {
-        const { data: assigneeProf } = await supabaseAdmin
-          .from("profiles")
+      const assignedToId = (currentApp as any)?.assigned_to;
+      if (assignedToId) {
+        const { data: assigneeProf } = await (supabaseAdmin
+          .from("profiles" as any) as any)
           .select("id, is_active, employment_status")
-          .eq("id", currentApp.assigned_to)
+          .eq("id", assignedToId)
           .maybeSingle();
-        isAssigneeActive = assigneeProf?.is_active !== false && (assigneeProf?.employment_status === "ACTIVE" || !assigneeProf?.employment_status);
+        isAssigneeActive = (assigneeProf as any)?.is_active !== false && ((assigneeProf as any)?.employment_status === "ACTIVE" || !(assigneeProf as any)?.employment_status);
       }
 
       if (!isAssigneeActive) {
         const { assignOrderToNextEligibleEmployee } = await import("@/lib/crm/assignment-engine.server");
         await assignOrderToNextEligibleEmployee({
           orderId: ticket.application_id,
-          changeType: currentApp?.assigned_to ? "AUTO_TERMINATED" : "AUTO_INITIAL_POOL",
-          reason: currentApp?.assigned_to ? "Order reopened from ticket: Previous assignee was inactive/exited" : "Order reopened from ticket: Assigned to active pool staff",
+          changeType: assignedToId ? "AUTO_TERMINATED" : "AUTO_INITIAL_POOL",
+          reason: assignedToId ? "Order reopened from ticket: Previous assignee was inactive/exited" : "Order reopened from ticket: Assigned to active pool staff",
           actorId: context.userId,
         });
       }

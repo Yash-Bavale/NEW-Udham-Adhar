@@ -52,7 +52,7 @@ import { handleGovtRejected } from "@/lib/orders/actions/close-actions.functions
 import { listCloseReasons } from "@/lib/orders/actions/reasons.functions";
 import { updateFulfillmentStatus } from "@/lib/crm/orders-v2.functions";
 import { markConsultationCompleted } from "@/lib/orders/actions/consultation.functions";
-import { getActiveOrderCallback } from "@/lib/orders/actions/callback-reminder.functions";
+import { getActiveOrderCallback, completeOrderCallback, getOrderCallbackHistory, type CallbackHistoryItem } from "@/lib/orders/actions/callback-reminder.functions";
 import { silentCloseOrder } from "@/lib/crm/workflow-closure.functions";
 
 interface Props {
@@ -232,6 +232,31 @@ export function CustomerJourneyMap(p: Props) {
     staleTime: 10_000,
   });
   const activeCallback = activeCallbackQ.data;
+
+  const getCallbackHistoryFn = useServerFn(getOrderCallbackHistory);
+  const callbackHistoryQ = useQuery({
+    queryKey: ["order-callback-history", p.applicationId],
+    queryFn: () => getCallbackHistoryFn({ data: { orderId: p.applicationId } }),
+    staleTime: 5_000,
+  });
+  const callbackHistory = (callbackHistoryQ.data ?? []) as CallbackHistoryItem[];
+  const historyCount =
+    activeCallback?.historyCount ??
+    callbackHistory.filter((h) => h.action_type === "CALLBACK_SCHEDULED" || h.action_type === "CALLBACK_RESCHEDULED").length;
+
+  const fnCompleteCallback = useServerFn(completeOrderCallback);
+  const mutCompleteCallback = useMutation({
+    mutationFn: () => fnCompleteCallback({ data: { orderId: p.applicationId } }),
+    onSuccess: () => {
+      toast.success("Customer call marked completed — Hot Order removed");
+      qc.invalidateQueries({ queryKey: ["active-order-callback", p.applicationId] });
+      qc.invalidateQueries({ queryKey: ["order-callback-history", p.applicationId] });
+      invalidate();
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Failed to complete callback"),
+  });
+
+  const isReopenedHot = !closed && !completed && (p.stage === "order_reopened" || p.fulfillmentStatus === "order_reopened" || (p.workflowStatus as string) === "reopened");
   const role = useRole();
   const isAdmin = role.hasAny(["super_admin", "admin"]);
 
@@ -256,6 +281,8 @@ export function CustomerJourneyMap(p: Props) {
     qc.invalidateQueries({ queryKey: ["workflow-timers", p.applicationId] });
     qc.invalidateQueries({ queryKey: ["workflow-events", p.applicationId] });
     qc.invalidateQueries({ queryKey: ["due-reminders-summary"] });
+    qc.invalidateQueries({ queryKey: ["active-order-callback", p.applicationId] });
+    qc.invalidateQueries({ queryKey: ["order-callback-history", p.applicationId] });
   };
 
   const fnFormLink = useServerFn(sendFormLink);
@@ -673,7 +700,9 @@ export function CustomerJourneyMap(p: Props) {
                 ? "bg-rose-600 hover:bg-rose-700 animate-pulse ring-2 ring-rose-400"
                 : activeCallback && !closed && !completed
                   ? "bg-indigo-600 hover:bg-indigo-700"
-                  : "bg-blue-600 hover:bg-blue-700"
+                  : isReopenedHot
+                    ? "bg-rose-600 hover:bg-rose-700 animate-pulse ring-2 ring-rose-400"
+                    : "bg-blue-600 hover:bg-blue-700"
             )}
             title={
               closed || completed
@@ -681,15 +710,16 @@ export function CustomerJourneyMap(p: Props) {
                 : "Set customer callback reminder (order becomes Hot Order when reminder ends)"
             }
           >
-            {activeCallback?.isDue && !closed && !completed ? <Flame className="size-3.5" /> : <PhoneCall className="size-3.5" />}
-            {activeCallback?.isDue && !closed && !completed
-              ? (activeCallback.parsedRemarks?.channel === "technical_delay" ? "Tech Delay Due (HOT ORDER)" : "Call Due Now (HOT ORDER)")
+            {(activeCallback?.isDue || isReopenedHot) && !closed && !completed ? <Flame className="size-3.5" /> : <PhoneCall className="size-3.5" />}
+            {(activeCallback?.isDue || isReopenedHot) && !closed && !completed
+              ? (activeCallback?.parsedRemarks?.channel === "technical_delay" ? "Tech Delay Due (HOT ORDER)" : "Call Due Now (HOT ORDER)")
               : activeCallback && !closed && !completed
                 ? (activeCallback.parsedRemarks?.channel === "technical_delay" ? "Tech Delay Scheduled" : "Callback Scheduled")
                 : "Call Back / Reminder"}
           </button>
         </div>
 
+        {/* Banner 1: Active Scheduled Callback (Due or Upcoming) */}
         {activeCallback && !closed && !completed && (
           <div className={cn(
             "mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-2.5 shadow-xs",
@@ -733,8 +763,8 @@ export function CustomerJourneyMap(p: Props) {
               )}
             </div>
 
-            <div className="flex items-center gap-2 ml-auto">
-              {(activeCallback.historyCount ?? 0) > 0 && (
+            <div className="flex items-center gap-2 ml-auto flex-wrap">
+              {(historyCount ?? 0) > 0 && (
                 <button
                   type="button"
                   onClick={() => setDialog({ kind: "callback_history" })}
@@ -742,17 +772,173 @@ export function CustomerJourneyMap(p: Props) {
                   title="View callback scheduling & rescheduling history"
                 >
                   <History className="size-3.5 text-indigo-600" />
-                  VIEW ({activeCallback.historyCount})
+                  VIEW ({historyCount})
+                </button>
+              )}
+
+              {/* Primary Action 1: Call Completed */}
+              <button
+                type="button"
+                onClick={() => mutCompleteCallback.mutate()}
+                disabled={mutCompleteCallback.isPending}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3.5 py-1.5 text-xs font-bold text-white hover:bg-emerald-700 transition cursor-pointer shadow-xs disabled:opacity-50"
+                title="Mark scheduled callback completed & remove Hot Order"
+              >
+                {mutCompleteCallback.isPending ? <Loader2 className="size-3.5 animate-spin" /> : <CheckCircle2 className="size-3.5" />}
+                Call Completed
+              </button>
+
+              {/* Primary Action 2: Reschedule */}
+              <button
+                type="button"
+                onClick={() => setDialog({ kind: "callback_reminder" })}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-800 hover:bg-slate-50 transition cursor-pointer shadow-2xs"
+                title="Reschedule this callback"
+              >
+                <Clock className="size-3.5 text-slate-600" />
+                Reschedule
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Banner 2: Hot Order without Active Scheduled Callback (STATE B: Reopened order) */}
+        {!activeCallback && isReopenedHot && !closed && !completed && (
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-rose-300 bg-rose-50 px-4 py-2.5 shadow-xs text-rose-950">
+            <div className="flex flex-wrap items-center gap-2.5">
+              <span className="inline-flex items-center gap-1 rounded-md bg-rose-600 px-2 py-0.5 text-[10px] font-black uppercase text-white shadow-xs tracking-wider">
+                <Flame className="size-3" /> HOT ORDER NOW
+              </span>
+              <span className="text-sm font-bold text-slate-900">
+                Reopened Hot Order · Employee workflow action or customer call required
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2 ml-auto flex-wrap">
+              {(historyCount ?? 0) > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setDialog({ kind: "callback_history" })}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-white px-2.5 py-1.5 text-xs font-bold text-indigo-700 hover:bg-indigo-50 hover:border-indigo-300 transition cursor-pointer shadow-2xs"
+                  title="View callback scheduling & rescheduling history"
+                >
+                  <History className="size-3.5 text-indigo-600" />
+                  VIEW ({historyCount})
                 </button>
               )}
 
               <button
                 type="button"
-                onClick={() => setDialog({ kind: "callback_reminder" })}
-                className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-800 hover:bg-slate-50 transition cursor-pointer shadow-2xs"
+                onClick={() => mutCompleteCallback.mutate()}
+                disabled={mutCompleteCallback.isPending}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3.5 py-1.5 text-xs font-bold text-white hover:bg-emerald-700 transition cursor-pointer shadow-xs disabled:opacity-50"
+                title="Mark customer contact completed & remove Hot Order"
               >
-                Manage Reminder
+                {mutCompleteCallback.isPending ? <Loader2 className="size-3.5 animate-spin" /> : <CheckCircle2 className="size-3.5" />}
+                Call Completed
               </button>
+
+              <button
+                type="button"
+                onClick={() => setDialog({ kind: "callback_reminder" })}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-800 hover:bg-slate-50 transition cursor-pointer shadow-2xs"
+              >
+                <Clock className="size-3.5 text-slate-600" />
+                Schedule Callback
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Section 3: Callback & Call History Audit below the flowchart */}
+        {callbackHistory.length > 0 && (
+          <div className="mt-4 rounded-xl border border-slate-200 bg-white/95 p-4 shadow-xs space-y-3">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2.5 flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <History className="size-4 text-indigo-600" />
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                  Callback History
+                </span>
+                <span className="px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 text-[10px] font-bold border border-indigo-200">
+                  VIEW ({historyCount})
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDialog({ kind: "callback_history" })}
+                className="text-xs font-bold text-indigo-600 hover:text-indigo-800 hover:underline inline-flex items-center gap-1 cursor-pointer"
+              >
+                <History className="size-3.5" /> Full Audit Log ({callbackHistory.length})
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5">
+              {callbackHistory.slice(0, 6).map((item) => {
+                const isRescheduled = item.action_type === "CALLBACK_RESCHEDULED";
+                const isScheduled = item.action_type === "CALLBACK_SCHEDULED";
+                const isCompleted = item.action_type === "CALLBACK_COMPLETED";
+
+                return (
+                  <div
+                    key={item.id}
+                    className={cn(
+                      "rounded-lg border p-3 text-xs space-y-2 transition shadow-2xs",
+                      isCompleted
+                        ? "border-emerald-200 bg-emerald-50/40"
+                        : isRescheduled
+                        ? "border-amber-200 bg-amber-50/40"
+                        : "border-indigo-200 bg-indigo-50/30"
+                    )}
+                  >
+                    <div className="flex items-center justify-between gap-1.5 border-b border-slate-100 pb-1.5">
+                      <span
+                        className={cn(
+                          "px-2 py-0.5 rounded text-[10px] font-extrabold uppercase tracking-wider inline-flex items-center gap-1",
+                          isCompleted
+                            ? "bg-emerald-100 text-emerald-900 border border-emerald-300"
+                            : isRescheduled
+                            ? "bg-amber-100 text-amber-900 border border-amber-300"
+                            : "bg-indigo-100 text-indigo-900 border border-indigo-300"
+                        )}
+                      >
+                        {isCompleted && <CheckCircle2 className="size-2.5 text-emerald-700" />}
+                        {isRescheduled && <Clock className="size-2.5 text-amber-700" />}
+                        {isScheduled && <PhoneCall className="size-2.5 text-indigo-700" />}
+                        {item.action_type.replace(/_/g, " ")}
+                      </span>
+                      <span className="text-[10px] text-slate-500 font-medium">
+                        {formatIST(item.created_at)}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 text-slate-700">
+                      <span className="text-slate-400 font-medium text-[11px]">By:</span>
+                      <span className="font-bold text-slate-900 truncate">{item.actor_name || "Staff"}</span>
+                      {item.actor_role && (
+                        <span className="text-[9px] text-slate-500 uppercase font-semibold">({item.actor_role})</span>
+                      )}
+                    </div>
+
+                    {item.previous_fires_at && (
+                      <div className="text-[11px] text-slate-600">
+                        <span className="font-medium text-slate-400">Previous:</span> {formatIST(item.previous_fires_at)}
+                      </div>
+                    )}
+
+                    {item.new_fires_at && (
+                      <div className="text-[11px] font-semibold text-slate-800">
+                        <span className="font-medium text-slate-500">Scheduled:</span> {formatIST(item.new_fires_at)}
+                      </div>
+                    )}
+
+                    <div className="text-[11px] text-slate-800">
+                      <span className="font-medium text-slate-500">Reason:</span>{" "}
+                      <span className="font-semibold text-slate-900">{item.reason_label || item.reason}</span>
+                      {item.note && <span className="block text-slate-600 italic text-[10px] mt-0.5">"{item.note}"</span>}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}

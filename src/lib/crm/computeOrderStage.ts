@@ -50,6 +50,8 @@ export interface ComputeStageApplication {
   closure_stage?: string | null;
   refund_status?: string | null;
   order_status?: string | null;
+  technical_hold_started_at?: string | null;
+  customer_hold_started_at?: string | null;
 }
 
 export function computeOrderStage(

@@ -244,6 +244,21 @@ export const closeOrder = createServerFn({ method: "POST" })
       actorId: context.userId,
     });
 
+    // Automatically complete any active callback / Hot Order on order close
+    try {
+      const { completeHotOrderOnQualifyingAction } = await import("@/lib/orders/actions/callback-reminder.functions");
+      await completeHotOrderOnQualifyingAction({
+        orderId: app.id,
+        actorId: context.userId,
+        actorName: name,
+        actionName: data.silent ? "Silent Close" : "Order Force Closed",
+        actionReason: `Order closed (${data.reasonLabel})`,
+        supabase: admin,
+      });
+    } catch (hotErr) {
+      console.warn("[closeOrder] completeHotOrderOnQualifyingAction warning:", hotErr);
+    }
+
     return { ok: true, silent: data.silent };
   });
 

@@ -84,8 +84,8 @@ export const scheduleOrderCallback = createServerFn({ method: "POST" })
     // 1. Duplicate & Idempotency Protection: Check if request was already processed
     if (data.idempotencyKey) {
       try {
-        const { data: existingHistory } = await admin
-          .from("order_callback_history" as any)
+        const { data: existingHistory } = await (admin
+          .from("order_callback_history" as any) as any)
           .select("id, new_fires_at, reason_label")
           .eq("idempotency_key", data.idempotencyKey)
           .maybeSingle();
@@ -280,7 +280,7 @@ export const scheduleOrderCallback = createServerFn({ method: "POST" })
         employeeId: context.userId,
         employeeName: staff.staff_name,
         employeeRole: staff.staff_role,
-        actionType: actionType,
+        actionType: actionType as any,
         notes: `${actionLabel} for ${istFormattedTime} · Reason: ${data.reasonLabel}${data.note ? ` (${data.note})` : ""}`,
         source: "employee",
         supabase: admin,
@@ -408,12 +408,13 @@ export const completeOrderCallback = createServerFn({ method: "POST" })
     await assertStaff(context.supabase, context.userId);
     const admin = await getAdmin();
     const staff = await getStaff(context.userId);
-    const now = new Date().toISOString();
+    const now = new Date();
+    const nowIso = now.toISOString();
 
-    // Fetch existing scheduler before completing to record in history
+    // 1. Fetch existing active scheduler before completing to record in history
     const { data: existingActive } = await admin
       .from("order_schedulers")
-      .select("id, fires_at, remarks")
+      .select("id, fires_at, remarks, created_at")
       .eq("application_id", data.orderId)
       .in("scheduler_type", ["our_side_reminder", "callback_reminder"])
       .eq("status", "active")
@@ -421,11 +422,12 @@ export const completeOrderCallback = createServerFn({ method: "POST" })
       .limit(1)
       .maybeSingle();
 
+    // 2. Stop/complete active schedulers atomically
     let query = admin
       .from("order_schedulers")
       .update({
         status: "completed",
-        stopped_at: now,
+        stopped_at: nowIso,
         stop_reason: data.callOutcomeNote ? `Call completed: ${data.callOutcomeNote}` : "completed_by_staff",
         stop_triggered_by: context.userId,
       })
@@ -440,20 +442,47 @@ export const completeOrderCallback = createServerFn({ method: "POST" })
     const { error } = await query;
     if (error) throw new Error(error.message);
 
-    // Record in order_callback_history
-    try {
-      let prevReason = null;
-      let prevLabel = null;
-      if (existingActive?.remarks) {
-        try {
-          const p = typeof existingActive.remarks === "string" ? JSON.parse(existingActive.remarks) : existingActive.remarks;
-          prevReason = p.reason;
-          prevLabel = p.reasonLabel;
-        } catch {
-          prevLabel = existingActive.remarks;
-        }
-      }
+    // 3. If order was in order_reopened stage, remove reopened hot state
+    const { data: appRow } = await admin
+      .from("applications")
+      .select("id, lead_id, fulfillment_status, order_status, form_submitted_at")
+      .eq("id", data.orderId)
+      .maybeSingle();
 
+    if ((appRow as any)?.fulfillment_status === "order_reopened" || (appRow as any)?.order_status === "REOPENED") {
+      const nextFulfillment = appRow?.form_submitted_at ? "form_submitted" : "form_not_submitted";
+      await admin
+        .from("applications")
+        .update({
+          fulfillment_status: nextFulfillment,
+          order_status: "UNDER_PROCESS",
+          application_status: "under_process",
+          workflow_status: "processing",
+        } as never)
+        .eq("id", data.orderId);
+    }
+
+    let prevReason = null;
+    let prevLabel = null;
+    let prevNote = null;
+    let prevChannel = "call";
+    if (existingActive?.remarks) {
+      try {
+        const p = typeof existingActive.remarks === "string" ? JSON.parse(existingActive.remarks) : existingActive.remarks;
+        prevReason = p.reason;
+        prevLabel = p.reasonLabel;
+        prevNote = p.note;
+        prevChannel = p.channel || "call";
+      } catch {
+        prevLabel = existingActive.remarks;
+      }
+    }
+
+    const reasonText = data.callOutcomeNote || prevNote || "Customer contacted successfully";
+    const reasonLabelText = prevLabel || "Customer Contacted";
+
+    // 4. Record in order_callback_history
+    try {
       await admin.from("order_callback_history" as any).insert({
         order_id: data.orderId,
         actor_id: context.userId,
@@ -462,22 +491,30 @@ export const completeOrderCallback = createServerFn({ method: "POST" })
         action_type: "CALLBACK_COMPLETED",
         previous_fires_at: existingActive?.fires_at || null,
         new_fires_at: null,
-        reason: data.callOutcomeNote || "completed_by_staff",
-        reason_label: data.callOutcomeNote ? `Completed: ${data.callOutcomeNote}` : "Callback Completed",
+        reason: reasonText,
+        reason_label: reasonLabelText,
         previous_reason: prevReason,
         previous_reason_label: prevLabel,
-        channel: "call",
+        note: data.callOutcomeNote?.trim() || null,
+        previous_note: prevNote,
+        channel: prevChannel,
         source: "employee",
       });
     } catch (hErr) {
       console.warn("[completeOrderCallback] history log warning:", hErr);
     }
 
+    const formattedScheduled = existingActive?.fires_at
+      ? new Date(existingActive.fires_at).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: true })
+      : null;
+    const formattedCompleted = now.toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: true });
+
+    // 5. Log in application_events
     try {
       await admin.from("application_events").insert({
         application_id: data.orderId,
         event_type: "callback_completed",
-        note: `Customer callback marked completed by ${staff.staff_name}.${data.callOutcomeNote ? ` Note: ${data.callOutcomeNote}` : ""}`,
+        note: `Customer callback marked completed by ${staff.staff_name}.${formattedScheduled ? ` (Scheduled: ${formattedScheduled})` : ""}${data.callOutcomeNote ? ` Note: ${data.callOutcomeNote}` : ""}`,
         staff_name: staff.staff_name,
         staff_role: staff.staff_role || "staff",
       } as never);
@@ -485,6 +522,41 @@ export const completeOrderCallback = createServerFn({ method: "POST" })
       console.warn("[completeOrderCallback] event log warning:", evtErr);
     }
 
+    // 6. Log in workflow_events & activity_logs
+    try {
+      await admin.from("workflow_events").insert({
+        application_id: data.orderId,
+        lead_id: appRow?.lead_id ?? null,
+        event_type: "callback_completed",
+        title: `Call Completed: ${staff.staff_name}`,
+        description: `Customer contacted successfully by ${staff.staff_name}. Completed: ${formattedCompleted}.${formattedScheduled ? ` Scheduled Call: ${formattedScheduled}.` : ""}${data.callOutcomeNote ? ` Note: ${data.callOutcomeNote}` : ""}`,
+        customer_visible: false,
+        actor_id: context.userId,
+        actor_name: staff.staff_name,
+        actor_role: staff.staff_role,
+        is_system: false,
+        metadata: {
+          scheduler_id: existingActive?.id || null,
+          scheduled_fires_at: existingActive?.fires_at || null,
+          completed_at: nowIso,
+          actor_name: staff.staff_name,
+          reason: reasonText,
+        },
+      } as never);
+
+      if (appRow?.lead_id) {
+        await admin.from("activity_logs").insert({
+          lead_id: appRow.lead_id,
+          user_id: context.userId,
+          activity_type: "callback_completed",
+          activity_description: `Call Completed: ${staff.staff_name}`,
+        } as never);
+      }
+    } catch (wErr) {
+      console.warn("[completeOrderCallback] workflow_events log warning:", wErr);
+    }
+
+    // 7. Log in order_action_logs
     try {
       const { logEmployeeOrderAction } = await import("@/lib/orders/order-action-logger.server");
       await logEmployeeOrderAction({
@@ -493,7 +565,7 @@ export const completeOrderCallback = createServerFn({ method: "POST" })
         employeeName: staff.staff_name,
         employeeRole: staff.staff_role,
         actionType: "CUSTOMER_CONTACTED",
-        notes: `Callback completed by ${staff.staff_name}.${data.callOutcomeNote ? ` Outcome: ${data.callOutcomeNote}` : ""}`,
+        notes: `Callback completed by ${staff.staff_name}.${formattedScheduled ? ` Scheduled: ${formattedScheduled}.` : ""}${data.callOutcomeNote ? ` Outcome: ${data.callOutcomeNote}` : ""}`,
         source: "employee",
         supabase: admin,
       });
@@ -504,6 +576,187 @@ export const completeOrderCallback = createServerFn({ method: "POST" })
     return { success: true };
   });
 
+/**
+ * Automatically complete any active callback / hot order when a qualifying human order action is performed.
+ */
+export async function completeHotOrderOnQualifyingAction(params: {
+  orderId: string;
+  actorId: string;
+  actorName?: string | null;
+  actorRole?: string | null;
+  actionName: string;
+  actionReason?: string | null;
+  supabase?: any;
+}): Promise<{ completed: boolean }> {
+  const admin = params.supabase || (await getAdmin());
+  const now = new Date();
+  const nowIso = now.toISOString();
+
+  let actorName = params.actorName;
+  let actorRole = params.actorRole;
+  if (!actorName && params.actorId) {
+    const staff = await getStaff(params.actorId);
+    actorName = staff.staff_name;
+    actorRole = staff.staff_role;
+  }
+  actorName = actorName || "Staff";
+  actorRole = actorRole || "staff";
+
+  // 1. Fetch active schedulers on this order
+  const { data: activeSchedulers } = await admin
+    .from("order_schedulers")
+    .select("id, application_id, status, fires_at, remarks, created_at, created_by")
+    .eq("application_id", params.orderId)
+    .in("scheduler_type", ["our_side_reminder", "callback_reminder"])
+    .eq("status", "active")
+    .order("created_at", { ascending: false });
+
+  // 2. Fetch order state to check if reopened / hot
+  const { data: appRow } = await admin
+    .from("applications")
+    .select("id, lead_id, customer_id, fulfillment_status, order_status, application_status, workflow_status")
+    .eq("id", params.orderId)
+    .maybeSingle();
+
+  const fs = String(appRow?.fulfillment_status ?? "").toLowerCase();
+  const os = String(appRow?.order_status ?? "").toLowerCase();
+  const isReopenedHot = fs === "order_reopened" || os === "reopened";
+  const hasSchedulers = activeSchedulers && activeSchedulers.length > 0;
+
+  if (!hasSchedulers && !isReopenedHot) {
+    return { completed: false };
+  }
+
+  // 3. Mark active schedulers as completed
+  if (hasSchedulers) {
+    await admin
+      .from("order_schedulers")
+      .update({
+        status: "completed",
+        stopped_at: nowIso,
+        stop_reason: `Qualifying action: ${params.actionName}`,
+        stop_triggered_by: params.actorId,
+      })
+      .eq("application_id", params.orderId)
+      .in("status", ["active", "paused"]);
+  }
+
+  const primaryScheduler = hasSchedulers ? activeSchedulers[0] : null;
+  let prevReason: string | null = null;
+  let prevReasonLabel: string | null = null;
+  let prevNote: string | null = null;
+  let prevChannel = "call";
+
+  if (primaryScheduler?.remarks) {
+    try {
+      const parsed = typeof primaryScheduler.remarks === "string" ? JSON.parse(primaryScheduler.remarks) : primaryScheduler.remarks;
+      prevReason = parsed?.reason || null;
+      prevReasonLabel = parsed?.reasonLabel || null;
+      prevNote = parsed?.note || null;
+      prevChannel = parsed?.channel || "call";
+    } catch {
+      prevReason = "custom";
+      prevReasonLabel = String(primaryScheduler.remarks);
+    }
+  }
+
+  const completedReason = params.actionReason || `${params.actionName} action performed`;
+  const completedReasonLabel = `${params.actionName} action performed`;
+
+  // 4. Record in order_callback_history
+  try {
+    await admin.from("order_callback_history" as any).insert({
+      order_id: params.orderId,
+      actor_id: params.actorId,
+      actor_name: actorName,
+      actor_role: actorRole,
+      action_type: "CALLBACK_COMPLETED",
+      previous_fires_at: primaryScheduler?.fires_at || null,
+      new_fires_at: null,
+      reason: completedReason,
+      reason_label: completedReasonLabel,
+      previous_reason: prevReason,
+      previous_reason_label: prevReasonLabel,
+      note: params.actionReason || null,
+      previous_note: prevNote,
+      channel: prevChannel,
+      source: "employee",
+    });
+  } catch (hErr) {
+    console.warn("[completeHotOrderOnQualifyingAction] history insert warning:", hErr);
+  }
+
+  const formattedScheduled = primaryScheduler?.fires_at
+    ? new Date(primaryScheduler.fires_at).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: true })
+    : null;
+  const formattedCompleted = now.toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: true });
+
+  // 5. Insert into application_events
+  try {
+    await admin.from("application_events").insert({
+      application_id: params.orderId,
+      event_type: "callback_completed",
+      note: `Call completed: ${params.actionName} action performed by ${actorName}${params.actionReason ? ` (${params.actionReason})` : ""}`,
+      staff_name: actorName,
+      staff_role: actorRole,
+    } as never);
+  } catch (e1) {
+    console.warn("[completeHotOrderOnQualifyingAction] application_events warning:", e1);
+  }
+
+  // 6. Insert into workflow_events & activity_logs
+  try {
+    await admin.from("workflow_events").insert({
+      application_id: params.orderId,
+      lead_id: appRow?.lead_id ?? null,
+      event_type: "callback_completed",
+      title: `Call Completed: ${actorName}`,
+      description: `${params.actionName} action performed · Call Completed by ${actorName}${formattedScheduled ? ` (Scheduled: ${formattedScheduled})` : ""}${params.actionReason ? ` · Note: ${params.actionReason}` : ""}`,
+      customer_visible: false,
+      actor_id: params.actorId,
+      actor_name: actorName,
+      actor_role: actorRole,
+      is_system: false,
+      metadata: {
+        action: params.actionName,
+        reason: completedReason,
+        scheduled_fires_at: primaryScheduler?.fires_at || null,
+        completed_at: nowIso,
+      },
+    } as never);
+
+    if (appRow?.lead_id) {
+      await admin.from("activity_logs").insert({
+        lead_id: appRow.lead_id,
+        user_id: params.actorId,
+        activity_type: "callback_completed",
+        activity_description: `Call Completed (${params.actionName}): ${actorName}`,
+      } as never);
+    }
+  } catch (e2) {
+    console.warn("[completeHotOrderOnQualifyingAction] workflow_events warning:", e2);
+  }
+
+  // 7. Log to order_action_logs
+  try {
+    const { logEmployeeOrderAction } = await import("@/lib/orders/order-action-logger.server");
+    await logEmployeeOrderAction({
+      orderId: params.orderId,
+      employeeId: params.actorId,
+      employeeName: actorName,
+      employeeRole: actorRole,
+      actionType: "CUSTOMER_CONTACTED",
+      notes: `Call Completed via ${params.actionName} action by ${actorName}${params.actionReason ? ` · Note: ${params.actionReason}` : ""}`,
+      source: "employee",
+      supabase: admin,
+    });
+  } catch (e3) {
+    console.warn("[completeHotOrderOnQualifyingAction] order_action_logs warning:", e3);
+  }
+
+  return { completed: true };
+}
+
 export const getActiveOrderCallback = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => z.object({ orderId: z.string().uuid() }).parse(i))
@@ -511,7 +764,7 @@ export const getActiveOrderCallback = createServerFn({ method: "POST" })
     await assertStaff(context.supabase);
     const admin = await getAdmin();
 
-    const [{ data: row, error }, { data: app }, historyCountRes] = await Promise.all([
+    const [{ data: row, error }, { data: app }] = await Promise.all([
       admin
         .from("order_schedulers")
         .select("id, application_id, status, fires_at, remarks, created_at, created_by")
@@ -526,13 +779,19 @@ export const getActiveOrderCallback = createServerFn({ method: "POST" })
         .select("fulfillment_status, application_status, order_status, workflow_status")
         .eq("id", data.orderId)
         .maybeSingle(),
-      admin
-        .from("order_callback_history" as any)
+    ]);
+
+    let historyCount = 0;
+    try {
+      const { count } = await (admin
+        .from("order_callback_history" as any) as any)
         .select("id", { count: "exact", head: true })
         .eq("order_id", data.orderId)
-        .then((res: any) => ({ count: res.count ?? 0 }))
-        .catch(() => ({ count: 0 })),
-    ]);
+        .in("action_type", ["CALLBACK_SCHEDULED", "CALLBACK_RESCHEDULED"]);
+      historyCount = count ?? 0;
+    } catch {
+      historyCount = 0;
+    }
 
     if (error) {
       console.error("[getActiveOrderCallback] error:", error);
@@ -581,7 +840,7 @@ export const getActiveOrderCallback = createServerFn({ method: "POST" })
       ...row,
       parsedRemarks,
       isDue,
-      historyCount: historyCountRes?.count ?? 0,
+      historyCount,
     };
   });
 
@@ -635,7 +894,8 @@ export const getOrderCallbackHistoryCount = createServerFn({ method: "POST" })
       const { count } = await admin
         .from("order_callback_history" as any)
         .select("id", { count: "exact", head: true })
-        .eq("order_id", data.orderId);
+        .eq("order_id", data.orderId)
+        .in("action_type", ["CALLBACK_SCHEDULED", "CALLBACK_RESCHEDULED"]);
 
       return { count: count ?? 0 };
     } catch {

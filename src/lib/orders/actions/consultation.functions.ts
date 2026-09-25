@@ -187,5 +187,21 @@ export const markConsultationCompleted = createServerFn({ method: "POST" })
       throw new Error(`E005 email could not be sent: ${msg}`);
     }
 
+    // Automatically complete any active callback / Hot Order on this qualifying action
+    try {
+      const { completeHotOrderOnQualifyingAction } = await import("@/lib/orders/actions/callback-reminder.functions");
+      const staffName = ((prof as any)?.display_name as string) || ((prof as any)?.full_name as string) || ((prof as any)?.email as string) || "Staff";
+      await completeHotOrderOnQualifyingAction({
+        orderId: app.id,
+        actorId: context.userId,
+        actorName: staffName,
+        actionName: "Consultation Completed",
+        actionReason: data.remarks || "Consultation completed & customer email sent",
+        supabase: supabaseAdmin,
+      });
+    } catch (hotErr) {
+      console.warn("[markConsultationCompleted] completeHotOrderOnQualifyingAction warning:", hotErr);
+    }
+
     return { ok: true, emailQueued: true };
   });

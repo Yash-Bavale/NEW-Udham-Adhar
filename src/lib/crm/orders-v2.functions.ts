@@ -812,8 +812,8 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         return q.order("created_at", { ascending: false }).limit(5000);
       })(),
       (() => {
-        let q = admin
-          .from("order_action_logs")
+        let q = (admin
+          .from("order_action_logs" as any) as any)
           .select("order_id, action_type, new_status, created_at")
           .or("action_type.ilike.%complete%,new_status.ilike.%complete%,action_type.eq.CERTIFICATE_GENERATED,action_type.eq.ORDER_COMPLETED");
         if (normalized.fromIso) q = q.gte("created_at", normalized.fromIso);
@@ -879,8 +879,8 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         .select("application_id, issued_at, delivered_at, created_at")
         .in("application_id", ids)
         .order("created_at", { ascending: false }),
-      admin
-        .from("order_action_logs")
+      (admin
+        .from("order_action_logs" as any) as any)
         .select("order_id, action_type, new_status, created_at")
         .in("order_id", ids)
         .or("action_type.ilike.%complete%,new_status.ilike.%complete%,action_type.eq.CERTIFICATE_GENERATED,action_type.eq.ORDER_COMPLETED")
@@ -906,14 +906,14 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
     }
 
     // Index action log timestamps
-    for (const l of [...(inRangeActionLogsRes.data ?? []), ...(actionLogsRes.data ?? [])]) {
+    for (const l of [...((inRangeActionLogsRes.data as any[]) ?? []), ...((actionLogsRes.data as any[]) ?? [])]) {
       if (l.order_id && l.created_at && !eventCompletedMap.has(l.order_id)) {
         eventCompletedMap.set(l.order_id, l.created_at);
       }
     }
 
     const allEvents = [...(inRangeEventsRes.data ?? []), ...(eventsRes.data ?? [])];
-    allEvents.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    allEvents.sort((a: any, b: any) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
     for (const ev of allEvents) {
       const et = String(ev.event_type || "").toLowerCase();
       const nv = String(ev.new_value || "").toLowerCase();
@@ -1916,12 +1916,44 @@ export const updateFulfillmentStatus = createServerFn({ method: "POST" })
         staff_role,
       } as never);
 
+      // Automatically complete any active callback / Hot Order on order completion
+      try {
+        const { completeHotOrderOnQualifyingAction } = await import("@/lib/orders/actions/callback-reminder.functions");
+        await completeHotOrderOnQualifyingAction({
+          orderId: data.orderId,
+          actorId: context.userId,
+          actorName: staff_name,
+          actorRole: staff_role,
+          actionName: "Application Accepted",
+          actionReason: `Completed with certificate ${certNumber}`,
+          supabase: admin,
+        });
+      } catch (hotErr) {
+        console.warn("[updateFulfillmentStatus.completed] completeHotOrderOnQualifyingAction warning:", hotErr);
+      }
+
       return {
         ok: true,
         certificateId,
         certificateNumber: certNumber,
         emailQueuedTo: recipientEmail,
       };
+    }
+
+    // Automatically complete any active callback / Hot Order on qualifying fulfillment transition
+    try {
+      const { completeHotOrderOnQualifyingAction } = await import("@/lib/orders/actions/callback-reminder.functions");
+      await completeHotOrderOnQualifyingAction({
+        orderId: data.orderId,
+        actorId: context.userId,
+        actorName: staff_name,
+        actorRole: staff_role,
+        actionName: FULFILLMENT_LABEL[target] || target,
+        actionReason: data.note || `Fulfillment stage changed to ${FULFILLMENT_LABEL[target] || target}`,
+        supabase: admin,
+      });
+    } catch (hotErr) {
+      console.warn("[updateFulfillmentStatus] completeHotOrderOnQualifyingAction warning:", hotErr);
     }
 
     return { ok: true };

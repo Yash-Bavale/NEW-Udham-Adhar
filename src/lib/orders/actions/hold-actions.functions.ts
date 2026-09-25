@@ -269,6 +269,21 @@ export const resumeFromHold = createServerFn({ method: "POST" })
     const recipientName = lead?.name || customer?.name || "Customer";
     if (!email) throw new Error("This order has no recipient email, so E011 could not be sent.");
 
+    // Resolve executive name
+    let executiveName = "Customer Care Team";
+    const staffId = (preRow as any).assigned_to || lead?.assigned_to || context.userId;
+    if (staffId) {
+      const { data: prof } = await supabaseAdmin
+        .from("profiles")
+        .select("display_name, full_name, email")
+        .eq("id", staffId)
+        .maybeSingle();
+      const p = prof as { display_name?: string | null; full_name?: string | null; email?: string | null } | null;
+      if (p?.display_name || p?.full_name || p?.email) {
+        executiveName = p.display_name || p.full_name || p.email || "Customer Care Team";
+      }
+    }
+
     try {
       const [{ enqueueFromTemplateInternal }, { BHS_EMAILS }] = await Promise.all([
         import("@/lib/emails/emails.server"),
@@ -278,21 +293,6 @@ export const resumeFromHold = createServerFn({ method: "POST" })
         timeZone: "Asia/Kolkata", day: "2-digit", month: "short", year: "numeric",
         hour: "2-digit", minute: "2-digit", hour12: true,
       });
-
-      // Resolve executive name
-      let executiveName = "Customer Care Team";
-      const staffId = (preRow as any).assigned_to || lead?.assigned_to || context.userId;
-      if (staffId) {
-        const { data: prof } = await supabaseAdmin
-          .from("profiles")
-          .select("display_name, full_name, email")
-          .eq("id", staffId)
-          .maybeSingle();
-        const p = prof as { display_name?: string | null; full_name?: string | null; email?: string | null } | null;
-        if (p?.display_name || p?.full_name || p?.email) {
-          executiveName = p.display_name || p.full_name || p.email || "Customer Care Team";
-        }
-      }
 
       const sendResult = await enqueueFromTemplateInternal(
         BHS_EMAILS.E011_TECHNICAL_DELAY_RESOLVED,
@@ -325,6 +325,21 @@ export const resumeFromHold = createServerFn({ method: "POST" })
     } catch (e) {
       console.error("[resumeFromHold] E011 enqueue failed", e);
       throw e instanceof Error ? e : new Error(String(e));
+    }
+
+    // Automatically complete any active callback / Hot Order on technical delay resolved
+    try {
+      const { completeHotOrderOnQualifyingAction } = await import("@/lib/orders/actions/callback-reminder.functions");
+      await completeHotOrderOnQualifyingAction({
+        orderId: data.orderId,
+        actorId: context.userId,
+        actorName: executiveName,
+        actionName: "Technical Delay Resolved",
+        actionReason: "Technical issue resolved (E011 sent) & order resumed",
+        supabase: supabaseAdmin,
+      });
+    } catch (hotErr) {
+      console.warn("[resumeFromHold] completeHotOrderOnQualifyingAction warning:", hotErr);
     }
 
     return { ok: true, order: updated, emailSent: true };
@@ -387,6 +402,20 @@ export const resumeFromCustomerDelay = createServerFn({ method: "POST" })
       staff_name: "Admin",
       staff_role: "admin",
     } as never);
+
+    // Automatically complete any active callback / Hot Order on customer delay resolved
+    try {
+      const { completeHotOrderOnQualifyingAction } = await import("@/lib/orders/actions/callback-reminder.functions");
+      await completeHotOrderOnQualifyingAction({
+        orderId: data.orderId,
+        actorId: context.userId,
+        actionName: "Customer Delay Resumed",
+        actionReason: "Customer side delay resolved — order resumed to Form Submitted",
+        supabase: supabaseAdmin,
+      });
+    } catch (hotErr) {
+      console.warn("[resumeFromCustomerDelay] completeHotOrderOnQualifyingAction warning:", hotErr);
+    }
 
     return { ok: true };
   });
@@ -505,6 +534,21 @@ export const resumeReopenedOrder = createServerFn({ method: "POST" })
       });
     } catch (auditErr) {
       console.warn("[resumeReopenedOrder] audit log error:", auditErr);
+    }
+
+    // Automatically complete any active callback / Hot Order on resumed reopened order
+    try {
+      const { completeHotOrderOnQualifyingAction } = await import("@/lib/orders/actions/callback-reminder.functions");
+      await completeHotOrderOnQualifyingAction({
+        orderId: data.orderId,
+        actorId: context.userId,
+        actorName: staffName,
+        actionName: "Order Resumed",
+        actionReason: data.note || `Order resumed from reopened state into ${nextFulfillmentStatus === "form_submitted" ? "Form Submitted" : "Form Not Submitted"}`,
+        supabase: supabaseAdmin,
+      });
+    } catch (hotErr) {
+      console.warn("[resumeReopenedOrder] completeHotOrderOnQualifyingAction warning:", hotErr);
     }
 
     return { ok: true, nextStage: nextFulfillmentStatus };
