@@ -1133,6 +1133,173 @@ export type Database = {
           },
         ]
       }
+      email_ingestion_audit_logs: {
+        Row: {
+          created_at: string
+          error_details: Json | null
+          id: string
+          in_reply_to: string | null
+          is_duplicate: boolean
+          matched_application_id: string | null
+          matched_customer_id: string | null
+          matched_ticket_id: string | null
+          message_id: string | null
+          metadata: Json | null
+          reply_to_email: string | null
+          sender_normalized: string | null
+          sender_raw: string | null
+          stage: string
+          subject: string | null
+          to_email: string | null
+          zoho_folder_id: string | null
+          zoho_folder_name: string | null
+          zoho_mail_uid: string
+        }
+        Insert: {
+          created_at?: string
+          error_details?: Json | null
+          id?: string
+          in_reply_to?: string | null
+          is_duplicate?: boolean
+          matched_application_id?: string | null
+          matched_customer_id?: string | null
+          matched_ticket_id?: string | null
+          message_id?: string | null
+          metadata?: Json | null
+          reply_to_email?: string | null
+          sender_normalized?: string | null
+          sender_raw?: string | null
+          stage: string
+          subject?: string | null
+          to_email?: string | null
+          zoho_folder_id?: string | null
+          zoho_folder_name?: string | null
+          zoho_mail_uid: string
+        }
+        Update: {
+          created_at?: string
+          error_details?: Json | null
+          id?: string
+          in_reply_to?: string | null
+          is_duplicate?: boolean
+          matched_application_id?: string | null
+          matched_customer_id?: string | null
+          matched_ticket_id?: string | null
+          message_id?: string | null
+          metadata?: Json | null
+          reply_to_email?: string | null
+          sender_normalized?: string | null
+          sender_raw?: string | null
+          stage?: string
+          subject?: string | null
+          to_email?: string | null
+          zoho_folder_id?: string | null
+          zoho_folder_name?: string | null
+          zoho_mail_uid?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_ingestion_audit_logs_matched_application_id_fkey"
+            columns: ["matched_application_id"]
+            isOneToOne: false
+            referencedRelation: "applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_ingestion_audit_logs_matched_customer_id_fkey"
+            columns: ["matched_customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_stats"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "email_ingestion_audit_logs_matched_customer_id_fkey"
+            columns: ["matched_customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_ingestion_audit_logs_matched_ticket_id_fkey"
+            columns: ["matched_ticket_id"]
+            isOneToOne: false
+            referencedRelation: "support_tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      email_ingestion_checkpoints: {
+        Row: {
+          account_id: string
+          consecutive_failures: number
+          created_at: string
+          error_message: string | null
+          folder_id: string
+          folder_name: string
+          folder_type: string | null
+          id: string
+          last_processed_uid: string | null
+          last_received_time_ms: number
+          last_sync_at: string
+          mailbox_address: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          account_id: string
+          consecutive_failures?: number
+          created_at?: string
+          error_message?: string | null
+          folder_id: string
+          folder_name: string
+          folder_type?: string | null
+          id?: string
+          last_processed_uid?: string | null
+          last_received_time_ms?: number
+          last_sync_at?: string
+          mailbox_address: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string
+          consecutive_failures?: number
+          created_at?: string
+          error_message?: string | null
+          folder_id?: string
+          folder_name?: string
+          folder_type?: string | null
+          id?: string
+          last_processed_uid?: string | null
+          last_received_time_ms?: number
+          last_sync_at?: string
+          mailbox_address?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      email_ingestion_locks: {
+        Row: {
+          expires_at: string
+          locked_at: string
+          locked_by: string
+          mailbox_address: string
+        }
+        Insert: {
+          expires_at: string
+          locked_at?: string
+          locked_by: string
+          mailbox_address: string
+        }
+        Update: {
+          expires_at?: string
+          locked_at?: string
+          locked_by?: string
+          mailbox_address?: string
+        }
+        Relationships: []
+      }
       email_logs: {
         Row: {
           application_id: string | null
@@ -1149,6 +1316,7 @@ export type Database = {
           lead_id: string | null
           message_id: string | null
           queue_id: string | null
+          received_at: string | null
           references_header: string | null
           sent_at: string
           smtp_response: string | null
@@ -1174,6 +1342,7 @@ export type Database = {
           lead_id?: string | null
           message_id?: string | null
           queue_id?: string | null
+          received_at?: string | null
           references_header?: string | null
           sent_at?: string
           smtp_response?: string | null
@@ -1199,6 +1368,7 @@ export type Database = {
           lead_id?: string | null
           message_id?: string | null
           queue_id?: string | null
+          received_at?: string | null
           references_header?: string | null
           sent_at?: string
           smtp_response?: string | null
@@ -1215,6 +1385,89 @@ export type Database = {
             columns: ["queue_id"]
             isOneToOne: false
             referencedRelation: "email_queue"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      email_processing_errors: {
+        Row: {
+          body_snippet: string | null
+          created_at: string
+          error_message: string
+          error_stack: string | null
+          error_stage: string
+          from_email: string | null
+          id: string
+          last_retried_at: string | null
+          matched_ticket_id: string | null
+          message_id: string | null
+          raw_headers: Json | null
+          reply_to_email: string | null
+          resolution_action: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          retry_count: number
+          status: string
+          subject: string | null
+          updated_at: string
+          zoho_folder_id: string | null
+          zoho_folder_name: string | null
+          zoho_mail_uid: string
+        }
+        Insert: {
+          body_snippet?: string | null
+          created_at?: string
+          error_message: string
+          error_stack?: string | null
+          error_stage: string
+          from_email?: string | null
+          id?: string
+          last_retried_at?: string | null
+          matched_ticket_id?: string | null
+          message_id?: string | null
+          raw_headers?: Json | null
+          reply_to_email?: string | null
+          resolution_action?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          retry_count?: number
+          status?: string
+          subject?: string | null
+          updated_at?: string
+          zoho_folder_id?: string | null
+          zoho_folder_name?: string | null
+          zoho_mail_uid: string
+        }
+        Update: {
+          body_snippet?: string | null
+          created_at?: string
+          error_message?: string
+          error_stack?: string | null
+          error_stage?: string
+          from_email?: string | null
+          id?: string
+          last_retried_at?: string | null
+          matched_ticket_id?: string | null
+          message_id?: string | null
+          raw_headers?: Json | null
+          reply_to_email?: string | null
+          resolution_action?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          retry_count?: number
+          status?: string
+          subject?: string | null
+          updated_at?: string
+          zoho_folder_id?: string | null
+          zoho_folder_name?: string | null
+          zoho_mail_uid?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_processing_errors_matched_ticket_id_fkey"
+            columns: ["matched_ticket_id"]
+            isOneToOne: false
+            referencedRelation: "support_tickets"
             referencedColumns: ["id"]
           },
         ]
@@ -3440,6 +3693,7 @@ export type Database = {
       }
       support_tickets: {
         Row: {
+          alternate_sender_email: string | null
           application_id: string | null
           assigned_to: string | null
           attachment_url: string | null
@@ -3450,9 +3704,12 @@ export type Database = {
           description: string | null
           first_response_at: string | null
           id: string
+          is_unlinked: boolean
           last_closed_at: string | null
           last_customer_message_at: string | null
           last_staff_message_at: string | null
+          order_link_status: string
+          parent_ticket_id: string | null
           priority: Database["public"]["Enums"]["priority_enum"] | null
           reopened_count: number
           resolved_at: string | null
@@ -3467,6 +3724,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          alternate_sender_email?: string | null
           application_id?: string | null
           assigned_to?: string | null
           attachment_url?: string | null
@@ -3477,9 +3735,12 @@ export type Database = {
           description?: string | null
           first_response_at?: string | null
           id?: string
+          is_unlinked?: boolean
           last_closed_at?: string | null
           last_customer_message_at?: string | null
           last_staff_message_at?: string | null
+          order_link_status?: string
+          parent_ticket_id?: string | null
           priority?: Database["public"]["Enums"]["priority_enum"] | null
           reopened_count?: number
           resolved_at?: string | null
@@ -3494,6 +3755,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          alternate_sender_email?: string | null
           application_id?: string | null
           assigned_to?: string | null
           attachment_url?: string | null
@@ -3504,9 +3766,12 @@ export type Database = {
           description?: string | null
           first_response_at?: string | null
           id?: string
+          is_unlinked?: boolean
           last_closed_at?: string | null
           last_customer_message_at?: string | null
           last_staff_message_at?: string | null
+          order_link_status?: string
+          parent_ticket_id?: string | null
           priority?: Database["public"]["Enums"]["priority_enum"] | null
           reopened_count?: number
           resolved_at?: string | null
@@ -3540,6 +3805,13 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "support_tickets_parent_ticket_id_fkey"
+            columns: ["parent_ticket_id"]
+            isOneToOne: false
+            referencedRelation: "support_tickets"
             referencedColumns: ["id"]
           },
           {
@@ -3704,6 +3976,60 @@ export type Database = {
             columns: ["ticket_id"]
             isOneToOne: false
             referencedRelation: "support_tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ticket_reply_attachments: {
+        Row: {
+          created_at: string
+          file_name: string
+          file_size: number
+          id: string
+          mime_type: string
+          storage_bucket: string
+          storage_path: string
+          ticket_id: string
+          ticket_reply_id: string | null
+          zoho_attachment_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          file_name: string
+          file_size?: number
+          id?: string
+          mime_type?: string
+          storage_bucket?: string
+          storage_path: string
+          ticket_id: string
+          ticket_reply_id?: string | null
+          zoho_attachment_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          file_name?: string
+          file_size?: number
+          id?: string
+          mime_type?: string
+          storage_bucket?: string
+          storage_path?: string
+          ticket_id?: string
+          ticket_reply_id?: string | null
+          zoho_attachment_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ticket_reply_attachments_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "support_tickets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ticket_reply_attachments_ticket_reply_id_fkey"
+            columns: ["ticket_reply_id"]
+            isOneToOne: false
+            referencedRelation: "ticket_replies"
             referencedColumns: ["id"]
           },
         ]
@@ -4466,6 +4792,10 @@ export type Database = {
       }
     }
     Functions: {
+      acquire_email_ingestion_lock: {
+        Args: { p_mailbox: string; p_ttl_seconds?: number; p_worker_id: string }
+        Returns: boolean
+      }
       allowed_order_transitions: {
         Args: { _from: Database["public"]["Enums"]["order_status_enum"] }
         Returns: Database["public"]["Enums"]["order_status_enum"][]
@@ -4541,6 +4871,10 @@ export type Database = {
           msg_id: number
           read_ct: number
         }[]
+      }
+      release_email_ingestion_lock: {
+        Args: { p_mailbox: string; p_worker_id: string }
+        Returns: undefined
       }
       restart_order: {
         Args: { _note?: string; _order_id: string }

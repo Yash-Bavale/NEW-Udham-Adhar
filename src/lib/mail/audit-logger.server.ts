@@ -37,8 +37,7 @@ export type IngestionAuditEvent = {
 
 /** Record an immutable lifecycle step for an inbound email. */
 export async function recordIngestionAudit(event: IngestionAuditEvent): Promise<void> {
-  try {
-    await (supabaseAdmin.from("email_ingestion_audit_logs" as any) as any).insert({
+  const { error } = await (supabaseAdmin.from("email_ingestion_audit_logs" as any) as any).insert({
       zoho_mail_uid: event.zohoMailUid,
       zoho_folder_id: event.zohoFolderId ?? null,
       zoho_folder_name: event.zohoFolderName ?? null,
@@ -56,9 +55,9 @@ export async function recordIngestionAudit(event: IngestionAuditEvent): Promise<
       is_duplicate: event.isDuplicate ?? false,
       metadata: event.metadata ?? null,
       error_details: event.errorDetails ?? null,
-    } as never);
-  } catch (e) {
-    console.warn(`[audit] recordIngestionAudit failed for UID ${event.zohoMailUid}:`, e);
+  } as never);
+  if (error) {
+    throw new Error(`[audit] recordIngestionAudit failed for UID ${event.zohoMailUid}: ${error.message}`);
   }
 }
 
@@ -79,9 +78,8 @@ export type ProcessingErrorInput = {
 
 /** Record a technical or processing failure into the retryable email_processing_errors queue. */
 export async function recordProcessingError(input: ProcessingErrorInput): Promise<string | null> {
-  try {
-    const now = new Date().toISOString();
-    const { data, error } = await (supabaseAdmin.from("email_processing_errors" as any) as any)
+  const now = new Date().toISOString();
+  const { data, error } = await (supabaseAdmin.from("email_processing_errors" as any) as any)
       .upsert(
         {
           zoho_mail_uid: input.zohoMailUid,
@@ -104,13 +102,8 @@ export async function recordProcessingError(input: ProcessingErrorInput): Promis
       .select("id")
       .maybeSingle();
 
-    if (error) {
-      console.warn(`[audit] recordProcessingError DB error:`, error.message);
-      return null;
-    }
-    return (data as any)?.id ?? null;
-  } catch (e) {
-    console.warn(`[audit] recordProcessingError exception for UID ${input.zohoMailUid}:`, e);
-    return null;
+  if (error) {
+    throw new Error(`[audit] recordProcessingError failed for UID ${input.zohoMailUid}: ${error.message}`);
   }
+  return (data as any)?.id ?? null;
 }
