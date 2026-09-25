@@ -311,48 +311,19 @@ function OrdersListPage() {
   }, [fulfillmentStatus, serviceId, assignedTo, paymentStatus, actionStatusFilter, stageFilter, dateFrom, dateTo, bucket, pendingAge, customDays, sortField, sortOrder, debouncedSearch]);
 
   const routeSearch = Route.useSearch();
+  const lastProcessedSearchRef = useRef<string>("");
 
-  // Ensure employees land on "needs_action" by default when permissions/roles resolve if no bucket was saved or in URL
-  const roleLoadedRef = useRef(false);
+  // Hydrate filters from URL query params (deep-links from dashboard KPIs) ONLY when URL search actually changes.
   useEffect(() => {
-    if (!role.loading && !userPerms.isLoading && !roleLoadedRef.current) {
-      roleLoadedRef.current = true;
-      if (!savedState?.bucket && !routeSearch.filter) {
-        setBucket(isAdmin ? "all" : "needs_action");
-      }
+    const searchSerialized = JSON.stringify(routeSearch ?? {});
+    if (lastProcessedSearchRef.current === searchSerialized) {
+      return;
     }
-  }, [role.loading, userPerms.isLoading, isAdmin, savedState?.bucket, routeSearch.filter]);
+    lastProcessedSearchRef.current = searchSerialized;
 
-  // Listener to reset all filters when clicking "Orders" in leftbar
-  useEffect(() => {
-    const handleReset = () => {
-      clearModuleFilterState("admin.orders");
-      setSearch("");
-      setDebouncedSearch("");
-      setFulfillmentStatus("all");
-      setServiceId("all");
-      setAssignedTo("all");
-      setPaymentStatus("all");
-      setActionStatusFilter("all");
-      setStageFilter("all");
-      setDateFrom("");
-      setDateTo("");
-      setBucket(isAdmin ? "all" : "needs_action");
-      setPendingAge("any");
-      setCustomDays("");
-      setSortField("created_at");
-      setSortOrder("desc");
-      setPage(1);
-      const container = document.getElementById("admin-main-scroll");
-      if (container) container.scrollTop = 0;
-    };
+    // Only apply if routeSearch actually contains keys
+    if (Object.keys(routeSearch ?? {}).length === 0) return;
 
-    window.addEventListener("reset-orders-filters", handleReset);
-    return () => window.removeEventListener("reset-orders-filters", handleReset);
-  }, [isAdmin]);
-
-  // Hydrate filters from URL query params (deep-links from dashboard KPIs).
-  useEffect(() => {
     if (routeSearch.filter) {
       switch (routeSearch.filter) {
         case "pending": setBucket("pending"); break;
@@ -384,6 +355,11 @@ function OrdersListPage() {
     if (routeSearch.stage) setStageFilter(routeSearch.stage);
     if (routeSearch.search) setSearch(routeSearch.search);
   }, [routeSearch]);
+
+  const dateRangeValue = useMemo(() => ({
+    from: dateFrom ? new Date(dateFrom.includes("T") ? dateFrom : `${dateFrom}T00:00:00+05:30`) : undefined,
+    to: dateTo ? new Date(dateTo.includes("T") ? dateTo : `${dateTo}T23:59:59+05:30`) : undefined,
+  }), [dateFrom, dateTo]);
 
   const { data: assignStaffData } = useQuery({
     queryKey: ["admin.staff.assignment"],
@@ -827,10 +803,7 @@ return (
         </Select>
 
         <DateRangePicker
-          value={{
-            from: dateFrom ? new Date(dateFrom.includes("T") ? dateFrom : `${dateFrom}T00:00:00+05:30`) : undefined,
-            to: dateTo ? new Date(dateTo.includes("T") ? dateTo : `${dateTo}T23:59:59+05:30`) : undefined,
-          }}
+          value={dateRangeValue}
           onChange={(range) => {
             if (!range.from) {
               setDateFrom("");

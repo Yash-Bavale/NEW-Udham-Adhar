@@ -154,16 +154,19 @@ export function DateRangePicker({
     return subMonths(targetDate, 1);
   });
 
-  // Synchronize when value/preset props change externally
+  // Synchronize when value/preset props change externally (ONLY when popover is closed to avoid interrupting active user selection)
   React.useEffect(() => {
+    if (open) return;
     setActivePreset(preset);
     if (preset !== "custom") {
       const calc = getPresetRange(preset);
       setDraftRange({ from: calc.from, to: calc.to });
     } else if (value?.from || value?.to) {
       setDraftRange({ from: value.from, to: value.to });
+    } else {
+      setDraftRange(undefined);
     }
-  }, [preset, value?.from, value?.to]);
+  }, [preset, value?.from?.getTime(), value?.to?.getTime(), open]);
 
   // When opening popover, reset draft to currently applied value & month
   const handleOpenChange = (nextOpen: boolean) => {
