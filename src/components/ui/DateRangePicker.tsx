@@ -329,7 +329,7 @@ export function DateRangePicker({
 
   return (
     <div className={cn("inline-flex items-center", className)}>
-      <Popover open={open} onOpenChange={handleOpenChange}>
+      <Popover open={open} onOpenChange={handleOpenChange} modal={true}>
         <PopoverTrigger asChild>
           <Button
             ref={triggerRef}
@@ -350,6 +350,7 @@ export function DateRangePicker({
         <PopoverContent
           align={align}
           onKeyDown={handleKeyDown}
+          onFocusOutside={(e) => e.preventDefault()}
           className="w-auto p-0 rounded-2xl border border-slate-200/80 bg-white shadow-2xl overflow-hidden z-50 min-w-[340px] md:min-w-[700px]"
         >
           {/* Accessible Screen Reader Announcer */}

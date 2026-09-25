@@ -464,20 +464,29 @@ usePreserveScroll("admin.orders", !isLoading);
 
 // Real-time subscription with debouncing to prevent spamming queries
 const invalidateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-const scheduleDebouncedInvalidation = () => {
-  if (invalidateTimeoutRef.current) return;
+const scheduleDebouncedInvalidation = useCallback(() => {
+  if (invalidateTimeoutRef.current) {
+    clearTimeout(invalidateTimeoutRef.current);
+  }
   invalidateTimeoutRef.current = setTimeout(() => {
     invalidateTimeoutRef.current = null;
     qc.invalidateQueries({ queryKey: ["admin.orders.v2"] });
-  }, 1000);
-};
+  }, 6000);
+}, [qc]);
+
+useEffect(() => {
+  return () => {
+    if (invalidateTimeoutRef.current) {
+      clearTimeout(invalidateTimeoutRef.current);
+    }
+  };
+}, []);
 
 useRealtimeTable("applications", scheduleDebouncedInvalidation);
 useRealtimeTable("payments", scheduleDebouncedInvalidation);
-useRealtimeTable("order_schedulers", scheduleDebouncedInvalidation);
 useRealtimeTable("assignment_pool", () => {
   qc.invalidateQueries({ queryKey: ["admin.staff.assignment"] });
-  qc.invalidateQueries({ queryKey: ["admin.orders.v2"] });
+  scheduleDebouncedInvalidation();
 });
 
 // Background prefetch for next page
