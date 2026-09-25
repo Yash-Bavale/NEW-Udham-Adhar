@@ -682,41 +682,41 @@ export const listStaff = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     await assertRole(context.supabase, STAFF_MANAGEMENT_ROLES);
     const admin = await getAdmin();
+    const adminAny = admin as any;
     
-    const { data: staffRoles, error: rolesErr } = await admin
-      .from("user_roles")
-      .select("user_id, role")
-      .in("role", ["operations", "manager", "executive", "support", "finance", "accounts", "agent", "verifier"]);
-
-    if (rolesErr) throw new Error(rolesErr.message);
-    const userIds = Array.from(new Set((staffRoles ?? []).map(r => r.user_id)));
-    if (userIds.length === 0) return { profiles: [] };
-
-    const { data: profiles, error: profilesErr } = await (admin as any)
-      .from("profiles")
-      .select("*")
-      .in("id", userIds);
+    const [{ data: profiles, error: profilesErr }, { data: superAdminRoles }] = await Promise.all([
+      adminAny.from("profiles").select("*"),
+      admin.from("user_roles").select("user_id").eq("role", "super_admin"),
+    ]);
 
     if (profilesErr) throw new Error(profilesErr.message);
 
-    // Active workforce only (exclude archived/inactive/terminated)
+    const superAdminIds = new Set((superAdminRoles ?? []).map((r: any) => String(r.user_id)));
+
+    // Active workforce only (exclude super_admins and archived/inactive/terminated)
     const activeStaff = (profiles ?? [])
-      .filter((p: any) => p.is_active !== false && (p.employment_status === "ACTIVE" || !p.employment_status))
+      .filter(
+        (p: any) =>
+          !superAdminIds.has(String(p.id)) &&
+          p.is_active !== false &&
+          p.employment_status !== "ARCHIVED" &&
+          p.employment_status !== "TERMINATED" &&
+          p.employment_status !== "INACTIVE",
+      )
       .map((p: any) => ({
         ...p,
         display_name: p.full_name || p.display_name || p.email?.split("@")[0] || "Unknown Employee",
         name: p.full_name || p.display_name || p.email?.split("@")[0] || "Unknown Employee",
-        employment_status: p.employment_status || (p.is_active === false ? "INACTIVE" : "ACTIVE"),
+        employment_status: p.employment_status || "ACTIVE",
       }));
 
+    activeStaff.sort((a: any, b: any) => (a.display_name || "").localeCompare(b.display_name || ""));
     return { profiles: activeStaff };
   });
 
 /**
  * Returns staff formatted for operational assignment dropdowns:
- * Shows ONLY employees who are members of the Assignment Pool (both active & inactive).
- * For manual assignment, admins can reassign to any pool member regardless of active/offline status.
- * For equal distribution, the system assigns strictly to active, available employees.
+ * Shows active workforce members with live presence and workload status.
  */
 export const listAssignmentStaff = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -725,15 +725,14 @@ export const listAssignmentStaff = createServerFn({ method: "GET" })
     const admin = await getAdmin();
     const adminAny = admin as any;
 
-    // 1. Fetch ALL assignment pool records (both active and inactive members)
-    const [{ data: poolRows, error: poolErr }, { data: superAdminRoles }] = await Promise.all([
-      adminAny
-        .from("assignment_pool")
-        .select("user_id, service_id, is_active"),
+    // 1. Fetch profiles, super_admin roles, and pool configurations
+    const [{ data: profiles, error: profErr }, { data: superAdminRoles }, { data: poolRows }] = await Promise.all([
+      adminAny.from("profiles").select("*"),
       admin.from("user_roles").select("user_id").eq("role", "super_admin"),
+      adminAny.from("assignment_pool").select("user_id, service_id, is_active"),
     ]);
 
-    if (poolErr) console.error("[listAssignmentStaff] pool error:", poolErr);
+    if (profErr) console.error("[listAssignmentStaff] profiles error:", profErr);
 
     const superAdminIds = new Set((superAdminRoles ?? []).map((r: any) => String(r.user_id)));
 
@@ -744,36 +743,22 @@ export const listAssignmentStaff = createServerFn({ method: "GET" })
       }
     });
 
-    const poolUserIds = Array.from(poolUserMap.keys());
-    if (poolUserIds.length === 0) {
-      return { profiles: [] };
-    }
-
-    // 2. Fetch profiles strictly for assignment pool members
-    const { data: poolProfiles, error: profErr } = await adminAny
-      .from("profiles")
-      .select("*")
-      .in("id", poolUserIds);
-
-    if (profErr) console.error("[listAssignmentStaff] profiles error:", profErr);
-
-    // 3. Attach live presence & workload metadata
+    // 2. Attach live presence & workload metadata from assignment engine
     const { calculateStaffWorkloads } = await import("./assignment-engine.server");
     const workloads = await calculateStaffWorkloads();
     const workloadMap = new Map(workloads.map((w) => [String(w.employeeId), w]));
 
-    const result = (poolProfiles ?? [])
+    const result = (profiles ?? [])
       .filter((p: any) => {
-        if (!poolUserMap.has(String(p.id))) return false;
+        if (!p.id || superAdminIds.has(String(p.id))) return false;
         if (p.is_active === false) return false;
-        if (p.employment_status === "ARCHIVED" || p.employment_status === "TERMINATED") return false;
-        if (superAdminIds.has(String(p.id))) return false;
+        if (p.employment_status === "ARCHIVED" || p.employment_status === "TERMINATED" || p.employment_status === "INACTIVE") return false;
         return true;
       })
       .map((p: any) => {
         const w = workloadMap.get(String(p.id));
         const displayName = p.full_name || p.display_name || p.email?.split("@")[0] || "Staff";
-        const isPoolActive = poolUserMap.get(String(p.id)) === true;
+        const isPoolActive = poolUserMap.has(String(p.id)) ? poolUserMap.get(String(p.id)) === true : true;
         const isOnLeave = w?.presenceStatus === "ON_LEAVE";
         const isEligible = isPoolActive && !isOnLeave && (w?.isAutoAssignEligible ?? true);
 
@@ -794,14 +779,14 @@ export const listAssignmentStaff = createServerFn({ method: "GET" })
           name: displayName,
           full_name: p.full_name,
           email: p.email,
-          role: w?.role || "operations",
+          role: w?.role || p.role || "operations",
           employment_status: p.employment_status || "ACTIVE",
           is_active: true,
           is_in_pool: true,
           is_pool_active: isPoolActive,
           is_eligible: isEligible,
           is_on_leave: isOnLeave,
-          presence_status: w?.presenceStatus || (isPoolActive ? "AVAILABLE" : "UNAVAILABLE"),
+          presence_status: w?.presenceStatus || "OFFLINE",
           effective_workload: w?.effectiveWorkload ?? 0,
           unavailability_reason: unavailReason,
         };
@@ -822,25 +807,26 @@ export const listAllHistoricalStaff = createServerFn({ method: "GET" })
     const admin = await getAdmin();
     const adminAny = admin as any;
 
-    const [rolesRes, profilesRes, superAdminRoles] = await Promise.all([
-      admin.from("user_roles").select("user_id, role").in("role", ["operations", "manager", "executive", "support", "finance", "accounts", "admin"]),
+    const [profilesRes, superAdminRoles] = await Promise.all([
       adminAny.from("profiles").select("*"),
       admin.from("user_roles").select("user_id").eq("role", "super_admin"),
     ]);
 
     const superAdminIds = new Set((superAdminRoles.data ?? []).map((r: any) => String(r.user_id)));
-    const staffUserIds = new Set((rolesRes.data ?? []).map((r: any) => r.user_id));
     const allProfiles = (profilesRes.data ?? []).filter((p: any) => !superAdminIds.has(String(p.id)));
-    const staffProfiles = staffUserIds.size > 0 ? allProfiles.filter((p: any) => staffUserIds.has(p.id)) : allProfiles;
 
     return {
-      profiles: (staffProfiles.length > 0 ? staffProfiles : allProfiles).map((p: any) => ({
+      profiles: allProfiles.map((p: any) => ({
         id: p.id,
         display_name: p.full_name || p.display_name || p.email?.split("@")[0] || "Unknown Employee",
         name: p.full_name || p.display_name || p.email?.split("@")[0] || "Unknown Employee",
         full_name: p.full_name || p.display_name || p.email?.split("@")[0] || "Unknown Employee",
         email: p.email,
-        is_active: p.is_active !== false && (p.employment_status === "ACTIVE" || !p.employment_status),
+        is_active:
+          p.is_active !== false &&
+          p.employment_status !== "ARCHIVED" &&
+          p.employment_status !== "TERMINATED" &&
+          p.employment_status !== "INACTIVE",
         employment_status: p.employment_status || (p.is_active === false ? "INACTIVE" : "ACTIVE"),
       })),
     };

@@ -779,13 +779,19 @@ return (
                       <div className="flex items-center justify-between gap-1.5 w-full">
                         <span>{s.display_name || s.name || s.email}</span>
                         {s.presence_status === "AVAILABLE" && (
-                          <span className="text-[9px] text-emerald-600 font-mono ml-1">● ONLINE</span>
+                          <span className="text-[9px] text-emerald-600 font-mono ml-1 font-semibold">● ONLINE</span>
+                        )}
+                        {s.presence_status === "IDLE" && (
+                          <span className="text-[9px] text-amber-500 font-mono ml-1 font-medium">● IDLE</span>
+                        )}
+                        {s.presence_status === "AWAY" && (
+                          <span className="text-[9px] text-orange-500 font-mono ml-1 font-medium">● AWAY</span>
                         )}
                         {s.presence_status === "OFFLINE" && (
                           <span className="text-[9px] text-slate-400 font-mono ml-1">● OFFLINE</span>
                         )}
                         {s.presence_status === "ON_LEAVE" && (
-                          <span className="text-[9px] text-amber-500 font-mono ml-1">● ON LEAVE</span>
+                          <span className="text-[9px] text-purple-600 font-mono ml-1">● ON LEAVE</span>
                         )}
                       </div>
                     </SelectItem>
@@ -1126,12 +1132,16 @@ return (
                 ⚖️ Auto-Balance / Equally Distribute
               </SelectItem>
               <SelectItem value="unassign">❌ Unassign Order</SelectItem>
-              {assignStaffProfiles.map((s: any) => {
+              {activeStaffList.map((s: any) => {
                 const statusTag = s.is_on_leave
                   ? " [🌴 On Leave]"
-                  : !s.is_eligible
-                    ? ` [⚠️ ${s.unavailability_reason || "Unavailable"}]`
-                    : " [⚡ Available]";
+                  : s.presence_status === "AVAILABLE"
+                    ? " [🟢 Online]"
+                    : s.presence_status === "IDLE"
+                      ? " [🟡 Idle]"
+                      : s.presence_status === "AWAY"
+                        ? " [🟠 Away]"
+                        : " [⚪ Offline]";
                 return (
                   <SelectItem key={s.id} value={s.id}>
                     👤 {s.display_name || s.name || s.email}
