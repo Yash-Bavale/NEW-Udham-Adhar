@@ -103,11 +103,6 @@ export const ORDER_ACCESS_ROLES = [
   "operations",
   "executive",
   "manager",
-  "admin",
-  "super_admin",
-  "support",
-  "accounts",
-  "finance",
   "agent",
   "verifier",
 ] as const;
@@ -472,7 +467,7 @@ export async function assignOrderCanonical(
 export async function calculateStaffWorkloads(): Promise<StaffWorkloadSummary[]> {
   const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-  const [{ data: roleRows }, { data: activeProfiles }] = await Promise.all([
+  const [{ data: roleRows }, { data: activeProfiles }, { data: superAdminRows }] = await Promise.all([
     (supabaseAdmin as any)
       .from("user_roles")
       .select("user_id, role")
@@ -481,17 +476,23 @@ export async function calculateStaffWorkloads(): Promise<StaffWorkloadSummary[]>
       .from("profiles")
       .select("*")
       .not("id", "is", null),
+    (supabaseAdmin as any)
+      .from("user_roles")
+      .select("user_id")
+      .eq("role", "super_admin"),
   ]);
+
+  const superAdminIdSet = new Set((superAdminRows ?? []).map((r: any) => String(r.user_id)));
 
   const rawUserIds = new Set<string>();
   (roleRows ?? []).forEach((r: any) => {
-    if (r.user_id && UUID_REGEX.test(String(r.user_id))) {
+    if (r.user_id && UUID_REGEX.test(String(r.user_id)) && !superAdminIdSet.has(String(r.user_id))) {
       rawUserIds.add(String(r.user_id));
     }
   });
   (activeProfiles ?? []).forEach((p: any) => {
     const status = p.employment_status || (p.is_active === false ? "INACTIVE" : "ACTIVE");
-    if (p.id && UUID_REGEX.test(String(p.id)) && status !== "ARCHIVED" && status !== "TERMINATED") {
+    if (p.id && UUID_REGEX.test(String(p.id)) && status !== "ARCHIVED" && status !== "TERMINATED" && !superAdminIdSet.has(String(p.id))) {
       rawUserIds.add(String(p.id));
     }
   });
@@ -726,8 +727,27 @@ export async function distributeOrdersEquallyCanonical(
     };
   }
 
-  // 1. Fetch eligible candidates (Strictly active, online, within shift, within capacity)
-  const candidates = await getEligibleAssignmentEmployees();
+  // 1. Fetch eligible candidates (Strictly active operations workforce members)
+  let candidates = (await getEligibleAssignmentEmployees()).filter(
+    (c) => c.role !== "super_admin" && c.role !== "admin" && c.role !== "support" && c.role !== "finance" && c.role !== "accounts",
+  );
+
+  // Fallback: If no currently online staff found (e.g. at night, after shift hours, or offline presence),
+  // fallback to ALL active pool / operations workforce members so orders are distributed directly!
+  if (candidates.length === 0) {
+    const allWorkloads = await calculateStaffWorkloads();
+    candidates = allWorkloads.filter(
+      (c) =>
+        c.employmentStatus === "ACTIVE" &&
+        c.role !== "super_admin" &&
+        c.role !== "admin" &&
+        c.role !== "support" &&
+        c.role !== "finance" &&
+        c.role !== "accounts" &&
+        !c.ineligibilityReasons.some((r) => r.includes("Account is disabled")),
+    );
+  }
+
   if (candidates.length === 0) {
     return {
       success: false,
@@ -735,7 +755,7 @@ export async function distributeOrdersEquallyCanonical(
       distributedCount: 0,
       unassignedCount: orderIds.length,
       distributionMap: {},
-      summaryMessage: "No active, available employees currently eligible for auto-assignment.",
+      summaryMessage: "No active operations employees found in the workforce to distribute orders to.",
     };
   }
 
@@ -753,14 +773,13 @@ export async function distributeOrdersEquallyCanonical(
 
   for (const orderId of orderIds) {
     // Filter out candidates who have reached max capacity during this batch
-    const availableNow = dynamicWorkloads.filter(
+    let availableNow = dynamicWorkloads.filter(
       (c) => c.simulatedActiveCount < c.maxWorkload,
     );
 
+    // If all eligible employees reached max capacity, distribute across least loaded anyway so orders are not left unassigned
     if (availableNow.length === 0) {
-      // All eligible employees reached capacity
-      unassignedCount += 1;
-      continue;
+      availableNow = [...dynamicWorkloads];
     }
 
     // Pick candidate with minimum simulated workload (fair workload balancing)

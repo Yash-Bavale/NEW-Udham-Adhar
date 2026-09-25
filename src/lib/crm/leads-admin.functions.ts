@@ -686,7 +686,7 @@ export const listStaff = createServerFn({ method: "GET" })
     const { data: staffRoles, error: rolesErr } = await admin
       .from("user_roles")
       .select("user_id, role")
-      .in("role", ["super_admin", "admin", "operations", "manager", "executive", "support", "finance", "accounts"]);
+      .in("role", ["operations", "manager", "executive", "support", "finance", "accounts", "agent", "verifier"]);
 
     if (rolesErr) throw new Error(rolesErr.message);
     const userIds = Array.from(new Set((staffRoles ?? []).map(r => r.user_id)));
@@ -726,15 +726,20 @@ export const listAssignmentStaff = createServerFn({ method: "GET" })
     const adminAny = admin as any;
 
     // 1. Fetch ALL assignment pool records (both active and inactive members)
-    const { data: poolRows, error: poolErr } = await adminAny
-      .from("assignment_pool")
-      .select("user_id, service_id, is_active");
+    const [{ data: poolRows, error: poolErr }, { data: superAdminRoles }] = await Promise.all([
+      adminAny
+        .from("assignment_pool")
+        .select("user_id, service_id, is_active"),
+      admin.from("user_roles").select("user_id").eq("role", "super_admin"),
+    ]);
 
     if (poolErr) console.error("[listAssignmentStaff] pool error:", poolErr);
 
+    const superAdminIds = new Set((superAdminRoles ?? []).map((r: any) => String(r.user_id)));
+
     const poolUserMap = new Map<string, boolean>();
     (poolRows ?? []).forEach((r: any) => {
-      if (r.user_id) {
+      if (r.user_id && !superAdminIds.has(String(r.user_id))) {
         poolUserMap.set(String(r.user_id), Boolean(r.is_active));
       }
     });
@@ -762,6 +767,7 @@ export const listAssignmentStaff = createServerFn({ method: "GET" })
         if (!poolUserMap.has(String(p.id))) return false;
         if (p.is_active === false) return false;
         if (p.employment_status === "ARCHIVED" || p.employment_status === "TERMINATED") return false;
+        if (superAdminIds.has(String(p.id))) return false;
         return true;
       })
       .map((p: any) => {
@@ -816,13 +822,15 @@ export const listAllHistoricalStaff = createServerFn({ method: "GET" })
     const admin = await getAdmin();
     const adminAny = admin as any;
 
-    const [rolesRes, profilesRes] = await Promise.all([
-      admin.from("user_roles").select("user_id, role").in("role", ["super_admin", "admin", "operations", "manager", "executive", "support", "finance", "accounts"]),
+    const [rolesRes, profilesRes, superAdminRoles] = await Promise.all([
+      admin.from("user_roles").select("user_id, role").in("role", ["operations", "manager", "executive", "support", "finance", "accounts", "admin"]),
       adminAny.from("profiles").select("*"),
+      admin.from("user_roles").select("user_id").eq("role", "super_admin"),
     ]);
 
+    const superAdminIds = new Set((superAdminRoles.data ?? []).map((r: any) => String(r.user_id)));
     const staffUserIds = new Set((rolesRes.data ?? []).map((r: any) => r.user_id));
-    const allProfiles = profilesRes.data ?? [];
+    const allProfiles = (profilesRes.data ?? []).filter((p: any) => !superAdminIds.has(String(p.id)));
     const staffProfiles = staffUserIds.size > 0 ? allProfiles.filter((p: any) => staffUserIds.has(p.id)) : allProfiles;
 
     return {
