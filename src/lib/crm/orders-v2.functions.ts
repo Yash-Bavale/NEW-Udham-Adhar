@@ -501,10 +501,10 @@ export function isTechnicalDelayOrder(row: any): boolean {
 }
 
 export function isCallbackScheduledOrder(row: any): boolean {
-  if (row.is_terminal) return false;
+  if (row.is_terminal || row.is_hot) return false;
   return Boolean(
     row.is_callback_scheduled ||
-    (row.callback_reminder && !isTechnicalDelayOrder(row) && !isCustomerDelayOrder(row))
+    (row.callback_reminder && !row.callback_reminder.is_due && !isTechnicalDelayOrder(row) && !isCustomerDelayOrder(row))
   );
 }
 
@@ -890,7 +890,8 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         .select("id, application_id, status, scheduler_type, fires_at, remarks, created_at, created_by")
         .in("application_id", ids)
         .eq("status", "active")
-        .order("created_at", { ascending: false }),
+        .order("created_at", { ascending: false })
+        .limit(5000),
     ]);
 
     const globalActiveSchedulers = globalActiveSchedulersRes.data;

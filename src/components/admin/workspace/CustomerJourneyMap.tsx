@@ -874,9 +874,9 @@ export function CustomerJourneyMap(p: Props) {
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5">
               {callbackHistory.slice(0, 6).map((item) => {
-                const isRescheduled = item.action_type === "CALLBACK_RESCHEDULED";
-                const isScheduled = item.action_type === "CALLBACK_SCHEDULED";
-                const isCompleted = item.action_type === "CALLBACK_COMPLETED";
+                const isRescheduled = item.action_type === "CALLBACK_RESCHEDULED" || (item.action_type as string) === "RESCHEDULED";
+                const isScheduled = item.action_type === "CALLBACK_SCHEDULED" || (item.action_type as string) === "SCHEDULED";
+                const isCompleted = item.action_type === "CALLBACK_COMPLETED" || (item.action_type as string) === "CALL_COMPLETED";
 
                 return (
                   <div
@@ -904,7 +904,7 @@ export function CustomerJourneyMap(p: Props) {
                         {isCompleted && <CheckCircle2 className="size-2.5 text-emerald-700" />}
                         {isRescheduled && <Clock className="size-2.5 text-amber-700" />}
                         {isScheduled && <PhoneCall className="size-2.5 text-indigo-700" />}
-                        {item.action_type.replace(/_/g, " ")}
+                        {isCompleted ? "CALL COMPLETED" : isRescheduled ? "CALLBACK RESCHEDULED" : isScheduled ? "CALLBACK SCHEDULED" : item.action_type.replace(/_/g, " ")}
                       </span>
                       <span className="text-[10px] text-slate-500 font-medium">
                         {formatIST(item.created_at)}

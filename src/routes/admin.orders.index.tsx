@@ -442,7 +442,8 @@ function OrdersListPage() {
     queryKey: getOrdersQueryKey(normalizedFilter, page),
     queryFn: () => listFn({ data: queryPayload }),
     placeholderData: keepPreviousData,
-    staleTime: 30_000,
+    staleTime: 10_000,
+    refetchInterval: 15_000,
     gcTime: 10 * 60 * 1000,
   });
 
@@ -491,6 +492,8 @@ useEffect(() => {
 
 useRealtimeTable("applications", scheduleDebouncedInvalidation);
 useRealtimeTable("payments", scheduleDebouncedInvalidation);
+useRealtimeTable("order_schedulers", scheduleDebouncedInvalidation);
+useRealtimeTable("order_callback_history", scheduleDebouncedInvalidation);
 useRealtimeTable("assignment_pool", () => {
   qc.invalidateQueries({ queryKey: ["admin.staff.assignment"] });
   scheduleDebouncedInvalidation();

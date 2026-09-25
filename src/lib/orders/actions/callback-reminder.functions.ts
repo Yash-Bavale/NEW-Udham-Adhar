@@ -852,28 +852,139 @@ export const getOrderCallbackHistory = createServerFn({ method: "POST" })
     const admin = await getAdmin();
 
     try {
-      const { data: rows, error } = await admin
-        .from("order_callback_history" as any)
-        .select("id, order_id, actor_id, actor_name, actor_role, action_type, previous_fires_at, new_fires_at, reason, reason_label, previous_reason, previous_reason_label, note, previous_note, channel, source, created_at")
-        .eq("order_id", data.orderId)
-        .order("created_at", { ascending: false });
+      const [{ data: historyRows }, { data: appEvents }, { data: schedulers }] = await Promise.all([
+        (admin.from("order_callback_history" as any) as any)
+          .select("id, order_id, actor_id, actor_name, actor_role, action_type, previous_fires_at, new_fires_at, reason, reason_label, previous_reason, previous_reason_label, note, previous_note, channel, source, created_at")
+          .eq("order_id", data.orderId)
+          .order("created_at", { ascending: false }),
+        admin
+          .from("application_events")
+          .select("id, application_id, event_type, note, staff_name, staff_role, created_by, created_at")
+          .eq("application_id", data.orderId)
+          .or("event_type.ilike.%callback%,note.ilike.%callback%,note.ilike.%call completed%")
+          .order("created_at", { ascending: false }),
+        admin
+          .from("order_schedulers")
+          .select("id, application_id, scheduler_type, status, fires_at, remarks, created_at, created_by, stopped_at, stop_reason, stop_triggered_by")
+          .eq("application_id", data.orderId)
+          .in("scheduler_type", ["our_side_reminder", "callback_reminder"])
+          .order("created_at", { ascending: false }),
+      ]);
 
-      if (error) {
-        console.error("[getOrderCallbackHistory] query error:", error);
-        return [];
+      const items: CallbackHistoryItem[] = [];
+      const seenTimeKeys = new Set<string>();
+
+      // 1. Add records from order_callback_history
+      for (const r of (historyRows ?? [])) {
+        const timeKey = `${r.action_type}_${new Date(r.created_at).getTime()}`;
+        seenTimeKeys.add(timeKey);
+        items.push({
+          ...r,
+          action_type: r.action_type,
+        });
       }
 
-      if (!rows || rows.length === 0) return [];
+      // 2. Synthesize completed / scheduled callbacks from application_events if not already captured
+      for (const ev of (appEvents ?? [])) {
+        const et = String(ev.event_type || "").toLowerCase();
+        const noteStr = String(ev.note || "");
+        const isCompleted = et.includes("completed") || noteStr.toLowerCase().includes("call completed") || noteStr.toLowerCase().includes("callback marked completed");
+        const isCancelled = et.includes("cancelled") || noteStr.toLowerCase().includes("callback cancelled");
+
+        const actionType: "CALLBACK_SCHEDULED" | "CALLBACK_RESCHEDULED" | "CALLBACK_COMPLETED" | "CALLBACK_CANCELLED" = isCompleted
+          ? "CALLBACK_COMPLETED"
+          : isCancelled
+          ? "CALLBACK_CANCELLED"
+          : noteStr.toLowerCase().includes("rescheduled")
+          ? "CALLBACK_RESCHEDULED"
+          : "CALLBACK_SCHEDULED";
+
+        const evTime = ev.created_at ? new Date(ev.created_at).getTime() : Date.now();
+        // Check within +/- 5 seconds for deduplication with order_callback_history
+        const alreadyCovered = Array.from(seenTimeKeys).some((k) => {
+          const [aType, tStr] = k.split("_");
+          return aType === actionType && Math.abs(Number(tStr) - evTime) < 5000;
+        });
+
+        if (!alreadyCovered) {
+          seenTimeKeys.add(`${actionType}_${evTime}`);
+          // Extract scheduled time from note if present e.g. "(Scheduled: 25 Sept 2026, 06:41 pm)"
+          const schedMatch = noteStr.match(/\(Scheduled:\s*([^)]+)\)/i);
+          items.push({
+            id: ev.id,
+            order_id: ev.application_id || data.orderId,
+            actor_id: ev.created_by || null,
+            actor_name: ev.staff_name || "Staff",
+            actor_role: ev.staff_role || "staff",
+            action_type: actionType,
+            previous_fires_at: null,
+            new_fires_at: schedMatch ? schedMatch[1] : null,
+            reason: noteStr || (isCompleted ? "Customer Contacted" : "Callback Event"),
+            reason_label: noteStr || (isCompleted ? "Customer Contacted" : "Callback Event"),
+            previous_reason: null,
+            previous_reason_label: null,
+            note: noteStr,
+            previous_note: null,
+            channel: "call",
+            source: "employee",
+            created_at: ev.created_at || new Date().toISOString(),
+          });
+        }
+      }
+
+      // 3. Synthesize historical schedulers from order_schedulers if not already captured
+      for (const s of (schedulers ?? [])) {
+        let remarksObj: any = null;
+        if (s.remarks) {
+          try {
+            remarksObj = typeof s.remarks === "string" ? JSON.parse(s.remarks) : s.remarks;
+          } catch {
+            remarksObj = { reasonLabel: String(s.remarks) };
+          }
+        }
+
+        const sTime = s.created_at ? new Date(s.created_at).getTime() : Date.now();
+        const schedCovered = Array.from(seenTimeKeys).some((k) => {
+          const [aType, tStr] = k.split("_");
+          return (aType === "CALLBACK_SCHEDULED" || aType === "CALLBACK_RESCHEDULED") && Math.abs(Number(tStr) - sTime) < 5000;
+        });
+
+        if (!schedCovered) {
+          seenTimeKeys.add(`CALLBACK_SCHEDULED_${sTime}`);
+          items.push({
+            id: s.id,
+            order_id: s.application_id || data.orderId,
+            actor_id: s.created_by || null,
+            actor_name: remarksObj?.created_by_name || "Staff",
+            actor_role: "staff",
+            action_type: "CALLBACK_SCHEDULED",
+            previous_fires_at: null,
+            new_fires_at: s.fires_at,
+            reason: remarksObj?.reason || "follow_up",
+            reason_label: remarksObj?.reasonLabel || "Scheduled Callback",
+            previous_reason: null,
+            previous_reason_label: null,
+            note: remarksObj?.note || null,
+            previous_note: null,
+            channel: remarksObj?.channel || "call",
+            source: "employee",
+            created_at: s.created_at || new Date().toISOString(),
+          });
+        }
+      }
+
+      // Sort by created_at DESC
+      items.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
       // Join current profile display names for actors
-      const actorIds = Array.from(new Set(rows.map((r: any) => r.actor_id).filter(Boolean))) as string[];
+      const actorIds = Array.from(new Set(items.map((r) => r.actor_id).filter(Boolean))) as string[];
       let profMap = new Map<string, string>();
       if (actorIds.length > 0) {
         const { data: profs } = await admin.from("profiles").select("id, display_name, email").in("id", actorIds);
         profMap = new Map((profs ?? []).map((p: any) => [p.id, (p.display_name as string) || (p.email as string)]));
       }
 
-      return rows.map((r: any): CallbackHistoryItem => ({
+      return items.map((r): CallbackHistoryItem => ({
         ...r,
         actor_name: (r.actor_id && profMap.get(r.actor_id)) || r.actor_name || "Staff",
       }));
@@ -891,13 +1002,11 @@ export const getOrderCallbackHistoryCount = createServerFn({ method: "POST" })
     const admin = await getAdmin();
 
     try {
-      const { count } = await admin
-        .from("order_callback_history" as any)
-        .select("id", { count: "exact", head: true })
-        .eq("order_id", data.orderId)
-        .in("action_type", ["CALLBACK_SCHEDULED", "CALLBACK_RESCHEDULED"]);
-
-      return { count: count ?? 0 };
+      const items = await (getOrderCallbackHistory as any)({ data, context });
+      const count = Array.isArray(items)
+        ? items.filter((item) => item.action_type === "CALLBACK_SCHEDULED" || item.action_type === "CALLBACK_RESCHEDULED").length
+        : 0;
+      return { count };
     } catch {
       return { count: 0 };
     }

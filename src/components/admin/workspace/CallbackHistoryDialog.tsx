@@ -101,10 +101,10 @@ export function CallbackHistoryDialog({ orderId, orderCode = "Order", onClose }:
           ) : (
             <div className="relative pl-6 space-y-4 before:absolute before:left-[11px] before:top-3 before:bottom-3 before:w-0.5 before:bg-slate-200">
               {history.map((item, index) => {
-                const isRescheduled = item.action_type === "CALLBACK_RESCHEDULED";
-                const isScheduled = item.action_type === "CALLBACK_SCHEDULED";
-                const isCompleted = item.action_type === "CALLBACK_COMPLETED";
-                const isCancelled = item.action_type === "CALLBACK_CANCELLED";
+                const isRescheduled = item.action_type === "CALLBACK_RESCHEDULED" || (item.action_type as string) === "RESCHEDULED";
+                const isScheduled = item.action_type === "CALLBACK_SCHEDULED" || (item.action_type as string) === "SCHEDULED";
+                const isCompleted = item.action_type === "CALLBACK_COMPLETED" || (item.action_type as string) === "CALL_COMPLETED";
+                const isCancelled = item.action_type === "CALLBACK_CANCELLED" || (item.action_type as string) === "CANCELLED";
 
                 return (
                   <div key={item.id || index} className="relative group">
@@ -144,12 +144,12 @@ export function CallbackHistoryDialog({ orderId, orderCode = "Order", onClose }:
                             {isCompleted && <CheckCircle2 className="size-3 text-emerald-700" />}
                             {isCancelled && <XCircle className="size-3 text-slate-600" />}
                             {isRescheduled
-                              ? "Rescheduled Callback"
+                              ? "Callback Rescheduled"
                               : isScheduled
-                              ? "Scheduled Callback"
+                              ? "Callback Scheduled"
                               : isCompleted
-                              ? "Completed Callback"
-                              : "Cancelled Callback"}
+                              ? "Call Completed"
+                              : "Callback Cancelled"}
                           </span>
 
                           {item.channel === "email" ? (
