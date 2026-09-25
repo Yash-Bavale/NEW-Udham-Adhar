@@ -714,7 +714,9 @@ export const listStaff = createServerFn({ method: "GET" })
 
 /**
  * Returns staff formatted for operational assignment dropdowns:
- * Retrieves active staff profiles and attaches live presence & workload metadata.
+ * Shows ONLY employees who are members of the Assignment Pool (both active & inactive).
+ * For manual assignment, admins can reassign to any pool member regardless of active/offline status.
+ * For equal distribution, the system assigns strictly to active, available employees.
  */
 export const listAssignmentStaff = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -723,51 +725,63 @@ export const listAssignmentStaff = createServerFn({ method: "GET" })
     const admin = await getAdmin();
     const adminAny = admin as any;
 
-    // 1. Fetch active pool records
+    // 1. Fetch ALL assignment pool records (both active and inactive members)
     const { data: poolRows, error: poolErr } = await adminAny
       .from("assignment_pool")
-      .select("user_id, service_id, is_active")
-      .eq("is_active", true);
+      .select("user_id, service_id, is_active");
 
     if (poolErr) console.error("[listAssignmentStaff] pool error:", poolErr);
 
-    const activePoolUserIds = new Set(
-      (poolRows ?? []).map((r: any) => String(r.user_id)).filter(Boolean),
-    );
+    const poolUserMap = new Map<string, boolean>();
+    (poolRows ?? []).forEach((r: any) => {
+      if (r.user_id) {
+        poolUserMap.set(String(r.user_id), Boolean(r.is_active));
+      }
+    });
 
-    // 2. Fetch staff user roles and active profiles
-    const [{ data: staffRoles }, { data: activeProfiles, error: profErr }] = await Promise.all([
-      adminAny
-        .from("user_roles")
-        .select("user_id, role"),
-      adminAny
-        .from("profiles")
-        .select("*")
-        .eq("is_active", true),
-    ]);
+    const poolUserIds = Array.from(poolUserMap.keys());
+    if (poolUserIds.length === 0) {
+      return { profiles: [] };
+    }
+
+    // 2. Fetch profiles strictly for assignment pool members
+    const { data: poolProfiles, error: profErr } = await adminAny
+      .from("profiles")
+      .select("*")
+      .in("id", poolUserIds);
 
     if (profErr) console.error("[listAssignmentStaff] profiles error:", profErr);
 
-    const staffUserIds = new Set(
-      (staffRoles ?? []).map((r: any) => String(r.user_id)).filter(Boolean),
-    );
-
-    // 3. Attach live presence / workload metadata
+    // 3. Attach live presence & workload metadata
     const { calculateStaffWorkloads } = await import("./assignment-engine.server");
     const workloads = await calculateStaffWorkloads();
     const workloadMap = new Map(workloads.map((w) => [String(w.employeeId), w]));
 
-    const result = (activeProfiles ?? [])
+    const result = (poolProfiles ?? [])
       .filter((p: any) => {
+        if (!poolUserMap.has(String(p.id))) return false;
         if (p.is_active === false) return false;
         if (p.employment_status === "ARCHIVED" || p.employment_status === "TERMINATED") return false;
-        // Include if they have a staff role, or are in the assignment pool, or in workloads
-        return staffUserIds.has(String(p.id)) || activePoolUserIds.has(String(p.id)) || workloadMap.has(String(p.id));
+        return true;
       })
       .map((p: any) => {
         const w = workloadMap.get(String(p.id));
         const displayName = p.full_name || p.display_name || p.email?.split("@")[0] || "Staff";
-        const inPool = activePoolUserIds.has(String(p.id));
+        const isPoolActive = poolUserMap.get(String(p.id)) === true;
+        const isOnLeave = w?.presenceStatus === "ON_LEAVE";
+        const isEligible = isPoolActive && !isOnLeave && (w?.isAutoAssignEligible ?? true);
+
+        let unavailReason = w?.unavailabilityReason;
+        if (!isPoolActive) {
+          unavailReason = "Auto-assign OFF";
+        } else if (w?.presenceStatus === "OFFLINE") {
+          unavailReason = "Staff Offline";
+        } else if (w?.presenceStatus === "AWAY") {
+          unavailReason = "Staff Away";
+        } else if (isOnLeave) {
+          unavailReason = "On Leave";
+        }
+
         return {
           id: p.id,
           display_name: displayName,
@@ -777,11 +791,13 @@ export const listAssignmentStaff = createServerFn({ method: "GET" })
           role: w?.role || "operations",
           employment_status: p.employment_status || "ACTIVE",
           is_active: true,
-          is_eligible: inPool && (w?.isAutoAssignEligible ?? true),
-          is_on_leave: w?.presenceStatus === "ON_LEAVE",
-          presence_status: w?.presenceStatus || "AVAILABLE",
+          is_in_pool: true,
+          is_pool_active: isPoolActive,
+          is_eligible: isEligible,
+          is_on_leave: isOnLeave,
+          presence_status: w?.presenceStatus || (isPoolActive ? "AVAILABLE" : "UNAVAILABLE"),
           effective_workload: w?.effectiveWorkload ?? 0,
-          unavailability_reason: w?.unavailabilityReason,
+          unavailability_reason: unavailReason,
         };
       });
 
