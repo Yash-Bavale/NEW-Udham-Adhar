@@ -162,13 +162,6 @@ const BUCKET_CARDS: BucketCardItem[] = [
     tone: "rose",
   },
   {
-    id: "technical_delay",
-    label: "TECHNICAL DELAY",
-    subtitle: "NIC/Gov Portal Down",
-    icon: Server,
-    tone: "sky",
-  },
-  {
     id: "backlog",
     label: "BACKLOG",
     subtitle: "Oldest Untouched",
@@ -178,6 +171,13 @@ const BUCKET_CARDS: BucketCardItem[] = [
       pillClass: "bg-amber-600 text-white font-bold",
     },
     tone: "amber",
+  },
+  {
+    id: "technical_delay",
+    label: "TECHNICAL DELAY",
+    subtitle: "NIC/Gov Portal Down",
+    icon: Server,
+    tone: "sky",
   },
   {
     id: "reminders",
