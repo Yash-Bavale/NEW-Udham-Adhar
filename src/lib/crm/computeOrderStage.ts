@@ -136,7 +136,7 @@ export function computeOrderStage(
   if (fs === "documents_received") return "in_progress";
 
   if (fs === "customer_delay" || ws === "waiting_for_customer" || ws === "waiting_for_documents" || ws === "customer_non_responsive" || ws === "customer_delay") return "customer_delay";
-  if (fs === "technical_delay" || fs === "technical_hold" || ws === "government_portal_pending" || ws === "technical_hold" || ws === "external_dependency") return "technical_delay";
+  if (fs === "technical_delay" || fs === "technical_hold" || ws === "technical_delay" || ws === "government_portal_pending" || ws === "technical_hold" || ws === "external_dependency" || Boolean((application as any)?.technical_hold_started_at)) return "technical_delay";
 
   if (fs === "consultation_completed") return "consultation_completed";
 

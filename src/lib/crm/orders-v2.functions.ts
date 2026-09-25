@@ -381,6 +381,80 @@ export type Bucket =
   | "closed" // Closed (Count only)
   | "exception";
 
+export function isTechnicalDelayOrder(row: any): boolean {
+  if (row.is_terminal) return false;
+  const fs = String(row.fulfillment_status ?? "").toLowerCase();
+  const stage = String(row.stage ?? "").toLowerCase();
+  const ws = String(row.workflow_status ?? "").toLowerCase();
+  const cbChannel = String(row.callback_reminder?.remarks?.channel ?? "").toLowerCase();
+  const cbReason = String(row.callback_reminder?.remarks?.reason ?? "").toLowerCase();
+  const cbKind = String(row.callback_reminder?.remarks?.kind ?? "").toLowerCase();
+  const schedulerType = String(row.callback_reminder?.scheduler_type ?? "").toLowerCase();
+  const reasonCat = String(row.callback_reminder?.remarks?.reasonCategory ?? "").toUpperCase();
+
+  return (
+    stage === "technical_delay" ||
+    fs === "technical_delay" ||
+    fs === "technical_hold" ||
+    ws === "technical_delay" ||
+    ws === "technical_hold" ||
+    ws === "government_portal_pending" ||
+    ws === "external_dependency" ||
+    cbChannel === "technical_delay" ||
+    cbReason === "technical_delay" ||
+    cbKind === "technical_delay" ||
+    cbKind === "external" ||
+    cbKind === "internal" ||
+    schedulerType === "technical_hold_reminder" ||
+    reasonCat === "B" ||
+    Boolean(row.technical_hold_started_at)
+  );
+}
+
+export function isCustomerDelayOrder(row: any): boolean {
+  if (row.is_terminal) return false;
+  const fs = String(row.fulfillment_status ?? "").toLowerCase();
+  const stage = String(row.stage ?? "").toLowerCase();
+  const ws = String(row.workflow_status ?? "").toLowerCase();
+  const cbChannel = String(row.callback_reminder?.remarks?.channel ?? "").toLowerCase();
+  const cbReason = String(row.callback_reminder?.remarks?.reason ?? "").toLowerCase();
+  const cbKind = String(row.callback_reminder?.remarks?.kind ?? "").toLowerCase();
+  const schedulerType = String(row.callback_reminder?.scheduler_type ?? "").toLowerCase();
+  const reasonCat = String(row.callback_reminder?.remarks?.reasonCategory ?? "").toUpperCase();
+
+  return (
+    stage === "customer_delay" ||
+    fs === "customer_delay" ||
+    ws === "customer_delay" ||
+    ws === "waiting_for_customer" ||
+    ws === "waiting_for_documents" ||
+    ws === "customer_non_responsive" ||
+    cbChannel === "customer_delay" ||
+    cbReason === "customer_delay" ||
+    cbKind === "customer_delay" ||
+    schedulerType === "customer_delay_reminder" ||
+    reasonCat === "A"
+  );
+}
+
+export function isCallbackScheduledOrder(row: any): boolean {
+  if (row.is_terminal) return false;
+  return Boolean(
+    row.is_callback_scheduled ||
+    (row.callback_reminder && !isTechnicalDelayOrder(row) && !isCustomerDelayOrder(row))
+  );
+}
+
+export function isActionTakenOrder(row: any): boolean {
+  return Boolean(
+    isTechnicalDelayOrder(row) ||
+    isCustomerDelayOrder(row) ||
+    isCallbackScheduledOrder(row) ||
+    row.is_callback_scheduled ||
+    row.in_range_completed
+  );
+}
+
 export function bucketOfRow(
   row: {
     fulfillment_status?: string | null;
@@ -388,6 +462,10 @@ export function bucketOfRow(
     created_at?: string | null;
     is_hot?: boolean;
     is_callback_scheduled?: boolean;
+    callback_reminder?: any;
+    workflow_status?: string | null;
+    technical_hold_started_at?: string | null;
+    is_terminal?: boolean;
   },
   todayIst?: string,
 ): Exclude<Bucket, "all"> {
@@ -403,10 +481,10 @@ export function bucketOfRow(
   if (row.is_callback_scheduled) return "reminders";
 
   // Technical Delay (full name)
-  if (row.stage === "technical_delay" || fs === "technical_delay") return "technical_delay";
+  if (isTechnicalDelayOrder(row)) return "technical_delay";
 
   // Customer Delay
-  if (row.stage === "customer_delay" || fs === "customer_delay") return "customer_delay";
+  if (isCustomerDelayOrder(row)) return "customer_delay";
 
   // Action-required untouched orders (Needs Action vs Backlog)
   const isActionStage = isNeedsActionStage(row.stage);
@@ -599,7 +677,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       let query = admin
         .from("applications")
         .select(
-          "id, application_code, fulfillment_status, application_status, created_at, assigned_to, lead_id, customer_id, service_id, form_submitted_at, certificate_uploaded_at, fulfilled_at, updated_at, workflow_status, closure_stage, closure_reason_code, refund_approved_at, refund_processed_at",
+          "id, application_code, fulfillment_status, application_status, created_at, assigned_to, lead_id, customer_id, service_id, form_submitted_at, certificate_uploaded_at, fulfilled_at, updated_at, workflow_status, closure_stage, closure_reason_code, refund_approved_at, refund_processed_at, technical_hold_started_at, technical_hold_kind",
         )
         .eq("is_deleted", false);
 
@@ -837,6 +915,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
           refund_approved_at: (a as any).refund_approved_at,
           refund_processed_at: (a as any).refund_processed_at,
           order_status: (a as any).order_status,
+          technical_hold_started_at: (a as any).technical_hold_started_at,
         },
       );
 
@@ -880,6 +959,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
             fires_at: cb.fires_at,
             is_due,
             remarks: parsedRemarks,
+            scheduler_type: cb.scheduler_type,
             created_at: cb.created_at,
           }
         : null;
@@ -951,6 +1031,8 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         is_hot,
         is_callback_scheduled,
         callback_reminder,
+        workflow_status: (a as any).workflow_status,
+        technical_hold_started_at: (a as any).technical_hold_started_at,
         is_terminal: isTerminal,
         in_range: inRangeCreated,
         in_range_created: inRangeCreated,
@@ -977,20 +1059,11 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
           return b === "needs_action" || b === "backlog";
         });
       } else if (normalized.actionStatus === "processed" || normalized.actionStatus === "action_taken") {
-        baseFilteredRows = baseFilteredRows.filter((r) => {
-          return (
-            r.stage === "technical_delay" ||
-            r.fulfillment_status === "technical_delay" ||
-            r.stage === "customer_delay" ||
-            r.fulfillment_status === "customer_delay" ||
-            r.is_callback_scheduled ||
-            r.in_range_completed
-          );
-        });
+        baseFilteredRows = baseFilteredRows.filter((r) => isActionTakenOrder(r));
       } else if (normalized.actionStatus === "hot_orders") {
         baseFilteredRows = baseFilteredRows.filter((r) => r.is_hot);
       } else if (normalized.actionStatus === "scheduled_callback") {
-        baseFilteredRows = baseFilteredRows.filter((r) => bucketOfRow(r, todayIst) === "reminders");
+        baseFilteredRows = baseFilteredRows.filter((r) => isCallbackScheduledOrder(r));
       }
     }
     if (normalized.paymentStatus) {
@@ -1041,15 +1114,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       }
 
       // Action Taken (Pending): orders in technical delay, customer delay, scheduled callback, or completed
-      const isActionTaken =
-        r.stage === "technical_delay" ||
-        r.fulfillment_status === "technical_delay" ||
-        r.stage === "customer_delay" ||
-        r.fulfillment_status === "customer_delay" ||
-        r.is_callback_scheduled ||
-        r.in_range_completed;
-
-      if (isActionTaken) {
+      if (isActionTakenOrder(r)) {
         counts.pending++;
       }
 
@@ -1062,21 +1127,21 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       }
 
       // Operational Queues (Live all-time active portfolio)
-      if (!r.is_terminal && isActionStage) {
+      if (!r.is_terminal && isActionStage && !isTechnicalDelayOrder(r) && !isCustomerDelayOrder(r)) {
         counts.needs_action++;
         counts.actionRequired++;
       }
 
       if (r.is_hot) {
         counts.hot_orders++;
-      } else if (r.is_callback_scheduled) {
+      } else if (isCallbackScheduledOrder(r)) {
         counts.reminders++;
       }
 
       if (!r.is_terminal) {
-        if (r.stage === "technical_delay") {
+        if (isTechnicalDelayOrder(r)) {
           counts.technical_delay++;
-        } else if (r.stage === "customer_delay") {
+        } else if (isCustomerDelayOrder(r)) {
           counts.customer_delay++;
         }
       }
@@ -1095,7 +1160,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
     // independent of the current date range. It remains a subset of Need Action.
     counts.backlog = baseFilteredRows.filter((r) => {
       const rowDate = istDateKey(r.created_at);
-      return !r.is_terminal && isNeedsActionStage(r.stage) && Boolean(rowDate && rowDate < todayIst);
+      return !r.is_terminal && isNeedsActionStage(r.stage) && !isTechnicalDelayOrder(r) && !isCustomerDelayOrder(r) && Boolean(rowDate && rowDate < todayIst);
     }).length;
 
     // 3. Apply bucket tab filter to obtain the table rows
@@ -1103,31 +1168,22 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
     const bucket = normalized.bucket || "all";
 
     if (bucket === "needs_action") {
-      filtered = filtered.filter((r) => !r.is_terminal && isNeedsActionStage(r.stage));
+      filtered = filtered.filter((r) => !r.is_terminal && isNeedsActionStage(r.stage) && !isTechnicalDelayOrder(r) && !isCustomerDelayOrder(r));
     } else if (bucket === "hot_orders") {
       filtered = filtered.filter((r) => r.is_hot);
     } else if (bucket === "reminders") {
-      filtered = filtered.filter((r) => r.is_callback_scheduled);
+      filtered = filtered.filter((r) => isCallbackScheduledOrder(r));
     } else if (bucket === "backlog") {
       filtered = filtered.filter((r) => {
         const rowDate = istDateKey(r.created_at);
-        return !r.is_terminal && isNeedsActionStage(r.stage) && rowDate && rowDate < todayIst;
+        return !r.is_terminal && isNeedsActionStage(r.stage) && !isTechnicalDelayOrder(r) && !isCustomerDelayOrder(r) && rowDate && rowDate < todayIst;
       });
     } else if (bucket === "technical_delay") {
-      filtered = filtered.filter((r) => !r.is_terminal && r.stage === "technical_delay");
+      filtered = filtered.filter((r) => isTechnicalDelayOrder(r));
     } else if (bucket === "customer_delay") {
-      filtered = filtered.filter((r) => !r.is_terminal && r.stage === "customer_delay");
+      filtered = filtered.filter((r) => isCustomerDelayOrder(r));
     } else if (bucket === "pending") {
-      filtered = filtered.filter((r) => {
-        return (
-          r.stage === "technical_delay" ||
-          r.fulfillment_status === "technical_delay" ||
-          r.stage === "customer_delay" ||
-          r.fulfillment_status === "customer_delay" ||
-          r.is_callback_scheduled ||
-          r.in_range_completed
-        );
-      });
+      filtered = filtered.filter((r) => isActionTakenOrder(r));
     } else if (bucket === "completed") {
       filtered = filtered.filter((r) => r.in_range_completed);
     } else if (bucket === "closed") {

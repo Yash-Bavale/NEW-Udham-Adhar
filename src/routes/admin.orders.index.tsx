@@ -6,7 +6,15 @@ import { Search, ChevronLeft, ChevronRight, RotateCcw, X, Filter, Loader2, Arrow
 import { formatIST, istDateKey } from "@/lib/datetime";
 import { toast } from "sonner";
 
-import { listOrdersV2 } from "@/lib/crm/orders-v2.functions";
+import {
+  listOrdersV2,
+  bucketOfRow,
+  isPendingRow,
+  isTechnicalDelayOrder,
+  isCustomerDelayOrder,
+  isCallbackScheduledOrder,
+  isActionTakenOrder,
+} from "@/lib/crm/orders-v2.functions";
 import { normalizeOrdersFilter, getOrdersQueryKey } from "@/lib/orders/orders-filter";
 import { listAssignmentStaff, listAllHistoricalStaff } from "@/lib/crm/leads-admin.functions";
 import { listServices } from "@/lib/crm/services-admin.functions";
@@ -70,56 +78,6 @@ const COMPLETED_FS = new Set<string>([
 ]);
 const EXCEPTION_STAGES: OrderStage[] = ["refund_requested", "refunded", "uninterested"];
 const NEEDS_ACTION_STAGES: OrderStage[] = ["lead_received", "payment_done", "form_submitted", "form_not_submitted"];
-
-function bucketOfRow(row: {
-  fulfillment_status?: string | null;
-  stage: OrderStage;
-  created_at?: string | null;
-  is_hot?: boolean;
-  is_callback_scheduled?: boolean;
-}, todayIst?: string): Exclude<Bucket, "all"> {
-  const fs = String(row.fulfillment_status ?? "").toLowerCase();
-  if (EXCEPTION_STAGES.includes(row.stage)) return "exception";
-  if (CLOSED_FS.has(fs) || row.stage === "closed") return "closed";
-  if (COMPLETED_FS.has(fs) || row.stage === "completed") return "completed";
-
-  // Hot Orders: strictly isolated under Hot Orders ONLY
-  if (row.is_hot) return "hot_orders";
-
-  // Call Back Scheduled: active/future callbacks only (fires_at > now)
-  if (row.is_callback_scheduled) return "reminders";
-
-  // Technical Delay (show full name)
-  if (row.stage === "technical_delay" || fs === "technical_delay") return "technical_delay";
-
-  // Customer Delay
-  if (row.stage === "customer_delay" || fs === "customer_delay") return "customer_delay";
-
-  // Action-required untouched orders (Needs Action vs Backlog)
-  const isActionStage = NEEDS_ACTION_STAGES.includes(row.stage);
-  if (isActionStage) {
-    const curToday = todayIst || istDateKey(new Date());
-    const rowDate = istDateKey(row.created_at);
-    if (rowDate && rowDate < curToday) {
-      return "backlog";
-    }
-    return "needs_action";
-  }
-
-  // All other active in-progress stages where action has been taken (e.g. submitted to govt)
-  return "pending"; // Action Taken
-}
-
-function isPendingRow(row: {
-  fulfillment_status?: string | null;
-  stage: OrderStage;
-  created_at?: string | null;
-  is_hot?: boolean;
-  is_callback_scheduled?: boolean;
-}): boolean {
-  const b = bucketOfRow(row);
-  return b === "pending" || b === "needs_action" || b === "backlog";
-}
 
 interface BucketCardItem {
   id: Bucket;
