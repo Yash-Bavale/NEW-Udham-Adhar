@@ -74,7 +74,15 @@ const CLOSED_FS = new Set<string>([
   "application_rejected", "certificate_rejected", "order_closed", "cancelled",
 ]);
 const COMPLETED_FS = new Set<string>([
-  "consultation_completed", "order_completed", "completed",
+  "consultation_completed",
+  "order_completed",
+  "completed",
+  "certificate_ready",
+  "certificate_delivered",
+  "certificate_uploaded",
+  "service_completed",
+  "application_approved",
+  "approved",
 ]);
 const EXCEPTION_STAGES: OrderStage[] = ["refund_requested", "refunded", "uninterested"];
 const NEEDS_ACTION_STAGES: OrderStage[] = ["lead_received", "payment_done", "form_submitted", "form_not_submitted"];

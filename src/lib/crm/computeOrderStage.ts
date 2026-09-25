@@ -113,14 +113,24 @@ export function computeOrderStage(
   }
 
   // Terminals
-  if (fs === "completed" || fs === "order_completed" || application.application_status === "completed") return "completed";
+  if (
+    fs === "completed" ||
+    fs === "order_completed" ||
+    fs === "certificate_delivered" ||
+    fs === "service_completed" ||
+    application?.application_status === "completed" ||
+    os === "COMPLETED" ||
+    ws === "completed" ||
+    ws === "order_completed"
+  ) return "completed";
   if (
     fs === "order_closed" ||
     fs === "cancelled" ||
     ws === "closed" ||
-    application.application_status === "closed" ||
-    application.closure_stage === "closed" ||
-    application.closure_stage === "final_ticket_closed"
+    application?.application_status === "closed" ||
+    application?.closure_stage === "closed" ||
+    application?.closure_stage === "final_ticket_closed" ||
+    os === "CLOSED"
   ) return "closed";
 
   // S09/S10 near-terminals

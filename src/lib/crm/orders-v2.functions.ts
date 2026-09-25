@@ -359,7 +359,15 @@ const CLOSED_FS = new Set<string>([
   "application_rejected", "certificate_rejected", "order_closed", "cancelled",
 ]);
 const COMPLETED_FS = new Set<string>([
-  "consultation_completed", "order_completed", "completed",
+  "consultation_completed",
+  "order_completed",
+  "completed",
+  "certificate_ready",
+  "certificate_delivered",
+  "certificate_uploaded",
+  "service_completed",
+  "application_approved",
+  "approved",
 ]);
 const EXCEPTION_STAGES: OrderStage[] = ["refund_requested", "refunded", "uninterested"];
 const NEEDS_ACTION_STAGES: OrderStage[] = ["lead_received", "payment_done", "form_submitted", "form_not_submitted"];
@@ -677,7 +685,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       let query = admin
         .from("applications")
         .select(
-          "id, application_code, fulfillment_status, application_status, created_at, assigned_to, lead_id, customer_id, service_id, form_submitted_at, certificate_uploaded_at, fulfilled_at, updated_at, workflow_status, closure_stage, closure_reason_code, refund_approved_at, refund_processed_at, technical_hold_started_at, technical_hold_kind",
+          "id, application_code, fulfillment_status, application_status, order_status, created_at, assigned_to, lead_id, customer_id, service_id, form_submitted_at, certificate_uploaded_at, fulfilled_at, updated_at, workflow_status, closure_stage, closure_reason_code, refund_approved_at, refund_processed_at, technical_hold_started_at, technical_hold_kind",
         )
         .eq("is_deleted", false);
 
@@ -706,7 +714,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
     }
 
     // Fetch in-range applications by creation date, update date, fulfilled date, certificate date, completion events, and active portfolio
-    const [inRangeCreatedRes, inRangeUpdatedRes, inRangeFulfilledRes, inRangeCertRes, inRangeEventsRes, activePortfolioRes] = await Promise.all([
+    const [inRangeCreatedRes, inRangeUpdatedRes, inRangeFulfilledRes, inRangeCertRes, inRangeEventsRes, inRangeCertificatesTableRes, inRangeActionLogsRes, activePortfolioRes] = await Promise.all([
       (() => {
         let q = buildBaseQuery();
         if (normalized.fromIso) q = q.gte("created_at", normalized.fromIso);
@@ -735,7 +743,24 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         let q = admin
           .from("application_events")
           .select("application_id, event_type, old_value, new_value, created_at")
-          .or("new_value.ilike.%complete%,new_value.ilike.%close%,new_value.ilike.%cancel%,event_type.ilike.%complete%,event_type.ilike.%close%,event_type.ilike.%cancel%,event_type.eq.certificate_uploaded,event_type.eq.certificate_issued");
+          .or("new_value.ilike.%complete%,new_value.ilike.%close%,new_value.ilike.%cancel%,event_type.ilike.%complete%,event_type.ilike.%close%,event_type.ilike.%cancel%,event_type.ilike.%cert%,event_type.eq.certificate_uploaded,event_type.eq.certificate_issued");
+        if (normalized.fromIso) q = q.gte("created_at", normalized.fromIso);
+        if (normalized.toIso) q = q.lte("created_at", normalized.toIso);
+        return q.order("created_at", { ascending: false }).limit(5000);
+      })(),
+      (() => {
+        let q = admin
+          .from("certificates")
+          .select("application_id, issued_at, delivered_at, created_at");
+        if (normalized.fromIso) q = q.gte("created_at", normalized.fromIso);
+        if (normalized.toIso) q = q.lte("created_at", normalized.toIso);
+        return q.order("created_at", { ascending: false }).limit(5000);
+      })(),
+      (() => {
+        let q = admin
+          .from("order_action_logs")
+          .select("order_id, action_type, new_status, created_at")
+          .or("action_type.ilike.%complete%,new_status.ilike.%complete%,action_type.eq.CERTIFICATE_GENERATED,action_type.eq.ORDER_COMPLETED");
         if (normalized.fromIso) q = q.gte("created_at", normalized.fromIso);
         if (normalized.toIso) q = q.lte("created_at", normalized.toIso);
         return q.order("created_at", { ascending: false }).limit(5000);
@@ -756,13 +781,13 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
     (inRangeFulfilledRes.data ?? []).forEach((a: any) => mergedAppMap.set(a.id, a));
     (inRangeCertRes.data ?? []).forEach((a: any) => mergedAppMap.set(a.id, a));
 
-    // For any application_id returned from in-range events not yet in mergedAppMap, fetch those applications
+    // For any application_id returned from in-range events/certificates/action_logs not yet in mergedAppMap, fetch those applications
     const inRangeEventAppIds = Array.from(
-      new Set(
-        (inRangeEventsRes.data ?? [])
-          .map((e: any) => e.application_id)
-          .filter((id: string) => id && !mergedAppMap.has(id))
-      )
+      new Set([
+        ...(inRangeEventsRes.data ?? []).map((e: any) => e.application_id),
+        ...(inRangeCertificatesTableRes.data ?? []).map((c: any) => c.application_id),
+        ...(inRangeActionLogsRes.data ?? []).map((l: any) => l.order_id),
+      ].filter((id: string) => id && !mergedAppMap.has(id)))
     );
 
     if (inRangeEventAppIds.length > 0) {
@@ -787,12 +812,23 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
 
     const ids = appList.map((a) => a.id);
 
-    const [eventsRes, globalActiveSchedulersRes] = await Promise.all([
+    const [eventsRes, certsTableRes, actionLogsRes, globalActiveSchedulersRes] = await Promise.all([
       admin
         .from("application_events")
         .select("application_id, event_type, old_value, new_value, created_at")
         .in("application_id", ids)
-        .or("new_value.ilike.%complete%,new_value.ilike.%close%,new_value.ilike.%cancel%,event_type.ilike.%complete%,event_type.ilike.%close%,event_type.ilike.%cancel%")
+        .or("new_value.ilike.%complete%,new_value.ilike.%close%,new_value.ilike.%cancel%,event_type.ilike.%complete%,event_type.ilike.%close%,event_type.ilike.%cancel%,event_type.ilike.%cert%,event_type.eq.certificate_uploaded,event_type.eq.certificate_issued")
+        .order("created_at", { ascending: false }),
+      admin
+        .from("certificates")
+        .select("application_id, issued_at, delivered_at, created_at")
+        .in("application_id", ids)
+        .order("created_at", { ascending: false }),
+      admin
+        .from("order_action_logs")
+        .select("order_id, action_type, new_status, created_at")
+        .in("order_id", ids)
+        .or("action_type.ilike.%complete%,new_status.ilike.%complete%,action_type.eq.CERTIFICATE_GENERATED,action_type.eq.ORDER_COMPLETED")
         .order("created_at", { ascending: false }),
       admin
         .from("order_schedulers")
@@ -806,11 +842,27 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
     const eventCompletedMap = new Map<string, string>();
     const eventClosedMap = new Map<string, string>();
 
+    // Index certificate timestamps
+    for (const c of [...(inRangeCertificatesTableRes.data ?? []), ...(certsTableRes.data ?? [])]) {
+      const t = c.delivered_at || c.issued_at || c.created_at;
+      if (c.application_id && t && !eventCompletedMap.has(c.application_id)) {
+        eventCompletedMap.set(c.application_id, t);
+      }
+    }
+
+    // Index action log timestamps
+    for (const l of [...(inRangeActionLogsRes.data ?? []), ...(actionLogsRes.data ?? [])]) {
+      if (l.order_id && l.created_at && !eventCompletedMap.has(l.order_id)) {
+        eventCompletedMap.set(l.order_id, l.created_at);
+      }
+    }
+
     const allEvents = [...(inRangeEventsRes.data ?? []), ...(eventsRes.data ?? [])];
+    allEvents.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
     for (const ev of allEvents) {
       const et = String(ev.event_type || "").toLowerCase();
       const nv = String(ev.new_value || "").toLowerCase();
-      const isComp = nv.includes("complete") || et.includes("complete") || et === "certificate_uploaded" || et === "certificate_issued";
+      const isComp = nv.includes("complete") || et.includes("complete") || et.includes("cert") || et === "certificate_uploaded" || et === "certificate_issued";
       const isClose = nv.includes("close") || nv.includes("cancel") || et.includes("close") || et.includes("cancel");
       if (isComp && ev.application_id && ev.created_at && !eventCompletedMap.has(ev.application_id)) {
         eventCompletedMap.set(ev.application_id, ev.created_at);
@@ -972,10 +1024,13 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       const appStatusLower = String(a.application_status ?? "").toLowerCase();
       const isCompletedStage =
         stage === "completed" ||
+        stage === "certificate_ready" ||
+        stage === "consultation_completed" ||
         COMPLETED_FS.has(fsLower) ||
         COMPLETED_FS.has(appStatusLower) ||
         COMPLETED_FS.has(String((a as any).order_status ?? "").toLowerCase()) ||
-        COMPLETED_FS.has(String((a as any).workflow_status ?? "").toLowerCase());
+        COMPLETED_FS.has(String((a as any).workflow_status ?? "").toLowerCase()) ||
+        String((a as any).order_status ?? "").toUpperCase() === "COMPLETED";
 
       const isClosedStage =
         stage === "closed" ||
@@ -1191,8 +1246,8 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
     } else if (bucket === "exception") {
       filtered = filtered.filter((r) => r.in_range_created && bucketOfRow(r, todayIst) === "exception");
     } else {
-      // Default 'all': in-range active portfolio (excluding completed/closed)
-      filtered = filtered.filter((r) => r.in_range_created && !r.is_terminal);
+      // Default 'all' (ALL ORDERS): ALL orders in the period/range of ANY stage (Payment Done, Form Submitted, Customer Delay, Technical Delay, Completed, Closed, etc.)
+      filtered = filtered.filter((r) => r.in_range_created);
     }
 
     if (bucket === "backlog" && (!normalized.sortField || normalized.sortField === "created_at")) {
