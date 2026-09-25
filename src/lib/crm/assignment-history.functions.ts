@@ -383,6 +383,7 @@ export const autoDistributeSelectedOrders = createServerFn({ method: "POST" })
       data.applicationIds,
       context.userId,
       data.reason || "Equally distributed by SuperAdmin across active staff",
+      data.targetEmployeeIds,
     );
   });
 
