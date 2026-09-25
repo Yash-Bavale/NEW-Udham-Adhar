@@ -1,9 +1,20 @@
 "use client";
 
 import * as React from "react";
-import { format, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subMonths, differenceInDays } from "date-fns";
-import { Calendar as CalendarIcon, X, Check, RotateCcw } from "lucide-react";
-import { DateRange } from "react-day-picker";
+import {
+  format,
+  subDays,
+  startOfWeek,
+  endOfWeek,
+  startOfMonth,
+  endOfMonth,
+  subMonths,
+  differenceInDays,
+  isBefore,
+  isSameDay,
+} from "date-fns";
+import { Calendar as CalendarIcon, Check, RotateCcw } from "lucide-react";
+import { type DateRange } from "react-day-picker";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -121,15 +132,29 @@ export function DateRangePicker({
   placeholder = "Select date range",
 }: DateRangePickerProps) {
   const [open, setOpen] = React.useState(false);
+  const triggerRef = React.useRef<HTMLButtonElement>(null);
+
+  // Active committed preset vs temporary pending preset
   const [activePreset, setActivePreset] = React.useState<DateRangePresetKey>(preset);
 
-  const [draftRange, setDraftRange] = React.useState<DateRange | undefined>(() => {
+  // Draft (pending) range inside the picker
+  const [draftRange, setDraftRange] = React.useState<{ from?: Date; to?: Date } | undefined>(() => {
     if (value?.from || value?.to) {
       return { from: value.from, to: value.to };
     }
     return getPresetRange(preset);
   });
 
+  // Hover date for range preview during Step 2
+  const [hoverDate, setHoverDate] = React.useState<Date | null>(null);
+
+  // Controlled month navigation so moving months doesn't reset selection
+  const [month, setMonth] = React.useState<Date>(() => {
+    const targetDate = value?.to ?? new Date();
+    return subMonths(targetDate, 1);
+  });
+
+  // Synchronize when value/preset props change externally
   React.useEffect(() => {
     setActivePreset(preset);
     if (preset !== "custom") {
@@ -140,15 +165,90 @@ export function DateRangePicker({
     }
   }, [preset, value?.from, value?.to]);
 
+  // When opening popover, reset draft to currently applied value & month
+  const handleOpenChange = (nextOpen: boolean) => {
+    if (nextOpen) {
+      setActivePreset(preset);
+      if (preset !== "custom") {
+        const calc = getPresetRange(preset);
+        setDraftRange({ from: calc.from, to: calc.to });
+        setMonth(subMonths(calc.to, 1));
+      } else if (value?.from || value?.to) {
+        setDraftRange({ from: value.from, to: value.to });
+        setMonth(value.to ? subMonths(value.to, 1) : subMonths(new Date(), 1));
+      } else {
+        setDraftRange(undefined);
+        setMonth(subMonths(new Date(), 1));
+      }
+      setHoverDate(null);
+      setOpen(true);
+    } else {
+      // Discard uncommitted changes on close (outside click / escape)
+      handleCancel();
+    }
+  };
+
   const handleSelectPreset = (key: DateRangePresetKey) => {
     setActivePreset(key);
-    onPresetChange?.(key);
+    setHoverDate(null);
     if (key !== "custom") {
       const computed = getPresetRange(key);
       setDraftRange({ from: computed.from, to: computed.to });
-      onChange?.({ from: computed.from, to: computed.to }, key);
-      setOpen(false);
+      setMonth(subMonths(computed.to, 1));
     }
+  };
+
+  // Day click handler implementing proper 2-step range selection
+  const handleDayClick = (clickedDate: Date) => {
+    setActivePreset("custom");
+
+    if (!draftRange?.from || (draftRange.from && draftRange.to)) {
+      // STEP 1: Setting start date (or starting fresh if complete range already existed)
+      setDraftRange({ from: clickedDate, to: undefined });
+      setHoverDate(null);
+    } else {
+      // STEP 2: Setting end date
+      const start = draftRange.from;
+      if (isBefore(clickedDate, start)) {
+        // Automatically swap: earlier date becomes start, previous start becomes end
+        setDraftRange({ from: clickedDate, to: start });
+      } else {
+        setDraftRange({ from: start, to: clickedDate });
+      }
+      setHoverDate(null);
+    }
+  };
+
+  const handleDayHover = (day: Date) => {
+    if (draftRange?.from && !draftRange?.to) {
+      setHoverDate(day);
+    }
+  };
+
+  const handleMouseLeaveCalendar = () => {
+    setHoverDate(null);
+  };
+
+  const handleReset = () => {
+    setDraftRange(undefined);
+    setHoverDate(null);
+    setActivePreset("custom");
+  };
+
+  const handleCancel = () => {
+    // Discard uncommitted draft range and restore committed value
+    if (preset !== "custom") {
+      const calc = getPresetRange(preset);
+      setDraftRange({ from: calc.from, to: calc.to });
+    } else if (value?.from || value?.to) {
+      setDraftRange({ from: value.from, to: value.to });
+    } else {
+      setDraftRange(undefined);
+    }
+    setActivePreset(preset);
+    setHoverDate(null);
+    setOpen(false);
+    triggerRef.current?.focus();
   };
 
   const handleApply = () => {
@@ -157,29 +257,63 @@ export function DateRangePicker({
       const to = draftRange.to || draftRange.from;
       const toEnd = new Date(to.getFullYear(), to.getMonth(), to.getDate(), 23, 59, 59);
       onChange?.({ from, to: toEnd }, activePreset);
+      onPresetChange?.(activePreset);
     }
     setOpen(false);
+    triggerRef.current?.focus();
   };
 
-  const handleRangeSelect = (range: DateRange | undefined) => {
-    setDraftRange(range);
-    setActivePreset("custom");
-    onPresetChange?.("custom");
-    if (range?.from && range?.to) {
-      const from = range.from;
-      const to = range.to;
-      const toEnd = new Date(to.getFullYear(), to.getMonth(), to.getDate(), 23, 59, 59);
-      onChange?.({ from, to: toEnd }, "custom");
-      setOpen(false);
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      handleCancel();
     }
   };
 
+  // Modifiers for full selected range vs hover preview range
+  const selectedRangeForDisplay = React.useMemo(() => {
+    if (draftRange?.from && draftRange?.to) {
+      return { from: draftRange.from, to: draftRange.to };
+    }
+    if (draftRange?.from && hoverDate) {
+      const from = isBefore(hoverDate, draftRange.from) ? hoverDate : draftRange.from;
+      const to = isBefore(hoverDate, draftRange.from) ? draftRange.from : hoverDate;
+      return { from, to };
+    }
+    if (draftRange?.from) {
+      return { from: draftRange.from, to: draftRange.from };
+    }
+    return undefined;
+  }, [draftRange?.from, draftRange?.to, hoverDate]);
+
+  const daysCount = React.useMemo(() => {
+    if (draftRange?.from && draftRange?.to) {
+      return differenceInDays(draftRange.to, draftRange.from) + 1;
+    }
+    if (draftRange?.from && hoverDate) {
+      const from = isBefore(hoverDate, draftRange.from) ? hoverDate : draftRange.from;
+      const to = isBefore(hoverDate, draftRange.from) ? draftRange.from : hoverDate;
+      return differenceInDays(to, from) + 1;
+    }
+    return 0;
+  }, [draftRange?.from, draftRange?.to, hoverDate]);
+
+  const instructionText = React.useMemo(() => {
+    if (!draftRange?.from) {
+      return "Select start date";
+    }
+    if (draftRange.from && !draftRange.to) {
+      return "Select end date";
+    }
+    return "Review your date range, then click Apply Filter";
+  }, [draftRange?.from, draftRange?.to]);
+
   const displayLabel = React.useMemo(() => {
-    if (activePreset !== "custom") {
-      const pObj = presets.find((p) => p.key === activePreset);
+    if (preset !== "custom") {
+      const pObj = presets.find((p) => p.key === preset);
       if (pObj) {
-        if (draftRange?.from && draftRange?.to) {
-          return `${pObj.label} (${format(draftRange.from, "d MMM")} – ${format(draftRange.to, "d MMM")})`;
+        if (value?.from && value?.to) {
+          return `${pObj.label} (${format(value.from, "d MMM")} – ${format(value.to, "d MMM")})`;
         }
         return pObj.label;
       }
@@ -187,33 +321,19 @@ export function DateRangePicker({
     if (value?.from && value?.to) {
       return `${format(value.from, "d MMM yyyy")} — ${format(value.to, "d MMM yyyy")}`;
     }
-    if (draftRange?.from && draftRange?.to) {
-      return `${format(draftRange.from, "d MMM yyyy")} — ${format(draftRange.to, "d MMM yyyy")}`;
-    }
     return placeholder;
-  }, [activePreset, presets, value?.from, value?.to, draftRange?.from, draftRange?.to, placeholder]);
-
-  const daysCount = React.useMemo(() => {
-    if (draftRange?.from && draftRange?.to) {
-      return differenceInDays(draftRange.to, draftRange.from) + 1;
-    }
-    return 0;
-  }, [draftRange?.from, draftRange?.to]);
-
-  // Default left month to previous month when showing past date range filter
-  const initialMonth = React.useMemo(() => {
-    const targetDate = draftRange?.to ?? value?.to ?? new Date();
-    return subMonths(targetDate, 1);
-  }, [draftRange?.to, value?.to]);
+  }, [preset, presets, value?.from, value?.to, placeholder]);
 
   return (
     <div className={cn("inline-flex items-center", className)}>
-      <Popover open={open} onOpenChange={setOpen}>
+      <Popover open={open} onOpenChange={handleOpenChange}>
         <PopoverTrigger asChild>
           <Button
+            ref={triggerRef}
             variant="outline"
             role="combobox"
             aria-expanded={open}
+            aria-label="Select date range"
             className={cn(
               "h-9 px-3.5 py-1.5 text-xs font-semibold rounded-xl border border-slate-200 bg-white text-slate-700 shadow-xs hover:bg-slate-50 hover:text-slate-900 transition-all flex items-center gap-2",
               open && "border-blue-500 ring-2 ring-blue-500/20",
@@ -226,8 +346,14 @@ export function DateRangePicker({
 
         <PopoverContent
           align={align}
+          onKeyDown={handleKeyDown}
           className="w-auto p-0 rounded-2xl border border-slate-200/80 bg-white shadow-2xl overflow-hidden z-50 min-w-[340px] md:min-w-[700px]"
         >
+          {/* Accessible Screen Reader Announcer */}
+          <div className="sr-only" aria-live="polite" aria-atomic="true">
+            {instructionText}
+          </div>
+
           <div className="flex flex-col md:flex-row">
             {/* Left Sidebar: Presets (Enterprise UX Standard) */}
             <div className="w-full md:w-48 bg-slate-50/70 border-b md:border-b-0 md:border-r border-slate-100 p-3 flex flex-col justify-between shrink-0">
@@ -265,12 +391,28 @@ export function DateRangePicker({
               <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100 bg-white">
                 <div className="flex items-center gap-3">
                   <div className="flex items-center gap-2 text-xs">
-                    <span className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-800 font-semibold border border-slate-200/60">
+                    <span
+                      className={cn(
+                        "px-2.5 py-1 rounded-lg font-semibold border transition-colors",
+                        draftRange?.from
+                          ? "bg-blue-50 text-blue-900 border-blue-200"
+                          : "bg-slate-100 text-slate-500 border-slate-200/60"
+                      )}
+                    >
                       {draftRange?.from ? format(draftRange.from, "MMM d, yyyy") : "Start Date"}
                     </span>
                     <span className="text-slate-400 font-medium">to</span>
-                    <span className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-800 font-semibold border border-slate-200/60">
-                      {draftRange?.to ? format(draftRange.to, "MMM d, yyyy") : "End Date"}
+                    <span
+                      className={cn(
+                        "px-2.5 py-1 rounded-lg font-semibold border transition-colors",
+                        draftRange?.to
+                          ? "bg-blue-50 text-blue-900 border-blue-200"
+                          : "bg-slate-100 text-slate-500 border-slate-200/60"
+                      )}
+                    >
+                      {draftRange?.to
+                        ? format(draftRange.to, "MMM d, yyyy")
+                        : (draftRange?.from ? (hoverDate ? format(hoverDate, "MMM d, yyyy") : "Select end date") : "End Date")}
                     </span>
                   </div>
 
@@ -284,10 +426,7 @@ export function DateRangePicker({
                 {draftRange?.from && (
                   <button
                     type="button"
-                    onClick={() => {
-                      setDraftRange(undefined);
-                      setActivePreset("custom");
-                    }}
+                    onClick={handleReset}
                     className="text-xs text-slate-400 hover:text-slate-700 flex items-center gap-1 hover:bg-slate-100 px-2 py-1 rounded-md transition-colors font-medium"
                   >
                     <RotateCcw className="size-3" /> Reset
@@ -296,30 +435,40 @@ export function DateRangePicker({
               </div>
 
               {/* Dual Month Calendar View */}
-              <div className="p-4 bg-white flex justify-center">
+              <div
+                className="p-4 bg-white flex justify-center"
+                onMouseLeave={handleMouseLeaveCalendar}
+              >
                 <Calendar
                   mode="range"
-                  selected={draftRange}
-                  onSelect={handleRangeSelect}
+                  selected={selectedRangeForDisplay as DateRange}
+                  onDayClick={handleDayClick}
                   numberOfMonths={2}
-                  defaultMonth={initialMonth}
+                  month={month}
+                  onMonthChange={setMonth}
                   showOutsideDays={false}
                   disabled={{ after: new Date() }}
                   className="p-0 font-sans"
+                  modifiers={{
+                    range_start: draftRange?.from ? [draftRange.from] : [],
+                    range_end: draftRange?.to ? [draftRange.to] : [],
+                    preview_start: draftRange?.from && !draftRange?.to && hoverDate && isBefore(hoverDate, draftRange.from) ? [hoverDate] : [],
+                    preview_end: draftRange?.from && !draftRange?.to && hoverDate && !isBefore(hoverDate, draftRange.from) ? [hoverDate] : [],
+                  }}
                 />
               </div>
 
               {/* Footer Actions */}
               <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100 bg-slate-50/50">
-                <span className="text-[11px] text-slate-400 font-medium hidden sm:inline">
-                  Click start date then end date to set custom range
+                <span className="text-[11px] text-slate-500 font-medium hidden sm:inline">
+                  {instructionText}
                 </span>
                 <div className="flex items-center gap-2 ml-auto">
                   <Button
                     type="button"
                     variant="ghost"
                     size="sm"
-                    onClick={() => setOpen(false)}
+                    onClick={handleCancel}
                     className="text-xs font-semibold text-slate-600 hover:text-slate-900 h-8 px-3 rounded-lg"
                   >
                     Cancel

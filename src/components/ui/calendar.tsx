@@ -86,7 +86,7 @@ function Calendar({
           defaultClassNames.week_number,
         ),
         day: cn(
-          "group/day relative h-9 w-full select-none p-0 text-center flex items-center justify-center data-[range-middle=true]:bg-blue-50/80 data-[range-start=true]:bg-blue-50/80 data-[range-start=true]:rounded-l-lg data-[range-end=true]:bg-blue-50/80 data-[range-end=true]:rounded-r-lg",
+          "group/day relative h-9 w-full select-none p-0 text-center flex items-center justify-center data-[range-middle=true]:bg-blue-50/80 data-[range-start=true]:bg-blue-50/80 data-[range-start=true]:rounded-l-lg data-[range-end=true]:bg-blue-50/80 data-[range-end=true]:rounded-r-lg data-[preview-middle=true]:bg-blue-50/60 data-[preview-start=true]:bg-blue-50/60 data-[preview-start=true]:rounded-l-lg data-[preview-end=true]:bg-blue-50/60 data-[preview-end=true]:rounded-r-lg",
           defaultClassNames.day,
         ),
         range_start: cn("bg-blue-50/80 rounded-l-lg", defaultClassNames.range_start),
@@ -149,23 +149,51 @@ function CalendarDayButton({
     if (modifiers.focused) ref.current?.focus();
   }, [modifiers.focused]);
 
+  const isRangeStart = Boolean(modifiers.range_start || modifiers.preview_start);
+  const isRangeEnd = Boolean(modifiers.range_end || modifiers.preview_end);
+  const isRangeMiddle = Boolean(modifiers.range_middle || modifiers.preview_middle);
+  const isSingle = Boolean(modifiers.selected && !isRangeStart && !isRangeEnd && !isRangeMiddle);
+
+  let srLabel: string | undefined;
+  try {
+    const formattedDate = day.date.toLocaleDateString("en-US", {
+      month: "long",
+      day: "numeric",
+      year: "numeric",
+      weekday: "long",
+    });
+    if (isRangeStart && isRangeEnd) {
+      srLabel = `${formattedDate}, selected start and end date`;
+    } else if (isRangeStart) {
+      srLabel = `${formattedDate}, selected start date`;
+    } else if (isRangeEnd) {
+      srLabel = `${formattedDate}, selected end date`;
+    } else if (isRangeMiddle) {
+      srLabel = `${formattedDate}, within selected range`;
+    } else {
+      srLabel = formattedDate;
+    }
+  } catch {
+    srLabel = undefined;
+  }
+
   return (
     <Button
       ref={ref}
       variant="ghost"
       size="icon"
+      aria-label={srLabel}
+      aria-selected={Boolean(modifiers.selected || isRangeStart || isRangeEnd || isRangeMiddle)}
       data-day={day.date.toLocaleDateString()}
-      data-selected-single={
-        modifiers.selected &&
-        !modifiers.range_start &&
-        !modifiers.range_end &&
-        !modifiers.range_middle
-      }
-      data-range-start={modifiers.range_start}
-      data-range-end={modifiers.range_end}
-      data-range-middle={modifiers.range_middle}
+      data-selected-single={isSingle}
+      data-range-start={isRangeStart}
+      data-range-end={isRangeEnd}
+      data-range-middle={isRangeMiddle}
+      data-preview-start={modifiers.preview_start}
+      data-preview-end={modifiers.preview_end}
+      data-preview-middle={modifiers.preview_middle}
       className={cn(
-        "data-[selected-single=true]:bg-blue-600 data-[selected-single=true]:text-white data-[selected-single=true]:hover:bg-blue-700 data-[selected-single=true]:shadow-sm data-[range-middle=true]:bg-transparent data-[range-middle=true]:text-blue-900 data-[range-middle=true]:hover:bg-blue-100/70 data-[range-middle=true]:rounded-none data-[range-start=true]:bg-blue-600 data-[range-start=true]:text-white data-[range-start=true]:hover:bg-blue-700 data-[range-start=true]:shadow-sm data-[range-end=true]:bg-blue-600 data-[range-end=true]:text-white data-[range-end=true]:hover:bg-blue-700 data-[range-end=true]:shadow-sm group-data-[focused=true]/day:border-ring group-data-[focused=true]/day:ring-ring/50 flex h-9 w-9 items-center justify-center font-semibold text-xs leading-none data-[range-end=true]:rounded-lg data-[range-start=true]:rounded-lg group-data-[focused=true]/day:relative group-data-[focused=true]/day:z-10 group-data-[focused=true]/day:ring-[2px] transition-all",
+        "data-[selected-single=true]:bg-blue-600 data-[selected-single=true]:text-white data-[selected-single=true]:hover:bg-blue-700 data-[selected-single=true]:shadow-sm data-[range-middle=true]:bg-transparent data-[range-middle=true]:text-blue-900 data-[range-middle=true]:hover:bg-blue-100/70 data-[range-middle=true]:rounded-none data-[range-start=true]:bg-blue-600 data-[range-start=true]:text-white data-[range-start=true]:hover:bg-blue-700 data-[range-start=true]:shadow-sm data-[range-end=true]:bg-blue-600 data-[range-end=true]:text-white data-[range-end=true]:hover:bg-blue-700 data-[range-end=true]:shadow-sm data-[preview-start=true]:bg-blue-500 data-[preview-start=true]:text-white data-[preview-end=true]:bg-blue-500 data-[preview-end=true]:text-white group-data-[focused=true]/day:border-ring group-data-[focused=true]/day:ring-ring/50 flex h-9 w-9 items-center justify-center font-semibold text-xs leading-none data-[range-end=true]:rounded-lg data-[range-start=true]:rounded-lg data-[preview-end=true]:rounded-lg data-[preview-start=true]:rounded-lg group-data-[focused=true]/day:relative group-data-[focused=true]/day:z-10 group-data-[focused=true]/day:ring-[2px] transition-all",
         defaultClassNames.day,
         className,
       )}
