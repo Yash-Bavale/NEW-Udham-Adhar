@@ -140,7 +140,7 @@ export const ACTION_REQUIRED_STAGES: Set<OrderStage> = new Set([
 export const WORKFORCE_THRESHOLDS = {
   IDLE_THRESHOLD_MINUTES: 5,        // 5 min inactivity -> IDLE (still eligible for new orders, no reassignment)
   AWAY_THRESHOLD_MINUTES: 15,       // 15 min inactivity -> AWAY (blocked from new automatic orders)
-  HEARTBEAT_TIMEOUT_MINUTES: 5,     // 5 min without heartbeat -> OFFLINE (blocked from new automatic orders)
+  HEARTBEAT_TIMEOUT_MINUTES: 10,    // 10 min without heartbeat -> OFFLINE (resilient to browser background tab throttling)
   PROLONGED_OFFLINE_REASSIGN_MINUTES: 30, // 30 min offline during working hours -> trigger automatic reassignment of action orders
   PROLONGED_AWAY_REASSIGN_MINUTES: 60,    // 60 min away during working hours -> trigger automatic reassignment of action orders
 } as const;

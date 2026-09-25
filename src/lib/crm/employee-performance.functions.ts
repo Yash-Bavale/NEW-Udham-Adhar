@@ -910,6 +910,7 @@ export const getEmployeePerformanceCommandCenter = createServerFn({
       { data: prevAppEvents },
       { data: prevSchedulers },
       { data: prevActivityLogs },
+      { data: activeEmployeeSessions },
     ] = await Promise.all([
       // Current application_events
       admin
@@ -954,7 +955,22 @@ export const getEmployeePerformanceCommandCenter = createServerFn({
         .gte("created_at", dateRange.previous.start)
         .lte("created_at", dateRange.previous.end)
         .limit(3000),
+      // Active employee sessions for real-time presence
+      adminAny
+        .from("employee_sessions")
+        .select("employee_id, is_active, last_heartbeat_at, last_activity_at, login_at, status, active_seconds, idle_seconds, away_seconds, current_page, current_module, last_action_text, current_order_code")
+        .order("last_heartbeat_at", { ascending: false })
+        .limit(300),
     ]);
+
+    // Map active session by employee ID
+    const activeSessionsMap = new Map<string, any>();
+    (activeEmployeeSessions ?? []).forEach((sess: any) => {
+      const empId = String(sess.employee_id);
+      if (!activeSessionsMap.has(empId)) {
+        activeSessionsMap.set(empId, sess);
+      }
+    });
 
     // Normalize current and previous period operational actions
     const currentCanonicalEvents = normalizeOperationalEvents({
@@ -1249,9 +1265,30 @@ export const getEmployeePerformanceCommandCenter = createServerFn({
 
     // 5. Build Employee Performance Table Rows
     const employeeRows = Array.from(empStatsMap.values()).map((s) => {
+      const sess = activeSessionsMap.get(s.employeeId);
       let status: "active" | "idle" | "away" | "offline" = "offline";
       let lastActiveAgo = "Never";
-      if (s.lastActionTime) {
+
+      if (sess && sess.is_active && sess.status !== "force_logged_out" && sess.status !== "logged_out") {
+        const lastHb = sess.last_heartbeat_at || sess.last_activity_at || sess.login_at;
+        const diffMins = Math.floor((nowTime - new Date(lastHb).getTime()) / 60000);
+        if (diffMins <= 10) {
+          if (sess.status === "away" || diffMins > 8) {
+            status = "away";
+            lastActiveAgo = diffMins <= 1 ? "Away (just now)" : `Away (${diffMins}m ago)`;
+          } else if (sess.status === "idle" || diffMins > 5) {
+            status = "idle";
+            lastActiveAgo = diffMins <= 1 ? "Idle (just now)" : `Idle (${diffMins}m ago)`;
+          } else {
+            status = "active";
+            lastActiveAgo = diffMins <= 1 ? "Just now" : `${diffMins}m ago`;
+          }
+        } else {
+          const hours = Math.floor(diffMins / 60);
+          status = "offline";
+          lastActiveAgo = hours < 24 ? `${hours}h ago` : `${Math.floor(hours / 24)}d ago`;
+        }
+      } else if (s.lastActionTime) {
         const diffMins = Math.floor((nowTime - new Date(s.lastActionTime).getTime()) / 60000);
         if (diffMins < 15) {
           status = "active";
@@ -1270,7 +1307,13 @@ export const getEmployeePerformanceCommandCenter = createServerFn({
       }
 
       let sessionMins = 0;
-      if (s.firstActionTime && s.lastActionTime) {
+      if (sess?.login_at) {
+        const totalSec = (sess.active_seconds || 0) + (sess.idle_seconds || 0) + (sess.away_seconds || 0);
+        sessionMins = Math.round(totalSec / 60);
+        if (sessionMins === 0) {
+          sessionMins = Math.round((nowTime - new Date(sess.login_at).getTime()) / 60000);
+        }
+      } else if (s.firstActionTime && s.lastActionTime) {
         sessionMins = Math.round(
           (new Date(s.lastActionTime).getTime() - new Date(s.firstActionTime).getTime()) / 60000,
         );
@@ -1280,11 +1323,16 @@ export const getEmployeePerformanceCommandCenter = createServerFn({
           ? sessionMins >= 60
             ? `${Math.floor(sessionMins / 60)}h ${sessionMins % 60}m`
             : `${sessionMins}m`
-          : "—";
+          : (status === "active" ? "Active" : "—");
 
       // Effective assigned count: Assigned in range or worked in range
       const assignedCount = Math.max(s.assignedOrders.size, s.workedOrders.size);
       const slaPercent = s.slaTotalCount > 0 ? Math.round((s.slaCompliantCount / s.slaTotalCount) * 100) : 100;
+
+      const effectiveFirstActionTime = s.firstActionTime || sess?.login_at || null;
+      const effectiveLastActionText = (s.lastActionText && s.lastActionText !== "No actions yet")
+        ? s.lastActionText
+        : (sess?.last_action_text || (status === "active" ? "Connected to CRM" : "No actions yet"));
 
       return {
         employeeId: s.employeeId,
@@ -1302,10 +1350,10 @@ export const getEmployeePerformanceCommandCenter = createServerFn({
         closedDueToTechnicalDelay: s.closedDueToTechnicalDelayOrders.size,
         hotOrders: s.hotOrders.size,
         slaPercent,
-        lastActionText: s.lastActionText,
-        lastActionTime: s.lastActionTime,
-        firstActionTime: s.firstActionTime,
-        lastOrderCode: s.lastOrderCode,
+        lastActionText: effectiveLastActionText,
+        lastActionTime: s.lastActionTime || sess?.last_activity_at || null,
+        firstActionTime: effectiveFirstActionTime,
+        lastOrderCode: s.lastOrderCode || sess?.current_order_code || null,
         lastActiveAgo,
         status,
         sessionLabel,

@@ -92,12 +92,20 @@ export function useEmployeePresence(options?: {
       } else {
         lastActivityRef.current = Date.now();
         statusRef.current = "ACTIVE";
+        void sendHeartbeat();
       }
+    };
+
+    const handleFocus = () => {
+      lastActivityRef.current = Date.now();
+      statusRef.current = "ACTIVE";
+      void sendHeartbeat();
     };
 
     window.addEventListener("pointerdown", handleUserActivity, { passive: true });
     window.addEventListener("keydown", handleUserActivity, { passive: true });
     window.addEventListener("click", handleUserActivity, { passive: true });
+    window.addEventListener("focus", handleFocus);
     document.addEventListener("visibilitychange", handleVisibilityChange);
 
     // 1-second ticker for accumulation
@@ -118,7 +126,7 @@ export function useEmployeePresence(options?: {
       }
     }, 1000);
 
-    // Heartbeat every 60 seconds
+    // Heartbeat every 30-45 seconds
     const sendHeartbeat = async () => {
       const activeDelta = activeSecondsRef.current;
       const idleDelta = idleSecondsRef.current;
@@ -172,7 +180,7 @@ export function useEmployeePresence(options?: {
 
     // Initial heartbeat
     void sendHeartbeat();
-    const heartbeatTimer = setInterval(sendHeartbeat, 60_000);
+    const heartbeatTimer = setInterval(sendHeartbeat, 30_000);
 
     return () => {
       clearInterval(ticker);
@@ -180,6 +188,7 @@ export function useEmployeePresence(options?: {
       window.removeEventListener("pointerdown", handleUserActivity);
       window.removeEventListener("keydown", handleUserActivity);
       window.removeEventListener("click", handleUserActivity);
+      window.removeEventListener("focus", handleFocus);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, []);

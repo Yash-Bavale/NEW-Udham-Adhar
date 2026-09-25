@@ -488,11 +488,11 @@ export const listEmployeeSessionsAdmin = createServerFn({ method: "POST" })
       if (sess && sess.is_active && sess.status !== "force_logged_out" && sess.status !== "logged_out") {
         const lastHbMs = new Date(sess.last_heartbeat_at || sess.last_activity_at || sess.login_at).getTime();
         const diffMs = nowTime - lastHbMs;
-        if (diffMs > 3 * 60 * 1000) {
+        if (diffMs > 10 * 60 * 1000) {
           presence = "offline";
-        } else if (sess.status === "away" || diffMs > 2 * 60 * 1000) {
+        } else if (sess.status === "away" || diffMs > 8 * 60 * 1000) {
           presence = "away";
-        } else if (sess.status === "idle") {
+        } else if (sess.status === "idle" || diffMs > 5 * 60 * 1000) {
           presence = "idle";
         } else {
           presence = "active";

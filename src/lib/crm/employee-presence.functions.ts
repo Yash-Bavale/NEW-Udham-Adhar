@@ -258,10 +258,11 @@ export const getActiveEmployeeSessions = createServerFn({ method: "POST" })
 
       let status: "ACTIVE" | "IDLE" | "AWAY" | "OFFLINE" = "OFFLINE";
       if (s && s.is_active && s.status !== "force_logged_out" && s.status !== "logged_out") {
-        const diffMs = nowTime - new Date(s.last_heartbeat_at).getTime();
-        if (diffMs > 5 * 60 * 1000) {
+        const lastHb = s.last_heartbeat_at || s.last_activity_at || s.login_at;
+        const diffMs = nowTime - new Date(lastHb).getTime();
+        if (diffMs > 10 * 60 * 1000) {
           status = "OFFLINE";
-        } else if (diffMs > 15 * 60 * 1000 || s.status === "away") {
+        } else if (diffMs > 8 * 60 * 1000 || s.status === "away") {
           status = "AWAY";
         } else if (diffMs > 5 * 60 * 1000 || s.status === "idle") {
           status = "IDLE";

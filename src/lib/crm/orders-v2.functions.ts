@@ -828,7 +828,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       const is_due = firesAtTime > 0 && firesAtTime <= now;
       const is_reopened =
         stage === "order_reopened" ||
-        a.fulfillment_status === "order_reopened" ||
+        (a.fulfillment_status as any) === "order_reopened" ||
         (a as any).application_status === "order_reopened" ||
         (a as any).order_status === "REOPENED" ||
         (a as any).workflow_status === "order_reopened";
