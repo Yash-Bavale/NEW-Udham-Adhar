@@ -472,6 +472,17 @@ export const generateDisputeEvidencePackage = createServerFn({ method: "POST" })
           .in("id", data.selectedEmailIds),
       ]);
 
+      // Also fetch queue records linked by queue_id to ensure complete body_html
+      const queueIdsFromLogs = (logs ?? []).map((l: any) => l.queue_id).filter(Boolean);
+      const { data: queueForLogs } = queueIdsFromLogs.length > 0
+        ? await admin.from("email_queue").select("*").in("id", queueIdsFromLogs)
+        : { data: [] };
+
+      const queueById = new Map<string, any>();
+      for (const q of [...(queue ?? []), ...(queueForLogs ?? [])]) {
+        queueById.set(q.id, q);
+      }
+
       const emailMap = new Map<string, any>();
       for (const q of (queue ?? [])) {
         emailMap.set(q.id, {
@@ -489,16 +500,17 @@ export const generateDisputeEvidencePackage = createServerFn({ method: "POST" })
       }
 
       for (const l of (logs ?? [])) {
+        const q = l.queue_id ? queueById.get(l.queue_id) : null;
         emailMap.set(l.id, {
           id: l.id,
-          subject: l.subject,
+          subject: l.subject || q?.subject || "Email Notification",
           from_email: l.from_email || COMPANY_EMAIL,
           to_email: l.to_email || lead.email || "customer@email.com",
-          sent_at: l.sent_at || l.created_at,
+          sent_at: l.sent_at || l.created_at || q?.sent_at,
           status: l.status || "sent",
-          template_code: l.template_code || null,
-          body_html: l.body_html || null,
-          body_text: l.body_text || null,
+          template_code: l.template_code || q?.template_code || null,
+          body_html: l.body_html || q?.body_html || null,
+          body_text: l.body_text || q?.body_text || null,
           message_id: l.message_id || null,
         });
       }

@@ -423,7 +423,10 @@ export async function renderDisputeEvidencePackagePdf(data: DisputePackageData):
     ey -= 34;
 
     // Email Metadata Card (Clean layout, no Template ID, Message ID safely wrapped)
-    const metaCardH = 74;
+    const subLines = wrap(email.subject || "No Subject", helvBold, 8.5, CONTENT_W - 95);
+    const subHeight = Math.max(subLines.length, 1) * 14;
+    const metaCardH = 48 + subHeight;
+
     emailPage.drawRectangle({
       x: MARGIN_X,
       y: ey - metaCardH,
@@ -434,26 +437,36 @@ export async function renderDisputeEvidencePackagePdf(data: DisputePackageData):
       borderWidth: 1,
     });
 
-    let metaY = ey - 16;
+    let metaY = ey - 14;
     drawText(emailPage, "Subject", { x: MARGIN_X + 12, y: metaY, size: 8.5, font: helvBold, color: TEXT_MUTED });
-    const subClean = wrap(email.subject || "No Subject", helvBold, 9, CONTENT_W - 95)[0] || email.subject;
-    drawText(emailPage, `: ${safePdfText(subClean)}`, { x: MARGIN_X + 80, y: metaY, size: 9, font: helvBold, color: NAVY });
+    for (let sIdx = 0; sIdx < subLines.length; sIdx++) {
+      drawText(emailPage, sIdx === 0 ? `: ${safePdfText(subLines[sIdx])}` : `  ${safePdfText(subLines[sIdx])}`, {
+        x: MARGIN_X + 75,
+        y: metaY,
+        size: 8.5,
+        font: helvBold,
+        color: NAVY,
+      });
+      metaY -= 14;
+    }
 
-    metaY -= 16;
-    drawText(emailPage, "From", { x: MARGIN_X + 12, y: metaY, size: 8.5, font: helv, color: TEXT_MUTED });
-    drawText(emailPage, `: ${safePdfText(email.from_email || COMPANY_EMAIL)}`, { x: MARGIN_X + 80, y: metaY, size: 8.5, font: helv, color: TEXT_DARK });
+    metaY -= 2;
+    // Row 2: From & To
+    drawText(emailPage, "From", { x: MARGIN_X + 12, y: metaY, size: 8, font: helv, color: TEXT_MUTED });
+    drawText(emailPage, `: ${safePdfText(email.from_email || COMPANY_EMAIL)}`, { x: MARGIN_X + 75, y: metaY, size: 8, font: helv, color: TEXT_DARK });
 
-    drawText(emailPage, "To", { x: MARGIN_X + 290, y: metaY, size: 8.5, font: helv, color: TEXT_MUTED });
-    drawText(emailPage, `: ${safePdfText(email.to_email)}`, { x: MARGIN_X + 315, y: metaY, size: 8.5, font: helv, color: TEXT_DARK });
+    drawText(emailPage, "To", { x: MARGIN_X + 280, y: metaY, size: 8, font: helv, color: TEXT_MUTED });
+    drawText(emailPage, `: ${safePdfText(email.to_email)}`, { x: MARGIN_X + 305, y: metaY, size: 8, font: helv, color: TEXT_DARK });
 
-    metaY -= 16;
-    drawText(emailPage, "Sent Date", { x: MARGIN_X + 12, y: metaY, size: 8.5, font: helv, color: TEXT_MUTED });
-    drawText(emailPage, `: ${formatIST(email.sent_at)}`, { x: MARGIN_X + 80, y: metaY, size: 8.5, font: helvBold, color: TEXT_DARK });
+    metaY -= 14;
+    // Row 3: Sent Date & Message ID
+    drawText(emailPage, "Sent Date", { x: MARGIN_X + 12, y: metaY, size: 8, font: helv, color: TEXT_MUTED });
+    drawText(emailPage, `: ${formatIST(email.sent_at)}`, { x: MARGIN_X + 75, y: metaY, size: 8, font: helvBold, color: TEXT_DARK });
 
     if (email.message_id) {
-      drawText(emailPage, "Message ID", { x: MARGIN_X + 290, y: metaY, size: 8, font: helv, color: TEXT_MUTED });
-      const msgIdWrapped = wrap(email.message_id, helv, 7.5, CONTENT_W - 370)[0] || email.message_id;
-      drawText(emailPage, `: ${safePdfText(msgIdWrapped)}`, { x: MARGIN_X + 355, y: metaY, size: 7.5, font: helv, color: TEXT_MUTED });
+      drawText(emailPage, "Message ID", { x: MARGIN_X + 280, y: metaY, size: 7.5, font: helv, color: TEXT_MUTED });
+      const msgLines = wrap(email.message_id, helv, 7, CONTENT_W - 350);
+      drawText(emailPage, `: ${safePdfText(msgLines[0] || email.message_id)}`, { x: MARGIN_X + 345, y: metaY, size: 7, font: helv, color: TEXT_MUTED });
     }
 
     ey -= (metaCardH + 12);
@@ -485,16 +498,20 @@ export async function renderDisputeEvidencePackagePdf(data: DisputePackageData):
 
     for (const block of blocks) {
       if (block.type === "heading") {
-        ensureSpace(24);
+        const wrapped = wrap(block.text, helvBold, 9.5, BODY_MAX_W);
+        ensureSpace(wrapped.length * 14 + 8);
         ey -= 4;
-        drawText(emailPage, block.text, {
-          x: BODY_LEFT,
-          y: ey,
-          size: 9.5,
-          font: helvBold,
-          color: NAVY,
-        });
-        ey -= 14;
+        for (const line of wrapped) {
+          drawText(emailPage, line, {
+            x: BODY_LEFT,
+            y: ey,
+            size: 9.5,
+            font: helvBold,
+            color: NAVY,
+          });
+          ey -= 13;
+        }
+        ey -= 3;
       } else if (block.type === "paragraph") {
         const wrapped = wrap(block.text, helv, 8.5, BODY_MAX_W);
         for (const line of wrapped) {
@@ -506,7 +523,7 @@ export async function renderDisputeEvidencePackagePdf(data: DisputePackageData):
             font: helv,
             color: TEXT_DARK,
           });
-          ey -= 12;
+          ey -= 11.5;
         }
         ey -= 4;
       } else if (block.type === "list_item") {
@@ -515,7 +532,7 @@ export async function renderDisputeEvidencePackagePdf(data: DisputePackageData):
         for (const line of wrapped) {
           ensureSpace(12);
           if (first) {
-            drawText(emailPage, "•", {
+            drawText(emailPage, "*", {
               x: BODY_LEFT + 2,
               y: ey,
               size: 9,
@@ -539,23 +556,29 @@ export async function renderDisputeEvidencePackagePdf(data: DisputePackageData):
               color: TEXT_DARK,
             });
           }
-          ey -= 12;
+          ey -= 11.5;
         }
-        ey -= 2;
+        ey -= 3;
       } else if (block.type === "table_2col") {
-        const rowHeight = 16;
-        const keyW = 180;
+        const keyW = 175;
         const valW = BODY_MAX_W - keyW;
 
         for (let r = 0; r < block.rows.length; r++) {
-          ensureSpace(rowHeight + 2);
           const row = block.rows[r];
           const isEven = r % 2 === 0;
+          const isAmount = row.val.includes("Rs.") || row.val.includes("INR");
+
+          const keyLines = wrap(row.key, helvBold, 8, keyW - 14);
+          const valLines = wrap(row.val, isAmount ? helvBold : helv, 8, valW - 14);
+          const lineCount = Math.max(keyLines.length, valLines.length, 1);
+          const rowHeight = lineCount * 12 + 6;
+
+          ensureSpace(rowHeight + 2);
 
           // Subtle background for alternating rows
           emailPage.drawRectangle({
             x: BODY_LEFT,
-            y: ey - rowHeight + 4,
+            y: ey - rowHeight + 3,
             width: BODY_MAX_W,
             height: rowHeight,
             color: isEven ? LIGHT_BG : WHITE,
@@ -563,38 +586,56 @@ export async function renderDisputeEvidencePackagePdf(data: DisputePackageData):
             borderWidth: 0.5,
           });
 
-          drawText(emailPage, wrap(row.key, helvBold, 8, keyW - 12)[0] || row.key, {
-            x: BODY_LEFT + 8,
-            y: ey - 8,
-            size: 8,
-            font: helvBold,
-            color: TEXT_MUTED,
-          });
+          // Draw all lines of Key
+          let kY = ey - 8;
+          for (const kLine of keyLines) {
+            drawText(emailPage, kLine, {
+              x: BODY_LEFT + 8,
+              y: kY,
+              size: 8,
+              font: helvBold,
+              color: TEXT_MUTED,
+            });
+            kY -= 12;
+          }
 
-          const isAmount = row.val.includes("Rs.") || row.val.includes("INR");
-          drawText(emailPage, wrap(row.val, isAmount ? helvBold : helv, 8, valW - 12)[0] || row.val, {
-            x: BODY_LEFT + keyW,
-            y: ey - 8,
-            size: 8,
-            font: isAmount ? helvBold : helv,
-            color: isAmount ? NAVY : TEXT_DARK,
-          });
+          // Draw all lines of Value
+          let vY = ey - 8;
+          for (const vLine of valLines) {
+            drawText(emailPage, vLine, {
+              x: BODY_LEFT + keyW,
+              y: vY,
+              size: 8,
+              font: isAmount ? helvBold : helv,
+              color: isAmount ? NAVY : TEXT_DARK,
+            });
+            vY -= 12;
+          }
 
           ey -= rowHeight;
         }
         ey -= 6;
       } else if (block.type === "table_1col") {
-        // Timeline or bullet list rows
         for (const item of block.rows) {
-          ensureSpace(14);
-          drawText(emailPage, item, {
-            x: BODY_LEFT + 4,
-            y: ey,
-            size: 8.5,
-            font: item.startsWith("[OK]") ? helvBold : helv,
-            color: item.startsWith("[OK]") ? GREEN_DARK : TEXT_DARK,
-          });
-          ey -= 14;
+          const isOk = item.startsWith("[OK]");
+          const isPending = item.startsWith("[Pending]");
+          const isEmail = item.startsWith("[Email]");
+          const itemFont = isOk ? helvBold : helv;
+          const itemColor = isOk ? GREEN_DARK : isPending ? rgb(0.7, 0.4, 0.05) : isEmail ? NAVY_SOFT : TEXT_DARK;
+
+          const wrapped = wrap(item, itemFont, 8, BODY_MAX_W - 8);
+          for (const line of wrapped) {
+            ensureSpace(12);
+            drawText(emailPage, line, {
+              x: BODY_LEFT + 4,
+              y: ey,
+              size: 8,
+              font: itemFont,
+              color: itemColor,
+            });
+            ey -= 11.5;
+          }
+          ey -= 2;
         }
         ey -= 4;
       } else if (block.type === "hr") {
@@ -905,12 +946,18 @@ function parseNonTableHtml(html: string): DocumentBlock[] {
     } else {
       const text = stripTags(t);
       if (text) {
-        // Detect bold heading paragraphs e.g. "Order Summary" or "Order Timeline"
-        if (
-          (text.endsWith("Summary") || text.endsWith("Timeline") || text.endsWith("Information") || text.startsWith("Dear ") || text.length < 30) &&
+        // True headings are short titles/sections (e.g. "Order Summary", "Important Service Information")
+        const isHeading =
+          (text.endsWith("Summary") ||
+            text.endsWith("Timeline") ||
+            text.endsWith("Information") ||
+            text.endsWith("Details") ||
+            text.endsWith("Status")) &&
+          text.length <= 40 &&
           !text.includes(".") &&
-          !text.includes(",")
-        ) {
+          !text.includes(",");
+
+        if (isHeading) {
           blocks.push({ type: "heading", text });
         } else {
           blocks.push({ type: "paragraph", text });
