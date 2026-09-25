@@ -362,7 +362,11 @@ const COMPLETED_FS = new Set<string>([
   "consultation_completed", "order_completed", "completed",
 ]);
 const EXCEPTION_STAGES: OrderStage[] = ["refund_requested", "refunded", "uninterested"];
-const NEEDS_ACTION_STAGES: OrderStage[] = ["lead_received", "payment_done", "form_submitted", "order_reopened"];
+const NEEDS_ACTION_STAGES: OrderStage[] = ["lead_received", "payment_done", "form_submitted", "form_not_submitted"];
+
+function isNeedsActionStage(stage: OrderStage): boolean {
+  return NEEDS_ACTION_STAGES.includes(stage);
+}
 
 export type Bucket =
   | "all"
@@ -405,7 +409,7 @@ export function bucketOfRow(
   if (row.stage === "customer_delay" || fs === "customer_delay") return "customer_delay";
 
   // Action-required untouched orders (Needs Action vs Backlog)
-  const isActionStage = ["lead_received", "payment_done", "form_submitted", "form_not_submitted"].includes(row.stage);
+  const isActionStage = isNeedsActionStage(row.stage);
   if (isActionStage) {
     const curToday = todayIst || istDateKey(new Date());
     const rowDate = istDateKey(row.created_at);
@@ -959,9 +963,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
 
     for (const r of baseFilteredRows) {
       const b = bucketOfRow(r, todayIst);
-      const isActionStage = ["lead_received", "payment_done", "form_submitted", "form_not_submitted"].includes(r.stage);
-      const rowDate = istDateKey(r.created_at);
-      const isOlderThanToday = Boolean(rowDate && rowDate < todayIst);
+      const isActionStage = isNeedsActionStage(r.stage);
 
       if (r.in_range) {
         counts.totalAll++;
@@ -983,9 +985,6 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       if (!r.is_terminal && isActionStage) {
         counts.needs_action++;
         counts.actionRequired++;
-        if (isOlderThanToday) {
-          counts.backlog++;
-        }
       }
 
       if (r.is_hot) {
@@ -1012,21 +1011,27 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       }
     }
 
+    // Backlog is intentionally derived from the complete active portfolio,
+    // independent of the current date range. It remains a subset of Need Action.
+    counts.backlog = baseFilteredRows.filter((r) => {
+      const rowDate = istDateKey(r.created_at);
+      return !r.is_terminal && isNeedsActionStage(r.stage) && Boolean(rowDate && rowDate < todayIst);
+    }).length;
+
     // 3. Apply bucket tab filter to obtain the table rows
     let filtered = baseFilteredRows;
     const bucket = normalized.bucket || "all";
 
     if (bucket === "needs_action") {
-      filtered = filtered.filter((r) => !r.is_terminal && ["lead_received", "payment_done", "form_submitted", "form_not_submitted"].includes(r.stage));
+      filtered = filtered.filter((r) => !r.is_terminal && isNeedsActionStage(r.stage));
     } else if (bucket === "hot_orders") {
       filtered = filtered.filter((r) => r.is_hot);
     } else if (bucket === "reminders") {
       filtered = filtered.filter((r) => r.is_callback_scheduled);
     } else if (bucket === "backlog") {
       filtered = filtered.filter((r) => {
-        const isActionStage = ["lead_received", "payment_done", "form_submitted", "form_not_submitted"].includes(r.stage);
         const rowDate = istDateKey(r.created_at);
-        return !r.is_terminal && isActionStage && rowDate && rowDate < todayIst;
+        return !r.is_terminal && isNeedsActionStage(r.stage) && rowDate && rowDate < todayIst;
       });
     } else if (bucket === "technical_delay") {
       filtered = filtered.filter((r) => !r.is_terminal && r.stage === "technical_delay");
