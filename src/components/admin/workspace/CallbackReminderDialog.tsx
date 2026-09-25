@@ -5,11 +5,12 @@ import { toast } from "sonner";
 import {
   Clock, X, Check, Flame, BellRing, MessageSquare,
   Briefcase, FileText, CheckCircle2, Calendar, Zap,
-  PhoneOff, PhoneCall, ShieldCheck, Mail
+  PhoneOff, PhoneCall, ShieldCheck, Mail, History
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatIST } from "@/lib/datetime";
 import { CustomDateTimePicker } from "./CustomDateTimePicker";
+import { CallbackHistoryDialog } from "./CallbackHistoryDialog";
 import {
   scheduleOrderCallback,
   cancelOrderCallback,
@@ -157,6 +158,9 @@ export function CallbackReminderDialog({
   }, [durationPreset, customDate, quickMinutes, recommendedHours, afternoonHours, beforeShiftEndHours, tomorrowDefaultTime]);
 
 
+  const [showHistory, setShowHistory] = useState(false);
+  const idempotencyKey = useMemo(() => `${orderId}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`, [orderId]);
+
   // When outcome changes, update default note if user hasn't heavily modified it
   const handleSelectOutcome = (outcomeId: string) => {
     setSelectedOutcome(outcomeId);
@@ -181,12 +185,19 @@ export function CallbackReminderDialog({
           customFiresAt: targetDate.toISOString(),
           note: note.trim() || null,
           channel,
+          idempotencyKey,
         },
       });
     },
-    onSuccess: () => {
-      toast.success(`Callback scheduled for ${formatIST(targetDate.toISOString())}. Order tagged as HOT.`);
+    onSuccess: (res) => {
+      const isReschedule = res?.actionType === "CALLBACK_RESCHEDULED";
+      toast.success(
+        isReschedule
+          ? `Callback rescheduled for ${formatIST(targetDate.toISOString())}.`
+          : `Callback scheduled for ${formatIST(targetDate.toISOString())}. Order tagged as HOT.`
+      );
       qc.invalidateQueries({ queryKey: ["active-order-callback", orderId] });
+      qc.invalidateQueries({ queryKey: ["order-callback-history", orderId] });
       qc.invalidateQueries({ queryKey: ["admin.orders.v2"] });
       qc.invalidateQueries({ queryKey: ["order-detail-v2", orderId] });
       qc.invalidateQueries({ queryKey: ["due-reminders-summary"] });
@@ -202,6 +213,7 @@ export function CallbackReminderDialog({
     onSuccess: () => {
       toast.success("Callback reminder cancelled");
       qc.invalidateQueries({ queryKey: ["active-order-callback", orderId] });
+      qc.invalidateQueries({ queryKey: ["order-callback-history", orderId] });
       qc.invalidateQueries({ queryKey: ["admin.orders.v2"] });
       qc.invalidateQueries({ queryKey: ["due-reminders-summary"] });
       onClose();
@@ -214,6 +226,7 @@ export function CallbackReminderDialog({
     onSuccess: () => {
       toast.success("Callback marked as completed!");
       qc.invalidateQueries({ queryKey: ["active-order-callback", orderId] });
+      qc.invalidateQueries({ queryKey: ["order-callback-history", orderId] });
       qc.invalidateQueries({ queryKey: ["admin.orders.v2"] });
       qc.invalidateQueries({ queryKey: ["due-reminders-summary"] });
       onClose();
@@ -315,6 +328,16 @@ export function CallbackReminderDialog({
               </div>
 
               <div className="flex items-center gap-2">
+                {(activeCallback.historyCount ?? 0) > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setShowHistory(true)}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-white px-2.5 py-1 text-xs font-bold text-indigo-700 hover:bg-indigo-50 transition cursor-pointer shadow-2xs"
+                  >
+                    <History className="size-3.5 text-indigo-600" />
+                    History ({activeCallback.historyCount})
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => cancelMut.mutate()}
@@ -793,6 +816,14 @@ export function CallbackReminderDialog({
           </div>
         </div>
       </div>
+
+      {showHistory && (
+        <CallbackHistoryDialog
+          orderId={orderId}
+          orderCode={orderCode}
+          onClose={() => setShowHistory(false)}
+        />
+      )}
     </div>
   );
 }

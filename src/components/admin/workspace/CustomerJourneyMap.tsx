@@ -12,7 +12,7 @@ import {
   Clock, XCircle, CheckCircle2, ClipboardCheck,
   Wrench, UserX, LifeBuoy, Send, UploadCloud, Mail,
   ArrowRight, AlertTriangle, RotateCcw, MailWarning, ShoppingBag, ShieldAlert,
-  PhoneCall, Flame, VolumeX, Loader2, Server,
+  PhoneCall, Flame, VolumeX, Loader2, Server, History,
   type LucideIcon,
 } from "lucide-react";
 
@@ -40,6 +40,7 @@ import { CustomerDelayDialog } from "@/components/admin/workspace/CustomerDelayD
 import { TechnicalDelayDialog } from "@/components/admin/workspace/TechnicalDelayDialog";
 import { CloseOrderDialog } from "@/components/admin/CloseOrderDialog";
 import { CallbackReminderDialog } from "@/components/admin/workspace/CallbackReminderDialog";
+import { CallbackHistoryDialog } from "@/components/admin/workspace/CallbackHistoryDialog";
 import { CompletionGateDialogStandalone } from "./CompletionGateDialogStandalone";
 import { CountdownChip } from "./CountdownChip";
 
@@ -244,6 +245,7 @@ export function CustomerJourneyMap(p: Props) {
     | { kind: "complete_with_cert" }
     | { kind: "consultation_completed" }
     | { kind: "callback_reminder" }
+    | { kind: "callback_history" }
   >(null);
 
   const invalidate = () => {
@@ -731,13 +733,27 @@ export function CustomerJourneyMap(p: Props) {
               )}
             </div>
 
-            <button
-              type="button"
-              onClick={() => setDialog({ kind: "callback_reminder" })}
-              className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-800 hover:bg-slate-50 transition cursor-pointer shadow-2xs ml-auto"
-            >
-              Manage Reminder
-            </button>
+            <div className="flex items-center gap-2 ml-auto">
+              {(activeCallback.historyCount ?? 0) > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setDialog({ kind: "callback_history" })}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-white px-2.5 py-1.5 text-xs font-bold text-indigo-700 hover:bg-indigo-50 hover:border-indigo-300 transition cursor-pointer shadow-2xs"
+                  title="View callback scheduling & rescheduling history"
+                >
+                  <History className="size-3.5 text-indigo-600" />
+                  VIEW ({activeCallback.historyCount})
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={() => setDialog({ kind: "callback_reminder" })}
+                className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-800 hover:bg-slate-50 transition cursor-pointer shadow-2xs"
+              >
+                Manage Reminder
+              </button>
+            </div>
           </div>
         )}
 
@@ -745,6 +761,12 @@ export function CustomerJourneyMap(p: Props) {
       </section>
 
       {/* Dialogs */}
+      {dialog?.kind === "callback_history" && (
+        <CallbackHistoryDialog
+          orderId={p.applicationId}
+          onClose={() => setDialog(null)}
+        />
+      )}
       {dialog?.kind === "callback_reminder" && (
         <CallbackReminderDialog
           orderId={p.applicationId}

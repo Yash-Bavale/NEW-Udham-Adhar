@@ -433,11 +433,49 @@ export type Bucket =
   | "closed" // Closed (Count only)
   | "exception";
 
-export function isTechnicalDelayOrder(row: any): boolean {
+export function isCustomerDelayOrder(row: any): boolean {
   if (row.is_terminal) return false;
   const fs = String(row.fulfillment_status ?? "").toLowerCase();
   const stage = String(row.stage ?? "").toLowerCase();
   const ws = String(row.workflow_status ?? "").toLowerCase();
+  const os = String(row.order_status ?? "").toUpperCase();
+  const cbChannel = String(row.callback_reminder?.remarks?.channel ?? "").toLowerCase();
+  const cbReason = String(row.callback_reminder?.remarks?.reason ?? "").toLowerCase();
+  const cbKind = String(row.callback_reminder?.remarks?.kind ?? "").toLowerCase();
+  const schedulerType = String(row.callback_reminder?.scheduler_type ?? "").toLowerCase();
+  const reasonCat = String(row.callback_reminder?.remarks?.reasonCategory ?? "").toUpperCase();
+
+  return (
+    stage === "customer_delay" ||
+    fs === "customer_delay" ||
+    fs === "customer_hold" ||
+    ws === "customer_delay" ||
+    ws === "waiting_for_customer" ||
+    ws === "waiting_for_documents" ||
+    ws === "customer_non_responsive" ||
+    ws === "external_dependency" ||
+    os === "CUSTOMER_HOLD" ||
+    cbChannel === "customer_delay" ||
+    cbReason === "customer_delay" ||
+    cbKind === "customer_delay" ||
+    cbKind === "external_dependency" ||
+    schedulerType === "customer_delay_reminder" ||
+    schedulerType === "customer_hold_reminder" ||
+    schedulerType === "customer_side_delay" ||
+    reasonCat === "A" ||
+    Boolean(row.customer_hold_started_at)
+  );
+}
+
+export function isTechnicalDelayOrder(row: any): boolean {
+  if (row.is_terminal) return false;
+  // Safeguard: Customer Delay is NEVER Technical Delay
+  if (isCustomerDelayOrder(row)) return false;
+
+  const fs = String(row.fulfillment_status ?? "").toLowerCase();
+  const stage = String(row.stage ?? "").toLowerCase();
+  const ws = String(row.workflow_status ?? "").toLowerCase();
+  const os = String(row.order_status ?? "").toUpperCase();
   const cbChannel = String(row.callback_reminder?.remarks?.channel ?? "").toLowerCase();
   const cbReason = String(row.callback_reminder?.remarks?.reason ?? "").toLowerCase();
   const cbKind = String(row.callback_reminder?.remarks?.kind ?? "").toLowerCase();
@@ -451,41 +489,14 @@ export function isTechnicalDelayOrder(row: any): boolean {
     ws === "technical_delay" ||
     ws === "technical_hold" ||
     ws === "government_portal_pending" ||
-    ws === "external_dependency" ||
+    os.includes("TECHNICAL_HOLD") ||
     cbChannel === "technical_delay" ||
     cbReason === "technical_delay" ||
     cbKind === "technical_delay" ||
-    cbKind === "external" ||
-    cbKind === "internal" ||
     schedulerType === "technical_hold_reminder" ||
+    schedulerType === "our_side_delay" ||
     reasonCat === "B" ||
-    Boolean(row.technical_hold_started_at)
-  );
-}
-
-export function isCustomerDelayOrder(row: any): boolean {
-  if (row.is_terminal) return false;
-  const fs = String(row.fulfillment_status ?? "").toLowerCase();
-  const stage = String(row.stage ?? "").toLowerCase();
-  const ws = String(row.workflow_status ?? "").toLowerCase();
-  const cbChannel = String(row.callback_reminder?.remarks?.channel ?? "").toLowerCase();
-  const cbReason = String(row.callback_reminder?.remarks?.reason ?? "").toLowerCase();
-  const cbKind = String(row.callback_reminder?.remarks?.kind ?? "").toLowerCase();
-  const schedulerType = String(row.callback_reminder?.scheduler_type ?? "").toLowerCase();
-  const reasonCat = String(row.callback_reminder?.remarks?.reasonCategory ?? "").toUpperCase();
-
-  return (
-    stage === "customer_delay" ||
-    fs === "customer_delay" ||
-    ws === "customer_delay" ||
-    ws === "waiting_for_customer" ||
-    ws === "waiting_for_documents" ||
-    ws === "customer_non_responsive" ||
-    cbChannel === "customer_delay" ||
-    cbReason === "customer_delay" ||
-    cbKind === "customer_delay" ||
-    schedulerType === "customer_delay_reminder" ||
-    reasonCat === "A"
+    (Boolean(row.technical_hold_started_at) && !Boolean(row.customer_hold_started_at))
   );
 }
 
@@ -532,11 +543,11 @@ export function bucketOfRow(
   // Call Back Scheduled: only active/future callbacks (fires_at > now)
   if (row.is_callback_scheduled) return "reminders";
 
+  // Customer Delay (evaluated before technical delay to guarantee customer delay is never placed into technical delay)
+  if (isCustomerDelayOrder(row)) return "customer_delay";
+
   // Technical Delay (full name)
   if (isTechnicalDelayOrder(row)) return "technical_delay";
-
-  // Customer Delay
-  if (isCustomerDelayOrder(row)) return "customer_delay";
 
   // Action-required untouched orders (Needs Action vs Backlog)
   const isActionStage = isNeedsActionStage(row.stage);

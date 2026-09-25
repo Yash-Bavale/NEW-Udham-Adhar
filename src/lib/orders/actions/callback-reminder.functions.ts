@@ -39,6 +39,26 @@ export interface CallbackRemarks {
   created_at?: string;
 }
 
+export interface CallbackHistoryItem {
+  id: string;
+  order_id: string;
+  actor_id: string | null;
+  actor_name: string;
+  actor_role: string | null;
+  action_type: "CALLBACK_SCHEDULED" | "CALLBACK_RESCHEDULED" | "CALLBACK_CANCELLED" | "CALLBACK_COMPLETED";
+  previous_fires_at: string | null;
+  new_fires_at: string | null;
+  reason: string;
+  reason_label: string;
+  previous_reason: string | null;
+  previous_reason_label: string | null;
+  note: string | null;
+  previous_note: string | null;
+  channel: string;
+  source: string;
+  created_at: string;
+}
+
 export const scheduleOrderCallback = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) =>
@@ -51,6 +71,8 @@ export const scheduleOrderCallback = createServerFn({ method: "POST" })
         customFiresAt: z.string().optional(),
         note: z.string().optional().nullable(),
         channel: z.enum(["call", "email"]).optional().default("call"),
+        idempotencyKey: z.string().optional(),
+        sessionId: z.string().optional(),
       })
       .parse(i),
   )
@@ -58,6 +80,28 @@ export const scheduleOrderCallback = createServerFn({ method: "POST" })
     await assertStaff(context.supabase, context.userId);
     const admin = await getAdmin();
     const staff = await getStaff(context.userId);
+
+    // 1. Duplicate & Idempotency Protection: Check if request was already processed
+    if (data.idempotencyKey) {
+      try {
+        const { data: existingHistory } = await admin
+          .from("order_callback_history" as any)
+          .select("id, new_fires_at, reason_label")
+          .eq("idempotency_key", data.idempotencyKey)
+          .maybeSingle();
+
+        if (existingHistory) {
+          return {
+            success: true,
+            schedulerId: existingHistory.id,
+            firesAt: existingHistory.new_fires_at,
+            reasonLabel: existingHistory.reason_label,
+          };
+        }
+      } catch {
+        // Continue if table is being created
+      }
+    }
 
     const now = new Date();
     let firesAtDate: Date;
@@ -84,19 +128,54 @@ export const scheduleOrderCallback = createServerFn({ method: "POST" })
       created_at: now.toISOString(),
     };
 
-    // 1. Stop any active or paused scheduler on this order first to ensure one_open_scheduler_per_order is never violated
+    // 2. Fetch current active callback scheduler state to determine if this is a SCHEDULE or RESCHEDULE
+    const { data: existingActive } = await admin
+      .from("order_schedulers")
+      .select("id, status, fires_at, remarks, created_by, created_at")
+      .eq("application_id", data.orderId)
+      .in("scheduler_type", ["our_side_reminder", "callback_reminder"])
+      .eq("status", "active")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    let isReschedule = false;
+    let previousFiresAt: string | null = null;
+    let previousReason: string | null = null;
+    let previousReasonLabel: string | null = null;
+    let previousNote: string | null = null;
+
+    if (existingActive) {
+      isReschedule = true;
+      previousFiresAt = existingActive.fires_at;
+      if (existingActive.remarks) {
+        try {
+          const parsed = typeof existingActive.remarks === "string" ? JSON.parse(existingActive.remarks) : existingActive.remarks;
+          previousReason = parsed?.reason || null;
+          previousReasonLabel = parsed?.reasonLabel || null;
+          previousNote = parsed?.note || null;
+        } catch {
+          previousReason = "custom";
+          previousReasonLabel = existingActive.remarks;
+        }
+      }
+    }
+
+    const actionType = isReschedule ? "CALLBACK_RESCHEDULED" : "CALLBACK_SCHEDULED";
+
+    // 3. Stop any active or paused scheduler on this order first to ensure one_open_scheduler_per_order is never violated
     await admin
       .from("order_schedulers")
       .update({
         status: "stopped",
         stopped_at: now.toISOString(),
-        stop_reason: "rescheduled_new_callback",
+        stop_reason: isReschedule ? "rescheduled_new_callback" : "new_callback_scheduled",
         stop_triggered_by: context.userId,
       })
       .eq("application_id", data.orderId)
       .in("status", ["active", "paused"]);
 
-    // 2. Insert new callback reminder
+    // 4. Insert new callback reminder
     const { data: created, error } = await admin
       .from("order_schedulers")
       .insert({
@@ -116,14 +195,40 @@ export const scheduleOrderCallback = createServerFn({ method: "POST" })
       throw new Error(`Failed to schedule callback: ${error.message}`);
     }
 
-    // 3. Log event in application_events, workflow_events, and activity_logs
+    // 5. Create append-only history record in order_callback_history
+    try {
+      await admin.from("order_callback_history" as any).insert({
+        order_id: data.orderId,
+        actor_id: context.userId,
+        actor_name: staff.staff_name,
+        actor_role: staff.staff_role,
+        action_type: actionType,
+        previous_fires_at: previousFiresAt,
+        new_fires_at: firesAtIso,
+        reason: data.reason,
+        reason_label: data.reasonLabel,
+        previous_reason: previousReason,
+        previous_reason_label: previousReasonLabel,
+        note: data.note?.trim() || null,
+        previous_note: previousNote,
+        channel: data.channel ?? "call",
+        source: "employee",
+        session_id: data.sessionId ?? null,
+        idempotency_key: data.idempotencyKey ?? null,
+      });
+    } catch (histErr) {
+      console.warn("[scheduleOrderCallback] order_callback_history insert warning:", histErr);
+    }
+
+    // 6. Log event in application_events, workflow_events, and activity_logs
     const istFormattedTime = firesAtDate.toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: true }) + " IST";
-    const noteText = `Callback scheduled for ${istFormattedTime} · Reason: ${data.reasonLabel}${data.note ? ` (${data.note})` : ""}`;
+    const actionLabel = isReschedule ? "Callback Rescheduled" : "Callback Scheduled";
+    const noteText = `${actionLabel} for ${istFormattedTime} · Reason: ${data.reasonLabel}${data.note ? ` (${data.note})` : ""}`;
 
     try {
       await admin.from("application_events").insert({
         application_id: data.orderId,
-        event_type: "callback_scheduled",
+        event_type: isReschedule ? "callback_rescheduled" : "callback_scheduled",
         note: noteText,
         staff_name: staff.staff_name,
         staff_role: staff.staff_role || "staff",
@@ -137,9 +242,9 @@ export const scheduleOrderCallback = createServerFn({ method: "POST" })
       await admin.from("workflow_events").insert({
         application_id: data.orderId,
         lead_id: appRow?.lead_id ?? null,
-        event_type: "callback_scheduled",
-        title: `Callback Scheduled: ${data.reasonLabel}`,
-        description: `Scheduled for ${istFormattedTime}. ${data.note ? `Note: ${data.note}` : ""}`,
+        event_type: isReschedule ? "callback_rescheduled" : "callback_scheduled",
+        title: `${actionLabel}: ${data.reasonLabel}`,
+        description: `Scheduled for ${istFormattedTime}.${previousFiresAt ? ` (Previous: ${new Date(previousFiresAt).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: true })})` : ""} ${data.note ? `Note: ${data.note}` : ""}`,
         customer_visible: false,
         actor_id: context.userId,
         actor_name: staff.staff_name,
@@ -147,6 +252,8 @@ export const scheduleOrderCallback = createServerFn({ method: "POST" })
         is_system: false,
         metadata: {
           scheduler_id: created.id,
+          action_type: actionType,
+          previous_fires_at: previousFiresAt,
           reason: data.reason,
           reasonLabel: data.reasonLabel,
           fires_at: firesAtIso,
@@ -158,8 +265,8 @@ export const scheduleOrderCallback = createServerFn({ method: "POST" })
         await admin.from("activity_logs").insert({
           lead_id: appRow.lead_id,
           user_id: context.userId,
-          activity_type: "callback_scheduled",
-          activity_description: `Callback scheduled for ${istFormattedTime}: ${data.reasonLabel}`,
+          activity_type: isReschedule ? "callback_rescheduled" : "callback_scheduled",
+          activity_description: `${actionLabel} for ${istFormattedTime}: ${data.reasonLabel}`,
         } as never);
       }
     } catch (e2) {
@@ -173,8 +280,8 @@ export const scheduleOrderCallback = createServerFn({ method: "POST" })
         employeeId: context.userId,
         employeeName: staff.staff_name,
         employeeRole: staff.staff_role,
-        actionType: "CALLBACK_SCHEDULED",
-        notes: `Callback scheduled for ${istFormattedTime} · Reason: ${data.reasonLabel}${data.note ? ` (${data.note})` : ""}`,
+        actionType: actionType,
+        notes: `${actionLabel} for ${istFormattedTime} · Reason: ${data.reasonLabel}${data.note ? ` (${data.note})` : ""}`,
         source: "employee",
         supabase: admin,
       });
@@ -187,6 +294,7 @@ export const scheduleOrderCallback = createServerFn({ method: "POST" })
       schedulerId: created.id,
       firesAt: firesAtDate.toISOString(),
       reasonLabel: data.reasonLabel,
+      actionType,
     };
   });
 
@@ -207,6 +315,17 @@ export const cancelOrderCallback = createServerFn({ method: "POST" })
     const staff = await getStaff(context.userId);
     const now = new Date().toISOString();
 
+    // Fetch existing scheduler before cancelling to record in history
+    const { data: existingActive } = await admin
+      .from("order_schedulers")
+      .select("id, fires_at, remarks")
+      .eq("application_id", data.orderId)
+      .in("scheduler_type", ["our_side_reminder", "callback_reminder"])
+      .eq("status", "active")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
     let query = admin
       .from("order_schedulers")
       .update({
@@ -225,6 +344,39 @@ export const cancelOrderCallback = createServerFn({ method: "POST" })
 
     const { error } = await query;
     if (error) throw new Error(error.message);
+
+    // Record in order_callback_history
+    try {
+      let prevReason = null;
+      let prevLabel = null;
+      if (existingActive?.remarks) {
+        try {
+          const p = typeof existingActive.remarks === "string" ? JSON.parse(existingActive.remarks) : existingActive.remarks;
+          prevReason = p.reason;
+          prevLabel = p.reasonLabel;
+        } catch {
+          prevLabel = existingActive.remarks;
+        }
+      }
+
+      await admin.from("order_callback_history" as any).insert({
+        order_id: data.orderId,
+        actor_id: context.userId,
+        actor_name: staff.staff_name,
+        actor_role: staff.staff_role,
+        action_type: "CALLBACK_CANCELLED",
+        previous_fires_at: existingActive?.fires_at || null,
+        new_fires_at: null,
+        reason: data.reason || "cancelled_by_staff",
+        reason_label: data.reason || "Cancelled by staff",
+        previous_reason: prevReason,
+        previous_reason_label: prevLabel,
+        channel: "call",
+        source: "employee",
+      });
+    } catch (hErr) {
+      console.warn("[cancelOrderCallback] history log warning:", hErr);
+    }
 
     try {
       await admin.from("application_events").insert({
@@ -258,6 +410,17 @@ export const completeOrderCallback = createServerFn({ method: "POST" })
     const staff = await getStaff(context.userId);
     const now = new Date().toISOString();
 
+    // Fetch existing scheduler before completing to record in history
+    const { data: existingActive } = await admin
+      .from("order_schedulers")
+      .select("id, fires_at, remarks")
+      .eq("application_id", data.orderId)
+      .in("scheduler_type", ["our_side_reminder", "callback_reminder"])
+      .eq("status", "active")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
     let query = admin
       .from("order_schedulers")
       .update({
@@ -276,6 +439,39 @@ export const completeOrderCallback = createServerFn({ method: "POST" })
 
     const { error } = await query;
     if (error) throw new Error(error.message);
+
+    // Record in order_callback_history
+    try {
+      let prevReason = null;
+      let prevLabel = null;
+      if (existingActive?.remarks) {
+        try {
+          const p = typeof existingActive.remarks === "string" ? JSON.parse(existingActive.remarks) : existingActive.remarks;
+          prevReason = p.reason;
+          prevLabel = p.reasonLabel;
+        } catch {
+          prevLabel = existingActive.remarks;
+        }
+      }
+
+      await admin.from("order_callback_history" as any).insert({
+        order_id: data.orderId,
+        actor_id: context.userId,
+        actor_name: staff.staff_name,
+        actor_role: staff.staff_role,
+        action_type: "CALLBACK_COMPLETED",
+        previous_fires_at: existingActive?.fires_at || null,
+        new_fires_at: null,
+        reason: data.callOutcomeNote || "completed_by_staff",
+        reason_label: data.callOutcomeNote ? `Completed: ${data.callOutcomeNote}` : "Callback Completed",
+        previous_reason: prevReason,
+        previous_reason_label: prevLabel,
+        channel: "call",
+        source: "employee",
+      });
+    } catch (hErr) {
+      console.warn("[completeOrderCallback] history log warning:", hErr);
+    }
 
     try {
       await admin.from("application_events").insert({
@@ -315,7 +511,7 @@ export const getActiveOrderCallback = createServerFn({ method: "POST" })
     await assertStaff(context.supabase);
     const admin = await getAdmin();
 
-    const [{ data: row, error }, { data: app }] = await Promise.all([
+    const [{ data: row, error }, { data: app }, historyCountRes] = await Promise.all([
       admin
         .from("order_schedulers")
         .select("id, application_id, status, fires_at, remarks, created_at, created_by")
@@ -330,6 +526,12 @@ export const getActiveOrderCallback = createServerFn({ method: "POST" })
         .select("fulfillment_status, application_status, order_status, workflow_status")
         .eq("id", data.orderId)
         .maybeSingle(),
+      admin
+        .from("order_callback_history" as any)
+        .select("id", { count: "exact", head: true })
+        .eq("order_id", data.orderId)
+        .then((res: any) => ({ count: res.count ?? 0 }))
+        .catch(() => ({ count: 0 })),
     ]);
 
     if (error) {
@@ -379,7 +581,66 @@ export const getActiveOrderCallback = createServerFn({ method: "POST" })
       ...row,
       parsedRemarks,
       isDue,
+      historyCount: historyCountRes?.count ?? 0,
     };
+  });
+
+export const getOrderCallbackHistory = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({ orderId: z.string().uuid() }).parse(i))
+  .handler(async ({ data, context }) => {
+    await assertStaff(context.supabase);
+    const admin = await getAdmin();
+
+    try {
+      const { data: rows, error } = await admin
+        .from("order_callback_history" as any)
+        .select("id, order_id, actor_id, actor_name, actor_role, action_type, previous_fires_at, new_fires_at, reason, reason_label, previous_reason, previous_reason_label, note, previous_note, channel, source, created_at")
+        .eq("order_id", data.orderId)
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        console.error("[getOrderCallbackHistory] query error:", error);
+        return [];
+      }
+
+      if (!rows || rows.length === 0) return [];
+
+      // Join current profile display names for actors
+      const actorIds = Array.from(new Set(rows.map((r: any) => r.actor_id).filter(Boolean))) as string[];
+      let profMap = new Map<string, string>();
+      if (actorIds.length > 0) {
+        const { data: profs } = await admin.from("profiles").select("id, display_name, email").in("id", actorIds);
+        profMap = new Map((profs ?? []).map((p: any) => [p.id, (p.display_name as string) || (p.email as string)]));
+      }
+
+      return rows.map((r: any): CallbackHistoryItem => ({
+        ...r,
+        actor_name: (r.actor_id && profMap.get(r.actor_id)) || r.actor_name || "Staff",
+      }));
+    } catch (e) {
+      console.warn("[getOrderCallbackHistory] warning:", e);
+      return [];
+    }
+  });
+
+export const getOrderCallbackHistoryCount = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({ orderId: z.string().uuid() }).parse(i))
+  .handler(async ({ data, context }) => {
+    await assertStaff(context.supabase);
+    const admin = await getAdmin();
+
+    try {
+      const { count } = await admin
+        .from("order_callback_history" as any)
+        .select("id", { count: "exact", head: true })
+        .eq("order_id", data.orderId);
+
+      return { count: count ?? 0 };
+    } catch {
+      return { count: 0 };
+    }
   });
 
 export const getDueRemindersSummary = createServerFn({ method: "POST" })
@@ -474,7 +735,7 @@ export const getDueRemindersSummary = createServerFn({ method: "POST" })
         try {
           parsedRemarks = typeof s.remarks === "string" ? JSON.parse(s.remarks) : s.remarks;
         } catch {
-          parsedRemarks = { reason: "custom", reasonLabel: s.remarks };
+          parsedRemarks = { reason: "custom", reasonLabel: row_remarks_fallback(s.remarks) };
         }
       }
 
@@ -505,3 +766,8 @@ export const getDueRemindersSummary = createServerFn({ method: "POST" })
 
     return { dueReminders, upcomingReminders };
   });
+
+function row_remarks_fallback(r: any): string {
+  if (!r) return "Follow-up";
+  return typeof r === "string" ? r : "Follow-up";
+}
