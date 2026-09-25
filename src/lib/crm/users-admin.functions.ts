@@ -769,16 +769,23 @@ export const getMyStaffRoles = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const { userId } = context;
     const admin = await getAdmin();
-    const { data, error } = await admin.from("user_roles").select("role").eq("user_id", userId);
+    const [{ data, error }, { data: prof }] = await Promise.all([
+      admin.from("user_roles").select("role").eq("user_id", userId),
+      (admin as any)
+        .from("profiles")
+        .select("display_name, full_name, role")
+        .eq("id", userId)
+        .maybeSingle(),
+    ]);
     if (error) throw new Error(error.message);
-    const { data: prof } = await admin
-      .from("profiles")
-      .select("display_name, full_name")
-      .eq("id", userId)
-      .maybeSingle();
+
+    const rolesSet = new Set<string>((data ?? []).map((r: any) => r.role as string));
+    if (prof?.role) {
+      rolesSet.add(prof.role);
+    }
     return {
       userId,
-      roles: (data ?? []).map((r) => r.role as string),
+      roles: Array.from(rolesSet),
       displayName: (prof?.display_name || prof?.full_name || null) as string | null,
     };
   });

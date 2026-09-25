@@ -150,6 +150,14 @@ function Shell({ children, email }: { children: ReactNode; email?: string }) {
     .map((g) => ({
       ...g,
       items: g.items.filter((it) => {
+        const isSuperAdmin = role.has("super_admin") || (role.roles.length === 0 && Boolean(userPerms.perms?.isAdmin));
+        const isAdminUser = isSuperAdmin || role.has("admin") || Boolean(userPerms.perms?.isAdmin);
+
+        if (isAdminUser) {
+          if (it.requireRole === "super_admin" && !isSuperAdmin) return false;
+          return true;
+        }
+
         if (it.module) {
           const hasPerm = userPerms.can(it.module, "view");
           if (userPerms.perms && !hasPerm) return false;
