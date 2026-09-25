@@ -6,6 +6,8 @@ import {
   searchDisputeOrder,
   generateDisputeEvidencePackage,
   getDisputeEvidenceSignedUrl,
+  deleteDisputeEvidenceRecord,
+  deleteAllDisputeEvidenceRecords,
   type DisputeOrderSummary,
 } from "@/lib/disputes/dispute-manager.functions";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -45,6 +47,7 @@ import {
   FileText,
   ShieldCheck,
   AlertTriangle,
+  Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -89,6 +92,8 @@ function DisputeManagerPage() {
   const searchFn = useServerFn(searchDisputeOrder);
   const generateFn = useServerFn(generateDisputeEvidencePackage);
   const getUrlFn = useServerFn(getDisputeEvidenceSignedUrl);
+  const deleteRecordFn = useServerFn(deleteDisputeEvidenceRecord);
+  const deleteAllRecordsFn = useServerFn(deleteAllDisputeEvidenceRecords);
 
   const [orderQuery, setOrderQuery] = useState("");
   const [currentOrder, setCurrentOrder] = useState<DisputeOrderSummary | null>(null);
@@ -110,6 +115,43 @@ function DisputeManagerPage() {
     itemCount: number;
   } | null>(null);
   const [pdfSuccessModalOpen, setPdfSuccessModalOpen] = useState(false);
+
+  // Delete Mutations
+  const mutDeleteOne = useMutation({
+    mutationFn: async (recordId: string) => {
+      return await deleteRecordFn({ data: { recordId } });
+    },
+    onSuccess: () => {
+      toast.success("Dispute package removed");
+      if (currentOrder) {
+        searchFn({ data: { orderQuery: currentOrder.applicationCode } }).then((fresh) => {
+          if (fresh) setCurrentOrder(fresh);
+        });
+      }
+    },
+    onError: (err: any) => {
+      toast.error(err?.message ?? "Failed to delete package");
+    },
+  });
+
+  const mutDeleteAll = useMutation({
+    mutationFn: async () => {
+      return await deleteAllRecordsFn({
+        data: { orderId: currentOrder?.applicationId },
+      });
+    },
+    onSuccess: (res) => {
+      toast.success(`Removed ${res.deletedCount ?? 0} past dispute package(s)`);
+      if (currentOrder) {
+        searchFn({ data: { orderQuery: currentOrder.applicationCode } }).then((fresh) => {
+          if (fresh) setCurrentOrder(fresh);
+        });
+      }
+    },
+    onError: (err: any) => {
+      toast.error(err?.message ?? "Failed to remove old dispute packages");
+    },
+  });
 
   // Search Action
   const handleSearch = async (e?: React.FormEvent) => {
@@ -703,14 +745,33 @@ function DisputeManagerPage() {
 
           {/* 5. Dispute Evidence Record History */}
           <Card className="border-slate-200 shadow-xs bg-white">
-            <CardHeader className="pb-3 border-b border-slate-100">
-              <CardTitle className="text-base font-bold text-slate-900 flex items-center gap-2">
-                <History className="size-4 text-slate-600" />
-                Dispute Evidence History
-              </CardTitle>
-              <CardDescription className="text-xs">
-                Permanent audit log of all generated dispute evidence packages for this order (records are never overwritten)
-              </CardDescription>
+            <CardHeader className="pb-3 border-b border-slate-100 flex flex-row items-center justify-between gap-4">
+              <div>
+                <CardTitle className="text-base font-bold text-slate-900 flex items-center gap-2">
+                  <History className="size-4 text-slate-600" />
+                  Dispute Evidence History
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Audit log of all generated dispute evidence packages for this order
+                </CardDescription>
+              </div>
+              {currentOrder.evidenceHistory.length > 0 && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    if (window.confirm("Are you sure you want to remove all previous dispute PDF packages for this order from Supabase?")) {
+                      mutDeleteAll.mutate();
+                    }
+                  }}
+                  disabled={mutDeleteAll.isPending}
+                  className="h-8 text-xs font-medium text-rose-600 border-rose-200 hover:bg-rose-50 cursor-pointer gap-1.5"
+                >
+                  {mutDeleteAll.isPending ? <Loader2 className="size-3.5 animate-spin" /> : <Trash2 className="size-3.5" />}
+                  Clear All Past PDFs
+                </Button>
+              )}
             </CardHeader>
             <CardContent className="p-0">
               {currentOrder.evidenceHistory.length === 0 ? (
@@ -748,6 +809,21 @@ function DisputeManagerPage() {
                         >
                           <Eye className="size-3.5" />
                           View / Download
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            if (window.confirm("Are you sure you want to delete this dispute PDF package?")) {
+                              mutDeleteOne.mutate(pkg.id);
+                            }
+                          }}
+                          disabled={mutDeleteOne.isPending}
+                          className="h-8 text-xs font-medium text-rose-600 border-slate-200 hover:bg-rose-50 hover:border-rose-200 cursor-pointer px-2.5"
+                          title="Delete this PDF package"
+                        >
+                          <Trash2 className="size-3.5" />
                         </Button>
                       </div>
                     </div>

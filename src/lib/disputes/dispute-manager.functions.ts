@@ -736,3 +736,64 @@ export const getDisputeEvidenceSignedUrl = createServerFn({ method: "POST" })
       fileName: row.file_name,
     };
   });
+
+/**
+ * 4. Delete single dispute evidence package record and storage file
+ */
+export const deleteDisputeEvidenceRecord = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({ recordId: z.string().uuid() }).parse(i))
+  .handler(async ({ data, context }) => {
+    await assertRole(context.supabase, AUTHORIZED_ROLES as any);
+    const admin = await getAdmin();
+
+    const { data: row } = await (admin
+      .from("dispute_evidence_records" as any) as any)
+      .select("file_path")
+      .eq("id", data.recordId)
+      .maybeSingle();
+
+    if (row?.file_path) {
+      await admin.storage.from("documents").remove([row.file_path]);
+    }
+
+    await (admin.from("dispute_evidence_records" as any) as any)
+      .delete()
+      .eq("id", data.recordId);
+
+    return { success: true };
+  });
+
+/**
+ * 5. Delete all old dispute evidence packages from Supabase
+ */
+export const deleteAllDisputeEvidenceRecords = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({ orderId: z.string().uuid().optional() }).parse(i))
+  .handler(async ({ data, context }) => {
+    await assertRole(context.supabase, AUTHORIZED_ROLES as any);
+    const admin = await getAdmin();
+
+    let query = admin.from("dispute_evidence_records" as any).select("id, file_path");
+    if (data.orderId) {
+      query = query.eq("order_id", data.orderId);
+    }
+
+    const { data: rows } = await query;
+    const paths = (rows ?? []).map((r: any) => r.file_path).filter(Boolean);
+
+    if (paths.length > 0) {
+      await admin.storage.from("documents").remove(paths);
+    }
+
+    let delQuery = admin.from("dispute_evidence_records" as any).delete();
+    if (data.orderId) {
+      delQuery = delQuery.eq("order_id", data.orderId);
+    } else {
+      delQuery = delQuery.neq("id", "00000000-0000-0000-0000-000000000000");
+    }
+
+    await delQuery;
+
+    return { success: true, deletedCount: (rows ?? []).length };
+  });
