@@ -584,62 +584,6 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
 
     const normalized = normalizeOrdersFilter(data);
 
-    // Primary fast path: Execute single database-side aggregation & pagination RPC
-    try {
-      const { data: rpcRes, error: rpcErr } = await (admin as any).rpc("get_orders_v3_paged", {
-        p_page: data.page,
-        p_page_size: data.pageSize,
-        p_search: normalized.search,
-        p_date_from: normalized.fromIso,
-        p_date_to: normalized.toIso,
-        p_bucket: normalized.bucket,
-        p_stage: normalized.stage,
-        p_fulfillment_status: normalized.fulfillmentStatus,
-        p_action_status: normalized.actionStatus,
-        p_service_id: normalized.serviceId,
-        p_assigned_to: normalized.assignedTo,
-        p_payment_status: normalized.paymentStatus,
-        p_pending_age: normalized.pendingAge,
-        p_custom_days: normalized.customDays,
-        p_sort_field: normalized.sortField,
-        p_sort_order: normalized.sortOrder,
-        p_user_id: context.userId || null,
-        p_is_admin: isAdmin,
-      });
-
-      if (!rpcErr && rpcRes && typeof rpcRes === "object" && Array.isArray((rpcRes as any).rows)) {
-        const parsed = rpcRes as any;
-        return {
-          rows: parsed.rows ?? [],
-          total: parsed.total ?? 0,
-          counts: parsed.counts ?? {
-            all: 0,
-            needs_action: 0,
-            pending: 0,
-            completed: 0,
-            closed: 0,
-            exception: 0,
-            actionRequired: 0,
-            processed: 0,
-            reminders: 0,
-            hot_orders: 0,
-            technical_delay: 0,
-            customer_delay: 0,
-            totalAll: 0,
-          },
-          ageBuckets: parsed.ageBuckets ?? { d1: 0, d2: 0, d3: 0, d7: 0, older: 0 },
-          page: parsed.page ?? data.page,
-          pageSize: parsed.pageSize ?? data.pageSize,
-        };
-      }
-      if (rpcErr) {
-        console.warn("[listOrdersV2] get_orders_v3_paged RPC fallback triggered:", rpcErr.message);
-      }
-    } catch (e: any) {
-      console.warn("[listOrdersV2] RPC invocation error, using fallback:", e?.message);
-    }
-
-    // Robust fallback path if RPC is unavailable during migration
     let matchingLeadIds: string[] | null = null;
     if (data.search && data.search.trim()) {
       const s = `%${data.search.trim()}%`;
@@ -683,8 +627,8 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       return query;
     }
 
-    // Fetch in-range applications by creation date, event timestamps, and live active portfolio applications
-    const [inRangeCreatedRes, inRangeUpdatedRes, activePortfolioRes] = await Promise.all([
+    // Fetch in-range applications by creation date, update date, fulfilled date, certificate date, completion events, and active portfolio
+    const [inRangeCreatedRes, inRangeUpdatedRes, inRangeFulfilledRes, inRangeCertRes, inRangeEventsRes, activePortfolioRes] = await Promise.all([
       (() => {
         let q = buildBaseQuery();
         if (normalized.fromIso) q = q.gte("created_at", normalized.fromIso);
@@ -696,6 +640,27 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         if (normalized.fromIso) q = q.gte("updated_at", normalized.fromIso);
         if (normalized.toIso) q = q.lte("updated_at", normalized.toIso);
         return q.order("updated_at", { ascending: false }).limit(5000);
+      })(),
+      (() => {
+        let q = buildBaseQuery();
+        if (normalized.fromIso) q = q.gte("fulfilled_at", normalized.fromIso);
+        if (normalized.toIso) q = q.lte("fulfilled_at", normalized.toIso);
+        return q.order("fulfilled_at", { ascending: false }).limit(5000);
+      })(),
+      (() => {
+        let q = buildBaseQuery();
+        if (normalized.fromIso) q = q.gte("certificate_uploaded_at", normalized.fromIso);
+        if (normalized.toIso) q = q.lte("certificate_uploaded_at", normalized.toIso);
+        return q.order("certificate_uploaded_at", { ascending: false }).limit(5000);
+      })(),
+      (() => {
+        let q = admin
+          .from("application_events")
+          .select("application_id, event_type, old_value, new_value, created_at")
+          .or("new_value.ilike.%complete%,new_value.ilike.%close%,new_value.ilike.%cancel%,event_type.ilike.%complete%,event_type.ilike.%close%,event_type.ilike.%cancel%,event_type.eq.certificate_uploaded,event_type.eq.certificate_issued");
+        if (normalized.fromIso) q = q.gte("created_at", normalized.fromIso);
+        if (normalized.toIso) q = q.lte("created_at", normalized.toIso);
+        return q.order("created_at", { ascending: false }).limit(5000);
       })(),
       buildBaseQuery()
         .or("closure_stage.is.null,closure_stage.eq.none")
@@ -710,6 +675,24 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
     (activePortfolioRes.data ?? []).forEach((a: any) => mergedAppMap.set(a.id, a));
     (inRangeCreatedRes.data ?? []).forEach((a: any) => mergedAppMap.set(a.id, a));
     (inRangeUpdatedRes.data ?? []).forEach((a: any) => mergedAppMap.set(a.id, a));
+    (inRangeFulfilledRes.data ?? []).forEach((a: any) => mergedAppMap.set(a.id, a));
+    (inRangeCertRes.data ?? []).forEach((a: any) => mergedAppMap.set(a.id, a));
+
+    // For any application_id returned from in-range events not yet in mergedAppMap, fetch those applications
+    const inRangeEventAppIds = Array.from(
+      new Set(
+        (inRangeEventsRes.data ?? [])
+          .map((e: any) => e.application_id)
+          .filter((id: string) => id && !mergedAppMap.has(id))
+      )
+    );
+
+    if (inRangeEventAppIds.length > 0) {
+      const extraApps = await fetchInChunks<any>(inRangeEventAppIds, 100, (chunk) =>
+        buildBaseQuery().in("id", chunk)
+      );
+      (extraApps ?? []).forEach((a: any) => mergedAppMap.set(a.id, a));
+    }
 
     const appList = Array.from(mergedAppMap.values());
 
@@ -744,10 +727,12 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
     const globalActiveSchedulers = globalActiveSchedulersRes.data;
     const eventCompletedMap = new Map<string, string>();
     const eventClosedMap = new Map<string, string>();
-    for (const ev of (eventsRes.data ?? [])) {
+
+    const allEvents = [...(inRangeEventsRes.data ?? []), ...(eventsRes.data ?? [])];
+    for (const ev of allEvents) {
       const et = String(ev.event_type || "").toLowerCase();
       const nv = String(ev.new_value || "").toLowerCase();
-      const isComp = nv.includes("complete") || et.includes("complete") || et === "certificate_uploaded";
+      const isComp = nv.includes("complete") || et.includes("complete") || et === "certificate_uploaded" || et === "certificate_issued";
       const isClose = nv.includes("close") || nv.includes("cancel") || et.includes("close") || et.includes("cancel");
       if (isComp && ev.application_id && ev.created_at && !eventCompletedMap.has(ev.application_id)) {
         eventCompletedMap.set(ev.application_id, ev.created_at);
@@ -904,17 +889,46 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         (!normalized.fromIso || createdTime >= new Date(normalized.fromIso).getTime()) &&
         (!normalized.toIso || createdTime <= new Date(normalized.toIso).getTime());
 
-      const completionRaw = eventCompletedMap.get(a.id) || a.fulfilled_at || a.certificate_uploaded_at || a.updated_at || a.created_at;
-      const completionTime = completionRaw ? new Date(completionRaw).getTime() : createdTime;
-      const inRangeCompleted =
-        (!normalized.fromIso || completionTime >= new Date(normalized.fromIso).getTime()) &&
-        (!normalized.toIso || completionTime <= new Date(normalized.toIso).getTime());
+      const fsLower = String(a.fulfillment_status ?? "").toLowerCase();
+      const appStatusLower = String(a.application_status ?? "").toLowerCase();
+      const isCompletedStage =
+        stage === "completed" ||
+        COMPLETED_FS.has(fsLower) ||
+        COMPLETED_FS.has(appStatusLower) ||
+        COMPLETED_FS.has(String((a as any).order_status ?? "").toLowerCase()) ||
+        COMPLETED_FS.has(String((a as any).workflow_status ?? "").toLowerCase());
 
-      const closureRaw = eventClosedMap.get(a.id) || a.updated_at || a.created_at;
-      const closureTime = closureRaw ? new Date(closureRaw).getTime() : createdTime;
-      const inRangeClosed =
-        (!normalized.fromIso || closureTime >= new Date(normalized.fromIso).getTime()) &&
-        (!normalized.toIso || closureTime <= new Date(normalized.toIso).getTime());
+      const isClosedStage =
+        stage === "closed" ||
+        CLOSED_FS.has(fsLower) ||
+        CLOSED_FS.has(appStatusLower) ||
+        CLOSED_FS.has(String((a as any).order_status ?? "").toLowerCase()) ||
+        CLOSED_FS.has(String((a as any).workflow_status ?? "").toLowerCase());
+
+      const eventCompTime = eventCompletedMap.has(a.id) ? new Date(eventCompletedMap.get(a.id)!).getTime() : null;
+      const fulfilledTime = a.fulfilled_at ? new Date(a.fulfilled_at).getTime() : null;
+      const certTime = a.certificate_uploaded_at ? new Date(a.certificate_uploaded_at).getTime() : null;
+      const updatedTime = a.updated_at ? new Date(a.updated_at).getTime() : null;
+
+      const fromTime = normalized.fromIso ? new Date(normalized.fromIso).getTime() : -Infinity;
+      const toTime = normalized.toIso ? new Date(normalized.toIso).getTime() : Infinity;
+
+      const hasCompletionInRange =
+        (eventCompTime !== null && eventCompTime >= fromTime && eventCompTime <= toTime) ||
+        (fulfilledTime !== null && fulfilledTime >= fromTime && fulfilledTime <= toTime) ||
+        (certTime !== null && certTime >= fromTime && certTime <= toTime) ||
+        (isCompletedStage && updatedTime !== null && updatedTime >= fromTime && updatedTime <= toTime) ||
+        (isCompletedStage && inRangeCreated);
+
+      const inRangeCompleted = Boolean(isCompletedStage && hasCompletionInRange);
+
+      const eventCloseTime = eventClosedMap.has(a.id) ? new Date(eventClosedMap.get(a.id)!).getTime() : null;
+      const hasClosureInRange =
+        (eventCloseTime !== null && eventCloseTime >= fromTime && eventCloseTime <= toTime) ||
+        (isClosedStage && updatedTime !== null && updatedTime >= fromTime && updatedTime <= toTime) ||
+        (isClosedStage && inRangeCreated);
+
+      const inRangeClosed = Boolean(isClosedStage && hasClosureInRange);
 
       return {
         id: a.id,
@@ -971,8 +985,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
             r.stage === "customer_delay" ||
             r.fulfillment_status === "customer_delay" ||
             r.is_callback_scheduled ||
-            r.stage === "completed" ||
-            COMPLETED_FS.has(String(r.fulfillment_status).toLowerCase())
+            r.in_range_completed
           );
         });
       } else if (normalized.actionStatus === "hot_orders") {
@@ -1035,16 +1048,16 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         r.stage === "customer_delay" ||
         r.fulfillment_status === "customer_delay" ||
         r.is_callback_scheduled ||
-        (r.in_range_completed && (r.stage === "completed" || COMPLETED_FS.has(String(r.fulfillment_status).toLowerCase())));
+        r.in_range_completed;
 
       if (isActionTaken) {
         counts.pending++;
       }
 
-      if (b === "completed" && r.in_range_completed) {
+      if (r.in_range_completed) {
         counts.completed++;
         counts.processed++;
-      } else if (b === "closed" && r.in_range_closed) {
+      } else if (r.in_range_closed) {
         counts.closed++;
         counts.processed++;
       }
@@ -1113,13 +1126,13 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
           r.stage === "customer_delay" ||
           r.fulfillment_status === "customer_delay" ||
           r.is_callback_scheduled ||
-          (r.in_range_completed && (r.stage === "completed" || COMPLETED_FS.has(String(r.fulfillment_status).toLowerCase())))
+          r.in_range_completed
         );
       });
     } else if (bucket === "completed") {
-      filtered = filtered.filter((r) => r.in_range_completed && bucketOfRow(r, todayIst) === "completed");
+      filtered = filtered.filter((r) => r.in_range_completed);
     } else if (bucket === "closed") {
-      filtered = filtered.filter((r) => r.in_range_closed && bucketOfRow(r, todayIst) === "closed");
+      filtered = filtered.filter((r) => r.in_range_closed);
     } else if (bucket === "exception") {
       filtered = filtered.filter((r) => r.in_range_created && bucketOfRow(r, todayIst) === "exception");
     } else {
