@@ -350,6 +350,37 @@ async function ensurePaidOrdersIntegrated(admin: any) {
         }
       }
     }
+
+    // 5. Check if any active (non-terminal) orders are assigned to archived or inactive staff, and reassign them
+    try {
+      const { data: inactiveProfiles } = await admin
+        .from("profiles")
+        .select("id")
+        .or("is_active.eq.false,employment_status.eq.ARCHIVED,employment_status.eq.TERMINATED");
+      if (inactiveProfiles && inactiveProfiles.length > 0) {
+        const inactiveIds = inactiveProfiles.map((p: any) => p.id);
+        const { data: orphanedApps } = await admin
+          .from("applications")
+          .select("id, assigned_to")
+          .in("assigned_to", inactiveIds)
+          .eq("is_deleted", false)
+          .not("fulfillment_status", "in", '("completed","order_completed","order_closed","closed","rejected","cancelled","application_rejected","certificate_rejected")')
+          .limit(50);
+        if (orphanedApps && orphanedApps.length > 0) {
+          const { reassignOrdersFromUnavailableEmployee } = await import("@/lib/crm/assignment-engine.server");
+          const uniqueInactiveAssigned = Array.from(new Set(orphanedApps.map((a: any) => a.assigned_to).filter(Boolean)));
+          for (const unavailId of uniqueInactiveAssigned) {
+            await reassignOrdersFromUnavailableEmployee({
+              unavailableEmployeeId: String(unavailId),
+              reason: "Auto-reassigned from archived/inactive staff",
+              changeType: "AUTO_TERMINATED",
+            });
+          }
+        }
+      }
+    } catch (err) {
+      console.warn("[ensurePaidOrdersIntegrated] Inactive staff orders self-heal warning:", err);
+    }
   } catch (err) {
     console.error("[ensurePaidOrdersIntegrated] error:", err);
   }

@@ -520,8 +520,12 @@ export const archiveEmployee = createServerFn({ method: "POST" })
 
     const nowIso = new Date().toISOString();
 
-    // 1. Mark profile is_active false
-    await admin.from("profiles").update({ is_active: false }).eq("id", data.user_id);
+    // 1. Mark profile is_active false and employment_status ARCHIVED
+    await (admin.from("profiles") as any).update({
+      is_active: false,
+      employment_status: "ARCHIVED",
+      archived_at: nowIso,
+    }).eq("id", data.user_id);
 
     // 2. Disable assignment pool membership
     await admin.from("assignment_pool").update({ is_active: false }).eq("user_id", data.user_id);
@@ -569,8 +573,13 @@ export const deleteEmployee = createServerFn({ method: "POST" })
     const totalRefs = (appCount.count ?? 0) + (leadCount.count ?? 0) + (historyCount.count ?? 0);
 
     if (totalRefs > 0) {
+      const nowIso = new Date().toISOString();
       // User has historical records. Do NOT destructively delete! Safely archive instead.
-      await admin.from("profiles").update({ is_active: false }).eq("id", data.user_id);
+      await (admin.from("profiles") as any).update({
+        is_active: false,
+        employment_status: "ARCHIVED",
+        archived_at: nowIso,
+      }).eq("id", data.user_id);
       await admin.from("assignment_pool").update({ is_active: false }).eq("user_id", data.user_id);
       await admin.auth.admin.updateUserById(data.user_id, { ban_duration: "876000h" } as never);
 

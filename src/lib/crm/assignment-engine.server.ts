@@ -818,6 +818,13 @@ export async function reassignOrdersFromUnavailableEmployee(params: {
     actorId,
   } = params;
 
+  const isPermanentDeparture =
+    changeType === "AUTO_TERMINATED" ||
+    changeType === "AUTO_DISABLED" ||
+    reason.toLowerCase().includes("archived") ||
+    reason.toLowerCase().includes("departure") ||
+    reason.toLowerCase().includes("terminat");
+
   // 1. Fetch all non-deleted orders currently assigned to the unavailable employee
   const { data: apps, error: fetchErr } = await (supabaseAdmin as any)
     .from("applications")
@@ -849,7 +856,10 @@ export async function reassignOrdersFromUnavailableEmployee(params: {
 
   const nowMs = Date.now();
 
-  // 2. Filter ONLY action-required orders. Exclude terminal stages and pure customer waiting states.
+  // 2. Filter orders to reassign.
+  // Exclude terminal stages (completed, rejected, cancelled).
+  // For temporary unavailability (leaves/away), skip customer waiting states.
+  // For permanent departures / archiving, DO NOT skip any active orders so none are left orphaned!
   const actionOrders: Array<{ id: string; code: string; priorityScore: number }> = [];
 
   for (const a of apps) {
@@ -862,9 +872,11 @@ export async function reassignOrdersFromUnavailableEmployee(params: {
     const stage = computeOrderStage(null, a);
     if (TERMINAL_STAGES.has(stage)) continue;
 
-    // Exclude Customer Delay when purely waiting on customer submission
-    if (stage === "customer_delay" || fs === "customer_delay" || fs === "waiting_for_customer_submission") {
-      continue;
+    // Only skip customer waiting states if NOT a permanent departure
+    if (!isPermanentDeparture) {
+      if (stage === "customer_delay" || fs === "customer_delay" || fs === "waiting_for_customer_submission") {
+        continue;
+      }
     }
 
     const cb = schedulerMap.get(a.id);
@@ -897,9 +909,21 @@ export async function reassignOrdersFromUnavailableEmployee(params: {
   actionOrders.sort((a, b) => b.priorityScore - a.priorityScore);
 
   // 3. Redistribute to eligible active employees (excluding the unavailable employee)
-  const candidates = (await getEligibleAssignmentEmployees()).filter(
+  let candidates = (await getEligibleAssignmentEmployees()).filter(
     (c) => c.employeeId !== unavailableEmployeeId,
   );
+
+  // Fallback: If no currently online/pool staff found (e.g. outside shift hours or offline presence),
+  // fallback to all active workforce members so orders are never orphaned!
+  if (candidates.length === 0) {
+    const allWorkloads = await calculateStaffWorkloads();
+    candidates = allWorkloads.filter(
+      (c) =>
+        c.employeeId !== unavailableEmployeeId &&
+        c.employmentStatus === "ACTIVE" &&
+        c.role !== "support",
+    );
+  }
 
   if (candidates.length === 0) {
     return {
@@ -923,13 +947,13 @@ export async function reassignOrdersFromUnavailableEmployee(params: {
   const distributionMap: Record<string, number> = {};
 
   for (const ord of actionOrders) {
-    const availableNow = dynamicWorkloads.filter(
+    let availableNow = dynamicWorkloads.filter(
       (c) => c.simulatedActiveCount < c.maxWorkload,
     );
 
+    // If all candidates reached maxWorkload, distribute across least loaded anyway to avoid leaving orphaned orders
     if (availableNow.length === 0) {
-      skippedCount += 1;
-      continue;
+      availableNow = [...dynamicWorkloads];
     }
 
     availableNow.sort((a, b) => a.simulatedWorkload - b.simulatedWorkload);
@@ -997,7 +1021,25 @@ export async function reassignProlongedUnavailableStaff(): Promise<{
   let totalOrdersReassigned = 0;
 
   for (const w of workloads) {
-    if (w.employmentStatus !== "ACTIVE") continue;
+    if (w.employmentStatus !== "ACTIVE") {
+      if (w.activeActionOrders > 0) {
+        const res = await reassignOrdersFromUnavailableEmployee({
+          unavailableEmployeeId: w.employeeId,
+          reason: `Auto-reassigned from inactive/archived staff (${w.employmentStatus})`,
+          changeType: "AUTO_TERMINATED",
+        });
+        if (res.reassignedCount > 0) {
+          totalOrdersReassigned += res.reassignedCount;
+          results.push({
+            employeeId: w.employeeId,
+            employeeName: w.name,
+            reason: `INACTIVE_STAFF_${w.employmentStatus}`,
+            reassignedCount: res.reassignedCount,
+          });
+        }
+      }
+      continue;
+    }
 
     // Check if within working schedule
     const { data: prof } = await (supabaseAdmin as any)

@@ -339,6 +339,9 @@ export function WorkspaceShell(p: Props) {
   const assignedName =
     p.staff.find((s: any) => s.id === application.assigned_to)?.display_name
     ?? p.staff.find((s: any) => s.id === application.assigned_to)?.email
+    ?? (p.data as any)?.assignedStaff?.display_name
+    ?? (p.data as any)?.assignedStaff?.full_name
+    ?? (p.data as any)?.assignedStaff?.email
     ?? "Unassigned";
 
   const copy = (v: string) => { navigator.clipboard.writeText(v); toast.success("Copied"); };
@@ -552,6 +555,11 @@ export function WorkspaceShell(p: Props) {
                     className="rounded-md border border-slate-200 bg-white px-2 py-0.5 text-xs font-semibold text-slate-800 shadow-xs focus:outline-none focus:ring-1 focus:ring-indigo-500"
                   >
                     <option value="">Unassigned</option>
+                    {application.assigned_to && !p.staff.some((s: any) => s.id === application.assigned_to) && (
+                      <option value={application.assigned_to}>
+                        {(p.data as any)?.assignedStaff?.display_name || (p.data as any)?.assignedStaff?.full_name || (p.data as any)?.assignedStaff?.email || "Archived Staff"} (Archived)
+                      </option>
+                    )}
                     {(Array.isArray(p.staff) ? p.staff : []).map((s: any) => (
                       <option key={s.id} value={s.id}>{s.display_name || s.name || s.email}</option>
                     ))}
