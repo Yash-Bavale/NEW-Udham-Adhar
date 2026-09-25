@@ -949,6 +949,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
 
     for (const r of baseFilteredRows) {
       counts.totalAll++;
+      counts.all++; // Total all orders matching active filters / date range
       const b = bucketOfRow(r, todayIst);
       if (b === "completed") {
         counts.completed++;
@@ -957,7 +958,6 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         counts.closed++;
         counts.processed++;
       } else {
-        counts.all++; // ALL ACTIVE
         if (b === "needs_action") {
           counts.needs_action++;
           counts.actionRequired++;
@@ -1023,12 +1023,6 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
           filtered = filtered.filter((r) => bucketOfRow(r, todayIst) === "exception");
           break;
       }
-    } else {
-      // Bucket is "all" or default: active orders only (exclude completed & closed from active list)
-      filtered = filtered.filter((r) => {
-        const b = bucketOfRow(r, todayIst);
-        return b !== "completed" && b !== "closed";
-      });
     }
 
     if (normalized.bucket === "backlog" && (!normalized.sortField || normalized.sortField === "created_at")) {

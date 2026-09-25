@@ -153,21 +153,21 @@ describe("Orders Filter & Date Boundary System", () => {
       return "pending";
     }
 
-    it("should compute ALL ACTIVE count as non-completed and non-closed orders matching active filters", () => {
-      // Unfiltered base: 7 total, 1 completed, 1 closed -> 5 Active
+    it("should compute ALL ORDERS count as total orders matching active filters in the date range", () => {
+      // Unfiltered base: 7 total (1 completed, 1 closed, 5 active) -> 7 total
       const base1 = sampleOrders;
-      const allActive1 = base1.filter(o => !["completed", "closed"].includes(bucketOf(o))).length;
-      expect(allActive1).toBe(5);
+      const allOrders1 = base1.length;
+      expect(allOrders1).toBe(7);
 
-      // Filter by paymentStatus = "Paid" -> ids 1, 2, 3, 4, 5 (5 rows: 1 completed -> 4 Active)
+      // Filter by paymentStatus = "Paid" -> ids 1, 2, 3, 4, 5 (5 total rows)
       const base2 = sampleOrders.filter(o => o.payment_status === "Paid");
-      const allActive2 = base2.filter(o => !["completed", "closed"].includes(bucketOf(o))).length;
-      expect(allActive2).toBe(4);
+      const allOrders2 = base2.length;
+      expect(allOrders2).toBe(5);
 
-      // Filter by stage = "technical_delay" -> 1 Active
+      // Filter by stage = "technical_delay" -> 1 total
       const base3 = sampleOrders.filter(o => o.stage === "technical_delay");
-      const allActive3 = base3.filter(o => !["completed", "closed"].includes(bucketOf(o))).length;
-      expect(allActive3).toBe(1);
+      const allOrders3 = base3.length;
+      expect(allOrders3).toBe(1);
     });
 
     it("should ensure all 10 KPI categories derive from the exact same base filtered dataset", () => {
@@ -175,7 +175,7 @@ describe("Orders Filter & Date Boundary System", () => {
       const base = sampleOrders.filter(o => o.payment_status === "Paid");
 
       const kpis = {
-        all: base.filter(o => !["completed", "closed"].includes(bucketOf(o))).length,
+        all: base.length,
         needs_action: base.filter(o => bucketOf(o) === "needs_action").length,
         hot_orders: base.filter(o => bucketOf(o) === "hot_orders").length,
         reminders: base.filter(o => bucketOf(o) === "reminders").length,
@@ -187,7 +187,7 @@ describe("Orders Filter & Date Boundary System", () => {
         closed: base.filter(o => bucketOf(o) === "closed").length,
       };
 
-      expect(kpis.all).toBe(4);
+      expect(kpis.all).toBe(5); // All 5 paid orders in range
       expect(kpis.needs_action).toBe(2); // ids 1, 2
       expect(kpis.technical_delay).toBe(1); // id 3
       expect(kpis.pending).toBe(1); // id 4

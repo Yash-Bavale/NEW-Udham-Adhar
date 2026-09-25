@@ -138,8 +138,8 @@ interface BucketCardItem {
 const BUCKET_CARDS: BucketCardItem[] = [
   {
     id: "all",
-    label: "ALL ACTIVE",
-    subtitle: "Active Portfolio",
+    label: "ALL ORDERS",
+    subtitle: "All in Range",
     icon: LayoutGrid,
     adminOnly: true,
   },
@@ -657,10 +657,10 @@ return (
             "Loading orders…"
           ) : (
             <>
-              <span className="font-semibold text-slate-800">{(counts.all ?? 0).toLocaleString("en-IN")}</span> active portfolio ·{" "}
+              <span className="font-semibold text-slate-800">{(counts.all ?? counts.totalAll ?? 0).toLocaleString("en-IN")}</span> total in period ·{" "}
+              <span className="font-semibold text-blue-700">{Math.max(0, (counts.all ?? counts.totalAll ?? 0) - (counts.completed ?? 0) - (counts.closed ?? 0)).toLocaleString("en-IN")}</span> active portfolio ·{" "}
               <span className="font-semibold text-emerald-700">{(counts.completed ?? 0).toLocaleString("en-IN")}</span> completed ·{" "}
-              <span className="font-semibold text-slate-600">{(counts.closed ?? 0).toLocaleString("en-IN")}</span> closed ·{" "}
-              <span className="text-slate-600 font-medium">({(counts.totalAll ?? ((counts.all ?? 0) + (counts.completed ?? 0) + (counts.closed ?? 0))).toLocaleString("en-IN")} total in period)</span> · times in IST
+              <span className="font-semibold text-slate-600">{(counts.closed ?? 0).toLocaleString("en-IN")}</span> closed · times in IST
             </>
           )}
         </p>
