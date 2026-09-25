@@ -36,6 +36,48 @@
       "when": 1790320225041,
       "tag": "0004_repair_operational_kpi_queues_all_time",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1790320484037,
+      "tag": "0005_repair_orders_v3_payment_enum_values",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1790320534897,
+      "tag": "0006_repair_orders_v3_plain_payment_enum_values",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1790320569844,
+      "tag": "0007_repair_orders_v3_empty_enum_comparisons",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1790320594659,
+      "tag": "0008_repair_orders_v3_refund_status_comparison",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1790320623175,
+      "tag": "0009_normalize_orders_v3_statuses_to_text",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1790320716545,
+      "tag": "0010_repair_orders_v3_closure_none_stage",
+      "breakpoints": true
     }
   ]
 }
