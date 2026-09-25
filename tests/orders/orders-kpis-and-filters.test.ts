@@ -142,14 +142,22 @@ describe("Orders Filter & Date Boundary System", () => {
       { id: "7", stage: "payment_done", fulfillment_status: "order_received", payment_status: "Pending", is_hot: true, is_callback_scheduled: false, created_at: "2026-09-24T05:00:00.000Z" },
     ];
 
-    function bucketOf(o: any): string {
+    function bucketOf(o: any, todayIst = "2026-09-24"): string {
       if (o.stage === "completed" || o.fulfillment_status === "order_completed") return "completed";
       if (o.stage === "closed" || o.fulfillment_status === "order_closed") return "closed";
       if (o.is_hot) return "hot_orders";
       if (o.is_callback_scheduled) return "reminders";
       if (o.stage === "technical_delay") return "technical_delay";
       if (o.stage === "customer_delay") return "customer_delay";
-      if (["payment_done", "form_submitted"].includes(o.stage)) return "needs_action";
+      if (["lead_received", "payment_done", "form_submitted", "form_not_submitted"].includes(o.stage)) {
+        const date = new Intl.DateTimeFormat("en-CA", {
+          timeZone: "Asia/Kolkata",
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+        }).format(new Date(o.created_at));
+        return date < todayIst ? "backlog" : "needs_action";
+      }
       return "pending";
     }
 
@@ -176,7 +184,7 @@ describe("Orders Filter & Date Boundary System", () => {
 
       const kpis = {
         all: base.length,
-        needs_action: base.filter(o => bucketOf(o) === "needs_action").length,
+        needs_action: base.filter(o => ["needs_action", "backlog"].includes(bucketOf(o))).length,
         hot_orders: base.filter(o => bucketOf(o) === "hot_orders").length,
         reminders: base.filter(o => bucketOf(o) === "reminders").length,
         technical_delay: base.filter(o => bucketOf(o) === "technical_delay").length,
@@ -188,11 +196,31 @@ describe("Orders Filter & Date Boundary System", () => {
       };
 
       expect(kpis.all).toBe(5); // All 5 paid orders in range
-      expect(kpis.needs_action).toBe(2); // ids 1, 2
+      expect(kpis.needs_action).toBe(2); // ids 1, 2, including historical backlog
+      expect(kpis.backlog).toBe(2); // both action-needed orders predate 24 Sep IST
       expect(kpis.technical_delay).toBe(1); // id 3
       expect(kpis.pending).toBe(1); // id 4
       expect(kpis.completed).toBe(1); // id 5
       expect(kpis.closed).toBe(0); // id 6 was Failed
+    });
+
+    it("keeps operational queues all-time while Backlog excludes today's untouched orders", () => {
+      const todayIst = "2026-09-24";
+      const operationalOrders = [
+        ...sampleOrders,
+        { id: "8", stage: "form_not_submitted", fulfillment_status: "form_not_submitted", payment_status: "Paid", is_hot: false, is_callback_scheduled: false, created_at: "2026-09-24T06:00:00.000Z" },
+        { id: "9", stage: "under_review", fulfillment_status: "verification_pending", payment_status: "Paid", is_hot: false, is_callback_scheduled: true, created_at: "2026-09-19T06:00:00.000Z" },
+      ];
+
+      const needsAction = operationalOrders.filter((o) => ["needs_action", "backlog"].includes(bucketOf(o, todayIst)));
+      const backlog = operationalOrders.filter((o) => bucketOf(o, todayIst) === "backlog");
+      const hotOrders = operationalOrders.filter((o) => bucketOf(o, todayIst) === "hot_orders");
+      const reminders = operationalOrders.filter((o) => bucketOf(o, todayIst) === "reminders");
+
+      expect(needsAction.map((o) => o.id)).toEqual(["1", "2", "8"]);
+      expect(backlog.map((o) => o.id)).toEqual(["1", "2"]);
+      expect(hotOrders.map((o) => o.id)).toEqual(["7"]);
+      expect(reminders.map((o) => o.id)).toEqual(["9"]);
     });
   });
 

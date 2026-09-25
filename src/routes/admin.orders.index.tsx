@@ -69,7 +69,7 @@ const COMPLETED_FS = new Set<string>([
   "consultation_completed", "order_completed", "completed",
 ]);
 const EXCEPTION_STAGES: OrderStage[] = ["refund_requested", "refunded", "uninterested"];
-const NEEDS_ACTION_STAGES: OrderStage[] = ["lead_received", "payment_done", "form_submitted", "order_reopened"];
+const NEEDS_ACTION_STAGES: OrderStage[] = ["lead_received", "payment_done", "form_submitted", "form_not_submitted"];
 
 function bucketOfRow(row: {
   fulfillment_status?: string | null;
@@ -96,7 +96,7 @@ function bucketOfRow(row: {
   if (row.stage === "customer_delay" || fs === "customer_delay") return "customer_delay";
 
   // Action-required untouched orders (Needs Action vs Backlog)
-  const isActionStage = ["lead_received", "payment_done", "form_submitted", "form_not_submitted"].includes(row.stage);
+  const isActionStage = NEEDS_ACTION_STAGES.includes(row.stage);
   if (isActionStage) {
     const curToday = todayIst || istDateKey(new Date());
     const rowDate = istDateKey(row.created_at);
