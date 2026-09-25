@@ -27,8 +27,7 @@ export async function getFolderCheckpoint(
     .maybeSingle();
 
   if (error) {
-    console.warn(`[checkpoint] getFolderCheckpoint failed for ${mailboxAddress}/${folderId}:`, error.message);
-    return null;
+    throw new Error(`[checkpoint] getFolderCheckpoint failed for ${mailboxAddress}/${folderId}: ${error.message}`);
   }
   if (!data) return null;
   const d = data as any;
@@ -46,8 +45,7 @@ export async function getAllCheckpoints(mailboxAddress: string): Promise<FolderC
     .order("folder_name", { ascending: true });
 
   if (error) {
-    console.warn(`[checkpoint] getAllCheckpoints failed:`, error.message);
-    return [];
+    throw new Error(`[checkpoint] getAllCheckpoints failed: ${error.message}`);
   }
   return ((data ?? []) as any[]).map((d) => ({
     ...d,
@@ -80,7 +78,7 @@ export async function updateFolderCheckpoint(input: {
     ? (existing?.consecutive_failures || 0) + 1
     : 0;
 
-  await (supabaseAdmin.from("email_ingestion_checkpoints" as any) as any)
+  const { error } = await (supabaseAdmin.from("email_ingestion_checkpoints" as any) as any)
     .upsert(
       {
         mailbox_address: mailbox,
@@ -98,6 +96,9 @@ export async function updateFolderCheckpoint(input: {
       } as never,
       { onConflict: "mailbox_address,folder_id" },
     );
+  if (error) {
+    throw new Error(`[checkpoint] updateFolderCheckpoint failed for ${mailbox}/${input.folderId}: ${error.message}`);
+  }
 }
 
 /** Acquire distributed lock for single-instance mailbox polling. */
@@ -106,31 +107,24 @@ export async function acquireMailboxLock(
   workerId: string,
   ttlSeconds = 120,
 ): Promise<boolean> {
-  try {
-    const { data, error } = await supabaseAdmin.rpc("acquire_email_ingestion_lock" as any, {
-      p_mailbox: mailboxAddress.toLowerCase(),
-      p_worker_id: workerId,
-      p_ttl_seconds: ttlSeconds,
-    } as any);
-    if (error) {
-      console.warn("[checkpoint] acquire_email_ingestion_lock RPC error:", error.message);
-      return true; // Fallback to allowing execution if lock table isn't migrated yet
-    }
-    return Boolean(data);
-  } catch (e) {
-    console.warn("[checkpoint] acquire lock exception:", e);
-    return true;
+  const { data, error } = await supabaseAdmin.rpc("acquire_email_ingestion_lock" as any, {
+    p_mailbox: mailboxAddress.toLowerCase(),
+    p_worker_id: workerId,
+    p_ttl_seconds: ttlSeconds,
+  } as any);
+  if (error) {
+    throw new Error(`[checkpoint] acquire_email_ingestion_lock failed: ${error.message}`);
   }
+  return Boolean(data);
 }
 
 /** Release distributed lock when polling completes. */
 export async function releaseMailboxLock(mailboxAddress: string, workerId: string): Promise<void> {
-  try {
-    await supabaseAdmin.rpc("release_email_ingestion_lock" as any, {
-      p_mailbox: mailboxAddress.toLowerCase(),
-      p_worker_id: workerId,
-    } as any);
-  } catch (e) {
-    console.warn("[checkpoint] release lock exception:", e);
+  const { error } = await supabaseAdmin.rpc("release_email_ingestion_lock" as any, {
+    p_mailbox: mailboxAddress.toLowerCase(),
+    p_worker_id: workerId,
+  } as any);
+  if (error) {
+    throw new Error(`[checkpoint] release_email_ingestion_lock failed: ${error.message}`);
   }
 }

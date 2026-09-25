@@ -267,10 +267,15 @@ export async function fetchMessageAttachmentsList(
 ): Promise<ZohoAttachmentMeta[]> {
   const accountId = await resolveAccountId();
   try {
-    const data = await zohoFetch<{ data?: Array<{ attachmentId?: string; attachmentName?: string; attachmentSize?: string | number; contentType?: string }> }>(
+    const data = await zohoFetch<{ data?: unknown }>(
       `/api/accounts/${accountId}/folders/${folderId}/messages/${messageId}/attachmentinfo`,
     );
-    const list = data?.data ?? [];
+    const payload = data?.data;
+    const list = Array.isArray(payload)
+      ? payload
+      : payload && typeof payload === "object" && Array.isArray((payload as { attachments?: unknown }).attachments)
+        ? (payload as { attachments: Array<{ attachmentId?: string; attachmentName?: string; attachmentSize?: string | number; contentType?: string }> }).attachments
+        : [];
     return list.map((a) => ({
       attachmentId: String(a.attachmentId || ""),
       attachmentName: a.attachmentName || "attachment",
