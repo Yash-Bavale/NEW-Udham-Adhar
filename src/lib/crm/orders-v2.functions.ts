@@ -373,9 +373,56 @@ const COMPLETED_FS = new Set<string>([
   "approved",
 ]);
 const EXCEPTION_STAGES: OrderStage[] = ["refund_requested", "refunded", "uninterested"];
-const NEEDS_ACTION_STAGES: OrderStage[] = ["lead_received", "payment_done", "form_submitted", "form_not_submitted"];
+const NEEDS_ACTION_STAGES: OrderStage[] = ["lead_received", "payment_done", "form_submitted", "form_not_submitted", "order_reopened"];
 
-function isNeedsActionStage(stage: OrderStage): boolean {
+export function isNeedsActionOrder(row: any): boolean {
+  if (row.is_terminal) return false;
+  const fs = String(row.fulfillment_status ?? "").toLowerCase();
+  const stage = String(row.stage ?? "").toLowerCase();
+
+  // 1. Exclude terminal states (completed / closed)
+  if (stage === "completed" || stage === "closed" || COMPLETED_FS.has(fs) || CLOSED_FS.has(fs)) return false;
+
+  // 2. Exclude orders that already have an active scheduled callback (they belong in Call Back Scheduled)
+  if (row.is_callback_scheduled || (row.callback_reminder && !row.callback_reminder.is_due)) return false;
+
+  // 3. Exclude Technical Delay and Customer Delay (they belong in their dedicated tabs)
+  if (isTechnicalDelayOrder(row) || isCustomerDelayOrder(row)) return false;
+
+  // 4. Exclude Form Not Submitted where form link has already been sent (Action Taken)
+  if ((stage === "form_not_submitted" || fs === "form_not_submitted" || fs === "awaiting_customer_form" || fs === "form_link_sent") && Boolean(row.form_link_sent_at)) {
+    return false;
+  }
+
+  // 5. Exclude progressed stages like Certificate Ready, Submitted to Govt, Under Processing, Refunded
+  const progressedStages = new Set([
+    "submitted_to_govt",
+    "under_processing",
+    "under_review",
+    "certificate_ready",
+    "certificate_delivered",
+    "certificate_uploaded",
+    "consultation_completed",
+    "refunded",
+    "refund_requested",
+  ]);
+  if (progressedStages.has(stage) || progressedStages.has(fs)) return false;
+
+  // Untouched action-needed stages
+  return (
+    stage === "lead_received" ||
+    stage === "payment_done" ||
+    stage === "form_submitted" ||
+    stage === "form_not_submitted" ||
+    stage === "order_reopened" ||
+    fs === "order_received" ||
+    fs === "payment_done" ||
+    fs === "form_submitted" ||
+    fs === "form_not_submitted"
+  );
+}
+
+export function isNeedsActionStage(stage: OrderStage): boolean {
   return NEEDS_ACTION_STAGES.includes(stage);
 }
 
@@ -516,7 +563,7 @@ export function bucketOfRow(
   if (row.is_hot) return "hot_orders";
 
   // Call Back Scheduled: only active/future callbacks (fires_at > now)
-  if (row.is_callback_scheduled) return "reminders";
+  if (row.is_callback_scheduled || ((row as any).callback_reminder && !(row as any).callback_reminder.is_due)) return "reminders";
 
   // Customer Delay (evaluated before technical delay to guarantee customer delay is never placed into technical delay)
   if (isCustomerDelayOrder(row)) return "customer_delay";
@@ -524,16 +571,15 @@ export function bucketOfRow(
   // Technical Delay (full name)
   if (isTechnicalDelayOrder(row)) return "technical_delay";
 
-  // Backlog: all active non-delay orders from yesterday and before all-time
+  // Backlog: all active non-delay action-needed orders from yesterday and before all-time
   const curToday = todayIst || istDateKey(new Date());
   const rowDate = istDateKey(row.created_at);
-  if (rowDate && rowDate < curToday) {
+  if (rowDate && rowDate < curToday && isNeedsActionOrder(row)) {
     return "backlog";
   }
 
   // Today's action-required untouched orders
-  const isActionStage = isNeedsActionStage(row.stage);
-  if (isActionStage) {
+  if (isNeedsActionOrder(row)) {
     return "needs_action";
   }
 
@@ -1384,6 +1430,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         workflow_status: (a as any).workflow_status,
         technical_hold_started_at: (a as any).technical_hold_started_at,
         customer_hold_started_at: (a as any).customer_hold_started_at,
+        form_link_sent_at: (a as any).form_link_sent_at ?? null,
         is_terminal: isTerminal,
         in_range: inRangeCreated,
         in_range_created: inRangeCreated,
@@ -1482,7 +1529,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       }
 
       // Operational Queues (Live all-time active portfolio)
-      if (!r.is_terminal && (isActionStage || isTechnicalDelayOrder(r)) && !isCustomerDelayOrder(r)) {
+      if (isNeedsActionOrder(r)) {
         counts.needs_action++;
         counts.actionRequired++;
       }
@@ -1510,11 +1557,10 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       }
     }
 
-    // Backlog: all active non-terminal orders from yesterday and before (all-time),
-    // until closed or moved to technical delay / customer delay
+    // Backlog: all active non-delay action-needed orders from yesterday and before (all-time)
     counts.backlog = baseFilteredRows.filter((r) => {
       const rowDate = istDateKey(r.created_at);
-      return !r.is_terminal && !isTechnicalDelayOrder(r) && !isCustomerDelayOrder(r) && Boolean(rowDate && rowDate < todayIst);
+      return isNeedsActionOrder(r) && Boolean(rowDate && rowDate < todayIst);
     }).length;
 
     // 3. Apply bucket tab filter to obtain the table rows (guarantee 100% exact match with counts)
@@ -1522,7 +1568,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
     const bucket = normalized.bucket || "all";
 
     if (bucket === "needs_action") {
-      filtered = filtered.filter((r) => !r.is_terminal && (isNeedsActionStage(r.stage) || isTechnicalDelayOrder(r)) && !isCustomerDelayOrder(r));
+      filtered = filtered.filter((r) => isNeedsActionOrder(r));
     } else if (bucket === "hot_orders") {
       filtered = filtered.filter((r) => r.is_hot);
     } else if (bucket === "reminders") {
@@ -1530,7 +1576,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
     } else if (bucket === "backlog") {
       filtered = filtered.filter((r) => {
         const rowDate = istDateKey(r.created_at);
-        return !r.is_terminal && !isTechnicalDelayOrder(r) && !isCustomerDelayOrder(r) && Boolean(rowDate && rowDate < todayIst);
+        return isNeedsActionOrder(r) && Boolean(rowDate && rowDate < todayIst);
       });
     } else if (bucket === "technical_delay") {
       filtered = filtered.filter((r) => r.in_range_technical_delay);
