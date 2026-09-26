@@ -246,12 +246,8 @@ export function isEmployeeEligibleForAutoAssignment(
     }
   }
 
-  if (options.checkPresence !== false && emp.presenceStatus) {
-    if (emp.presenceStatus === "OFFLINE") {
-      reasons.push("Employee is OFFLINE (no active session / heartbeat lost)");
-    } else if (emp.presenceStatus === "AWAY") {
-      reasons.push("Employee is AWAY (inactive > 15 mins)");
-    } else if (emp.presenceStatus === "ON_LEAVE") {
+  if (options.checkPresence && emp.presenceStatus) {
+    if (emp.presenceStatus === "ON_LEAVE") {
       reasons.push("Employee is ON LEAVE");
     } else if (emp.presenceStatus === "UNAVAILABLE") {
       reasons.push("Employee is UNAVAILABLE");
@@ -1201,56 +1197,7 @@ export async function reassignProlongedUnavailableStaff(): Promise<{
       continue;
     }
 
-    // Check sessions for prolonged offline / away
-    const { data: session } = await (supabaseAdmin as any)
-      .from("employee_sessions")
-      .select("last_heartbeat_at, last_activity_at, is_active, status")
-      .eq("employee_id", w.employeeId)
-      .eq("is_active", true)
-      .order("last_heartbeat_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    let isProlongedOffline = false;
-    let isProlongedAway = false;
-
-    if (!session) {
-      isProlongedOffline = true;
-    } else {
-      const lastHb = session.last_heartbeat_at ? new Date(session.last_heartbeat_at).getTime() : 0;
-      const lastAct = session.last_activity_at ? new Date(session.last_activity_at).getTime() : 0;
-      const minsSinceHb = (nowMs - lastHb) / 60000;
-      const minsSinceAct = (nowMs - lastAct) / 60000;
-
-      if (minsSinceHb >= WORKFORCE_THRESHOLDS.PROLONGED_OFFLINE_REASSIGN_MINUTES) {
-        isProlongedOffline = true;
-      } else if (minsSinceAct >= WORKFORCE_THRESHOLDS.PROLONGED_AWAY_REASSIGN_MINUTES) {
-        isProlongedAway = true;
-      }
-    }
-
-    if ((isProlongedOffline || isProlongedAway) && w.activeActionOrders > 0) {
-      const changeType: AssignmentChangeType = isProlongedOffline ? "AUTO_OFFLINE" : "AUTO_INACTIVITY";
-      const reason = isProlongedOffline
-        ? `Employee offline for > ${WORKFORCE_THRESHOLDS.PROLONGED_OFFLINE_REASSIGN_MINUTES} mins during shift`
-        : `Employee away for > ${WORKFORCE_THRESHOLDS.PROLONGED_AWAY_REASSIGN_MINUTES} mins during shift`;
-
-      const res = await reassignOrdersFromUnavailableEmployee({
-        unavailableEmployeeId: w.employeeId,
-        reason,
-        changeType,
-      });
-
-      if (res.reassignedCount > 0) {
-        totalOrdersReassigned += res.reassignedCount;
-        results.push({
-          employeeId: w.employeeId,
-          employeeName: w.name,
-          reason: changeType,
-          reassignedCount: res.reassignedCount,
-        });
-      }
-    }
+    // Active employees retain their assigned orders; automatic redistribution is only for explicit leave or termination.
   }
 
   return {

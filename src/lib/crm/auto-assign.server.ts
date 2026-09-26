@@ -62,17 +62,51 @@ export async function autoAssignLeadOrOrder(opts: {
       return null;
     }
 
-    const staffUserId = (picked as unknown as string | null) ?? null;
+    let staffUserId = (picked as unknown as string | null) ?? null;
+    if (!staffUserId) {
+      let poolQ = supabaseAdmin
+        .from("assignment_pool")
+        .select("id, user_id, last_assigned_at, total_assigned")
+        .eq("is_active", true);
+
+      if (opts.serviceId) {
+        poolQ = poolQ.or(`service_id.eq.${opts.serviceId},service_id.is.null`);
+      }
+      const { data: fallbackPool } = await poolQ
+        .order("last_assigned_at", { ascending: true, nullsFirst: true })
+        .order("total_assigned", { ascending: true })
+        .limit(1)
+        .maybeSingle();
+
+      if (fallbackPool?.user_id) {
+        staffUserId = fallbackPool.user_id;
+        const curCount = Number((fallbackPool as any).total_assigned || 0) + 1;
+        await supabaseAdmin
+          .from("assignment_pool")
+          .update({ last_assigned_at: new Date().toISOString(), total_assigned: curCount } as never)
+          .eq("id", fallbackPool.id);
+      }
+    }
+
     if (!staffUserId) return null;
 
     const nowIso = new Date().toISOString();
 
     if (opts.applicationId) {
-      await supabaseAdmin
+      const { data: updatedApp } = await supabaseAdmin
         .from("applications")
         .update({ assigned_to: staffUserId, assigned_at: nowIso, auto_assigned: true, updated_at: nowIso } as never)
         .eq("id", opts.applicationId)
-        .is("assigned_to", null);
+        .is("assigned_to", null)
+        .select("lead_id")
+        .maybeSingle();
+
+      if (updatedApp?.lead_id) {
+        await supabaseAdmin
+          .from("leads")
+          .update({ assigned_to: staffUserId, assigned_at: nowIso, auto_assigned: true, updated_at: nowIso } as never)
+          .eq("id", updatedApp.lead_id);
+      }
 
       try {
         const { logEmployeeOrderAction } = await import("@/lib/orders/order-action-logger.server");
