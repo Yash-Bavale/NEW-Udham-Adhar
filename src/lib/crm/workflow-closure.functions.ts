@@ -76,13 +76,12 @@ async function executeOrderClosure({
   }
 
   const closedAt = new Date().toISOString();
-  await admin
+  const { error: appUpErr } = await admin
     .from("applications")
     .update({
       workflow_status: "closed",
       workflow_closed_at: closedAt,
       fulfillment_status: "order_closed",
-      application_status: "closed",
       order_status: "CLOSED",
       closure_stage: "closed",
       closure_reason_code: data.reasonCode,
@@ -98,6 +97,11 @@ async function executeOrderClosure({
       updated_at: closedAt,
     } as never)
     .eq("id", app.id);
+
+  if (appUpErr) {
+    console.error("[executeOrderClosure] update error:", appUpErr);
+    throw new Error(`Failed to close order: ${appUpErr.message}`);
+  }
 
   try {
     await admin.from("workflow_events").insert({

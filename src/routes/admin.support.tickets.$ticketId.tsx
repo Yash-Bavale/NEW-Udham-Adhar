@@ -744,18 +744,8 @@ function TicketWorkspace() {
   const serviceName = ticket.services?.service_name ?? app.services?.service_name ?? "New Udyam Certificate Registration";
   const customerEmailAddress = ticket.ticket_email ?? cust.primary_email ?? "customer@mail.com";
 
-  // Check Reopen Rule: Order Stage must be Closed, Completed, Cancelled, or Rejected
-  const orderStageStr = String(app.fulfillment_status ?? app.order_status ?? app.workflow_status ?? "").toLowerCase();
-  const canReopenOrder =
-    Boolean(app.id) &&
-    (orderStageStr.includes("completed") ||
-      orderStageStr.includes("closed") ||
-      orderStageStr.includes("cancelled") ||
-      orderStageStr.includes("rejected") ||
-      app.closure_stage === "closed" ||
-      app.order_status === "COMPLETED" ||
-      app.order_status === "CLOSED" ||
-      app.order_status === "CANCELLED");
+  // Reopen button is enabled for any linked order
+  const canReopenOrder = Boolean(app.id);
 
   // SLA Calculation
   const slaTargetHours = ticket.priority === "urgent" ? 4 : ticket.priority === "high" ? 8 : ticket.priority === "medium" ? 24 : 48;

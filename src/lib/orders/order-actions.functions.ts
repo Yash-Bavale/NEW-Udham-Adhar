@@ -1014,15 +1014,15 @@ export const reopenOrder = createServerFn({ method: "POST" })
       .maybeSingle();
     const staffName = (staffProf as any)?.display_name || (staffProf as any)?.email || "Staff";
 
-    // 2. Set dedicated ORDER_REOPENED status across all status columns and clear all hold/closure states
+    // 2. Set dedicated REOPENED status across valid enum columns and clear all hold/closure states
     const { error: upErr } = await supabaseAdmin
       .from("applications")
       .update({
         order_status: "REOPENED",
-        fulfillment_status: "order_reopened",
-        workflow_status: "order_reopened",
+        fulfillment_status: "form_submitted",
+        workflow_status: "processing_resumed",
         closure_stage: "none",
-        application_status: "order_reopened",
+        application_status: "form_submitted",
         closure_reason_id: null,
         closure_reason_code: null,
         closure_remarks: null,

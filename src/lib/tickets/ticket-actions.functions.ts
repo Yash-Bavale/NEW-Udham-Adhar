@@ -765,10 +765,10 @@ export const closeTicketRestartT001 = createServerFn({ method: "POST" })
       .from("applications")
       .update({
         order_status: "REOPENED",
-        fulfillment_status: "order_reopened",
-        workflow_status: "order_reopened",
+        fulfillment_status: "form_submitted",
+        workflow_status: "processing_resumed",
         closure_stage: "none",
-        application_status: "order_reopened",
+        application_status: "form_submitted",
         closure_reason_id: null,
         closure_reason_code: null,
         closure_remarks: null,
@@ -1128,10 +1128,10 @@ export const makeOrderHotFromTicket = createServerFn({ method: "POST" })
       .from("applications")
       .update({
         order_status: "REOPENED",
-        fulfillment_status: "order_reopened",
-        workflow_status: "order_reopened",
+        fulfillment_status: "form_submitted",
+        workflow_status: "processing_resumed",
         closure_stage: "none",
-        application_status: "order_reopened",
+        application_status: "form_submitted",
         closure_reason_id: null,
         closure_reason_code: null,
         closure_remarks: null,
