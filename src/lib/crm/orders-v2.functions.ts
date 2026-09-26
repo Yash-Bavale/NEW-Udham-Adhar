@@ -780,7 +780,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       (() => {
         let q = admin
           .from("application_events")
-          .select("application_id, event_type, old_value, new_value, staff_id, staff_name, created_at");
+          .select("application_id, event_type, old_value, new_value, staff_name, staff_role, created_at");
         if (normalized.fromIso) q = q.gte("created_at", normalized.fromIso);
         if (normalized.toIso) q = q.lte("created_at", normalized.toIso);
         return q.order("created_at", { ascending: false }).limit(10000);
@@ -862,7 +862,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
     const [eventsRes, certsTableRes, actionLogsRes, globalActiveSchedulersRes] = await Promise.all([
       admin
         .from("application_events")
-        .select("application_id, event_type, old_value, new_value, staff_id, staff_name, created_at")
+        .select("application_id, event_type, old_value, new_value, staff_name, staff_role, created_at")
         .in("application_id", ids)
         .order("created_at", { ascending: false })
         .limit(10000),
