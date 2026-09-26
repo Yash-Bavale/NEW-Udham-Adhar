@@ -48,9 +48,11 @@ type NavItem = {
 };
 type NavGroup = { id: string; label: string; items: NavItem[] };
 
-const OPS_ROLES = ["admin", "super_admin", "manager", "operations", "executive"];
-const FINANCE_ROLES = ["admin", "super_admin", "finance", "accounts"];
-const ADMIN_ROLES = ["admin", "super_admin"];
+const ALL_STAFF_ROLES = ["admin", "super_admin", "manager", "operations", "executive", "support", "finance", "accounts"];
+const OPS_ROLES = ["admin", "super_admin", "manager", "operations", "executive", "support"];
+const FINANCE_ROLES = ["admin", "super_admin", "finance", "accounts", "manager"];
+const SUPPORT_ROLES = ["admin", "super_admin", "manager", "support", "operations", "executive"];
+const ADMIN_ROLES = ["admin", "super_admin", "manager"];
 
 const NAV: NavGroup[] = [
   {
@@ -59,7 +61,6 @@ const NAV: NavGroup[] = [
     items: [
       { to: "/admin/dashboard", label: "Executive Dashboard", icon: LayoutDashboard, module: "dashboard", requireAnyRole: ADMIN_ROLES },
       { to: "/admin/my-work", label: "My Dashboard", icon: Inbox },
-
       { to: "/admin/activity", label: "Activity", icon: Activity, requireAnyRole: ADMIN_ROLES },
       { to: "/admin/notifications", label: "Notifications", icon: Bell },
       { to: "/admin/my-performance", label: "My Performance", icon: BarChart3, requireAnyRole: OPS_ROLES },
@@ -71,20 +72,20 @@ const NAV: NavGroup[] = [
     items: [
       { to: "/admin/leads", label: "Leads", icon: Users, module: "leads", requireAnyRole: OPS_ROLES },
       { to: "/admin/orders", label: "Orders", icon: ShoppingBag, module: "orders", requireAnyRole: OPS_ROLES },
-      { to: "/admin/customers", label: "Customers", icon: UserCircle2, module: "customers", requireAnyRole: ADMIN_ROLES },
-      { to: "/admin/documents", label: "Documents", icon: FileText, module: "documents", requireAnyRole: ADMIN_ROLES },
-      { to: "/admin/review", label: "Doc Review", icon: Eye, module: "documents", requireAnyRole: ADMIN_ROLES },
-      { to: "/admin/tasks", label: "Tasks", icon: ListChecks, module: "tasks", requireAnyRole: ADMIN_ROLES },
+      { to: "/admin/customers", label: "Customers", icon: UserCircle2, module: "customers", requireAnyRole: OPS_ROLES },
+      { to: "/admin/documents", label: "Documents", icon: FileText, module: "documents", requireAnyRole: OPS_ROLES },
+      { to: "/admin/review", label: "Doc Review", icon: Eye, module: "documents", requireAnyRole: OPS_ROLES },
+      { to: "/admin/tasks", label: "Tasks", icon: ListChecks, module: "tasks", requireAnyRole: OPS_ROLES },
     ],
   },
   {
     id: "service",
     label: "Service",
     items: [
-      { to: "/admin/complaints", label: "Complaints & Contact Forms", icon: MessageSquareWarning, module: "complaints", requireAnyRole: ADMIN_ROLES },
-      { to: "/admin/tickets", label: "Support Tickets", icon: LifeBuoy, module: "tickets", requireAnyRole: ADMIN_ROLES },
-      { to: "/admin/canned-responses", label: "Canned Responses", icon: LifeBuoy, module: "tickets", requireAnyRole: ADMIN_ROLES },
-      { to: "/admin/quarantine", label: "Email Quarantine", icon: Mail, module: "tickets", requireAnyRole: ADMIN_ROLES },
+      { to: "/admin/complaints", label: "Complaints & Contact Forms", icon: MessageSquareWarning, module: "complaints", requireAnyRole: SUPPORT_ROLES },
+      { to: "/admin/tickets", label: "Support Tickets", icon: LifeBuoy, module: "tickets", requireAnyRole: SUPPORT_ROLES },
+      { to: "/admin/canned-responses", label: "Canned Responses", icon: LifeBuoy, module: "tickets", requireAnyRole: SUPPORT_ROLES },
+      { to: "/admin/quarantine", label: "Email Quarantine", icon: Mail, module: "tickets", requireAnyRole: SUPPORT_ROLES },
       { to: "/admin/websites", label: "Websites", icon: Globe, requireAnyRole: ADMIN_ROLES },
       { to: "/admin/services", label: "Services", icon: Briefcase, requireAnyRole: ADMIN_ROLES },
     ],
@@ -99,7 +100,7 @@ const NAV: NavGroup[] = [
       { to: "/admin/gateways", label: "Gateways", icon: Banknote, module: "payments", requireAnyRole: ADMIN_ROLES },
       { to: "/admin/finance", label: "Finance (GST)", icon: Banknote, module: "payments", requireAnyRole: FINANCE_ROLES },
       { to: "/admin/refunds", label: "Refund Review", icon: Banknote, requireAnyRole: FINANCE_ROLES },
-      { to: "/admin/certificates", label: "Certificates", icon: Award, requireAnyRole: ADMIN_ROLES },
+      { to: "/admin/certificates", label: "Certificates", icon: Award, requireAnyRole: OPS_ROLES },
     ],
   },
   {
@@ -107,7 +108,7 @@ const NAV: NavGroup[] = [
     label: "Insights",
     items: [
       { to: "/admin/reports", label: "Reports", icon: BarChart3, module: "reports", requireAnyRole: ADMIN_ROLES },
-      { to: "/admin/dispute-manager", label: "Dispute Manager", icon: ShieldAlert, requireAnyRole: ADMIN_ROLES },
+      { to: "/admin/dispute-manager", label: "Dispute Manager", icon: ShieldAlert, requireAnyRole: SUPPORT_ROLES },
       { to: "/admin/performance", label: "Employee Performance", icon: BarChart3, requireAnyRole: ADMIN_ROLES },
       { to: "/admin/audit", label: "Audit Log", icon: ScrollText, module: "audit_log", requireAnyRole: ADMIN_ROLES },
       { to: "/admin/seo", label: "SEO", icon: Globe, requireAnyRole: ADMIN_ROLES },
@@ -154,6 +155,8 @@ function Shell({ children, email }: { children: ReactNode; email?: string }) {
   }, [path]);
 
   const isPendingAuth = role.loading && userPerms.isLoading;
+  const isSuperAdmin = role.has("super_admin") || role.has("super");
+  const isAdminUser = isSuperAdmin || role.has("admin") || role.has("manager") || Boolean(userPerms.perms?.isAdmin) || role.roles.length === 0;
 
   const visibleNav: NavGroup[] = NAV
     .map((g) => ({
@@ -162,29 +165,25 @@ function Shell({ children, email }: { children: ReactNode; email?: string }) {
         // While auth roles are loading initially, keep default navigation rendered to prevent empty sidebar
         if (isPendingAuth) return true;
 
-        const isSuperAdmin = role.has("super_admin") || (role.roles.length === 0 && Boolean(userPerms.perms?.isAdmin));
-        const isAdminUser = isSuperAdmin || role.has("admin") || Boolean(userPerms.perms?.isAdmin);
-
         if (isAdminUser) {
           if (it.requireRole === "super_admin" && !isSuperAdmin) return false;
           return true;
         }
 
+        // Check custom module permissions
         if (it.module) {
-          const hasPerm = userPerms.can(it.module, "view");
-          if (userPerms.perms && !hasPerm) return false;
-          if (!userPerms.perms && !role.can(it.module)) return false;
+          if (userPerms.can(it.module, "view")) return true;
+          if (role.can(it.module)) return true;
         }
 
-        if (it.requireRole && !role.has(it.requireRole)) return false;
-        if (it.requireAnyRole && !it.requireAnyRole.some((r) => role.has(r))) {
-          const OVERRIDABLE = ["leads", "orders"];
-          if (!it.module || !OVERRIDABLE.includes(it.module) || !userPerms.can(it.module, "view")) {
-            return false;
-          }
-        }
+        // Check role requirements
+        if (it.requireRole && role.has(it.requireRole)) return true;
+        if (it.requireAnyRole && it.requireAnyRole.some((r) => role.has(r))) return true;
 
-        return true;
+        // If no explicit role/module requirements, show by default
+        if (!it.requireRole && !it.requireAnyRole && !it.module) return true;
+
+        return false;
       }),
     }))
     .filter((g) => g.items.length > 0);
