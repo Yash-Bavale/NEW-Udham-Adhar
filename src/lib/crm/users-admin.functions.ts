@@ -501,6 +501,12 @@ export const toggleEmployeeAutoAssign = createServerFn({ method: "POST" })
       if (poolErr) throw new Error(poolErr.message);
     }
 
+    // Keep profiles table auto_assign_enabled in sync
+    await admin
+      .from("profiles")
+      .update({ auto_assign_enabled: data.enabled } as any)
+      .eq("id", data.user_id);
+
     return { ok: true };
   });
 

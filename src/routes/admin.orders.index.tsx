@@ -779,24 +779,7 @@ return (
                   </SelectLabel>
                   {activeStaffList.map((s: any) => (
                     <SelectItem key={s.id} value={s.id} className="pl-3 text-xs">
-                      <div className="flex items-center justify-between gap-1.5 w-full">
-                        <span>{s.display_name || s.name || s.email}</span>
-                        {s.presence_status === "AVAILABLE" && (
-                          <span className="text-[9px] text-emerald-600 font-mono ml-1 font-semibold">● ONLINE</span>
-                        )}
-                        {s.presence_status === "IDLE" && (
-                          <span className="text-[9px] text-amber-500 font-mono ml-1 font-medium">● IDLE</span>
-                        )}
-                        {s.presence_status === "AWAY" && (
-                          <span className="text-[9px] text-orange-500 font-mono ml-1 font-medium">● AWAY</span>
-                        )}
-                        {s.presence_status === "OFFLINE" && (
-                          <span className="text-[9px] text-slate-400 font-mono ml-1">● OFFLINE</span>
-                        )}
-                        {s.presence_status === "ON_LEAVE" && (
-                          <span className="text-[9px] text-purple-600 font-mono ml-1">● ON LEAVE</span>
-                        )}
-                      </div>
+                      {s.display_name || s.full_name || s.name || s.email}
                     </SelectItem>
                   ))}
                 </SelectGroup>
