@@ -3,7 +3,13 @@ import { ExternalLink, AlertCircle, Clock } from "lucide-react";
 import { STAGE_META, STAGE_BADGE_CLASS, type OrderStage } from "@/lib/crm/computeOrderStage";
 import { formatIST, relativeIST } from "@/lib/datetime";
 
-interface StaffOption { id: string; display_name?: string | null; email?: string | null }
+interface StaffOption {
+  id: string;
+  display_name?: string | null;
+  full_name?: string | null;
+  name?: string | null;
+  email?: string | null;
+}
 
 interface Props {
   orderCode: string;
