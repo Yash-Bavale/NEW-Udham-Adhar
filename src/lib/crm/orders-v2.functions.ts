@@ -1411,66 +1411,147 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         ? (hasDateFilter ? hasCallbackInRange : isCallbackScheduledOrder(a))
         : false;
 
-      // ── 6. Determine Qualifying Manual Action Taken In Range ──
-      let hasActionTakenInRange = false;
+      // ── 6. Collect All Distinct Manual Actions in Range (For Multi-Action & Repeat Tracking) ──
+      const actionHistoryList: Array<{
+        id: string;
+        action_type: string;
+        title: string;
+        staff_name: string;
+        created_at: string;
+        note?: string | null;
+      }> = [];
 
-      if (inRangeCompleted) {
-        hasActionTakenInRange = true;
-      } else if (inRangeClosed) {
-        hasActionTakenInRange = true;
-      } else if (hasCustDelayInRange || hasTechDelayInRange || hasCallbackInRange) {
-        hasActionTakenInRange = true;
-      } else if ((a as any).form_link_sent_at) {
-        const t = new Date((a as any).form_link_sent_at).getTime();
+      // Action Logs
+      for (const l of thisAppActionLogs) {
+        const t = new Date(l.created_at).getTime();
         if (!hasDateFilter || (t >= fromTime && t <= toTime)) {
-          hasActionTakenInRange = true;
+          const at = String(l.action_type || "").toUpperCase();
+          let title = "Staff Action";
+          if (at.includes("COMPLET")) title = "Order Completed";
+          else if (at.includes("CLOSE")) title = "Order Closed";
+          else if (at.includes("CUSTOMER_DELAY")) title = "Customer Delay Added";
+          else if (at.includes("TECHNICAL_DELAY")) title = "Technical Delay Added";
+          else if (at.includes("CALLBACK")) title = "Callback Scheduled";
+          else if (at.includes("FORM")) title = "Form Link Sent";
+          else if (l.action_type) title = l.action_type.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase());
+
+          actionHistoryList.push({
+            id: `log-${l.id}`,
+            action_type: l.action_type || "ACTION",
+            title,
+            staff_name: l.staff_name || staff?.display_name || staff?.full_name || "Staff",
+            created_at: l.created_at,
+            note: l.note || l.remarks || null,
+          });
         }
       }
 
-      if (!hasActionTakenInRange) {
-        for (const c of thisAppCerts) {
-          const t = new Date(c.delivered_at || c.issued_at || c.created_at).getTime();
-          if (!hasDateFilter || (t >= fromTime && t <= toTime)) {
-            hasActionTakenInRange = true;
-            break;
+      // Certificates
+      for (const c of thisAppCerts) {
+        const ts = c.delivered_at || c.issued_at || c.created_at;
+        const t = new Date(ts).getTime();
+        if (!hasDateFilter || (t >= fromTime && t <= toTime)) {
+          actionHistoryList.push({
+            id: `cert-${c.id}`,
+            action_type: "CERTIFICATE_UPLOADED",
+            title: "Certificate Uploaded / Delivered",
+            staff_name: c.issued_by_name || staff?.display_name || staff?.full_name || "Staff",
+            created_at: ts,
+            note: c.certificate_number ? `Cert #${c.certificate_number}` : null,
+          });
+        }
+      }
+
+      // Schedulers (Delays & Callbacks)
+      for (const s of thisAppSchedulers) {
+        const t = new Date(s.created_at).getTime();
+        if (!hasDateFilter || (t >= fromTime && t <= toTime)) {
+          const st = String(s.scheduler_type || "").toLowerCase();
+          let title = "Workflow Scheduler";
+          if (st.includes("customer")) title = "Customer Delay Active";
+          else if (st.includes("technical") || st.includes("our_side")) title = "Technical Delay Active";
+          else if (st.includes("callback")) title = "Callback Reminder Active";
+
+          const exists = actionHistoryList.some((x) => Math.abs(new Date(x.created_at).getTime() - t) < 60000);
+          if (!exists) {
+            actionHistoryList.push({
+              id: `sched-${s.id}`,
+              action_type: s.scheduler_type || "SCHEDULER",
+              title,
+              staff_name: staff?.display_name || staff?.full_name || "Staff",
+              created_at: s.created_at,
+              note: s.reason || null,
+            });
           }
         }
       }
 
-      if (!hasActionTakenInRange) {
-        for (const l of thisAppActionLogs) {
-          const t = new Date(l.created_at).getTime();
+      // Events (Manual staff events)
+      for (const ev of thisAppEvents) {
+        const et = String(ev.event_type || "").toLowerCase();
+        if (
+          et !== "order_created" &&
+          et !== "lead_created" &&
+          et !== "payment_received" &&
+          et !== "assignee_updated" &&
+          et !== "order_reopened" &&
+          et !== "followup_email_sent" &&
+          et !== "email_sent" &&
+          et !== "email_failed" &&
+          et !== "email_skipped" &&
+          et !== "internal_review_due"
+        ) {
+          const t = new Date(ev.created_at).getTime();
           if (!hasDateFilter || (t >= fromTime && t <= toTime)) {
-            hasActionTakenInRange = true;
-            break;
-          }
-        }
-      }
+            const exists = actionHistoryList.some((x) => Math.abs(new Date(x.created_at).getTime() - t) < 60000);
+            if (!exists) {
+              let title = ev.event_type ? ev.event_type.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase()) : "Staff Event";
+              if (et.includes("callback_completed")) title = "Callback Completed";
+              else if (et.includes("callback_scheduled")) title = "Callback Scheduled";
+              else if (et.includes("consultation")) title = "Consultation Completed";
+              else if (et.includes("resumed")) title = "Order Resumed / Re-served";
 
-      if (!hasActionTakenInRange) {
-        for (const ev of thisAppEvents) {
-          const et = String(ev.event_type || "").toLowerCase();
-          if (
-            et !== "order_created" &&
-            et !== "lead_created" &&
-            et !== "payment_received" &&
-            et !== "assignee_updated" &&
-            et !== "order_reopened" &&
-            et !== "followup_email_sent" &&
-            et !== "email_sent" &&
-            et !== "email_failed" &&
-            et !== "email_skipped" &&
-            et !== "internal_review_due"
-          ) {
-            const t = new Date(ev.created_at).getTime();
-            if (!hasDateFilter || (t >= fromTime && t <= toTime)) {
-              hasActionTakenInRange = true;
-              break;
+              actionHistoryList.push({
+                id: `ev-${ev.id}`,
+                action_type: ev.event_type || "EVENT",
+                title,
+                staff_name: ev.staff_name || staff?.display_name || staff?.full_name || "Staff",
+                created_at: ev.created_at,
+                note: ev.note || ev.new_value || null,
+              });
             }
           }
         }
       }
 
+      // If completed in range and no history entry yet
+      if (inRangeCompleted && !actionHistoryList.some((x) => x.action_type.toLowerCase().includes("complet"))) {
+        actionHistoryList.push({
+          id: `comp-${a.id}`,
+          action_type: "ORDER_COMPLETED",
+          title: "Order Completed",
+          staff_name: staff?.display_name || staff?.full_name || "Staff",
+          created_at: compTimestamp ? new Date(compTimestamp).toISOString() : a.updated_at || a.created_at,
+          note: "Order fulfilled and marked completed",
+        });
+      }
+
+      // If closed in range and no history entry yet
+      if (inRangeClosed && !actionHistoryList.some((x) => x.action_type.toLowerCase().includes("close"))) {
+        actionHistoryList.push({
+          id: `close-${a.id}`,
+          action_type: "ORDER_CLOSED",
+          title: "Order Closed",
+          staff_name: staff?.display_name || staff?.full_name || "Staff",
+          created_at: closeTimestamp ? new Date(closeTimestamp).toISOString() : a.updated_at || a.created_at,
+          note: "Order closed / customer delay closed",
+        });
+      }
+
+      // Sort actionHistoryList newest to oldest
+      actionHistoryList.sort((x, y) => new Date(y.created_at).getTime() - new Date(x.created_at).getTime());
+
+      let hasActionTakenInRange = actionHistoryList.length > 0;
       if (!hasActionTakenInRange && !hasDateFilter) {
         if (isActionTakenOrder(a)) {
           hasActionTakenInRange = true;
@@ -1478,6 +1559,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       }
 
       const inRangeActionTaken = hasActionTakenInRange;
+      const actionCount = actionHistoryList.length || (inRangeActionTaken ? 1 : 0);
 
       return {
         id: a.id,
@@ -1531,6 +1613,8 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         in_range_technical_delay: inRangeTechnicalDelay,
         in_range_callback_scheduled: inRangeCallbackScheduled,
         in_range_action_taken: inRangeActionTaken,
+        action_count: actionCount,
+        action_history: actionHistoryList,
       };
     });
 
@@ -1584,7 +1668,8 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       technical_delay: 0,
       backlog: 0,
       customer_delay: 0,
-      pending: 0, // Action Taken
+      pending: 0, // Action Taken (Unique Orders)
+      pending_actions_total: 0, // Total Manual Actions Count
       completed: 0,
       closed: 0,
       exception: 0,
@@ -1609,6 +1694,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       // Action Taken (Pending): orders with qualifying employee action in selected date range
       if (r.in_range_action_taken) {
         counts.pending++;
+        counts.pending_actions_total += (r.action_count || 1);
       }
 
       if (r.in_range_completed) {

@@ -30,6 +30,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel,
 } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useRole } from "@/hooks/useRole";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useRealtimeTable } from "@/hooks/useRealtimeTable";
@@ -1116,16 +1117,25 @@ return (
               <span className={cn("text-lg sm:text-xl font-black tracking-tight", countCls)}>
                 {countVal.toLocaleString()}
               </span>
-              {b.badge && (
+              {b.id === "pending" && (counts as any).pending_actions_total > countVal ? (
+                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded leading-none shrink-0 bg-purple-600 text-white shadow-2xs" title={`${(counts as any).pending_actions_total} total manual actions performed across these orders`}>
+                  {(counts as any).pending_actions_total} Actions
+                </span>
+              ) : b.badge ? (
                 <span className={cn("text-[9px] font-bold px-1.5 py-0.5 rounded leading-none shrink-0", b.badge.pillClass)}>
                   {b.badge.text}
                 </span>
-              )}
+              ) : null}
             </div>
 
             {/* Bottom row: Subtitle */}
-            <div className={cn("text-[9.5px] font-medium truncate mt-0.5", subtitleCls)} title={b.subtitle}>
-              {b.subtitle}
+            <div
+              className={cn("text-[9.5px] font-medium truncate mt-0.5", subtitleCls)}
+              title={b.id === "pending" && (counts as any).pending_actions_total > countVal ? `${countVal} unique orders · ${(counts as any).pending_actions_total} total actions performed` : b.subtitle}
+            >
+              {b.id === "pending" && (counts as any).pending_actions_total > countVal
+                ? `${(counts as any).pending_actions_total} Total Actions`
+                : b.subtitle}
             </div>
           </button>
         );
@@ -1368,6 +1378,72 @@ return (
 );
 }
 
+function OrderActionHistoryBadge({ order }: { order: any }) {
+  const history = order.action_history ?? [];
+  const count = order.action_count ?? history.length;
+  if (!count || count <= 0) return null;
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          data-no-row-click
+          onClick={(e) => e.stopPropagation()}
+          className={cn(
+            "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border transition-colors shadow-2xs cursor-pointer select-none shrink-0",
+            count > 1
+              ? "bg-purple-50 text-purple-700 border-purple-300 hover:bg-purple-100 hover:border-purple-400"
+              : "bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200"
+          )}
+          title={`Click to view timeline of ${count} manual action${count === 1 ? "" : "s"} taken on this order`}
+        >
+          <RotateCcw className="size-2.5 text-purple-600 shrink-0" />
+          <span>{count > 1 ? `${count} Actions` : "1 Action"}</span>
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        data-no-row-click
+        onClick={(e) => e.stopPropagation()}
+        align="start"
+        className="w-80 p-3 bg-white border border-slate-200 shadow-xl rounded-xl space-y-2.5 z-50 text-left"
+      >
+        <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+          <span className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+            <RotateCcw className="size-3.5 text-purple-600" />
+            Action Activity Timeline ({count})
+          </span>
+          <span className="text-[10px] font-mono text-slate-400 font-semibold">{order.application_code}</span>
+        </div>
+        <div className="max-h-60 overflow-y-auto space-y-2.5 pr-1 divide-y divide-slate-100">
+          {history.length === 0 ? (
+            <div className="text-xs text-slate-500 py-2">Manual action recorded on order.</div>
+          ) : (
+            history.map((act: any, idx: number) => (
+              <div key={act.id || idx} className="pt-2 first:pt-0 space-y-1">
+                <div className="flex items-center justify-between text-[11px] gap-1">
+                  <span className="font-semibold text-slate-800">{act.title}</span>
+                  <span className="text-[10px] text-slate-400 shrink-0">
+                    {formatIST(act.created_at, { dateOnly: true })} {formatIST(act.created_at, { timeOnly: true })}
+                  </span>
+                </div>
+                <div className="text-[10px] text-purple-700 font-medium">
+                  By {act.staff_name || "Staff"}
+                </div>
+                {act.note && (
+                  <div className="text-[10px] text-slate-600 bg-slate-50 p-1.5 rounded border border-slate-100">
+                    {act.note}
+                  </div>
+                )}
+              </div>
+            ))
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 function OrderCardMobile({
   order,
   bucket,
@@ -1522,6 +1598,8 @@ function OrderCardMobile({
           <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium border ${stageTone}`}>
             {meta?.label ?? stage}
           </span>
+
+          <OrderActionHistoryBadge order={order} />
         </div>
 
         {isAdmin && (
@@ -1741,52 +1819,56 @@ function OrderRow({
       {/* 4. Service */}
       <td className="px-2 py-2.5 text-slate-700 whitespace-nowrap text-[13px]">{order.service_name ?? "—"}</td>
 
-      {/* 5. Action Status */}
+      {/* 5. Action Status & Repeat Actions */}
       <td className="px-2 py-2.5 whitespace-nowrap">
-        {order.is_hot ? (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-rose-100 text-rose-800 border border-rose-300 shadow-2xs">
-            {order.fulfillment_status === "technical_delay" || order.callback_reminder?.remarks?.channel === "technical_delay" ? (
-              <>
-                <Server className="size-3 text-rose-600" />
-                Tech Delay Due
-              </>
-            ) : (
-              <>
-                <PhoneCall className="size-3 text-rose-600" />
-                Call Due Now
-              </>
-            )}
-          </span>
-        ) : order.is_callback_scheduled ? (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
-            {order.fulfillment_status === "technical_delay" || order.callback_reminder?.remarks?.channel === "technical_delay" ? (
-              <>
-                <Server className="size-3 text-indigo-600" />
-                Tech Delay Scheduled
-              </>
-            ) : (
-              <>
-                <PhoneForwarded className="size-3 text-indigo-600" />
-                Scheduled Callback
-              </>
-            )}
-          </span>
-        ) : actionStatus.tone === "red" ? (
-          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200">
-            <span className="size-1.5 rounded-full bg-rose-600 animate-pulse" />
-            {actionStatus.label}
-          </span>
-        ) : actionStatus.tone === "green" ? (
-          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
-            <span className="size-1.5 rounded-full bg-emerald-500" />
-            {actionStatus.label}
-          </span>
-        ) : (
-          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium bg-sky-50 text-sky-700 border border-sky-200">
-            <span className="size-1.5 rounded-full bg-sky-500" />
-            {actionStatus.label}
-          </span>
-        )}
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {order.is_hot ? (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-rose-100 text-rose-800 border border-rose-300 shadow-2xs">
+              {order.fulfillment_status === "technical_delay" || order.callback_reminder?.remarks?.channel === "technical_delay" ? (
+                <>
+                  <Server className="size-3 text-rose-600" />
+                  Tech Delay Due
+                </>
+              ) : (
+                <>
+                  <PhoneCall className="size-3 text-rose-600" />
+                  Call Due Now
+                </>
+              )}
+            </span>
+          ) : order.is_callback_scheduled ? (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
+              {order.fulfillment_status === "technical_delay" || order.callback_reminder?.remarks?.channel === "technical_delay" ? (
+                <>
+                  <Server className="size-3 text-indigo-600" />
+                  Tech Delay Scheduled
+                </>
+              ) : (
+                <>
+                  <PhoneForwarded className="size-3 text-indigo-600" />
+                  Scheduled Callback
+                </>
+              )}
+            </span>
+          ) : actionStatus.tone === "red" ? (
+            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200">
+              <span className="size-1.5 rounded-full bg-rose-600 animate-pulse" />
+              {actionStatus.label}
+            </span>
+          ) : actionStatus.tone === "green" ? (
+            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+              <span className="size-1.5 rounded-full bg-emerald-500" />
+              {actionStatus.label}
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium bg-sky-50 text-sky-700 border border-sky-200">
+              <span className="size-1.5 rounded-full bg-sky-500" />
+              {actionStatus.label}
+            </span>
+          )}
+
+          <OrderActionHistoryBadge order={order} />
+        </div>
       </td>
 
       {/* 6. Stage */}
