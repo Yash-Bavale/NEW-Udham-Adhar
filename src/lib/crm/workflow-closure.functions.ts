@@ -80,7 +80,6 @@ async function executeOrderClosure({
     .from("applications")
     .update({
       workflow_status: "closed",
-      workflow_closed_at: closedAt,
       fulfillment_status: "order_closed",
       order_status: "CLOSED",
       closure_stage: "closed",
