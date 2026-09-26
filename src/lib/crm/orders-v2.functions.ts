@@ -1285,29 +1285,31 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       }
       const inRangeCallbackScheduled = hasDateFilter ? hasCallbackInRange : isCallbackScheduledOrder(a);
 
-      // ── 6. Determine Qualifying Action Taken In Range ──
+      // ── 6. Determine Qualifying Action Taken In Range (Active & In-Progress only, excluding Completed & Closed) ──
       let hasActionTakenInRange = false;
-      if (inRangeCompleted || inRangeClosed || inRangeCustomerDelay || inRangeTechnicalDelay || inRangeCallbackScheduled) {
-        hasActionTakenInRange = true;
-      } else if (hasDateFilter) {
-        for (const l of thisAppActionLogs) {
-          const t = new Date(l.created_at).getTime();
-          if (t >= fromTime && t <= toTime) {
-            hasActionTakenInRange = true;
-            break;
-          }
-        }
-        if (!hasActionTakenInRange) {
-          for (const ev of thisAppEvents) {
-            const t = new Date(ev.created_at).getTime();
+      if (!inRangeCompleted && !inRangeClosed) {
+        if (inRangeCustomerDelay || inRangeTechnicalDelay || inRangeCallbackScheduled) {
+          hasActionTakenInRange = true;
+        } else if (hasDateFilter) {
+          for (const l of thisAppActionLogs) {
+            const t = new Date(l.created_at).getTime();
             if (t >= fromTime && t <= toTime) {
               hasActionTakenInRange = true;
               break;
             }
           }
+          if (!hasActionTakenInRange) {
+            for (const ev of thisAppEvents) {
+              const t = new Date(ev.created_at).getTime();
+              if (t >= fromTime && t <= toTime) {
+                hasActionTakenInRange = true;
+                break;
+              }
+            }
+          }
+        } else {
+          hasActionTakenInRange = isActionTakenOrder(a) && !isCompletedStage && !isClosedStage;
         }
-      } else {
-        hasActionTakenInRange = isActionTakenOrder(a);
       }
       const inRangeActionTaken = hasActionTakenInRange;
 
@@ -1317,6 +1319,8 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         fulfillment_status: (a.fulfillment_status ?? "order_received") as FulfillmentStatus,
         lead_status_v2: lead?.lead_status_v2 ?? null,
         created_at: a.created_at,
+        completed_at: compTimestamp ? new Date(compTimestamp).toISOString() : null,
+        closed_at: closeTimestamp ? new Date(closeTimestamp).toISOString() : null,
         lead_id: a.lead_id,
         lead_code: lead?.lead_code ?? null,
         customer_id: a.customer_id,
@@ -1512,6 +1516,18 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         const fB = b.callback_reminder?.fires_at ? new Date(b.callback_reminder.fires_at).getTime() : Infinity;
         if (fA !== fB) return fA - fB;
         return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+      });
+    } else if (bucket === "completed" && (!normalized.sortField || normalized.sortField === "created_at")) {
+      filtered.sort((a, b) => {
+        const tA = a.completed_at ? new Date(a.completed_at).getTime() : new Date(a.created_at).getTime();
+        const tB = b.completed_at ? new Date(b.completed_at).getTime() : new Date(b.created_at).getTime();
+        return normalized.sortOrder === "asc" ? tA - tB : tB - tA;
+      });
+    } else if (bucket === "closed" && (!normalized.sortField || normalized.sortField === "created_at")) {
+      filtered.sort((a, b) => {
+        const tA = a.closed_at ? new Date(a.closed_at).getTime() : new Date(a.created_at).getTime();
+        const tB = b.closed_at ? new Date(b.closed_at).getTime() : new Date(b.created_at).getTime();
+        return normalized.sortOrder === "asc" ? tA - tB : tB - tA;
       });
     } else if (normalized.sortField === "stage") {
       filtered.sort((a, b) => {

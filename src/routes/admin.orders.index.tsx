@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, keepPreviousData, useQueryClient } from "@tanstack/react-query";
 import { Fragment, useEffect, useMemo, useRef, useState, useCallback } from "react";
-import { Search, ChevronLeft, ChevronRight, RotateCcw, X, Filter, Loader2, ArrowUpDown, ArrowUp, ArrowDown, ShieldAlert, Flame, PhoneCall, PhoneForwarded, Clock, Server, LayoutGrid, Inbox, Bell, Hourglass, CheckCircle2, CheckCheck, AlertTriangle, UserX, UserCheck, Scale, Sparkles } from "lucide-react";
+import { ChevronLeft, ChevronRight, RotateCcw, X, Filter, Loader2, ArrowUpDown, ArrowUp, ArrowDown, ShieldAlert, Flame, PhoneCall, PhoneForwarded, Clock, Server, LayoutGrid, Inbox, Bell, Hourglass, CheckCircle2, CheckCheck, AlertTriangle, UserX, UserCheck, Scale, Sparkles, RefreshCw } from "lucide-react";
 import { formatIST, istDateKey } from "@/lib/datetime";
 import { toast } from "sonner";
 
@@ -26,6 +26,7 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { DateRangePicker } from "@/components/ui/DateRangePicker";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel,
 } from "@/components/ui/select";
@@ -166,7 +167,7 @@ const BUCKET_CARDS: BucketCardItem[] = [
   {
     id: "pending",
     label: "ACTION TAKEN",
-    subtitle: "Delays, Calls & Completed",
+    subtitle: "In-Progress & Delays",
     icon: Hourglass,
     tone: "amber",
   },
@@ -209,6 +210,17 @@ const PENDING_AGE_OPTIONS: { id: PendingAge; label: string }[] = [
   { id: "custom", label: "Custom days…" },
 ];
 
+type RangePreset = "today" | "yesterday" | "7d" | "15d" | "30d" | "mtd" | "custom";
+const RANGE_PRESETS: { value: RangePreset; label: string }[] = [
+  { value: "today", label: "Today" },
+  { value: "yesterday", label: "Yesterday" },
+  { value: "7d", label: "7 days" },
+  { value: "15d", label: "15 days" },
+  { value: "30d", label: "30 days" },
+  { value: "mtd", label: "This month" },
+  { value: "custom", label: "Custom" },
+];
+
 function daysSince(iso: string | null | undefined): number {
   if (!iso) return 0;
   const t = new Date(iso).getTime();
@@ -233,8 +245,11 @@ function OrdersListPage() {
 
   const todayKey = useMemo(() => istDateKey(new Date()), []);
 
-  const [search, setSearch] = useState<string>(savedState?.search ?? "");
-  const [debouncedSearch, setDebouncedSearch] = useState<string>(savedState?.debouncedSearch ?? "");
+  const [datePreset, setDatePreset] = useState<RangePreset>(() => {
+    if (savedState?.datePreset) return savedState.datePreset;
+    if (savedState?.dateFrom && savedState.dateFrom !== todayKey) return "custom";
+    return "today";
+  });
   const [fulfillmentStatus, setFulfillmentStatus] = useState<string>(savedState?.fulfillmentStatus ?? "all");
   const [serviceId, setServiceId] = useState<string>(savedState?.serviceId ?? "all");
   const [assignedTo, setAssignedTo] = useState<string>(savedState?.assignedTo ?? "all");
@@ -252,22 +267,45 @@ function OrdersListPage() {
   const pageSize = 50;
   const isInitialMount = useRef(true);
 
+  const applyDatePreset = useCallback((p: RangePreset) => {
+    setDatePreset(p);
+    const now = new Date();
+    const tKey = istDateKey(now);
+    if (p === "today") {
+      setDateFrom(tKey);
+      setDateTo(tKey);
+    } else if (p === "yesterday") {
+      const yKey = istDateKey(new Date(now.getTime() - 86400000));
+      setDateFrom(yKey);
+      setDateTo(yKey);
+    } else if (p === "7d") {
+      const startKey = istDateKey(new Date(now.getTime() - 6 * 86400000));
+      setDateFrom(startKey);
+      setDateTo(tKey);
+    } else if (p === "15d") {
+      const startKey = istDateKey(new Date(now.getTime() - 14 * 86400000));
+      setDateFrom(startKey);
+      setDateTo(tKey);
+    } else if (p === "30d") {
+      const startKey = istDateKey(new Date(now.getTime() - 29 * 86400000));
+      setDateFrom(startKey);
+      setDateTo(tKey);
+    } else if (p === "mtd") {
+      const ist = new Date(now.getTime() + 5.5 * 3600 * 1000);
+      const monthStart = new Date(Date.UTC(ist.getUTCFullYear(), ist.getUTCMonth(), 1));
+      setDateFrom(istDateKey(monthStart));
+      setDateTo(tKey);
+    }
+  }, []);
+
   // Persist state across navigation
   useEffect(() => {
     saveModuleFilterState("admin.orders", {
-      search, debouncedSearch, fulfillmentStatus, serviceId, assignedTo,
+      datePreset, fulfillmentStatus, serviceId, assignedTo,
       paymentStatus, actionStatusFilter, stageFilter, dateFrom, dateTo, bucket, pendingAge,
       customDays, sortField, sortOrder, page,
     });
-  }, [search, debouncedSearch, fulfillmentStatus, serviceId, assignedTo, paymentStatus, actionStatusFilter, stageFilter, dateFrom, dateTo, bucket, pendingAge, customDays, sortField, sortOrder, page]);
-
-  // Debounce search input by 350ms
-  useEffect(() => {
-    const t = setTimeout(() => {
-      setDebouncedSearch(search);
-    }, 350);
-    return () => clearTimeout(t);
-  }, [search]);
+  }, [datePreset, fulfillmentStatus, serviceId, assignedTo, paymentStatus, actionStatusFilter, stageFilter, dateFrom, dateTo, bucket, pendingAge, customDays, sortField, sortOrder, page]);
 
   // Reset page to 1 whenever filters change (skip on initial mount to preserve Page 2/3 when returning via Back button)
   useEffect(() => {
@@ -276,7 +314,7 @@ function OrdersListPage() {
       return;
     }
     setPage(1);
-  }, [fulfillmentStatus, serviceId, assignedTo, paymentStatus, actionStatusFilter, stageFilter, dateFrom, dateTo, bucket, pendingAge, customDays, sortField, sortOrder, debouncedSearch]);
+  }, [fulfillmentStatus, serviceId, assignedTo, paymentStatus, actionStatusFilter, stageFilter, dateFrom, dateTo, bucket, pendingAge, customDays, sortField, sortOrder]);
 
   const routeSearch = Route.useSearch();
   const lastProcessedSearchRef = useRef<string>("");
@@ -307,22 +345,14 @@ function OrdersListPage() {
       }
     }
     if (routeSearch.preset) {
-      const now = new Date();
-      if (routeSearch.preset === "today") {
-        const todayKey = istDateKey(now);
-        setDateFrom(todayKey);
-        setDateTo(todayKey);
-      } else if (routeSearch.preset === "yesterday") {
-        const yestKey = istDateKey(new Date(now.getTime() - 86400000));
-        setDateFrom(yestKey);
-        setDateTo(yestKey);
+      if (["today", "yesterday", "7d", "15d", "30d", "mtd", "custom"].includes(routeSearch.preset)) {
+        applyDatePreset(routeSearch.preset as RangePreset);
       }
     }
     if (routeSearch.dateFrom) setDateFrom(routeSearch.dateFrom);
     if (routeSearch.dateTo) setDateTo(routeSearch.dateTo);
     if (routeSearch.stage) setStageFilter(routeSearch.stage);
-    if (routeSearch.search) setSearch(routeSearch.search);
-  }, [routeSearch]);
+  }, [routeSearch, applyDatePreset]);
 
   const dateRangeValue = useMemo(() => ({
     from: dateFrom ? new Date(dateFrom.includes("T") ? dateFrom : `${dateFrom}T00:00:00+05:30`) : undefined,
@@ -426,7 +456,6 @@ function OrdersListPage() {
     paymentStatus: paymentStatus === "all" ? undefined : paymentStatus,
     dateFrom: dateFrom || undefined,
     dateTo: dateTo || undefined,
-    search: debouncedSearch || undefined,
     bucket: bucket || "all",
     stage: stageFilter === "all" ? undefined : stageFilter,
     actionStatus: actionStatusFilter || "all",
@@ -434,7 +463,7 @@ function OrdersListPage() {
     customDays: customDays || undefined,
     sortField,
     sortOrder,
-  }), [page, pageSize, fulfillmentStatus, serviceId, assignedTo, paymentStatus, dateFrom, dateTo, debouncedSearch, bucket, stageFilter, actionStatusFilter, pendingAge, customDays, sortField, sortOrder]);
+  }), [page, pageSize, fulfillmentStatus, serviceId, assignedTo, paymentStatus, dateFrom, dateTo, bucket, stageFilter, actionStatusFilter, pendingAge, customDays, sortField, sortOrder]);
 
   const normalizedFilter = useMemo(() => normalizeOrdersFilter(queryPayload), [queryPayload]);
 
@@ -574,40 +603,42 @@ const groups = useMemo(() => {
   const g = new Map<string, any[]>();
 
   for (const r of rows) {
-    const key = istDateKey(r.created_at) || "Unknown";
+    const rawKey =
+      bucket === "completed"
+        ? (r.completed_at || r.created_at)
+        : bucket === "closed"
+          ? (r.closed_at || r.created_at)
+          : r.created_at;
+    const key = istDateKey(rawKey) || "Unknown";
     const arr = g.get(key) ?? [];
     arr.push(r);
     g.set(key, arr);
   }
 
   return Array.from(g.entries());
-}, [rows]);
+}, [rows, bucket]);
 
   const isFilterActive =
-    search !== "" ||
     fulfillmentStatus !== "all" ||
     serviceId !== "all" ||
     assignedTo !== "all" ||
     paymentStatus !== "all" ||
     actionStatusFilter !== "all" ||
     stageFilter !== "all" ||
+    datePreset !== "today" ||
     (dateFrom !== "" && dateFrom !== todayKey) ||
     (dateTo !== "" && dateTo !== todayKey) ||
     pendingAge !== "any" ||
     bucket !== (isAdmin ? "all" : "needs_action");
 
   const resetFilters = () => {
-    const today = istDateKey(new Date());
-    setSearch("");
-    setDebouncedSearch("");
     setFulfillmentStatus("all");
     setServiceId("all");
     setAssignedTo("all");
     setPaymentStatus("all");
     setActionStatusFilter("all");
     setStageFilter("all");
-    setDateFrom(today);
-    setDateTo(today);
+    applyDatePreset("today");
     setPendingAge("any");
     setCustomDays("");
     setSortField("created_at");
@@ -683,24 +714,53 @@ return (
     {/* Modern Filter Card */}
     <div className="rounded-xl border border-slate-200 bg-white p-3.5 shadow-xs space-y-3">
       <div className="flex flex-wrap gap-2.5 items-center">
-        {/* Search bar */}
-        <div className="relative flex-1 min-w-[240px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-slate-400" />
-          <Input
-            placeholder="Search order #, customer, mobile, lead code…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9 pr-8 h-9 text-xs bg-slate-50/50 border-slate-200 focus:bg-white transition-colors"
-          />
-          {search && (
-            <button
-              type="button"
-              onClick={() => setSearch("")}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-            >
-              <X className="size-3.5" />
-            </button>
+        {/* Date Preset Selector */}
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <Tabs
+            value={datePreset}
+            onValueChange={(v) => applyDatePreset(v as RangePreset)}
+          >
+            <TabsList className="h-9 bg-slate-100/90 p-0.5 rounded-lg border border-slate-200">
+              {RANGE_PRESETS.map((p) => (
+                <TabsTrigger
+                  key={p.value}
+                  value={p.value}
+                  className="text-xs px-2.5 py-1 font-medium data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-xs rounded-md"
+                >
+                  {p.label}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </Tabs>
+
+          {datePreset === "custom" && (
+            <DateRangePicker
+              value={dateRangeValue}
+              onChange={(range) => {
+                if (!range.from) {
+                  setDateFrom("");
+                  setDateTo("");
+                } else {
+                  setDateFrom(istDateKey(range.from));
+                  setDateTo(range.to ? istDateKey(range.to) : istDateKey(range.from));
+                }
+              }}
+            />
           )}
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              qc.invalidateQueries({ queryKey: ["admin.orders.v2"] });
+              toast.success("Refreshing orders…");
+            }}
+            className="h-9 gap-1.5 text-xs text-slate-700 hover:text-slate-900 bg-slate-50/50 hover:bg-slate-100 border-slate-200 shadow-2xs"
+            title="Refresh orders"
+          >
+            <RefreshCw className={`size-3.5 ${isFetching && !isLoading ? "animate-spin text-indigo-600" : "text-slate-500"}`} />
+            <span>Refresh</span>
+          </Button>
         </div>
 
         {/* Stage Filter */}
@@ -848,19 +908,6 @@ return (
           </SelectContent>
         </Select>
 
-        <DateRangePicker
-          value={dateRangeValue}
-          onChange={(range) => {
-            if (!range.from) {
-              setDateFrom("");
-              setDateTo("");
-            } else {
-              setDateFrom(istDateKey(range.from));
-              setDateTo(range.to ? istDateKey(range.to) : istDateKey(range.from));
-            }
-          }}
-        />
-
         {/* Pending Age */}
         <Select value={pendingAge} onValueChange={(v) => setPendingAge(v as PendingAge)}>
           <SelectTrigger className="h-9 w-[140px] text-xs bg-slate-50/50 border-slate-200">
@@ -904,8 +951,12 @@ return (
             <SelectValue placeholder="Sort order" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="created_desc">Latest First (Newest)</SelectItem>
-            <SelectItem value="created_asc">Older First (Oldest)</SelectItem>
+            <SelectItem value="created_desc">
+              {bucket === "completed" ? "Latest Completed (Newest)" : bucket === "closed" ? "Latest Closed (Newest)" : "Latest First (Newest)"}
+            </SelectItem>
+            <SelectItem value="created_asc">
+              {bucket === "completed" ? "Older Completed (Oldest)" : bucket === "closed" ? "Older Closed (Oldest)" : "Older First (Oldest)"}
+            </SelectItem>
             <SelectItem value="stage_asc">Stage (A → Z)</SelectItem>
             <SelectItem value="stage_desc">Stage (Z → A)</SelectItem>
             <SelectItem value="stage_journey_asc">Stage (Journey Order)</SelectItem>
@@ -1169,10 +1220,10 @@ return (
               <th
                 onClick={() => handleSortToggle("created_at")}
                 className="text-left font-semibold px-3 py-2.5 cursor-pointer hover:bg-slate-100/80 transition-colors select-none group"
-                title="Click to toggle sorting by Created time"
+                title={`Click to toggle sorting by ${bucket === "completed" ? "Completed" : bucket === "closed" ? "Closed" : "Created"} time`}
               >
                 <div className="inline-flex items-center gap-1">
-                  <span>Created</span>
+                  <span>{bucket === "completed" ? "Completed" : bucket === "closed" ? "Closed" : "Created"}</span>
                   {sortField === "created_at" ? (
                     sortOrder === "desc" ? (
                       <ArrowDown className="w-3 h-3 text-indigo-600" />
@@ -1229,6 +1280,7 @@ return (
                   <OrderRow
                     key={r.id}
                     order={r}
+                    bucket={bucket}
                     hideMoney={hideMoney}
                     isAdmin={isAdmin}
                     selected={selectedOrderIds.includes(r.id)}
@@ -1269,6 +1321,7 @@ return (
               <OrderCardMobile
                 key={r.id}
                 order={r}
+                bucket={bucket}
                 hideMoney={hideMoney}
                 isAdmin={isAdmin}
                 selected={selectedOrderIds.includes(r.id)}
@@ -1317,6 +1370,7 @@ return (
 
 function OrderCardMobile({
   order,
+  bucket,
   hideMoney,
   isAdmin,
   selected,
@@ -1324,6 +1378,7 @@ function OrderCardMobile({
   onOpen,
 }: {
   order: any;
+  bucket?: Bucket;
   hideMoney: boolean;
   isAdmin: boolean;
   selected?: boolean;
@@ -1333,6 +1388,14 @@ function OrderCardMobile({
   const stage: OrderStage = order.stage;
   const meta = STAGE_META[stage];
   const actionStatus = getOrderActionStatus(order);
+
+  const isCompletedView = bucket === "completed";
+  const isClosedView = bucket === "closed";
+  const dateToShow = isCompletedView
+    ? (order.completed_at || order.created_at)
+    : isClosedView
+      ? (order.closed_at || order.created_at)
+      : order.created_at;
 
   const stageToneMap: Record<string, string> = {
     emerald: "bg-emerald-50 text-emerald-700 border-emerald-200",
@@ -1376,7 +1439,7 @@ function OrderCardMobile({
               <Flame className="size-2.5" /> HOT ORDER NOW
             </span>
           )}
-          {(!order.fulfillment_status || order.fulfillment_status === "order_received") && (
+          {!isCompletedView && !isClosedView && (!order.fulfillment_status || order.fulfillment_status === "order_received") && (
             <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-800 border border-amber-200">
               {formatOrderAge(Date.now() - new Date(order.created_at).getTime())}
             </span>
@@ -1395,7 +1458,7 @@ function OrderCardMobile({
           {order.customer_mobile && <span className="ml-1.5 text-slate-500">({order.customer_mobile})</span>}
         </div>
         <div className="text-[11px] text-slate-400">
-          {formatIST(order.created_at, { dateOnly: true })} {formatIST(order.created_at, { timeOnly: true })}
+          {formatIST(dateToShow, { dateOnly: true })} {formatIST(dateToShow, { timeOnly: true })} IST
         </div>
       </div>
 
@@ -1557,6 +1620,7 @@ export function getOrderActionStatus(order: any): { label: string; tone: "red" |
 
 function OrderRow({
   order,
+  bucket,
   hideMoney,
   isAdmin,
   selected,
@@ -1564,6 +1628,7 @@ function OrderRow({
   onOpen,
 }: {
   order: any;
+  bucket?: Bucket;
   hideMoney: boolean;
   isAdmin: boolean;
   selected?: boolean;
@@ -1572,6 +1637,14 @@ function OrderRow({
 }) {
   const stage: OrderStage = order.stage;
   const meta = STAGE_META[stage];
+
+  const isCompletedView = bucket === "completed";
+  const isClosedView = bucket === "closed";
+  const dateToShow = isCompletedView
+    ? (order.completed_at || order.created_at)
+    : isClosedView
+      ? (order.closed_at || order.created_at)
+      : order.created_at;
 
   const stageToneMap: Record<string, string> = {
     emerald: "bg-emerald-50 text-emerald-700",
@@ -1625,14 +1698,14 @@ function OrderRow({
         </div>
       </td>
 
-      {/* 2. Created */}
+      {/* 2. Created / Completed / Closed */}
       <td className="px-2 py-2.5 text-[11px] text-slate-600 whitespace-nowrap leading-tight">
         <div className="flex items-center gap-1.5">
           <div>
-            <div>{formatIST(order.created_at, { dateOnly: true })}</div>
-            <div className="text-slate-400">{formatIST(order.created_at, { timeOnly: true })} IST</div>
+            <div>{formatIST(dateToShow, { dateOnly: true })}</div>
+            <div className="text-slate-400">{formatIST(dateToShow, { timeOnly: true })} IST</div>
           </div>
-          {(!order.fulfillment_status || order.fulfillment_status === "order_received") && (
+          {!isCompletedView && !isClosedView && (!order.fulfillment_status || order.fulfillment_status === "order_received") && (
             <span
               className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-800 border border-amber-200"
               title="Time since order created — clears once first action is taken"

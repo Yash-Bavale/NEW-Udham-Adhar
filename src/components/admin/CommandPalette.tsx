@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/command";
 import {
   Users, FileText, LayoutDashboard, Briefcase, UserCog, Receipt, MessageSquareWarning,
-  Award, Mail, Activity, ShieldCheck, CreditCard, Settings,
+  Award, Mail, Activity, ShieldCheck, CreditCard, Settings, LifeBuoy,
 } from "lucide-react";
 import { globalSearch, type SearchHit } from "@/lib/crm/global-search.functions";
 
@@ -27,6 +27,7 @@ const QUICK_NAV: { to: string; label: string; icon: React.ComponentType<{ classN
   { to: "/admin/review", label: "Document Review", icon: FileText, group: "Applications" },
   { to: "/admin/submissions", label: "Submissions", icon: FileText, group: "Applications" },
   { to: "/admin/tasks", label: "Tasks", icon: Activity, group: "Operations" },
+  { to: "/admin/support/tickets", label: "Support Tickets", icon: LifeBuoy, group: "Operations", shortcut: "g t" },
   { to: "/admin/complaints", label: "Complaints", icon: MessageSquareWarning, group: "Operations" },
   { to: "/admin/certificates", label: "Certificates", icon: Award, group: "Operations" },
   { to: "/admin/services", label: "Service Catalog", icon: Briefcase, group: "Services" },
@@ -119,7 +120,7 @@ function KindIcon({ kind }: { kind: SearchHit["kind"] }) {
     invoice: Receipt,
     certificate: Award,
     complaint: MessageSquareWarning,
-    ticket: Mail,
+    ticket: LifeBuoy,
   } as const;
   const Icon = (map as Record<string, any>)[kind] || FileText;
   return <Icon className="size-4" />;
