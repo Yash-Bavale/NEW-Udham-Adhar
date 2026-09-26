@@ -1558,19 +1558,11 @@ function formatDayHeader(dayKey: string): string {
 }
 
 export function getOrderActionStatus(order: any): { label: string; tone: "red" | "green" | "blue" } {
-  const isTechDelay = order.fulfillment_status === "technical_delay" || order.callback_reminder?.remarks?.channel === "technical_delay";
-  if (order.is_hot) {
-    return { label: isTechDelay ? "Tech Delay Due" : "Call Due Now", tone: "red" };
-  }
-  if (order.is_callback_scheduled) {
-    return { label: isTechDelay ? "Tech Delay Scheduled" : "Scheduled Callback", tone: "blue" };
-  }
-
   const fs = order.fulfillment_status ?? "order_received";
   const stage = order.stage;
 
   // Closed states -> Subtle Green "Order Closed"
-  if (fs === "order_closed" || fs === "cancelled" || stage === "closed") {
+  if (fs === "order_closed" || fs === "cancelled" || stage === "closed" || order.is_terminal) {
     return { label: "Order Closed", tone: "green" };
   }
 
@@ -1584,6 +1576,14 @@ export function getOrderActionStatus(order: any): { label: string; tone: "red" |
 
   if (greenStatuses.has(fs) || stage === "completed") {
     return { label: "Completed", tone: "green" };
+  }
+
+  const isTechDelay = order.fulfillment_status === "technical_delay" || order.callback_reminder?.remarks?.channel === "technical_delay";
+  if (order.is_hot) {
+    return { label: isTechDelay ? "Tech Delay Due" : "Call Due Now", tone: "red" };
+  }
+  if (order.is_callback_scheduled) {
+    return { label: isTechDelay ? "Tech Delay Scheduled" : "Scheduled Callback", tone: "blue" };
   }
 
   // Action taken / in-progress states -> Subtle Blue "Action Taken"

@@ -393,9 +393,10 @@ export type Bucket =
   | "exception";
 
 export function isCustomerDelayOrder(row: any): boolean {
-  if (row.is_terminal) return false;
   const fs = String(row.fulfillment_status ?? "").toLowerCase();
   const stage = String(row.stage ?? "").toLowerCase();
+  if (row.is_terminal || stage === "completed" || stage === "closed" || COMPLETED_FS.has(fs) || CLOSED_FS.has(fs)) return false;
+
   const ws = String(row.workflow_status ?? "").toLowerCase();
   const os = String(row.order_status ?? "").toUpperCase();
   const cbChannel = String(row.callback_reminder?.remarks?.channel ?? "").toLowerCase();
@@ -427,12 +428,13 @@ export function isCustomerDelayOrder(row: any): boolean {
 }
 
 export function isTechnicalDelayOrder(row: any): boolean {
-  if (row.is_terminal) return false;
+  const fs = String(row.fulfillment_status ?? "").toLowerCase();
+  const stage = String(row.stage ?? "").toLowerCase();
+  if (row.is_terminal || stage === "completed" || stage === "closed" || COMPLETED_FS.has(fs) || CLOSED_FS.has(fs)) return false;
+
   // Safeguard: Customer Delay is NEVER Technical Delay
   if (isCustomerDelayOrder(row)) return false;
 
-  const fs = String(row.fulfillment_status ?? "").toLowerCase();
-  const stage = String(row.stage ?? "").toLowerCase();
   const ws = String(row.workflow_status ?? "").toLowerCase();
   const os = String(row.order_status ?? "").toUpperCase();
   const cbChannel = String(row.callback_reminder?.remarks?.channel ?? "").toLowerCase();
@@ -460,7 +462,9 @@ export function isTechnicalDelayOrder(row: any): boolean {
 }
 
 export function isCallbackScheduledOrder(row: any): boolean {
-  if (row.is_terminal || row.is_hot) return false;
+  const fs = String(row.fulfillment_status ?? "").toLowerCase();
+  const stage = String(row.stage ?? "").toLowerCase();
+  if (row.is_terminal || row.is_hot || stage === "completed" || stage === "closed" || COMPLETED_FS.has(fs) || CLOSED_FS.has(fs)) return false;
   return Boolean(
     row.is_callback_scheduled ||
     (row.callback_reminder && !row.callback_reminder.is_due && !isTechnicalDelayOrder(row) && !isCustomerDelayOrder(row))
@@ -468,12 +472,14 @@ export function isCallbackScheduledOrder(row: any): boolean {
 }
 
 export function isActionTakenOrder(row: any): boolean {
+  const fs = String(row.fulfillment_status ?? "").toLowerCase();
+  const stage = String(row.stage ?? "").toLowerCase();
+  if (row.is_terminal || stage === "completed" || stage === "closed" || COMPLETED_FS.has(fs) || CLOSED_FS.has(fs)) return false;
   return Boolean(
     isTechnicalDelayOrder(row) ||
     isCustomerDelayOrder(row) ||
     isCallbackScheduledOrder(row) ||
-    row.is_callback_scheduled ||
-    row.in_range_completed
+    row.is_callback_scheduled
   );
 }
 
@@ -1207,83 +1213,95 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         (!hasDateFilter || (closeTimestamp >= fromTime && closeTimestamp <= toTime))
       );
 
-      // ── 3. Determine Customer Delay In Range ──
+      // ── 3. Determine Customer Delay In Range (Strictly active, non-completed & non-closed orders) ──
       let hasCustDelayInRange = false;
-      if (a.customer_hold_started_at) {
-        const t = new Date(a.customer_hold_started_at).getTime();
-        if (t >= fromTime && t <= toTime) hasCustDelayInRange = true;
-      }
-      for (const s of thisAppSchedulers) {
-        const st = String(s.scheduler_type || "").toLowerCase();
-        if (st.includes("customer_side_delay") || st.includes("customer_delay")) {
-          const t = new Date(s.created_at).getTime();
+      if (!isCompletedStage && !isClosedStage && !inRangeCompleted && !inRangeClosed && !isTerminal) {
+        if (a.customer_hold_started_at) {
+          const t = new Date(a.customer_hold_started_at).getTime();
           if (t >= fromTime && t <= toTime) hasCustDelayInRange = true;
         }
-      }
-      for (const l of thisAppActionLogs) {
-        const at = String(l.action_type || "").toUpperCase();
-        if (at === "CUSTOMER_DELAY_ADDED" || at === "CUSTOMER_DELAY") {
-          const t = new Date(l.created_at).getTime();
-          if (t >= fromTime && t <= toTime) hasCustDelayInRange = true;
+        for (const s of thisAppSchedulers) {
+          const st = String(s.scheduler_type || "").toLowerCase();
+          if (st.includes("customer_side_delay") || st.includes("customer_delay")) {
+            const t = new Date(s.created_at).getTime();
+            if (t >= fromTime && t <= toTime) hasCustDelayInRange = true;
+          }
+        }
+        for (const l of thisAppActionLogs) {
+          const at = String(l.action_type || "").toUpperCase();
+          if (at === "CUSTOMER_DELAY_ADDED" || at === "CUSTOMER_DELAY") {
+            const t = new Date(l.created_at).getTime();
+            if (t >= fromTime && t <= toTime) hasCustDelayInRange = true;
+          }
+        }
+        for (const ev of thisAppEvents) {
+          const et = String(ev.event_type || "").toLowerCase();
+          const nv = String(ev.new_value || "").toLowerCase();
+          if (et.includes("customer_delay") || nv.includes("customer_delay")) {
+            const t = new Date(ev.created_at).getTime();
+            if (t >= fromTime && t <= toTime) hasCustDelayInRange = true;
+          }
         }
       }
-      for (const ev of thisAppEvents) {
-        const et = String(ev.event_type || "").toLowerCase();
-        const nv = String(ev.new_value || "").toLowerCase();
-        if (et.includes("customer_delay") || nv.includes("customer_delay")) {
-          const t = new Date(ev.created_at).getTime();
-          if (t >= fromTime && t <= toTime) hasCustDelayInRange = true;
-        }
-      }
-      const inRangeCustomerDelay = hasDateFilter ? hasCustDelayInRange : isCustomerDelayOrder(a);
+      const inRangeCustomerDelay = (!isCompletedStage && !isClosedStage && !inRangeCompleted && !inRangeClosed && !isTerminal)
+        ? (hasDateFilter ? hasCustDelayInRange : isCustomerDelayOrder(a))
+        : false;
 
-      // ── 4. Determine Technical Delay In Range ──
+      // ── 4. Determine Technical Delay In Range (Strictly active, non-completed & non-closed orders) ──
       let hasTechDelayInRange = false;
-      if (a.technical_hold_started_at && !inRangeCustomerDelay) {
-        const t = new Date(a.technical_hold_started_at).getTime();
-        if (t >= fromTime && t <= toTime) hasTechDelayInRange = true;
-      }
-      for (const s of thisAppSchedulers) {
-        const st = String(s.scheduler_type || "").toLowerCase();
-        if ((st.includes("technical_delay") || st.includes("our_side_delay")) && !inRangeCustomerDelay) {
-          const t = new Date(s.created_at).getTime();
+      if (!isCompletedStage && !isClosedStage && !inRangeCompleted && !inRangeClosed && !isTerminal && !inRangeCustomerDelay) {
+        if (a.technical_hold_started_at) {
+          const t = new Date(a.technical_hold_started_at).getTime();
           if (t >= fromTime && t <= toTime) hasTechDelayInRange = true;
         }
-      }
-      for (const l of thisAppActionLogs) {
-        const at = String(l.action_type || "").toUpperCase();
-        if ((at === "TECHNICAL_DELAY_ADDED" || at === "TECHNICAL_DELAY") && !inRangeCustomerDelay) {
-          const t = new Date(l.created_at).getTime();
-          if (t >= fromTime && t <= toTime) hasTechDelayInRange = true;
+        for (const s of thisAppSchedulers) {
+          const st = String(s.scheduler_type || "").toLowerCase();
+          if (st.includes("technical_delay") || st.includes("our_side_delay")) {
+            const t = new Date(s.created_at).getTime();
+            if (t >= fromTime && t <= toTime) hasTechDelayInRange = true;
+          }
+        }
+        for (const l of thisAppActionLogs) {
+          const at = String(l.action_type || "").toUpperCase();
+          if (at === "TECHNICAL_DELAY_ADDED" || at === "TECHNICAL_DELAY") {
+            const t = new Date(l.created_at).getTime();
+            if (t >= fromTime && t <= toTime) hasTechDelayInRange = true;
+          }
+        }
+        for (const ev of thisAppEvents) {
+          const et = String(ev.event_type || "").toLowerCase();
+          const nv = String(ev.new_value || "").toLowerCase();
+          if (et.includes("technical_delay") || nv.includes("technical_delay")) {
+            const t = new Date(ev.created_at).getTime();
+            if (t >= fromTime && t <= toTime) hasTechDelayInRange = true;
+          }
         }
       }
-      for (const ev of thisAppEvents) {
-        const et = String(ev.event_type || "").toLowerCase();
-        const nv = String(ev.new_value || "").toLowerCase();
-        if ((et.includes("technical_delay") || nv.includes("technical_delay")) && !inRangeCustomerDelay) {
-          const t = new Date(ev.created_at).getTime();
-          if (t >= fromTime && t <= toTime) hasTechDelayInRange = true;
-        }
-      }
-      const inRangeTechnicalDelay = hasDateFilter ? hasTechDelayInRange : isTechnicalDelayOrder(a);
+      const inRangeTechnicalDelay = (!isCompletedStage && !isClosedStage && !inRangeCompleted && !inRangeClosed && !isTerminal)
+        ? (hasDateFilter ? hasTechDelayInRange : isTechnicalDelayOrder(a))
+        : false;
 
-      // ── 5. Determine Callback Scheduled In Range ──
+      // ── 5. Determine Callback Scheduled In Range (Strictly active, non-completed & non-closed orders) ──
       let hasCallbackInRange = false;
-      for (const s of thisAppSchedulers) {
-        const st = String(s.scheduler_type || "").toLowerCase();
-        if (st.includes("callback") || st.includes("consultation")) {
-          const t = new Date(s.created_at).getTime();
-          if (t >= fromTime && t <= toTime) hasCallbackInRange = true;
+      if (!isCompletedStage && !isClosedStage && !inRangeCompleted && !inRangeClosed && !isTerminal) {
+        for (const s of thisAppSchedulers) {
+          const st = String(s.scheduler_type || "").toLowerCase();
+          if (st.includes("callback") || st.includes("consultation")) {
+            const t = new Date(s.created_at).getTime();
+            if (t >= fromTime && t <= toTime) hasCallbackInRange = true;
+          }
+        }
+        for (const l of thisAppActionLogs) {
+          const at = String(l.action_type || "").toUpperCase();
+          if (at === "CALLBACK_SCHEDULED") {
+            const t = new Date(l.created_at).getTime();
+            if (t >= fromTime && t <= toTime) hasCallbackInRange = true;
+          }
         }
       }
-      for (const l of thisAppActionLogs) {
-        const at = String(l.action_type || "").toUpperCase();
-        if (at === "CALLBACK_SCHEDULED") {
-          const t = new Date(l.created_at).getTime();
-          if (t >= fromTime && t <= toTime) hasCallbackInRange = true;
-        }
-      }
-      const inRangeCallbackScheduled = hasDateFilter ? hasCallbackInRange : isCallbackScheduledOrder(a);
+      const inRangeCallbackScheduled = (!isCompletedStage && !isClosedStage && !inRangeCompleted && !inRangeClosed && !isTerminal)
+        ? (hasDateFilter ? hasCallbackInRange : isCallbackScheduledOrder(a))
+        : false;
 
       // ── 6. Determine Qualifying Action Taken In Range (Active & In-Progress only, excluding Completed & Closed) ──
       let hasActionTakenInRange = false;

@@ -1178,6 +1178,7 @@ export const makeOrderHotFromTicket = createServerFn({ method: "POST" })
       .from("order_schedulers")
       .insert({
         application_id: targetOrderId,
+        ticket_id: data.ticketId || null,
         scheduler_type: "our_side_reminder",
         status: "active",
         started_at: now,
@@ -1187,6 +1188,10 @@ export const makeOrderHotFromTicket = createServerFn({ method: "POST" })
           reasonLabel,
           note: data.note || (ticketNumber ? `Order marked Hot Priority from support ticket #${ticketNumber}` : "Escalated to hot priority"),
           durationMinutes: 0,
+          channel: "email",
+          origin: "support_ticket",
+          ticketId: data.ticketId || null,
+          ticketNumber: ticketNumber || null,
           created_by_name: staffName,
           created_at: now,
         }),

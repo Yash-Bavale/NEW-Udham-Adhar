@@ -723,9 +723,13 @@ export function CustomerJourneyMap(p: Props) {
           >
             {(activeCallback?.isDue || isReopenedHot) && !closed && !completed ? <Flame className="size-3.5" /> : <PhoneCall className="size-3.5" />}
             {(activeCallback?.isDue || isReopenedHot) && !closed && !completed
-              ? (activeCallback?.parsedRemarks?.channel === "technical_delay" ? "Tech Delay Due (HOT ORDER)" : "Call Due Now (HOT ORDER)")
+              ? (activeCallback?.parsedRemarks?.channel === "technical_delay"
+                  ? "Tech Delay Due (HOT ORDER)"
+                  : (activeCallback?.parsedRemarks?.channel === "email" || activeCallback?.parsedRemarks?.reason === "ticket_hot_priority" || activeCallback?.parsedRemarks?.ticketNumber || activeCallback?.parsedRemarks?.origin === "support_ticket" || (activeCallback?.parsedRemarks?.reasonLabel && activeCallback.parsedRemarks.reasonLabel.toLowerCase().includes("ticket")) || (activeCallback?.parsedRemarks?.note && activeCallback.parsedRemarks.note.toLowerCase().includes("ticket")))
+                  ? "Email Action Due (HOT ORDER)"
+                  : "Call Due Now (HOT ORDER)")
               : activeCallback && !closed && !completed
-                ? (activeCallback.parsedRemarks?.channel === "technical_delay" ? "Tech Delay Scheduled" : "Callback Scheduled")
+                ? (activeCallback.parsedRemarks?.channel === "technical_delay" ? "Tech Delay Scheduled" : (activeCallback.parsedRemarks?.channel === "email" || activeCallback.parsedRemarks?.reason === "ticket_hot_priority" || activeCallback.parsedRemarks?.ticketNumber) ? "Email Reminder Active" : "Callback Scheduled")
                 : "Call Back / Reminder"}
           </button>
 
@@ -742,77 +746,88 @@ export function CustomerJourneyMap(p: Props) {
         </div>
 
         {/* Banner 1: Active Scheduled Callback (Due or Upcoming) */}
-        {activeCallback && !closed && !completed && (
-          <div className={cn(
-            "mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-2.5 shadow-xs",
-            activeCallback.isDue
-              ? "border-rose-300 bg-rose-50 text-rose-950"
-              : "border-indigo-200 bg-indigo-50/80 text-indigo-950"
-          )}>
-            <div className="flex flex-wrap items-center gap-2.5">
-              {activeCallback.isDue ? (
-                <span className="inline-flex items-center gap-1 rounded-md bg-rose-600 px-2 py-0.5 text-[10px] font-black uppercase text-white shadow-xs tracking-wider">
-                  <Flame className="size-3" /> HOT ORDER NOW
-                </span>
-              ) : (
-                <span className="inline-flex items-center gap-1 rounded-md bg-indigo-600 px-2 py-0.5 text-[10px] font-black uppercase text-white shadow-xs tracking-wider">
-                  <Clock className="size-3" /> {activeCallback.parsedRemarks?.channel === "technical_delay" ? "Tech Delay Reminder" : "Scheduled Callback"}
-                </span>
-              )}
-              <span className="text-sm font-bold text-slate-900">
-                Due: {formatIST(activeCallback.fires_at)}
-              </span>
-              <span className="text-sm text-slate-800">
-                · <strong className="font-bold text-slate-900">Reason:</strong> {activeCallback.parsedRemarks?.reasonLabel || "Follow-up"}
-                {activeCallback.parsedRemarks?.note ? (
-                  <span className="text-slate-600"> ({activeCallback.parsedRemarks.note})</span>
-                ) : null}
-              </span>
+        {activeCallback && !closed && !completed && (() => {
+          const isTicketSourceHot = Boolean(
+            activeCallback.parsedRemarks?.channel === "email" ||
+            activeCallback.parsedRemarks?.reason === "ticket_hot_priority" ||
+            activeCallback.parsedRemarks?.reason === "order_reopened" ||
+            activeCallback.parsedRemarks?.ticketNumber ||
+            activeCallback.parsedRemarks?.origin === "support_ticket" ||
+            (activeCallback.parsedRemarks?.reasonLabel && activeCallback.parsedRemarks.reasonLabel.toLowerCase().includes("ticket")) ||
+            (activeCallback.parsedRemarks?.note && activeCallback.parsedRemarks.note.toLowerCase().includes("ticket"))
+          );
 
-              {/* Channel Indicator Badge */}
-              {activeCallback.parsedRemarks?.channel === "technical_delay" ? (
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-sky-100 text-sky-900 border border-sky-300 text-xs font-bold shadow-2xs">
-                  <Server className="size-3.5 text-sky-700" /> Technical Delay
+          return (
+            <div className={cn(
+              "mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-2.5 shadow-xs",
+              activeCallback.isDue
+                ? "border-rose-300 bg-rose-50 text-rose-950"
+                : "border-indigo-200 bg-indigo-50/80 text-indigo-950"
+            )}>
+              <div className="flex flex-wrap items-center gap-2.5">
+                {activeCallback.isDue ? (
+                  <span className="inline-flex items-center gap-1 rounded-md bg-rose-600 px-2 py-0.5 text-[10px] font-black uppercase text-white shadow-xs tracking-wider">
+                    <Flame className="size-3" /> HOT ORDER NOW
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 rounded-md bg-indigo-600 px-2 py-0.5 text-[10px] font-black uppercase text-white shadow-xs tracking-wider">
+                    <Clock className="size-3" /> {activeCallback.parsedRemarks?.channel === "technical_delay" ? "Tech Delay Reminder" : isTicketSourceHot ? "Email Action Reminder" : "Scheduled Callback"}
+                  </span>
+                )}
+                <span className="text-sm font-bold text-slate-900">
+                  Due: {formatIST(activeCallback.fires_at)}
                 </span>
-              ) : activeCallback.parsedRemarks?.channel === "email" ? (
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-purple-100 text-purple-900 border border-purple-300 text-xs font-bold shadow-2xs">
-                  <Mail className="size-3.5 text-purple-700" /> Check Email
+                <span className="text-sm text-slate-800">
+                  · <strong className="font-bold text-slate-900">Reason:</strong> {activeCallback.parsedRemarks?.reasonLabel || "Follow-up"}
+                  {activeCallback.parsedRemarks?.note ? (
+                    <span className="text-slate-600"> ({activeCallback.parsedRemarks.note})</span>
+                  ) : null}
                 </span>
-              ) : (
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-amber-100 text-amber-900 border border-amber-300 text-xs font-bold shadow-2xs">
-                  <PhoneCall className="size-3.5 text-amber-700" /> Check Call
-                </span>
-              )}
-            </div>
 
-            <div className="flex items-center gap-2 ml-auto flex-wrap">
-              {/* Primary Action: View History Modal */}
-              <button
-                type="button"
-                onClick={() => setDialog({ kind: "callback_history" })}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-300 bg-white px-3 py-1.5 text-xs font-bold text-indigo-700 hover:bg-indigo-50 hover:border-indigo-400 transition cursor-pointer shadow-xs"
-                title="View callback scheduling & rescheduling history"
-              >
-                <History className="size-3.5 text-indigo-600" />
-                VIEW {historyCount > 0 ? `(${historyCount})` : ""}
-              </button>
+                {/* Channel Indicator Badge: Show Check Email for Ticket Escalations */}
+                {activeCallback.parsedRemarks?.channel === "technical_delay" ? (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-sky-100 text-sky-900 border border-sky-300 text-xs font-bold shadow-2xs">
+                    <Server className="size-3.5 text-sky-700" /> Technical Delay
+                  </span>
+                ) : (activeCallback.parsedRemarks?.channel === "email" || isTicketSourceHot) ? (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-purple-100 text-purple-900 border border-purple-300 text-xs font-bold shadow-2xs">
+                    <Mail className="size-3.5 text-purple-700" /> Check Email
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-amber-100 text-amber-900 border border-amber-300 text-xs font-bold shadow-2xs">
+                    <PhoneCall className="size-3.5 text-amber-700" /> Check Call
+                  </span>
+                )}
+              </div>
 
-              {/* Primary Action 1: Call Completed */}
-              <button
-                type="button"
-                onClick={() => mutCompleteCallback.mutate()}
-                disabled={mutCompleteCallback.isPending}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3.5 py-1.5 text-xs font-bold text-white hover:bg-emerald-700 transition cursor-pointer shadow-xs disabled:opacity-50"
-                title="Mark scheduled callback completed & remove Hot Order"
-              >
-                {mutCompleteCallback.isPending ? <Loader2 className="size-3.5 animate-spin" /> : <CheckCircle2 className="size-3.5" />}
-                Call Completed
-              </button>
+              <div className="flex items-center gap-2 ml-auto flex-wrap">
+                {/* Primary Action: View History Modal */}
+                <button
+                  type="button"
+                  onClick={() => setDialog({ kind: "callback_history" })}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-300 bg-white px-3 py-1.5 text-xs font-bold text-indigo-700 hover:bg-indigo-50 hover:border-indigo-400 transition cursor-pointer shadow-xs"
+                  title="View callback scheduling & rescheduling history"
+                >
+                  <History className="size-3.5 text-indigo-600" />
+                  VIEW {historyCount > 0 ? `(${historyCount})` : ""}
+                </button>
 
-              {/* Primary Action 2: Reschedule */}
-              <button
-                type="button"
-                onClick={() => setDialog({ kind: "callback_reminder" })}
+                {/* Primary Action 1: Call / Action Completed */}
+                <button
+                  type="button"
+                  onClick={() => mutCompleteCallback.mutate()}
+                  disabled={mutCompleteCallback.isPending}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3.5 py-1.5 text-xs font-bold text-white hover:bg-emerald-700 transition cursor-pointer shadow-xs disabled:opacity-50"
+                  title={isTicketSourceHot ? "Mark ticket email action completed & remove Hot Order" : "Mark scheduled callback completed & remove Hot Order"}
+                >
+                  {mutCompleteCallback.isPending ? <Loader2 className="size-3.5 animate-spin" /> : <CheckCircle2 className="size-3.5" />}
+                  {isTicketSourceHot ? "Action Completed" : "Call Completed"}
+                </button>
+
+                {/* Primary Action 2: Reschedule */}
+                <button
+                  type="button"
+                  onClick={() => setDialog({ kind: "callback_reminder" })}
                 className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-800 hover:bg-slate-50 transition cursor-pointer shadow-2xs"
                 title="Reschedule this callback"
               >
@@ -821,7 +836,8 @@ export function CustomerJourneyMap(p: Props) {
               </button>
             </div>
           </div>
-        )}
+        );
+      })()}
 
         {/* Banner 2: Hot Order without Active Scheduled Callback (STATE B: Reopened order) */}
         {!activeCallback && isReopenedHot && !closed && !completed && (

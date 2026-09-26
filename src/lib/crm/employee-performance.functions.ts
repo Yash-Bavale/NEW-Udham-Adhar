@@ -2102,10 +2102,10 @@ export const getMyPerformanceDashboard = createServerFn({ method: "POST" })
         stageName: cleanStageOrStatus(ord.fulfillment_status),
         isHot,
         slaStatus: "COMPLIANT",
-        isCustomerDelay: ord.fulfillment_status === "customer_delay" || ord.order_status === "CUSTOMER_HOLD",
-        isTechnicalDelay: ord.fulfillment_status === "technical_delay" || ord.order_status?.includes("TECHNICAL"),
         isCompleted: ord.order_status === "COMPLETED" || ["completed", "order_completed", "consultation_completed"].includes(ord.fulfillment_status),
         isClosed: ord.order_status === "CLOSED" || ["order_closed", "closed", "cancelled"].includes(ord.fulfillment_status),
+        isCustomerDelay: !(ord.order_status === "COMPLETED" || ["completed", "order_completed", "consultation_completed"].includes(ord.fulfillment_status) || ord.order_status === "CLOSED" || ["order_closed", "closed", "cancelled"].includes(ord.fulfillment_status)) && (ord.fulfillment_status === "customer_delay" || ord.order_status === "CUSTOMER_HOLD"),
+        isTechnicalDelay: !(ord.order_status === "COMPLETED" || ["completed", "order_completed", "consultation_completed"].includes(ord.fulfillment_status) || ord.order_status === "CLOSED" || ["order_closed", "closed", "cancelled"].includes(ord.fulfillment_status)) && (ord.fulfillment_status === "technical_delay" || ord.order_status?.includes("TECHNICAL")),
       };
     });
 

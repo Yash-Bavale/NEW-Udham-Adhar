@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import {
   Clock, X, Check, Flame, BellRing, MessageSquare,
   Briefcase, FileText, CheckCircle2, Calendar, Zap,
-  PhoneOff, PhoneCall, ShieldCheck, Mail, History
+  PhoneOff, PhoneCall, ShieldCheck, Mail, History, Server
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatIST } from "@/lib/datetime";
@@ -299,27 +299,47 @@ export function CallbackReminderDialog({
             )}>
               <div className="space-y-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  {activeCallback.isDue ? (
-                    <span className="inline-flex items-center gap-1 rounded bg-rose-600 px-2 py-0.5 text-[10px] font-black uppercase text-white shadow-xs">
-                      <Flame className="size-3" /> Call Due Now (HOT ORDER)
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1 rounded bg-indigo-600 px-2 py-0.5 text-[10px] font-black uppercase text-white shadow-xs">
-                      <Clock className="size-3" /> Scheduled Reminder Active
-                    </span>
-                  )}
-                  <span className="text-sm font-bold text-slate-900">
-                    Due: {formatIST(activeCallback.fires_at)}
-                  </span>
-                  {activeCallback.parsedRemarks?.channel === "email" ? (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-purple-100 text-purple-900 border border-purple-300 text-xs font-bold shadow-2xs">
-                      <Mail className="size-3.5 text-purple-700" /> Check Email
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-amber-100 text-amber-900 border border-amber-300 text-xs font-bold shadow-2xs">
-                      <PhoneCall className="size-3.5 text-amber-700" /> Check Call
-                    </span>
-                  )}
+                  {(() => {
+                    const isTicketSourceHot = Boolean(
+                      activeCallback.parsedRemarks?.channel === "email" ||
+                      activeCallback.parsedRemarks?.reason === "ticket_hot_priority" ||
+                      activeCallback.parsedRemarks?.reason === "order_reopened" ||
+                      activeCallback.parsedRemarks?.ticketNumber ||
+                      activeCallback.parsedRemarks?.origin === "support_ticket" ||
+                      (activeCallback.parsedRemarks?.reasonLabel && activeCallback.parsedRemarks.reasonLabel.toLowerCase().includes("ticket")) ||
+                      (activeCallback.parsedRemarks?.note && activeCallback.parsedRemarks.note.toLowerCase().includes("ticket"))
+                    );
+
+                    return (
+                      <>
+                        {activeCallback.isDue ? (
+                          <span className="inline-flex items-center gap-1 rounded bg-rose-600 px-2 py-0.5 text-[10px] font-black uppercase text-white shadow-xs">
+                            <Flame className="size-3" /> {isTicketSourceHot ? "Email Action Due (HOT ORDER)" : "Call Due Now (HOT ORDER)"}
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 rounded bg-indigo-600 px-2 py-0.5 text-[10px] font-black uppercase text-white shadow-xs">
+                            <Clock className="size-3" /> {isTicketSourceHot ? "Email Action Reminder Active" : "Scheduled Reminder Active"}
+                          </span>
+                        )}
+                        <span className="text-sm font-bold text-slate-900">
+                          Due: {formatIST(activeCallback.fires_at)}
+                        </span>
+                        {activeCallback.parsedRemarks?.channel === "technical_delay" ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-sky-100 text-sky-900 border border-sky-300 text-xs font-bold shadow-2xs">
+                            <Server className="size-3.5 text-sky-700" /> Technical Delay
+                          </span>
+                        ) : (activeCallback.parsedRemarks?.channel === "email" || isTicketSourceHot) ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-purple-100 text-purple-900 border border-purple-300 text-xs font-bold shadow-2xs">
+                            <Mail className="size-3.5 text-purple-700" /> Check Email
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-amber-100 text-amber-900 border border-amber-300 text-xs font-bold shadow-2xs">
+                            <PhoneCall className="size-3.5 text-amber-700" /> Check Call
+                          </span>
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
                 <p className="text-sm text-slate-800">
                   <strong className="font-bold text-slate-900">Reason:</strong> {activeCallback.parsedRemarks?.reasonLabel || "Follow-up"}
