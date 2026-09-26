@@ -618,7 +618,13 @@ export async function calculateStaffWorkloads(): Promise<StaffWorkloadSummary[]>
     const session = latestSessionByEmp.get(uid);
     const counts = workloadByEmp.get(uid) || { activeActionOrders: 0, hotOrders: 0, techDelayOrders: 0, weightedWorkload: 0 };
 
-    const empStatus: EmploymentStatus = prof?.employment_status ?? (prof?.is_active === false ? "INACTIVE" : "ACTIVE");
+    const rawStatus = prof?.employment_status;
+    const empStatus: EmploymentStatus =
+      rawStatus && ["ACTIVE", "INACTIVE", "SUSPENDED", "TERMINATED", "ARCHIVED"].includes(rawStatus)
+        ? rawStatus
+        : prof?.is_active === false
+          ? "INACTIVE"
+          : "ACTIVE";
     const isActiveAcc = prof?.is_active !== false && empStatus === "ACTIVE";
     const isOnLeave = !!leave;
     const isPoolActive = poolActiveMap.has(uid) ? (poolActiveMap.get(uid) === true) : true;
@@ -1146,7 +1152,7 @@ export async function reassignProlongedUnavailableStaff(): Promise<{
   let totalOrdersReassigned = 0;
 
   for (const w of workloads) {
-    if (w.employmentStatus !== "ACTIVE") {
+    if (w.employmentStatus === "ARCHIVED" || w.employmentStatus === "TERMINATED" || w.employmentStatus === "SUSPENDED") {
       if (w.activeActionOrders > 0) {
         const res = await reassignOrdersFromUnavailableEmployee({
           unavailableEmployeeId: w.employeeId,

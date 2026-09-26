@@ -118,7 +118,7 @@ export function OrderCommandHeader({
             >
               <option value="">Unassigned</option>
               {staff.map((s) => (
-                <option key={s.id} value={s.id}>{s.display_name || s.email}</option>
+                <option key={s.id} value={s.id}>{s.display_name || s.full_name || s.name || s.email}</option>
               ))}
             </select>
           </Meta>

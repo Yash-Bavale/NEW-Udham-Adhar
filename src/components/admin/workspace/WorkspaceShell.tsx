@@ -567,7 +567,7 @@ export function WorkspaceShell(p: Props) {
                       </option>
                     )}
                     {(Array.isArray(p.staff) ? p.staff : []).map((s: any) => (
-                      <option key={s.id} value={s.id}>{s.display_name || s.name || s.email}</option>
+                      <option key={s.id} value={s.id}>{s.display_name || s.full_name || s.name || s.email}</option>
                     ))}
                   </select>
                 }
