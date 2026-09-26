@@ -727,8 +727,20 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       return query;
     }
 
-    // Fetch in-range applications by creation date, update date, fulfilled date, certificate date, completion events, and active portfolio
-    const [inRangeCreatedRes, inRangeUpdatedRes, inRangeFulfilledRes, inRangeCertRes, inRangeEventsRes, inRangeCertificatesTableRes, inRangeActionLogsRes, activePortfolioRes] = await Promise.all([
+    // Fetch in-range applications by creation date, update date, fulfilled date, certificate date, delay dates, action logs, events, schedulers, and active portfolio
+    const [
+      inRangeCreatedRes,
+      inRangeUpdatedRes,
+      inRangeFulfilledRes,
+      inRangeCertRes,
+      inRangeTechHoldRes,
+      inRangeCustHoldRes,
+      inRangeEventsRes,
+      inRangeCertificatesTableRes,
+      inRangeActionLogsRes,
+      inRangeSchedulersRes,
+      activePortfolioRes,
+    ] = await Promise.all([
       (() => {
         let q = buildBaseQuery();
         if (normalized.fromIso) q = q.gte("created_at", normalized.fromIso);
@@ -754,13 +766,24 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         return q.order("certificate_uploaded_at", { ascending: false }).limit(5000);
       })(),
       (() => {
+        let q = buildBaseQuery();
+        if (normalized.fromIso) q = q.gte("technical_hold_started_at", normalized.fromIso);
+        if (normalized.toIso) q = q.lte("technical_hold_started_at", normalized.toIso);
+        return q.order("technical_hold_started_at", { ascending: false }).limit(5000);
+      })(),
+      (() => {
+        let q = buildBaseQuery();
+        if (normalized.fromIso) q = q.gte("customer_hold_started_at", normalized.fromIso);
+        if (normalized.toIso) q = q.lte("customer_hold_started_at", normalized.toIso);
+        return q.order("customer_hold_started_at", { ascending: false }).limit(5000);
+      })(),
+      (() => {
         let q = admin
           .from("application_events")
-          .select("application_id, event_type, old_value, new_value, created_at")
-          .or("new_value.ilike.%complete%,new_value.ilike.%close%,new_value.ilike.%cancel%,event_type.ilike.%complete%,event_type.ilike.%close%,event_type.ilike.%cancel%,event_type.ilike.%cert%,event_type.eq.certificate_uploaded,event_type.eq.certificate_issued");
+          .select("application_id, event_type, old_value, new_value, staff_id, staff_name, created_at");
         if (normalized.fromIso) q = q.gte("created_at", normalized.fromIso);
         if (normalized.toIso) q = q.lte("created_at", normalized.toIso);
-        return q.order("created_at", { ascending: false }).limit(5000);
+        return q.order("created_at", { ascending: false }).limit(10000);
       })(),
       (() => {
         let q = admin
@@ -773,8 +796,15 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       (() => {
         let q = (admin
           .from("order_action_logs" as any) as any)
-          .select("order_id, action_type, new_status, created_at")
-          .or("action_type.ilike.%complete%,new_status.ilike.%complete%,action_type.eq.CERTIFICATE_GENERATED,action_type.eq.ORDER_COMPLETED");
+          .select("order_id, action_type, new_status, new_stage, employee_id, created_at");
+        if (normalized.fromIso) q = q.gte("created_at", normalized.fromIso);
+        if (normalized.toIso) q = q.lte("created_at", normalized.toIso);
+        return q.order("created_at", { ascending: false }).limit(10000);
+      })(),
+      (() => {
+        let q = admin
+          .from("order_schedulers")
+          .select("id, application_id, status, scheduler_type, fires_at, remarks, created_at, created_by");
         if (normalized.fromIso) q = q.gte("created_at", normalized.fromIso);
         if (normalized.toIso) q = q.lte("created_at", normalized.toIso);
         return q.order("created_at", { ascending: false }).limit(5000);
@@ -794,13 +824,16 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
     (inRangeUpdatedRes.data ?? []).forEach((a: any) => mergedAppMap.set(a.id, a));
     (inRangeFulfilledRes.data ?? []).forEach((a: any) => mergedAppMap.set(a.id, a));
     (inRangeCertRes.data ?? []).forEach((a: any) => mergedAppMap.set(a.id, a));
+    (inRangeTechHoldRes.data ?? []).forEach((a: any) => mergedAppMap.set(a.id, a));
+    (inRangeCustHoldRes.data ?? []).forEach((a: any) => mergedAppMap.set(a.id, a));
 
-    // For any application_id returned from in-range events/certificates/action_logs not yet in mergedAppMap, fetch those applications
+    // For any application_id returned from in-range events/certificates/action_logs/schedulers not yet in mergedAppMap, fetch those applications
     const inRangeEventAppIds = Array.from(
       new Set([
         ...(inRangeEventsRes.data ?? []).map((e: any) => e.application_id),
         ...(inRangeCertificatesTableRes.data ?? []).map((c: any) => c.application_id),
         ...(inRangeActionLogsRes.data ?? []).map((l: any) => l.order_id),
+        ...(inRangeSchedulersRes.data ?? []).map((s: any) => s.application_id),
       ].filter((id: string) => id && !mergedAppMap.has(id)))
     );
 
@@ -829,10 +862,10 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
     const [eventsRes, certsTableRes, actionLogsRes, globalActiveSchedulersRes] = await Promise.all([
       admin
         .from("application_events")
-        .select("application_id, event_type, old_value, new_value, created_at")
+        .select("application_id, event_type, old_value, new_value, staff_id, staff_name, created_at")
         .in("application_id", ids)
-        .or("new_value.ilike.%complete%,new_value.ilike.%close%,new_value.ilike.%cancel%,event_type.ilike.%complete%,event_type.ilike.%close%,event_type.ilike.%cancel%,event_type.ilike.%cert%,event_type.eq.certificate_uploaded,event_type.eq.certificate_issued")
-        .order("created_at", { ascending: false }),
+        .order("created_at", { ascending: false })
+        .limit(10000),
       admin
         .from("certificates")
         .select("application_id, issued_at, delivered_at, created_at")
@@ -840,50 +873,54 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         .order("created_at", { ascending: false }),
       (admin
         .from("order_action_logs" as any) as any)
-        .select("order_id, action_type, new_status, created_at")
+        .select("order_id, action_type, new_status, new_stage, employee_id, created_at")
         .in("order_id", ids)
-        .or("action_type.ilike.%complete%,new_status.ilike.%complete%,action_type.eq.CERTIFICATE_GENERATED,action_type.eq.ORDER_COMPLETED")
-        .order("created_at", { ascending: false }),
+        .order("created_at", { ascending: false })
+        .limit(10000),
       admin
         .from("order_schedulers")
         .select("id, application_id, status, scheduler_type, fires_at, remarks, created_at, created_by")
         .in("application_id", ids)
-        .eq("status", "active")
         .order("created_at", { ascending: false })
         .limit(5000),
     ]);
 
     const globalActiveSchedulers = globalActiveSchedulersRes.data;
-    const eventCompletedMap = new Map<string, string>();
-    const eventClosedMap = new Map<string, string>();
 
-    // Index certificate timestamps
-    for (const c of [...(inRangeCertificatesTableRes.data ?? []), ...(certsTableRes.data ?? [])]) {
-      const t = c.delivered_at || c.issued_at || c.created_at;
-      if (c.application_id && t && !eventCompletedMap.has(c.application_id)) {
-        eventCompletedMap.set(c.application_id, t);
-      }
-    }
-
-    // Index action log timestamps
+    // Index all action logs, events, schedulers, and certificates per application
+    const appActionLogsMap = new Map<string, any[]>();
     for (const l of [...((inRangeActionLogsRes.data as any[]) ?? []), ...((actionLogsRes.data as any[]) ?? [])]) {
-      if (l.order_id && l.created_at && !eventCompletedMap.has(l.order_id)) {
-        eventCompletedMap.set(l.order_id, l.created_at);
+      if (l && l.order_id) {
+        const arr = appActionLogsMap.get(l.order_id) ?? [];
+        arr.push(l);
+        appActionLogsMap.set(l.order_id, arr);
       }
     }
 
-    const allEvents = [...(inRangeEventsRes.data ?? []), ...(eventsRes.data ?? [])];
-    allEvents.sort((a: any, b: any) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
-    for (const ev of allEvents) {
-      const et = String(ev.event_type || "").toLowerCase();
-      const nv = String(ev.new_value || "").toLowerCase();
-      const isComp = nv.includes("complete") || et.includes("complete") || et.includes("cert") || et === "certificate_uploaded" || et === "certificate_issued";
-      const isClose = nv.includes("close") || nv.includes("cancel") || et.includes("close") || et.includes("cancel");
-      if (isComp && ev.application_id && ev.created_at && !eventCompletedMap.has(ev.application_id)) {
-        eventCompletedMap.set(ev.application_id, ev.created_at);
+    const appEventsMap = new Map<string, any[]>();
+    for (const ev of [...(inRangeEventsRes.data ?? []), ...(eventsRes.data ?? [])]) {
+      if (ev && ev.application_id) {
+        const arr = appEventsMap.get(ev.application_id) ?? [];
+        arr.push(ev);
+        appEventsMap.set(ev.application_id, arr);
       }
-      if (isClose && ev.application_id && ev.created_at && !eventClosedMap.has(ev.application_id)) {
-        eventClosedMap.set(ev.application_id, ev.created_at);
+    }
+
+    const appSchedulersMap = new Map<string, any[]>();
+    for (const s of [...(inRangeSchedulersRes.data ?? []), ...(globalActiveSchedulers ?? [])]) {
+      if (s && s.application_id) {
+        const arr = appSchedulersMap.get(s.application_id) ?? [];
+        arr.push(s);
+        appSchedulersMap.set(s.application_id, arr);
+      }
+    }
+
+    const appCertsMap = new Map<string, any[]>();
+    for (const c of [...(inRangeCertificatesTableRes.data ?? []), ...(certsTableRes.data ?? [])]) {
+      if (c && c.application_id) {
+        const arr = appCertsMap.get(c.application_id) ?? [];
+        arr.push(c);
+        appCertsMap.set(c.application_id, arr);
       }
     }
 
@@ -911,7 +948,8 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
     ]);
 
     const leadMap = new Map((leadsData ?? []).map((l: any) => [l.id, l]));
-    const sortedSchedulers = [...(globalActiveSchedulers ?? [])].sort((a: any, b: any) => {
+    const activeSchedulers = (globalActiveSchedulers ?? []).filter((s: any) => s.status === "active");
+    const sortedSchedulers = [...activeSchedulers].sort((a: any, b: any) => {
       const tA = a.created_at ? new Date(a.created_at).getTime() : 0;
       const tB = b.created_at ? new Date(b.created_at).getTime() : 0;
       return tB - tA;
@@ -957,6 +995,9 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
     }
 
     const now = Date.now();
+    const fromTime = normalized.fromIso ? new Date(normalized.fromIso).getTime() : -Infinity;
+    const toTime = normalized.toIso ? new Date(normalized.toIso).getTime() : Infinity;
+    const hasDateFilter = Boolean(normalized.fromIso || normalized.toIso);
 
     const allRows = appList.map((a) => {
       const lead = leadMap.get(a.lead_id);
@@ -1032,9 +1073,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         : null;
 
       const createdTime = new Date(a.created_at).getTime();
-      const inRangeCreated =
-        (!normalized.fromIso || createdTime >= new Date(normalized.fromIso).getTime()) &&
-        (!normalized.toIso || createdTime <= new Date(normalized.toIso).getTime());
+      const inRangeCreated = (!hasDateFilter || (createdTime >= fromTime && createdTime <= toTime));
 
       const appStatusLower = String(a.application_status ?? "").toLowerCase();
       const isCompletedStage =
@@ -1052,32 +1091,225 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         CLOSED_FS.has(fsLower) ||
         CLOSED_FS.has(appStatusLower) ||
         CLOSED_FS.has(String((a as any).order_status ?? "").toLowerCase()) ||
-        CLOSED_FS.has(String((a as any).workflow_status ?? "").toLowerCase());
+        CLOSED_FS.has(String((a as any).workflow_status ?? "").toLowerCase()) ||
+        (Boolean((a as any).closure_stage) && (a as any).closure_stage !== "none");
 
-      const eventCompTime = eventCompletedMap.has(a.id) ? new Date(eventCompletedMap.get(a.id)!).getTime() : null;
-      const fulfilledTime = a.fulfilled_at ? new Date(a.fulfilled_at).getTime() : null;
-      const certTime = a.certificate_uploaded_at ? new Date(a.certificate_uploaded_at).getTime() : null;
-      const updatedTime = a.updated_at ? new Date(a.updated_at).getTime() : null;
+      const thisAppActionLogs = appActionLogsMap.get(a.id) ?? [];
+      const thisAppEvents = appEventsMap.get(a.id) ?? [];
+      const thisAppSchedulers = appSchedulersMap.get(a.id) ?? [];
+      const thisAppCerts = appCertsMap.get(a.id) ?? [];
 
-      const fromTime = normalized.fromIso ? new Date(normalized.fromIso).getTime() : -Infinity;
-      const toTime = normalized.toIso ? new Date(normalized.toIso).getTime() : Infinity;
+      // ── 1. Determine exact completion timestamp & in_range_completed ──
+      let compTimestamp: number | null = null;
+      if (a.fulfilled_at) {
+        const t = new Date(a.fulfilled_at).getTime();
+        if (!isNaN(t)) compTimestamp = t;
+      }
+      if (!compTimestamp && a.certificate_uploaded_at) {
+        const t = new Date(a.certificate_uploaded_at).getTime();
+        if (!isNaN(t)) compTimestamp = t;
+      }
+      for (const c of thisAppCerts) {
+        const t = new Date(c.delivered_at || c.issued_at || c.created_at).getTime();
+        if (!isNaN(t) && (!compTimestamp || t > compTimestamp)) compTimestamp = t;
+      }
+      for (const l of thisAppActionLogs) {
+        const at = String(l.action_type || "").toUpperCase();
+        const ns = String(l.new_status || "").toUpperCase();
+        const nst = String(l.new_stage || "").toUpperCase();
+        if (
+          at === "ORDER_COMPLETED" ||
+          at === "APPLICATION_COMPLETED" ||
+          at === "CERTIFICATE_GENERATED" ||
+          at === "CERTIFICATE_DELIVERED" ||
+          ns.includes("COMPLET") ||
+          nst.includes("COMPLET")
+        ) {
+          const t = new Date(l.created_at).getTime();
+          if (!isNaN(t) && (!compTimestamp || t > compTimestamp)) compTimestamp = t;
+        }
+      }
+      for (const ev of thisAppEvents) {
+        const et = String(ev.event_type || "").toLowerCase();
+        const nv = String(ev.new_value || "").toLowerCase();
+        if (
+          nv.includes("complete") ||
+          et.includes("complete") ||
+          et.includes("cert") ||
+          et === "certificate_uploaded" ||
+          et === "certificate_issued" ||
+          et === "application_approved" ||
+          et === "consultation_completed" ||
+          nv === "application_approved"
+        ) {
+          const t = new Date(ev.created_at).getTime();
+          if (!isNaN(t) && (!compTimestamp || t > compTimestamp)) compTimestamp = t;
+        }
+      }
+      if (!compTimestamp && isCompletedStage) {
+        if (a.updated_at) {
+          const t = new Date(a.updated_at).getTime();
+          if (!isNaN(t)) compTimestamp = t;
+        } else {
+          compTimestamp = createdTime;
+        }
+      }
+      const inRangeCompleted = Boolean(
+        isCompletedStage &&
+        compTimestamp !== null &&
+        (!hasDateFilter || (compTimestamp >= fromTime && compTimestamp <= toTime))
+      );
 
-      const hasCompletionInRange =
-        (eventCompTime !== null && eventCompTime >= fromTime && eventCompTime <= toTime) ||
-        (fulfilledTime !== null && fulfilledTime >= fromTime && fulfilledTime <= toTime) ||
-        (certTime !== null && certTime >= fromTime && certTime <= toTime) ||
-        (isCompletedStage && updatedTime !== null && updatedTime >= fromTime && updatedTime <= toTime) ||
-        (isCompletedStage && inRangeCreated);
+      // ── 2. Determine exact close timestamp & in_range_closed ──
+      let closeTimestamp: number | null = null;
+      for (const l of thisAppActionLogs) {
+        const at = String(l.action_type || "").toUpperCase();
+        const ns = String(l.new_status || "").toUpperCase();
+        const nst = String(l.new_stage || "").toUpperCase();
+        if (
+          at === "ORDER_CLOSED" ||
+          at === "SYSTEM_CLOSE" ||
+          ns.includes("CLOSE") ||
+          ns.includes("CANCEL") ||
+          nst.includes("CLOSE") ||
+          nst.includes("CANCEL")
+        ) {
+          const t = new Date(l.created_at).getTime();
+          if (!isNaN(t) && (!closeTimestamp || t > closeTimestamp)) closeTimestamp = t;
+        }
+      }
+      for (const ev of thisAppEvents) {
+        const et = String(ev.event_type || "").toLowerCase();
+        const nv = String(ev.new_value || "").toLowerCase();
+        if (
+          nv.includes("close") ||
+          nv.includes("cancel") ||
+          et.includes("close") ||
+          et.includes("cancel") ||
+          et === "workflow_closed" ||
+          et === "order_closed"
+        ) {
+          const t = new Date(ev.created_at).getTime();
+          if (!isNaN(t) && (!closeTimestamp || t > closeTimestamp)) closeTimestamp = t;
+        }
+      }
+      if (!closeTimestamp && isClosedStage) {
+        if (a.updated_at) {
+          const t = new Date(a.updated_at).getTime();
+          if (!isNaN(t)) closeTimestamp = t;
+        } else {
+          closeTimestamp = createdTime;
+        }
+      }
+      const inRangeClosed = Boolean(
+        isClosedStage &&
+        closeTimestamp !== null &&
+        (!hasDateFilter || (closeTimestamp >= fromTime && closeTimestamp <= toTime))
+      );
 
-      const inRangeCompleted = Boolean(isCompletedStage && hasCompletionInRange);
+      // ── 3. Determine Customer Delay In Range ──
+      let hasCustDelayInRange = false;
+      if (a.customer_hold_started_at) {
+        const t = new Date(a.customer_hold_started_at).getTime();
+        if (t >= fromTime && t <= toTime) hasCustDelayInRange = true;
+      }
+      for (const s of thisAppSchedulers) {
+        const st = String(s.scheduler_type || "").toLowerCase();
+        if (st.includes("customer_side_delay") || st.includes("customer_delay")) {
+          const t = new Date(s.created_at).getTime();
+          if (t >= fromTime && t <= toTime) hasCustDelayInRange = true;
+        }
+      }
+      for (const l of thisAppActionLogs) {
+        const at = String(l.action_type || "").toUpperCase();
+        if (at === "CUSTOMER_DELAY_ADDED" || at === "CUSTOMER_DELAY") {
+          const t = new Date(l.created_at).getTime();
+          if (t >= fromTime && t <= toTime) hasCustDelayInRange = true;
+        }
+      }
+      for (const ev of thisAppEvents) {
+        const et = String(ev.event_type || "").toLowerCase();
+        const nv = String(ev.new_value || "").toLowerCase();
+        if (et.includes("customer_delay") || nv.includes("customer_delay")) {
+          const t = new Date(ev.created_at).getTime();
+          if (t >= fromTime && t <= toTime) hasCustDelayInRange = true;
+        }
+      }
+      const inRangeCustomerDelay = hasDateFilter ? hasCustDelayInRange : isCustomerDelayOrder(a);
 
-      const eventCloseTime = eventClosedMap.has(a.id) ? new Date(eventClosedMap.get(a.id)!).getTime() : null;
-      const hasClosureInRange =
-        (eventCloseTime !== null && eventCloseTime >= fromTime && eventCloseTime <= toTime) ||
-        (isClosedStage && updatedTime !== null && updatedTime >= fromTime && updatedTime <= toTime) ||
-        (isClosedStage && inRangeCreated);
+      // ── 4. Determine Technical Delay In Range ──
+      let hasTechDelayInRange = false;
+      if (a.technical_hold_started_at && !inRangeCustomerDelay) {
+        const t = new Date(a.technical_hold_started_at).getTime();
+        if (t >= fromTime && t <= toTime) hasTechDelayInRange = true;
+      }
+      for (const s of thisAppSchedulers) {
+        const st = String(s.scheduler_type || "").toLowerCase();
+        if ((st.includes("technical_delay") || st.includes("our_side_delay")) && !inRangeCustomerDelay) {
+          const t = new Date(s.created_at).getTime();
+          if (t >= fromTime && t <= toTime) hasTechDelayInRange = true;
+        }
+      }
+      for (const l of thisAppActionLogs) {
+        const at = String(l.action_type || "").toUpperCase();
+        if ((at === "TECHNICAL_DELAY_ADDED" || at === "TECHNICAL_DELAY") && !inRangeCustomerDelay) {
+          const t = new Date(l.created_at).getTime();
+          if (t >= fromTime && t <= toTime) hasTechDelayInRange = true;
+        }
+      }
+      for (const ev of thisAppEvents) {
+        const et = String(ev.event_type || "").toLowerCase();
+        const nv = String(ev.new_value || "").toLowerCase();
+        if ((et.includes("technical_delay") || nv.includes("technical_delay")) && !inRangeCustomerDelay) {
+          const t = new Date(ev.created_at).getTime();
+          if (t >= fromTime && t <= toTime) hasTechDelayInRange = true;
+        }
+      }
+      const inRangeTechnicalDelay = hasDateFilter ? hasTechDelayInRange : isTechnicalDelayOrder(a);
 
-      const inRangeClosed = Boolean(isClosedStage && hasClosureInRange);
+      // ── 5. Determine Callback Scheduled In Range ──
+      let hasCallbackInRange = false;
+      for (const s of thisAppSchedulers) {
+        const st = String(s.scheduler_type || "").toLowerCase();
+        if (st.includes("callback") || st.includes("consultation")) {
+          const t = new Date(s.created_at).getTime();
+          if (t >= fromTime && t <= toTime) hasCallbackInRange = true;
+        }
+      }
+      for (const l of thisAppActionLogs) {
+        const at = String(l.action_type || "").toUpperCase();
+        if (at === "CALLBACK_SCHEDULED") {
+          const t = new Date(l.created_at).getTime();
+          if (t >= fromTime && t <= toTime) hasCallbackInRange = true;
+        }
+      }
+      const inRangeCallbackScheduled = hasDateFilter ? hasCallbackInRange : isCallbackScheduledOrder(a);
+
+      // ── 6. Determine Qualifying Action Taken In Range ──
+      let hasActionTakenInRange = false;
+      if (inRangeCompleted || inRangeClosed || inRangeCustomerDelay || inRangeTechnicalDelay || inRangeCallbackScheduled) {
+        hasActionTakenInRange = true;
+      } else if (hasDateFilter) {
+        for (const l of thisAppActionLogs) {
+          const t = new Date(l.created_at).getTime();
+          if (t >= fromTime && t <= toTime) {
+            hasActionTakenInRange = true;
+            break;
+          }
+        }
+        if (!hasActionTakenInRange) {
+          for (const ev of thisAppEvents) {
+            const t = new Date(ev.created_at).getTime();
+            if (t >= fromTime && t <= toTime) {
+              hasActionTakenInRange = true;
+              break;
+            }
+          }
+        }
+      } else {
+        hasActionTakenInRange = isActionTakenOrder(a);
+      }
+      const inRangeActionTaken = hasActionTakenInRange;
 
       return {
         id: a.id,
@@ -1103,11 +1335,16 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         callback_reminder,
         workflow_status: (a as any).workflow_status,
         technical_hold_started_at: (a as any).technical_hold_started_at,
+        customer_hold_started_at: (a as any).customer_hold_started_at,
         is_terminal: isTerminal,
         in_range: inRangeCreated,
         in_range_created: inRangeCreated,
         in_range_completed: inRangeCompleted,
         in_range_closed: inRangeClosed,
+        in_range_customer_delay: inRangeCustomerDelay,
+        in_range_technical_delay: inRangeTechnicalDelay,
+        in_range_callback_scheduled: inRangeCallbackScheduled,
+        in_range_action_taken: inRangeActionTaken,
       };
     });
 
@@ -1129,11 +1366,11 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
           return b === "needs_action" || b === "backlog";
         });
       } else if (normalized.actionStatus === "processed" || normalized.actionStatus === "action_taken") {
-        baseFilteredRows = baseFilteredRows.filter((r) => isActionTakenOrder(r));
+        baseFilteredRows = baseFilteredRows.filter((r) => r.in_range_action_taken);
       } else if (normalized.actionStatus === "hot_orders") {
         baseFilteredRows = baseFilteredRows.filter((r) => r.is_hot);
       } else if (normalized.actionStatus === "scheduled_callback") {
-        baseFilteredRows = baseFilteredRows.filter((r) => isCallbackScheduledOrder(r));
+        baseFilteredRows = baseFilteredRows.filter((r) => r.in_range_callback_scheduled);
       }
     }
     if (normalized.paymentStatus) {
@@ -1152,7 +1389,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       }
     }
 
-    // 2. Compute KPI counts: In-Range Volume + All-Time Operational Queues
+    // 2. Compute KPI counts: In-Range Volume + Action-based Range Metrics + All-Time Operational Queues
     const counts = {
       all: 0,
       needs_action: 0,
@@ -1183,8 +1420,8 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         }
       }
 
-      // Action Taken (Pending): orders in technical delay, customer delay, scheduled callback, or completed
-      if (isActionTakenOrder(r)) {
+      // Action Taken (Pending): orders with qualifying employee action in selected date range
+      if (r.in_range_action_taken) {
         counts.pending++;
       }
 
@@ -1204,16 +1441,14 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
 
       if (r.is_hot) {
         counts.hot_orders++;
-      } else if (isCallbackScheduledOrder(r)) {
+      } else if (r.in_range_callback_scheduled) {
         counts.reminders++;
       }
 
-      if (!r.is_terminal) {
-        if (isTechnicalDelayOrder(r)) {
-          counts.technical_delay++;
-        } else if (isCustomerDelayOrder(r)) {
-          counts.customer_delay++;
-        }
+      if (r.in_range_technical_delay) {
+        counts.technical_delay++;
+      } else if (r.in_range_customer_delay) {
+        counts.customer_delay++;
       }
 
       if (b === "pending" || b === "needs_action" || b === "backlog") {
@@ -1233,7 +1468,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       return !r.is_terminal && isNeedsActionStage(r.stage) && !isTechnicalDelayOrder(r) && !isCustomerDelayOrder(r) && Boolean(rowDate && rowDate < todayIst);
     }).length;
 
-    // 3. Apply bucket tab filter to obtain the table rows
+    // 3. Apply bucket tab filter to obtain the table rows (guarantee 100% exact match with counts)
     let filtered = baseFilteredRows;
     const bucket = normalized.bucket || "all";
 
@@ -1242,18 +1477,18 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
     } else if (bucket === "hot_orders") {
       filtered = filtered.filter((r) => r.is_hot);
     } else if (bucket === "reminders") {
-      filtered = filtered.filter((r) => isCallbackScheduledOrder(r));
+      filtered = filtered.filter((r) => r.in_range_callback_scheduled);
     } else if (bucket === "backlog") {
       filtered = filtered.filter((r) => {
         const rowDate = istDateKey(r.created_at);
         return !r.is_terminal && isNeedsActionStage(r.stage) && !isTechnicalDelayOrder(r) && !isCustomerDelayOrder(r) && rowDate && rowDate < todayIst;
       });
     } else if (bucket === "technical_delay") {
-      filtered = filtered.filter((r) => isTechnicalDelayOrder(r));
+      filtered = filtered.filter((r) => r.in_range_technical_delay);
     } else if (bucket === "customer_delay") {
-      filtered = filtered.filter((r) => isCustomerDelayOrder(r));
+      filtered = filtered.filter((r) => r.in_range_customer_delay);
     } else if (bucket === "pending") {
-      filtered = filtered.filter((r) => isActionTakenOrder(r));
+      filtered = filtered.filter((r) => r.in_range_action_taken);
     } else if (bucket === "completed") {
       filtered = filtered.filter((r) => r.in_range_completed);
     } else if (bucket === "closed") {

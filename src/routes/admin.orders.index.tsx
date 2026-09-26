@@ -935,9 +935,7 @@ return (
     )}>
       {(isAdmin ? BUCKET_CARDS : BUCKET_CARDS.filter((b) => !b.adminOnly)).map((b) => {
         const active = bucket === b.id;
-        const countVal = b.id === "needs_action"
-          ? Number(counts.needs_action ?? 0) + Number(counts.technical_delay ?? 0)
-          : Number((counts as any)[b.id] ?? 0);
+        const countVal = Number((counts as any)[b.id] ?? 0);
         const IconComponent = b.icon;
 
         let cardContainerCls = "bg-white border-slate-200 text-slate-800 hover:border-slate-300 hover:bg-slate-50/70";
