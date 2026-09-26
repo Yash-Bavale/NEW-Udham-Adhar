@@ -8,6 +8,7 @@ import {
   Mail, MessageCircle, Settings as SettingsIcon, LogOut, Bell, Search, Loader2,
   Inbox, Activity, FileCheck2, ClipboardList, Eye, Award,
   Banknote, ShieldCheck, ScrollText, Globe, ShieldAlert, History, Menu, X,
+  GraduationCap,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { AdminThemeProvider } from "@/components/admin/theme";
@@ -71,6 +72,7 @@ const NAV: NavGroup[] = [
     items: [
       { to: "/admin/leads", label: "Leads", icon: Users, module: "leads", requireAnyRole: ADMIN_ROLES },
       { to: "/admin/orders", label: "Orders", icon: ShoppingBag, module: "orders", requireAnyRole: ALL_STAFF_ROLES },
+      { to: "/admin/training", label: "Training & SOPs", icon: GraduationCap, requireAnyRole: ALL_STAFF_ROLES },
       { to: "/admin/customers", label: "Customers", icon: UserCircle2, module: "customers", requireAnyRole: ADMIN_ROLES },
       { to: "/admin/documents", label: "Documents", icon: FileText, module: "documents", requireAnyRole: ADMIN_ROLES },
       { to: "/admin/review", label: "Doc Review", icon: Eye, module: "documents", requireAnyRole: ADMIN_ROLES },
@@ -199,6 +201,7 @@ function Shell({ children, email }: { children: ReactNode; email?: string }) {
       label: "Work",
       items: [
         { to: "/admin/orders", label: "Orders", icon: ShoppingBag, module: "orders" },
+        { to: "/admin/training", label: "Training & SOPs", icon: GraduationCap },
       ],
     },
   ];
