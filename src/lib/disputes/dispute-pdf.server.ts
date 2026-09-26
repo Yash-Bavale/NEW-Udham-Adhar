@@ -1,5 +1,12 @@
+import fs from "node:fs";
+import path from "node:path";
+import os from "node:os";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import { PDFDocument, PDFPage, PDFFont, StandardFonts, rgb, type RGB } from "pdf-lib";
 import { BHS_LOGO_BASE64 } from "../invoices/bhs-logo";
+
+const execFileAsync = promisify(execFile);
 
 // Brand Colors
 const NAVY = rgb(0.07, 0.13, 0.27);
@@ -9,15 +16,6 @@ const TEXT_DARK = rgb(0.12, 0.15, 0.22);
 const TEXT_MUTED = rgb(0.45, 0.48, 0.55);
 const BORDER_COLOR = rgb(0.84, 0.86, 0.9);
 const LIGHT_BG = rgb(0.96, 0.97, 0.99);
-const GREEN_DARK = rgb(0.05, 0.55, 0.25);
-const GREEN_BG = rgb(0.93, 0.98, 0.95);
-const GREEN_BORDER = rgb(0.65, 0.88, 0.72);
-const AMBER_BG = rgb(1, 0.98, 0.92);
-const AMBER_BORDER = rgb(0.96, 0.78, 0.35);
-const AMBER_TEXT = rgb(0.65, 0.35, 0.05);
-const BLUE_BG = rgb(0.93, 0.96, 1);
-const BLUE_BORDER = rgb(0.7, 0.82, 0.98);
-const BLUE_TEXT = rgb(0.1, 0.3, 0.7);
 const WHITE = rgb(1, 1, 1);
 
 const COMPANY_NAME = "Business Help Services";
@@ -46,6 +44,16 @@ function safePdfText(value: string | null | undefined): string {
     .normalize("NFKD")
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^\x09\x0a\x0d\x20-\x7e]/g, " ");
+}
+
+function escapeHtml(str: string | null | undefined): string {
+  if (!str) return "";
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
 }
 
 function textWidth(font: PDFFont, text: string, size: number): number {
@@ -180,6 +188,278 @@ export interface DisputePackageData {
   } | null;
 }
 
+/**
+ * Locate installed Chromium / Chrome / Edge binary on the host environment
+ */
+function findChromiumExecutable(): string | null {
+  const envCandidates = [
+    process.env.CHROME_BIN,
+    process.env.CHROME_PATH,
+    process.env.PUPPETEER_EXECUTABLE_PATH,
+    process.env.CHROMIUM_PATH,
+  ].filter((p): p is string => Boolean(p));
+
+  const standardCandidates = [
+    "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+    "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
+    "C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe",
+    "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
+    process.env.LOCALAPPDATA ? path.join(process.env.LOCALAPPDATA, "Google\\Chrome\\Application\\chrome.exe") : null,
+    process.env.PROGRAMFILES ? path.join(process.env.PROGRAMFILES, "Google\\Chrome\\Application\\chrome.exe") : null,
+    process.env["PROGRAMFILES(X86)"] ? path.join(process.env["PROGRAMFILES(X86)"], "Google\\Chrome\\Application\\chrome.exe") : null,
+    "/usr/bin/google-chrome",
+    "/usr/bin/google-chrome-stable",
+    "/usr/bin/chromium",
+    "/usr/bin/chromium-browser",
+    "/snap/bin/chromium",
+    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+    "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+  ].filter((p): p is string => Boolean(p));
+
+  const all = [...envCandidates, ...standardCandidates];
+  for (const p of all) {
+    if (fs.existsSync(p)) return p;
+  }
+  return null;
+}
+
+/**
+ * High-fidelity HTML to PDF rendering via headless Chromium CLI
+ */
+async function renderHtmlToPdfBuffer(html: string): Promise<Uint8Array> {
+  const browserPath = findChromiumExecutable();
+  if (!browserPath) {
+    throw new Error(
+      "No Chromium/Chrome/Edge browser executable found on the server. Please ensure Chrome or Chromium is installed."
+    );
+  }
+
+  const tmpId = `dispute_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+  const tmpDir = os.tmpdir();
+  const tmpHtmlPath = path.join(tmpDir, `${tmpId}.html`);
+  const tmpPdfPath = path.join(tmpDir, `${tmpId}.pdf`);
+
+  try {
+    fs.writeFileSync(tmpHtmlPath, html, "utf8");
+
+    const args = [
+      "--headless=new",
+      "--disable-gpu",
+      "--no-sandbox",
+      "--disable-software-rasterizer",
+      "--no-pdf-header-footer",
+      `--print-to-pdf=${tmpPdfPath}`,
+      `file://${tmpHtmlPath.replace(/\\/g, "/")}`,
+    ];
+
+    await execFileAsync(browserPath, args, { timeout: 35000 });
+
+    if (!fs.existsSync(tmpPdfPath)) {
+      throw new Error("Chromium completed without generating output PDF");
+    }
+
+    const pdfBuffer = fs.readFileSync(tmpPdfPath);
+    return new Uint8Array(pdfBuffer);
+  } finally {
+    try {
+      if (fs.existsSync(tmpHtmlPath)) fs.unlinkSync(tmpHtmlPath);
+      if (fs.existsSync(tmpPdfPath)) fs.unlinkSync(tmpPdfPath);
+    } catch {
+      // ignore temp file cleanup errors
+    }
+  }
+}
+
+/**
+ * Render standard CRM email preview HTML page with Evidence Header and exact stored sent email HTML
+ */
+function renderEmailEvidenceHtmlDocument(params: {
+  email: DisputePackageData["selectedEmails"][0];
+  emailIndex: number;
+  totalEmails: number;
+  orderCode: string;
+  hasInvoiceAttachment: boolean;
+}): string {
+  const { email, emailIndex, totalEmails, orderCode, hasInvoiceAttachment } = params;
+
+  const fromDisplay = email.from_email || COMPANY_EMAIL;
+  const toDisplay = email.to_email || "customer@email.com";
+  const dateDisplay = formatIST(email.sent_at);
+  const subjectDisplay = email.subject || "Customer Notification";
+  const messageIdDisplay = email.message_id || `msg_${email.id.slice(0, 16)}@businesshelpservices.com`;
+
+  const rawBodyHtml = email.body_html?.trim();
+  const rawBodyText = email.body_text?.trim();
+
+  let bodyContentHtml = "";
+  if (rawBodyHtml) {
+    bodyContentHtml = rawBodyHtml;
+  } else if (rawBodyText) {
+    bodyContentHtml = `<div style="white-space: pre-wrap; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 13px; line-height: 1.6; color: #1e293b; padding: 12px 0;">${escapeHtml(
+      rawBodyText
+    )}</div>`;
+  } else {
+    bodyContentHtml = `<div style="font-family: sans-serif; font-size: 13px; color: #64748b; padding: 20px 0; text-align: center;">No email content recorded for this transmission.</div>`;
+  }
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Evidence Sent Email ${emailIndex + 1}</title>
+  <style>
+    @page {
+      size: A4 portrait;
+      margin: 12mm 12mm 16mm 12mm;
+    }
+    *, *::before, *::after {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      padding: 0;
+      background: #ffffff;
+      color: #0f172a;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      font-size: 12px;
+      line-height: 1.5;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .evidence-header-card {
+      margin-bottom: 16px;
+      border-radius: 6px;
+      overflow: hidden;
+      border: 1px solid #e2e8f0;
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+    .evidence-top-banner {
+      background: #072242;
+      color: #ffffff;
+      padding: 8px 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 2px solid #f59e0b;
+    }
+    .evidence-title {
+      font-size: 10.5px;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: #ffffff;
+    }
+    .evidence-badge {
+      background: #059669;
+      color: #ffffff;
+      font-size: 8.5px;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 3px;
+      letter-spacing: 0.02em;
+    }
+    .email-meta-table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #fefce8;
+      border: 1px solid #fef08a;
+      border-top: none;
+      font-size: 11px;
+    }
+    .email-meta-table td {
+      padding: 4px 12px;
+      vertical-align: top;
+    }
+    .email-meta-table .meta-label {
+      width: 85px;
+      font-weight: 700;
+      color: #475569;
+      white-space: nowrap;
+    }
+    .email-meta-table .meta-value {
+      color: #0f172a;
+    }
+    .email-meta-table .meta-value a {
+      color: #1e40af;
+      text-decoration: none;
+    }
+    .email-meta-table .meta-sub {
+      font-weight: 700;
+      color: #0f172a;
+    }
+    .email-meta-table .meta-id {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 9.5px;
+      color: #64748b;
+    }
+    .email-body-wrapper {
+      width: 100%;
+      background: #ffffff;
+      word-break: break-word;
+    }
+    /* Ensure high-fidelity email layout preservation */
+    .email-body-wrapper table {
+      max-width: 100% !important;
+    }
+    .email-body-wrapper img {
+      max-width: 100% !important;
+      height: auto !important;
+    }
+    /* Natural pagination rules */
+    table, tr, td, img, blockquote {
+      page-break-inside: auto;
+      break-inside: auto;
+    }
+  </style>
+</head>
+<body>
+  <div class="evidence-header-card">
+    <div class="evidence-top-banner">
+      <span class="evidence-title">EVIDENCE ITEM: SENT EMAIL #${emailIndex + 1} OF ${totalEmails}</span>
+      <span class="evidence-badge">&#10003; AUTHENTICATED SENT RECORD</span>
+    </div>
+    <table class="email-meta-table">
+      <tr>
+        <td class="meta-label">From:</td>
+        <td class="meta-value">&quot;Business Help Services&quot; &lt;<a href="mailto:${escapeHtml(fromDisplay)}">${escapeHtml(fromDisplay)}</a>&gt;</td>
+      </tr>
+      <tr>
+        <td class="meta-label">To:</td>
+        <td class="meta-value"><a href="mailto:${escapeHtml(toDisplay)}">${escapeHtml(toDisplay)}</a></td>
+      </tr>
+      <tr>
+        <td class="meta-label">Sent Date:</td>
+        <td class="meta-value">${escapeHtml(dateDisplay)}</td>
+      </tr>
+      <tr>
+        <td class="meta-label">Subject:</td>
+        <td class="meta-value meta-sub">${escapeHtml(subjectDisplay)}</td>
+      </tr>
+      ${
+        hasInvoiceAttachment
+          ? `<tr>
+        <td class="meta-label">Attachment:</td>
+        <td class="meta-value" style="color:#1e40af;font-weight:600;">Tax-Invoice-${escapeHtml(orderCode)}.pdf (Verified)</td>
+      </tr>`
+          : ""
+      }
+      <tr>
+        <td class="meta-label">Message ID:</td>
+        <td class="meta-value meta-id">${escapeHtml(messageIdDisplay)}</td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- EXACT HISTORICAL SENT EMAIL HTML -->
+  <div class="email-body-wrapper">
+    ${bodyContentHtml}
+  </div>
+</body>
+</html>`;
+}
+
 export async function renderDisputeEvidencePackagePdf(data: DisputePackageData): Promise<Uint8Array> {
   const mergedPdf = await PDFDocument.create();
   const helv = await mergedPdf.embedFont(StandardFonts.Helvetica);
@@ -274,7 +554,7 @@ export async function renderDisputeEvidencePackagePdf(data: DisputePackageData):
   drawMetaRow("Mobile", data.lead.mobile, "Email Address", data.lead.email);
   drawMetaRow("Service", data.lead.service, "Order Date", formatIST(data.order.createdAt));
   drawMetaRow("Payment Status", (data.payment?.status ?? "PAID").toUpperCase(), "Payment Amount", `INR ${(data.payment?.amount ?? data.lead.totalAmount ?? 0).toLocaleString("en-IN")}`);
-  
+
   // Row 5: Gateway & Transaction ID
   drawText(coverPage, "Gateway / Txn ID", { x: col1L, y: rowY, size: 8.5, font: helv, color: TEXT_MUTED });
   drawText(coverPage, `: ${data.payment?.gatewayName ?? "Razorpay"} / ${data.payment?.transactionId ?? "—"}`, {
@@ -398,7 +678,7 @@ export async function renderDisputeEvidencePackagePdf(data: DisputePackageData):
   });
 
   // ══════════════════════════════════════════════════════════════════════════
-  // 2. SELECTED SENT EMAILS (High-Fidelity Visual Email Print Layout)
+  // 2. SELECTED SENT EMAILS (Rendered 1:1 via Chromium Headless)
   // ══════════════════════════════════════════════════════════════════════════
   const sortedEmails = [...data.selectedEmails].sort((a, b) => {
     const ta = new Date(a.sent_at || 0).getTime();
@@ -406,467 +686,53 @@ export async function renderDisputeEvidencePackagePdf(data: DisputePackageData):
     return ta - tb;
   });
 
-  const GOLD_LINE = rgb(0.92, 0.62, 0.15);
-  const LINK_BLUE = rgb(0.12, 0.28, 0.8);
-  const HEADER_YELLOW_BG = rgb(1, 0.99, 0.9);
-  const HEADER_YELLOW_BORDER = rgb(0.92, 0.86, 0.72);
-  const INDIGO_BTN = rgb(0.31, 0.27, 0.9);
+  for (let idx = 0; idx < sortedEmails.length; idx++) {
+    const email = sortedEmails[idx];
+    try {
+      const emailHtml = renderEmailEvidenceHtmlDocument({
+        email,
+        emailIndex: idx,
+        totalEmails: sortedEmails.length,
+        orderCode: data.order.applicationCode,
+        hasInvoiceAttachment: Boolean(data.invoice),
+      });
 
-  for (const email of sortedEmails) {
-    let emailPageNum = 1;
-    let emailPage = mergedPdf.addPage([PAGE_W, PAGE_H]);
-    let ey = PAGE_H - 28;
-
-    const drawPageLabel = (p: PDFPage, num: number) => {
-      const pStr = `Evidence Email #${sortedEmails.indexOf(email) + 1} · Page ${num}`;
-      const pw = textWidth(helv, pStr, 7.5);
-      drawText(p, pStr, { x: (PAGE_W - pw) / 2, y: PAGE_H - 18, size: 7.5, font: helv, color: TEXT_MUTED });
-    };
-
-    drawPageLabel(emailPage, emailPageNum);
-
-    // ── Email Client Header Box (Yellow/Cream Background) ──
-    const subLines = wrap(email.subject || "Customer Notification", helvBold, 8, CONTENT_W - 90);
-    const subHeight = Math.max(subLines.length, 1) * 13;
-    const hasAttachment = Boolean(data.invoice);
-    const attachHeight = hasAttachment ? 14 : 0;
-    const headerBoxH = 70 + subHeight + attachHeight;
-
-    emailPage.drawRectangle({
-      x: MARGIN_X,
-      y: ey - headerBoxH,
-      width: CONTENT_W,
-      height: headerBoxH,
-      color: HEADER_YELLOW_BG,
-      borderColor: HEADER_YELLOW_BORDER,
-      borderWidth: 1,
-    });
-
-    let hy = ey - 14;
-    const labelX = MARGIN_X + 12;
-    const valX = MARGIN_X + 70;
-
-    // From
-    drawText(emailPage, "From:", { x: labelX, y: hy, size: 8, font: helvBold, color: TEXT_DARK });
-    drawText(emailPage, `"Business Help Services" <${email.from_email || COMPANY_EMAIL}>`, {
-      x: valX,
-      y: hy,
-      size: 8,
-      font: helv,
-      color: LINK_BLUE,
-    });
-
-    // Verification Badge Right
-    emailPage.drawRectangle({
-      x: MARGIN_X + CONTENT_W - 130,
-      y: hy - 4,
-      width: 120,
-      height: 14,
-      color: GREEN_BG,
-      borderColor: GREEN_BORDER,
-      borderWidth: 0.5,
-    });
-    drawText(emailPage, "[OK] SPF / DKIM / TLS PASS", {
-      x: MARGIN_X + CONTENT_W - 124,
-      y: hy,
-      size: 6.5,
-      font: helvBold,
-      color: GREEN_DARK,
-    });
-
-    hy -= 13;
-    // To
-    drawText(emailPage, "To:", { x: labelX, y: hy, size: 8, font: helvBold, color: TEXT_DARK });
-    drawText(emailPage, safePdfText(email.to_email), {
-      x: valX,
-      y: hy,
-      size: 8,
-      font: helv,
-      color: LINK_BLUE,
-    });
-
-    hy -= 13;
-    // Date
-    drawText(emailPage, "Date:", { x: labelX, y: hy, size: 8, font: helvBold, color: TEXT_DARK });
-    drawText(emailPage, formatIST(email.sent_at), {
-      x: valX,
-      y: hy,
-      size: 8,
-      font: helv,
-      color: TEXT_DARK,
-    });
-
-    hy -= 13;
-    // Subject
-    drawText(emailPage, "Subject:", { x: labelX, y: hy, size: 8, font: helvBold, color: TEXT_DARK });
-    for (let s = 0; s < subLines.length; s++) {
-      drawText(emailPage, safePdfText(subLines[s]), {
-        x: valX,
-        y: hy,
-        size: 8,
+      const emailPdfBytes = await renderHtmlToPdfBuffer(emailHtml);
+      const emailDoc = await PDFDocument.load(emailPdfBytes);
+      const copiedPages = await mergedPdf.copyPages(emailDoc, emailDoc.getPageIndices());
+      for (const page of copiedPages) {
+        mergedPdf.addPage(page);
+      }
+    } catch (renderErr) {
+      console.error(`[dispute-pdf] Failed to render email #${idx + 1} with Chromium:`, renderErr);
+      // Fallback page in case of severe rendering fault
+      const fallbackPage = mergedPdf.addPage([PAGE_W, PAGE_H]);
+      drawText(fallbackPage, `EVIDENCE ITEM: SENT EMAIL #${idx + 1} OF ${sortedEmails.length}`, {
+        x: MARGIN_X,
+        y: PAGE_H - 40,
+        size: 11,
         font: helvBold,
+        color: NAVY,
+      });
+      drawText(fallbackPage, `Subject: ${safePdfText(email.subject)}`, {
+        x: MARGIN_X,
+        y: PAGE_H - 60,
+        size: 9,
+        font: helv,
         color: TEXT_DARK,
       });
-      hy -= 13;
-    }
-
-    if (hasAttachment) {
-      drawText(emailPage, "Attachments:", { x: labelX, y: hy, size: 8, font: helvBold, color: TEXT_DARK });
-      drawText(emailPage, `Tax-Invoice-${data.order.applicationCode}.pdf (Verified)`, {
-        x: valX,
-        y: hy,
-        size: 8,
+      drawText(fallbackPage, `To: ${safePdfText(email.to_email)} | Sent: ${formatIST(email.sent_at)}`, {
+        x: MARGIN_X,
+        y: PAGE_H - 75,
+        size: 8.5,
         font: helv,
-        color: LINK_BLUE,
+        color: TEXT_MUTED,
       });
-      hy -= 13;
-    }
-
-    // Message ID footer in header box
-    drawText(emailPage, "Message-ID:", { x: labelX, y: hy, size: 7, font: helvBold, color: TEXT_MUTED });
-    drawText(emailPage, email.message_id || `msg_${email.id.slice(0, 16)}@businesshelpservices.com`, {
-      x: valX,
-      y: hy,
-      size: 7,
-      font: helv,
-      color: TEXT_MUTED,
-    });
-
-    ey -= (headerBoxH + 16);
-
-    // ── Email Visual Content Rendering ──
-    const rawContent = email.body_html || email.body_text || "No email content recorded.";
-    const blocks = parseRichHtmlToBlocks(rawContent, email.subject);
-
-    const BODY_LEFT = MARGIN_X;
-    const BODY_MAX_W = CONTENT_W;
-
-    const ensureSpace = (requiredH: number) => {
-      if (ey - requiredH < 45) {
-        emailPageNum++;
-        emailPage = mergedPdf.addPage([PAGE_W, PAGE_H]);
-        drawPageLabel(emailPage, emailPageNum);
-        ey = PAGE_H - 35;
-      }
-    };
-
-    for (const block of blocks) {
-      if (block.type === "banner") {
-        ensureSpace(34);
-        const bgColor = block.colorScheme === "emerald" ? GREEN_DARK : block.colorScheme === "amber" ? ACCENT : NAVY;
-        emailPage.drawRectangle({
-          x: BODY_LEFT,
-          y: ey - 28,
-          width: BODY_MAX_W,
-          height: 28,
-          color: bgColor,
-        });
-        emailPage.drawRectangle({
-          x: BODY_LEFT,
-          y: ey - 30,
-          width: BODY_MAX_W,
-          height: 2,
-          color: GOLD_LINE,
-        });
-        drawText(emailPage, block.title.toUpperCase(), {
-          x: BODY_LEFT + 12,
-          y: ey - 18,
-          size: 9.5,
-          font: helvBold,
-          color: WHITE,
-        });
-        ey -= 40;
-      } else if (block.type === "callout") {
-        const bg = block.tone === "warning" ? AMBER_BG : block.tone === "success" ? GREEN_BG : BLUE_BG;
-        const borderC = block.tone === "warning" ? AMBER_BORDER : block.tone === "success" ? GREEN_BORDER : BLUE_BORDER;
-        const leftAccent = block.tone === "warning" ? ACCENT : block.tone === "success" ? GREEN_DARK : BLUE_TEXT;
-        const txtColor = block.tone === "warning" ? AMBER_TEXT : block.tone === "success" ? GREEN_DARK : BLUE_TEXT;
-
-        const wrapped = wrap(block.text, helv, 8, BODY_MAX_W - 24);
-        const boxH = Math.max(wrapped.length * 12 + 16, 28);
-
-        ensureSpace(boxH + 8);
-
-        // Box background & outline
-        emailPage.drawRectangle({
-          x: BODY_LEFT,
-          y: ey - boxH,
-          width: BODY_MAX_W,
-          height: boxH,
-          color: bg,
-          borderColor: borderC,
-          borderWidth: 0.5,
-        });
-
-        // Left 3px accent bar
-        emailPage.drawRectangle({
-          x: BODY_LEFT,
-          y: ey - boxH,
-          width: 3.5,
-          height: boxH,
-          color: leftAccent,
-        });
-
-        let textY = ey - 14;
-        for (const line of wrapped) {
-          drawText(emailPage, line, {
-            x: BODY_LEFT + 12,
-            y: textY,
-            size: 8,
-            font: helv,
-            color: txtColor,
-          });
-          textY -= 12;
-        }
-
-        ey -= (boxH + 10);
-      } else if (block.type === "cta_button") {
-        ensureSpace(34);
-        const btnW = Math.min(textWidth(helvBold, block.label, 9) + 40, BODY_MAX_W);
-        const btnX = BODY_LEFT + (BODY_MAX_W - btnW) / 2;
-
-        emailPage.drawRectangle({
-          x: btnX,
-          y: ey - 24,
-          width: btnW,
-          height: 24,
-          color: INDIGO_BTN,
-        });
-
-        const labelW = textWidth(helvBold, block.label, 8.5);
-        drawText(emailPage, block.label, {
-          x: btnX + (btnW - labelW) / 2,
-          y: ey - 16,
-          size: 8.5,
-          font: helvBold,
-          color: WHITE,
-        });
-
-        ey -= 34;
-      } else if (block.type === "key_val_grid") {
-        if (block.title) {
-          ensureSpace(20);
-          drawText(emailPage, block.title.toUpperCase(), {
-            x: BODY_LEFT,
-            y: ey,
-            size: 9,
-            font: helvBold,
-            color: NAVY,
-          });
-          emailPage.drawLine({
-            start: { x: BODY_LEFT, y: ey - 4 },
-            end: { x: BODY_LEFT + BODY_MAX_W, y: ey - 4 },
-            thickness: 1,
-            color: GOLD_LINE,
-          });
-          ey -= 14;
-        }
-
-        const keyW = 160;
-        const valW = BODY_MAX_W - keyW;
-
-        for (let r = 0; r < block.rows.length; r++) {
-          const row = block.rows[r];
-          const isEven = r % 2 === 0;
-          const isAmount = row.val.includes("Rs.") || row.val.includes("INR") || row.val.includes("₹");
-
-          const keyLines = wrap(row.key, helv, 8, keyW - 14);
-          const valLines = wrap(row.val, helvBold, 8, valW - 14);
-          const lineCount = Math.max(keyLines.length, valLines.length, 1);
-          const rowHeight = lineCount * 12 + 6;
-
-          ensureSpace(rowHeight + 2);
-
-          emailPage.drawRectangle({
-            x: BODY_LEFT,
-            y: ey - rowHeight + 3,
-            width: BODY_MAX_W,
-            height: rowHeight,
-            color: isEven ? LIGHT_BG : WHITE,
-            borderColor: BORDER_COLOR,
-            borderWidth: 0.5,
-          });
-
-          let kY = ey - 8;
-          for (const kLine of keyLines) {
-            drawText(emailPage, kLine, {
-              x: BODY_LEFT + 8,
-              y: kY,
-              size: 8,
-              font: helv,
-              color: rgb(0.35, 0.4, 0.48),
-            });
-            kY -= 12;
-          }
-
-          let vY = ey - 8;
-          for (const vLine of valLines) {
-            drawText(emailPage, vLine, {
-              x: BODY_LEFT + keyW,
-              y: vY,
-              size: 8,
-              font: helvBold,
-              color: isAmount ? NAVY : TEXT_DARK,
-            });
-            vY -= 12;
-          }
-
-          ey -= rowHeight;
-        }
-        ey -= 8;
-      } else if (block.type === "timeline") {
-        const totalH = block.steps.length * 16 + 12;
-        ensureSpace(totalH + 10);
-
-        if (block.title) {
-          drawText(emailPage, block.title.toUpperCase(), {
-            x: BODY_LEFT,
-            y: ey,
-            size: 9,
-            font: helvBold,
-            color: NAVY,
-          });
-          ey -= 12;
-        }
-
-        emailPage.drawRectangle({
-          x: BODY_LEFT,
-          y: ey - totalH + 4,
-          width: BODY_MAX_W,
-          height: totalH,
-          color: LIGHT_BG,
-          borderColor: BORDER_COLOR,
-          borderWidth: 0.5,
-        });
-
-        let sY = ey - 10;
-        for (const step of block.steps) {
-          const isDone = step.status === "completed";
-          const isCurr = step.status === "current";
-
-          drawText(emailPage, isDone ? "[OK]" : isCurr ? "[*]" : "[ ]", {
-            x: BODY_LEFT + 10,
-            y: sY,
-            size: 8,
-            font: helvBold,
-            color: isDone ? GREEN_DARK : isCurr ? ACCENT : TEXT_MUTED,
-          });
-
-          drawText(emailPage, step.label, {
-            x: BODY_LEFT + 30,
-            y: sY,
-            size: 8,
-            font: isDone || isCurr ? helvBold : helv,
-            color: isDone ? GREEN_DARK : isCurr ? NAVY : TEXT_MUTED,
-          });
-
-          sY -= 16;
-        }
-        ey -= (totalH + 8);
-      } else if (block.type === "heading") {
-        const wrapped = wrap(block.text.toUpperCase(), helvBold, 9, BODY_MAX_W);
-        ensureSpace(wrapped.length * 13 + 10);
-        ey -= 4;
-        for (const line of wrapped) {
-          drawText(emailPage, line, {
-            x: BODY_LEFT,
-            y: ey,
-            size: 9,
-            font: helvBold,
-            color: NAVY,
-          });
-          ey -= 12;
-        }
-        emailPage.drawLine({
-          start: { x: BODY_LEFT, y: ey + 4 },
-          end: { x: BODY_LEFT + BODY_MAX_W, y: ey + 4 },
-          thickness: 1,
-          color: GOLD_LINE,
-        });
-        ey -= 8;
-      } else if (block.type === "paragraph") {
-        const wrapped = wrap(block.text, block.isBold ? helvBold : helv, 8.5, BODY_MAX_W);
-        for (const line of wrapped) {
-          ensureSpace(12);
-          drawText(emailPage, line, {
-            x: BODY_LEFT,
-            y: ey,
-            size: 8.5,
-            font: block.isBold ? helvBold : helv,
-            color: TEXT_DARK,
-          });
-          ey -= 12;
-        }
-        ey -= 5;
-      } else if (block.type === "list_item") {
-        const wrapped = wrap(block.text, helv, 8, BODY_MAX_W - 14);
-        let first = true;
-        for (const line of wrapped) {
-          ensureSpace(12);
-          if (first) {
-            drawText(emailPage, "*", {
-              x: BODY_LEFT + 2,
-              y: ey,
-              size: 8.5,
-              font: helvBold,
-              color: ACCENT,
-            });
-            drawText(emailPage, line, {
-              x: BODY_LEFT + 12,
-              y: ey,
-              size: 8,
-              font: helv,
-              color: TEXT_DARK,
-            });
-            first = false;
-          } else {
-            drawText(emailPage, line, {
-              x: BODY_LEFT + 12,
-              y: ey,
-              size: 8,
-              font: helv,
-              color: TEXT_DARK,
-            });
-          }
-          ey -= 11.5;
-        }
-        ey -= 3;
-      } else if (block.type === "divider") {
-        ensureSpace(10);
-        emailPage.drawLine({
-          start: { x: BODY_LEFT, y: ey },
-          end: { x: BODY_LEFT + BODY_MAX_W, y: ey },
-          thickness: 0.5,
-          color: BORDER_COLOR,
-        });
-        ey -= 8;
-      } else if (block.type === "disclaimer_box") {
-        const wrapped = wrap(block.text, helv, 7.5, BODY_MAX_W - 16);
-        const boxH = wrapped.length * 10.5 + 14;
-        ensureSpace(boxH + 6);
-
-        emailPage.drawRectangle({
-          x: BODY_LEFT,
-          y: ey - boxH,
-          width: BODY_MAX_W,
-          height: boxH,
-          color: rgb(0.98, 0.98, 0.99),
-          borderColor: BORDER_COLOR,
-          borderWidth: 0.5,
-        });
-
-        let dY = ey - 10;
-        for (const dLine of wrapped) {
-          drawText(emailPage, dLine, {
-            x: BODY_LEFT + 8,
-            y: dY,
-            size: 7.5,
-            font: helv,
-            color: TEXT_MUTED,
-          });
-          dY -= 10.5;
-        }
-        ey -= (boxH + 8);
+      const lines = wrap(email.body_text || email.body_html || "Content unavailable", helv, 8, CONTENT_W);
+      let fy = PAGE_H - 100;
+      for (const l of lines.slice(0, 45)) {
+        drawText(fallbackPage, l, { x: MARGIN_X, y: fy, size: 8, font: helv, color: TEXT_DARK });
+        fy -= 12;
       }
     }
   }
@@ -929,11 +795,11 @@ export async function renderDisputeEvidencePackagePdf(data: DisputePackageData):
 
   for (let i = 0; i < totalPages; i++) {
     const page = mergedPdf.getPage(i);
-    const footY = 24;
+    const footY = 20;
 
     page.drawLine({
-      start: { x: MARGIN_X, y: footY + 10 },
-      end: { x: PAGE_W - MARGIN_X, y: footY + 10 },
+      start: { x: MARGIN_X, y: footY + 8 },
+      end: { x: PAGE_W - MARGIN_X, y: footY + 8 },
       thickness: 0.5,
       color: BORDER_COLOR,
     });
@@ -941,293 +807,21 @@ export async function renderDisputeEvidencePackagePdf(data: DisputePackageData):
     drawText(page, `Order: ${data.order.applicationCode}  |  ${disputeTag}`, {
       x: MARGIN_X,
       y: footY,
-      size: 7.5,
+      size: 7,
       font: helv,
       color: TEXT_MUTED,
     });
 
     const pageStr = `Page ${i + 1} of ${totalPages}`;
-    const pWidth = textWidth(helvBold, pageStr, 7.5);
+    const pWidth = textWidth(helvBold, pageStr, 7);
     drawText(page, pageStr, {
       x: PAGE_W - MARGIN_X - pWidth,
       y: footY,
-      size: 7.5,
+      size: 7,
       font: helvBold,
-      color: NAVY,
+      color: TEXT_MUTED,
     });
   }
 
   return await mergedPdf.save();
-}
-
-/**
- * Decodes HTML entities (numeric and named) into safe text equivalents.
- */
-function decodeHtmlEntities(raw: string): string {
-  if (!raw) return "";
-  let s = raw;
-
-  s = s.replace(/&#(\d+);/g, (_, dec) => {
-    const code = parseInt(dec, 10);
-    if (code === 8377 || code === 0x20b9) return "Rs.";
-    if (code === 9989 || code === 10004 || code === 10003) return "[OK] ";
-    if (code === 8987) return "[Pending] ";
-    if (code === 128231 || code === 9993) return "[Email] ";
-    if (code === 8226 || code === 9679) return "* ";
-    if (code === 8211 || code === 8212) return "-";
-    if (code === 8216 || code === 8217) return "'";
-    if (code === 8220 || code === 8221) return '"';
-    if (code === 8230) return "...";
-    try {
-      return String.fromCharCode(code);
-    } catch {
-      return " ";
-    }
-  });
-
-  s = s.replace(/&#x([0-9a-f]+);/gi, (_, hex) => {
-    const code = parseInt(hex, 16);
-    if (code === 8377 || code === 0x20b9) return "Rs.";
-    if (code === 9989 || code === 10004 || code === 10003) return "[OK] ";
-    if (code === 8987) return "[Pending] ";
-    if (code === 128231 || code === 9993) return "[Email] ";
-    if (code === 8226 || code === 9679) return "* ";
-    if (code === 8211 || code === 8212) return "-";
-    if (code === 8216 || code === 8217) return "'";
-    if (code === 8220 || code === 8221) return '"';
-    if (code === 8230) return "...";
-    try {
-      return String.fromCharCode(code);
-    } catch {
-      return " ";
-    }
-  });
-
-  const named: Record<string, string> = {
-    "&nbsp;": " ",
-    "&amp;": "&",
-    "&lt;": "<",
-    "&gt;": ">",
-    "&quot;": '"',
-    "&apos;": "'",
-    "&#39;": "'",
-    "&#x27;": "'",
-    "&bull;": "* ",
-    "&copy;": "(c)",
-    "&reg;": "(R)",
-    "&trade;": "(TM)",
-    "&mdash;": "-",
-    "&ndash;": "-",
-    "&hellip;": "...",
-    "&check;": "[OK] ",
-    "&cross;": "[X] ",
-    "&rupee;": "Rs.",
-    "&inr;": "Rs.",
-    "&deg;": " deg ",
-  };
-
-  for (const [k, v] of Object.entries(named)) {
-    s = s.replaceAll(k, v);
-  }
-
-  return s;
-}
-
-type RichEmailBlock =
-  | { type: "banner"; title: string; colorScheme: "navy" | "indigo" | "emerald" | "amber" }
-  | { type: "callout"; text: string; tone: "warning" | "info" | "success" | "neutral" }
-  | { type: "cta_button"; label: string }
-  | { type: "key_val_grid"; title?: string; rows: Array<{ key: string; val: string }> }
-  | { type: "timeline"; title?: string; steps: Array<{ label: string; status: "completed" | "current" | "pending" }> }
-  | { type: "heading"; text: string }
-  | { type: "paragraph"; text: string; isBold?: boolean }
-  | { type: "list_item"; text: string }
-  | { type: "divider" }
-  | { type: "disclaimer_box"; text: string };
-
-function stripTags(html: string): string {
-  return decodeHtmlEntities(html.replace(/<[^>]+>/g, " "))
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-/**
- * Intelligent HTML-to-PDF Block Parser
- * Translates HTML email templates into visual components (Cards, Banners, Callouts, Buttons, Tables).
- */
-function parseRichHtmlToBlocks(htmlOrText: string, emailSubject?: string): RichEmailBlock[] {
-  if (!htmlOrText) return [];
-
-  const blocks: RichEmailBlock[] = [];
-
-  // Plain text email fallback
-  if (!/<[a-z][\s\S]*>/i.test(htmlOrText)) {
-    const rawLines = decodeHtmlEntities(htmlOrText).split(/\r?\n/);
-    for (const rawL of rawLines) {
-      const l = rawL.trim();
-      if (!l) continue;
-      if (l.startsWith("---") || l.startsWith("===")) {
-        blocks.push({ type: "divider" });
-      } else if (l.startsWith("• ") || l.startsWith("* ") || l.startsWith("- ")) {
-        blocks.push({ type: "list_item", text: l.replace(/^[•*\-\s]+/, "") });
-      } else if (l.includes(":") && l.length < 90 && !l.startsWith("http")) {
-        const parts = l.split(":");
-        blocks.push({
-          type: "key_val_grid",
-          rows: [{ key: parts[0].trim(), val: parts.slice(1).join(":").trim() }],
-        });
-      } else {
-        blocks.push({ type: "paragraph", text: l });
-      }
-    }
-    return blocks;
-  }
-
-  // 1. Clean script/style/head
-  let clean = htmlOrText
-    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
-    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
-    .replace(/<head[^>]*>[\s\S]*?<\/head>/gi, "");
-
-  // 2. Identify top title banner
-  const h1Match = clean.match(/<h[12][^>]*>([\s\S]*?)<\/h[12]>/i);
-  if (h1Match) {
-    const bannerTitle = stripTags(h1Match[1]);
-    if (bannerTitle && bannerTitle.length < 80) {
-      const isSuccess = bannerTitle.toLowerCase().includes("success") || bannerTitle.toLowerCase().includes("completed") || bannerTitle.toLowerCase().includes("verified");
-      const isWarning = bannerTitle.toLowerCase().includes("incomplete") || bannerTitle.toLowerCase().includes("action") || bannerTitle.toLowerCase().includes("delay");
-      blocks.push({
-        type: "banner",
-        title: bannerTitle,
-        colorScheme: isSuccess ? "emerald" : isWarning ? "amber" : "navy",
-      });
-      clean = clean.replace(h1Match[0], "");
-    }
-  }
-
-  // 3. Extract CTA buttons (<a ... class="button"...> or styled anchors)
-  const btnRegex = /<a[^>]+(?:class="[^"]*button[^"]*"|style="[^"]*background[^"]*")[^>]*>([\s\S]*?)<\/a>/gi;
-  let btnMatch: RegExpExecArray | null;
-  while ((btnMatch = btnRegex.exec(clean)) !== null) {
-    const btnText = stripTags(btnMatch[1]);
-    if (btnText && btnText.length < 60) {
-      blocks.push({ type: "cta_button", label: btnText });
-    }
-  }
-
-  // 4. Extract Callouts / Notice alerts (e.g., border-left or alert containers)
-  const calloutRegex = /<(?:div|table|td)[^>]+(?:background:[^;]*#(?:fffbeb|fef3c7|f0fdf4|ecfdf5|eff6ff|f0f9ff)|border-left)[^>]*>([\s\S]*?)<\/(?:div|table|td)>/gi;
-  let calloutMatch: RegExpExecArray | null;
-  while ((calloutMatch = calloutRegex.exec(clean)) !== null) {
-    const calloutText = stripTags(calloutMatch[1]);
-    if (calloutText && calloutText.length > 15 && calloutText.length < 500) {
-      const isWarn = calloutText.toLowerCase().includes("important") || calloutText.toLowerCase().includes("note") || calloutText.toLowerCase().includes("warning");
-      const isSuccess = calloutText.toLowerCase().includes("verified") || calloutText.toLowerCase().includes("success");
-      blocks.push({
-        type: "callout",
-        text: calloutText,
-        tone: isWarn ? "warning" : isSuccess ? "success" : "info",
-      });
-    }
-  }
-
-  // 5. Extract Tables (Structured Data / Financials)
-  const tableRegex = /<table[^>]*>([\s\S]*?)<\/table>/gi;
-  let tableMatch: RegExpExecArray | null;
-  const structuredRows: Array<{ key: string; val: string }> = [];
-  const timelineSteps: Array<{ label: string; status: "completed" | "current" | "pending" }> = [];
-
-  while ((tableMatch = tableRegex.exec(clean)) !== null) {
-    const tContent = tableMatch[1];
-    const trMatches = tContent.match(/<tr[^>]*>[\s\S]*?<\/tr>/gi) || [];
-
-    for (const tr of trMatches) {
-      const cells = tr.match(/<(td|th)[^>]*>([\s\S]*?)<\/\1>/gi) || [];
-      const cellTexts = cells.map((c) => stripTags(c)).filter((c) => c.length > 0);
-
-      if (cellTexts.length >= 2) {
-        const k = cellTexts[0];
-        const v = cellTexts.slice(1).join(" : ");
-        if (k.length <= 60 && v.length <= 150) {
-          structuredRows.push({ key: k, val: v });
-        }
-      } else if (cellTexts.length === 1) {
-        const single = cellTexts[0];
-        if (single.toLowerCase().includes("step") || single.toLowerCase().includes("order") || single.toLowerCase().includes("payment")) {
-          const isDone = single.includes("[OK]") || single.toLowerCase().includes("completed") || single.toLowerCase().includes("success");
-          timelineSteps.push({
-            label: single.replace(/\[OK\]\s*/g, ""),
-            status: isDone ? "completed" : "current",
-          });
-        }
-      }
-    }
-  }
-
-  if (structuredRows.length > 0) {
-    // Deduplicate rows
-    const uniqueRows: Array<{ key: string; val: string }> = [];
-    const seen = new Set<string>();
-    for (const r of structuredRows) {
-      const combo = `${r.key}_${r.val}`;
-      if (!seen.has(combo)) {
-        seen.add(combo);
-        uniqueRows.push(r);
-      }
-    }
-    blocks.push({
-      type: "key_val_grid",
-      title: "Transaction & Order Summary",
-      rows: uniqueRows,
-    });
-  }
-
-  if (timelineSteps.length > 0) {
-    blocks.push({
-      type: "timeline",
-      title: "Service Fulfillment Timeline",
-      steps: timelineSteps,
-    });
-  }
-
-  // 6. Remaining HTML Paragraphs / Disclaimers / Sign-offs
-  const remainingTokens = clean
-    .replace(/<table[^>]*>[\s\S]*?<\/table>/gi, "\n")
-    .replace(/<hr\s*[\/]?>/gi, "\n[[[HR]]]\n")
-    .replace(/<h[3-6][^>]*>(.*?)<\/h[3-6]>/gi, "\n[[[H]]]$1\n")
-    .replace(/<li[^>]*>(.*?)<\/li>/gi, "\n[[[LI]]]$1\n")
-    .replace(/<p[^>]*>/gi, "\n")
-    .replace(/<\/p>/gi, "\n")
-    .replace(/<div[^>]*>/gi, "\n")
-    .replace(/<\/div>/gi, "\n")
-    .replace(/<br\s*[\/]?>/gi, "\n")
-    .split(/\r?\n/);
-
-  for (const rawToken of remainingTokens) {
-    const t = rawToken.trim();
-    if (!t) continue;
-
-    if (t.includes("[[[HR]]]")) {
-      blocks.push({ type: "divider" });
-    } else if (t.startsWith("[[[H]]]")) {
-      const txt = stripTags(t.replace("[[[H]]]", ""));
-      if (txt) blocks.push({ type: "heading", text: txt });
-    } else if (t.startsWith("[[[LI]]]")) {
-      const txt = stripTags(t.replace("[[[LI]]]", ""));
-      if (txt) blocks.push({ type: "list_item", text: txt });
-    } else {
-      const txt = stripTags(t);
-      if (txt) {
-        if (txt.toLowerCase().includes("this is an automated") || txt.toLowerCase().includes("please do not reply") || txt.toLowerCase().includes("koregaon bk")) {
-          blocks.push({ type: "disclaimer_box", text: txt });
-        } else if (txt.length < 50 && (txt.endsWith(":") || txt.endsWith("Details") || txt.endsWith("Information"))) {
-          blocks.push({ type: "heading", text: txt });
-        } else {
-          blocks.push({ type: "paragraph", text: txt });
-        }
-      }
-    }
-  }
-
-  return blocks;
 }
