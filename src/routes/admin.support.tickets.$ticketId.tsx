@@ -274,6 +274,7 @@ function TicketWorkspace() {
   const [sendOptionsOpen, setSendOptionsOpen] = useState(false);
   const [sendCopy, setSendCopy] = useState(false);
   const [sidebarDrawerOpen, setSidebarDrawerOpen] = useState(false);
+  const [hotOrderModalOpen, setHotOrderModalOpen] = useState(false);
 
   // Composer state
   const [isComposerOpen, setIsComposerOpen] = useState(false);
@@ -644,10 +645,14 @@ function TicketWorkspace() {
   });
 
   const doMakeHotOrder = useMutation({
-    mutationFn: (orderId?: string) =>
-      makeHotOrderFn({ data: { ticketId, orderId } }),
+    mutationFn: (args?: { orderId?: string; note?: string } | string) => {
+      const orderId = typeof args === "string" ? args : args?.orderId;
+      const note = typeof args === "object" ? args?.note : undefined;
+      return makeHotOrderFn({ data: { ticketId, orderId: orderId || app.id, note } });
+    },
     onSuccess: () => {
       toast.success("🔥 Order reopened & prioritized as Hot Order!");
+      setHotOrderModalOpen(false);
       invalidate();
       if (app.id) {
         qc.invalidateQueries({ queryKey: ["admin.order", app.id] });
@@ -657,6 +662,7 @@ function TicketWorkspace() {
       }
       qc.invalidateQueries({ queryKey: ["admin.orders.v2"] });
       qc.invalidateQueries({ queryKey: ["due-reminders-summary"] });
+      qc.invalidateQueries({ queryKey: ["sidebar-notification-counts"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -846,7 +852,7 @@ function TicketWorkspace() {
 
               {Boolean(app.id) && (
                 <button
-                  onClick={() => doMakeHotOrder.mutate(app.id)}
+                  onClick={() => setHotOrderModalOpen(true)}
                   disabled={doMakeHotOrder.isPending}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-rose-500/80 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-2xs shrink-0 cursor-pointer"
                   title="Immediately escalate this linked order to Hot Priority (sounds alarm & moves to top)"
@@ -1503,7 +1509,7 @@ function TicketWorkspace() {
               </span>
             </div>
 
-            {Boolean(app.is_hot) && (
+            {Boolean(app.is_hot) ? (
               <div className="flex items-center justify-between gap-2 py-1.5 px-2.5 rounded-lg bg-rose-50 border border-rose-200">
                 <span className="text-rose-700 text-[11px] font-bold flex items-center gap-1.5">
                   <Flame className="size-3.5 text-rose-600 fill-rose-600 animate-pulse shrink-0" />
@@ -1513,7 +1519,16 @@ function TicketWorkspace() {
                   Needs Action
                 </span>
               </div>
-            )}
+            ) : app.id ? (
+              <button
+                type="button"
+                onClick={() => setHotOrderModalOpen(true)}
+                className="w-full mt-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-[11px] font-semibold transition-all cursor-pointer shadow-2xs"
+              >
+                <Flame className="size-3 text-rose-600" />
+                <span>Escalate to Hot Order 🔥</span>
+              </button>
+            ) : null}
           </div>
         </div>
 
@@ -1774,6 +1789,25 @@ function TicketWorkspace() {
             }
             setTemplatesModalOpen(false);
             toast.success(`Inserted template: ${item.template_name || item.template_code}`);
+          }}
+        />
+      )}
+
+      {/* Hot Order Escalation Modal with Custom Note for Assignee */}
+      {hotOrderModalOpen && Boolean(app.id) && (
+        <HotOrderModal
+          order={{
+            id: app.id,
+            application_code: app.application_code,
+            service_name: serviceName,
+          }}
+          customerName={cust.name}
+          assigneeName={ticket.executive_name || "Unassigned"}
+          ticketNumber={ticket.ticket_number ?? undefined}
+          isPending={doMakeHotOrder.isPending}
+          onClose={() => setHotOrderModalOpen(false)}
+          onConfirm={(note) => {
+            doMakeHotOrder.mutate({ orderId: app.id, note });
           }}
         />
       )}
@@ -2618,5 +2652,171 @@ function ReasonPickerDialog({
 
 
 
-// ── Message Card Component matching Screenshot ─────────────────────────────────
+// ── Hot Order Escalation Modal with Custom Note for Assignee ────────────
+
+function HotOrderModal({
+  order,
+  customerName,
+  assigneeName,
+  ticketNumber,
+  isPending,
+  onClose,
+  onConfirm,
+}: {
+  order: { id: string; application_code?: string; service_name?: string };
+  customerName?: string;
+  assigneeName?: string;
+  ticketNumber?: string;
+  isPending: boolean;
+  onClose: () => void;
+  onConfirm: (note: string) => void;
+}) {
+  const [note, setNote] = useState("");
+
+  const presetReasons = [
+    "Urgent: Customer called requesting immediate filing / status update",
+    "Customer submitted requested OTP / documents — please verify & file",
+    "Customer requested correction / rework on certificate",
+    "VIP / High priority escalation — please process on priority",
+  ];
+
+  return (
+    <div
+      className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-2xs"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-xl shadow-2xl w-full max-w-lg p-5 flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-100"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 rounded-lg bg-rose-100 text-rose-600 shadow-2xs">
+              <Flame className="size-4 text-rose-600 fill-rose-600 animate-pulse" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-slate-900">Escalate to Hot Order 🔥</h3>
+              <p className="text-[11px] text-slate-500">
+                Moves order to the top of the Hot Orders queue with immediate sound alerts
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1 rounded-md text-slate-400 hover:text-slate-700 transition-colors"
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="py-3.5 space-y-3.5 text-xs">
+          {/* Order Details Summary */}
+          <div className="rounded-xl bg-slate-50/80 border border-slate-200/90 p-3 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-slate-500 text-[11px]">Order No:</span>
+              <span className="font-mono font-bold text-slate-900">{order.application_code || "—"}</span>
+            </div>
+            {order.service_name && (
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500 text-[11px]">Service:</span>
+                <span className="font-medium text-slate-800 text-right truncate max-w-[220px]">
+                  {order.service_name}
+                </span>
+              </div>
+            )}
+            {customerName && (
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500 text-[11px]">Customer:</span>
+                <span className="font-medium text-slate-800">{customerName}</span>
+              </div>
+            )}
+            <div className="flex items-center justify-between">
+              <span className="text-slate-500 text-[11px]">Assigned Employee:</span>
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 font-semibold text-[10px]">
+                <User className="size-3 text-blue-500" />
+                {assigneeName || "Unassigned"}
+              </span>
+            </div>
+            {ticketNumber && (
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500 text-[11px]">Source Ticket:</span>
+                <span className="font-mono text-slate-700">#{ticketNumber}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Note / Remarks for Employee */}
+          <div className="space-y-1.5">
+            <label className="font-bold text-slate-800 flex items-center justify-between text-xs">
+              <span>Share Note / Instructions with Employee</span>
+              <span className="text-[10px] font-normal text-slate-400">{note.length}/1000</span>
+            </label>
+            <p className="text-[11px] text-slate-500 leading-snug">
+              This note will be notified to <strong>{assigneeName || "the assigned staff"}</strong> and attached to the Hot Order alert &amp; activity history.
+            </p>
+            <textarea
+              value={note}
+              onChange={(e) => setNote(e.target.value.slice(0, 1000))}
+              placeholder="e.g., Customer called requesting urgent verification. Please process right away."
+              rows={3}
+              className="w-full text-xs p-2.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-rose-500 transition-all resize-none leading-relaxed"
+              autoFocus
+            />
+          </div>
+
+          {/* Preset Suggestions */}
+          <div className="space-y-1.5">
+            <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+              Quick Suggestions:
+            </span>
+            <div className="flex flex-wrap gap-1.5">
+              {presetReasons.map((preset, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => setNote(preset)}
+                  className="text-[10px] px-2.5 py-1 rounded-md bg-slate-100 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-200 border border-slate-200 text-slate-600 transition-all text-left cursor-pointer"
+                >
+                  {preset}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Modal Actions */}
+        <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={isPending}
+            className="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-slate-700 hover:bg-slate-100 transition-colors disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={() => onConfirm(note.trim())}
+            disabled={isPending}
+            className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+          >
+            {isPending ? (
+              <>
+                <Loader2 className="size-3.5 animate-spin" />
+                <span>Escalating...</span>
+              </>
+            ) : (
+              <>
+                <Flame className="size-3.5 fill-current" />
+                <span>Confirm &amp; Make Hot Order 🔥</span>
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 

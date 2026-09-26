@@ -1265,12 +1265,13 @@ export const makeOrderHotFromTicket = createServerFn({ method: "POST" })
 
     // 6. Log event in workflow_events, application_events, and activity_logs
     try {
+      const noteSuffix = data.note ? `\nRemarks for Assignee: "${data.note}"` : "";
       await admin.from("workflow_events").insert({
         application_id: targetOrderId,
         lead_id: preApp.lead_id ?? null,
         event_type: "order_reopened",
         title: "Order Reopened & Escalated to Hot Priority",
-        description: `Order reopened and marked Hot Priority from Ticket #${ticketNumber || ""}`,
+        description: `Order reopened and marked Hot Priority from Ticket #${ticketNumber || ""}.${noteSuffix}`,
         customer_visible: false,
         actor_id: context.userId,
         actor_name: staffName,
@@ -1283,6 +1284,7 @@ export const makeOrderHotFromTicket = createServerFn({ method: "POST" })
           reopenedBy: context.userId,
           reopenedAt: now,
           ticketNumber: ticketNumber || null,
+          note: data.note || null,
         },
       } as never);
 
@@ -1293,7 +1295,9 @@ export const makeOrderHotFromTicket = createServerFn({ method: "POST" })
         event_type: "hot_priority_escalated",
         old_value: String(previousStatus),
         new_value: "REOPENED",
-        note: `Order reopened and escalated to Hot Priority from Ticket #${ticketNumber || ""}`,
+        note: data.note
+          ? `[Hot Priority Escalation from Ticket #${ticketNumber || ""}] Note for Assignee: ${data.note}`
+          : `Order reopened and escalated to Hot Priority from Ticket #${ticketNumber || ""}`,
         created_by: context.userId,
         staff_name: staffName,
         staff_role: "staff",
@@ -1303,8 +1307,25 @@ export const makeOrderHotFromTicket = createServerFn({ method: "POST" })
         await admin.from("activity_logs").insert({
           user_id: context.userId,
           activity_type: "ticket_order_hot_escalated",
-          activity_description: `Linked order was reopened and marked on HOT PRIORITY by ${staffName}`,
+          activity_description: `Linked order was reopened and marked on HOT PRIORITY by ${staffName}${data.note ? ` (Note: ${data.note})` : ""}`,
         } as never);
+      }
+
+      // 7. Send notification to assigned employee
+      const assignedTarget = preApp.assigned_to;
+      if (assignedTarget && assignedTarget !== context.userId) {
+        const { createNotification } = await import("@/lib/crm/notifications.functions");
+        await createNotification({
+          user_id: assignedTarget,
+          kind: "hot_order_alert",
+          title: `🔥 Hot Order Escalation: ${preApp.application_code || "Order"}`,
+          body: data.note
+            ? `Note from ${staffName}: "${data.note}"`
+            : `Order was marked as Hot Priority from Support Ticket #${ticketNumber || ""}`,
+          href: `/admin/orders/${targetOrderId}`,
+          entity_kind: "application",
+          entity_id: targetOrderId,
+        }).catch((notifErr) => console.warn("[makeOrderHotFromTicket] notif warning:", notifErr));
       }
     } catch (e) {
       console.warn("[makeOrderHotFromTicket] audit logging warning:", e);
