@@ -49,9 +49,8 @@ type NavItem = {
 type NavGroup = { id: string; label: string; items: NavItem[] };
 
 const ALL_STAFF_ROLES = ["admin", "super_admin", "manager", "operations", "executive", "support", "finance", "accounts"];
-const OPS_ROLES = ["admin", "super_admin", "manager", "operations", "executive", "support"];
 const FINANCE_ROLES = ["admin", "super_admin", "finance", "accounts", "manager"];
-const SUPPORT_ROLES = ["admin", "super_admin", "manager", "support", "operations", "executive"];
+const SUPPORT_ROLES = ["admin", "super_admin", "manager", "support"];
 const ADMIN_ROLES = ["admin", "super_admin", "manager"];
 
 const NAV: NavGroup[] = [
@@ -63,19 +62,19 @@ const NAV: NavGroup[] = [
       { to: "/admin/my-work", label: "My Dashboard", icon: Inbox },
       { to: "/admin/activity", label: "Activity", icon: Activity, requireAnyRole: ADMIN_ROLES },
       { to: "/admin/notifications", label: "Notifications", icon: Bell },
-      { to: "/admin/my-performance", label: "My Performance", icon: BarChart3, requireAnyRole: OPS_ROLES },
+      { to: "/admin/my-performance", label: "My Performance", icon: BarChart3, requireAnyRole: ALL_STAFF_ROLES },
     ],
   },
   {
     id: "work",
     label: "Work",
     items: [
-      { to: "/admin/leads", label: "Leads", icon: Users, module: "leads", requireAnyRole: OPS_ROLES },
-      { to: "/admin/orders", label: "Orders", icon: ShoppingBag, module: "orders", requireAnyRole: OPS_ROLES },
-      { to: "/admin/customers", label: "Customers", icon: UserCircle2, module: "customers", requireAnyRole: OPS_ROLES },
-      { to: "/admin/documents", label: "Documents", icon: FileText, module: "documents", requireAnyRole: OPS_ROLES },
-      { to: "/admin/review", label: "Doc Review", icon: Eye, module: "documents", requireAnyRole: OPS_ROLES },
-      { to: "/admin/tasks", label: "Tasks", icon: ListChecks, module: "tasks", requireAnyRole: OPS_ROLES },
+      { to: "/admin/leads", label: "Leads", icon: Users, module: "leads", requireAnyRole: ADMIN_ROLES },
+      { to: "/admin/orders", label: "Orders", icon: ShoppingBag, module: "orders", requireAnyRole: ALL_STAFF_ROLES },
+      { to: "/admin/customers", label: "Customers", icon: UserCircle2, module: "customers", requireAnyRole: ADMIN_ROLES },
+      { to: "/admin/documents", label: "Documents", icon: FileText, module: "documents", requireAnyRole: ADMIN_ROLES },
+      { to: "/admin/review", label: "Doc Review", icon: Eye, module: "documents", requireAnyRole: ADMIN_ROLES },
+      { to: "/admin/tasks", label: "Tasks", icon: ListChecks, module: "tasks", requireAnyRole: ADMIN_ROLES },
     ],
   },
   {
@@ -100,7 +99,7 @@ const NAV: NavGroup[] = [
       { to: "/admin/gateways", label: "Gateways", icon: Banknote, module: "payments", requireAnyRole: ADMIN_ROLES },
       { to: "/admin/finance", label: "Finance (GST)", icon: Banknote, module: "payments", requireAnyRole: FINANCE_ROLES },
       { to: "/admin/refunds", label: "Refund Review", icon: Banknote, requireAnyRole: FINANCE_ROLES },
-      { to: "/admin/certificates", label: "Certificates", icon: Award, requireAnyRole: OPS_ROLES },
+      { to: "/admin/certificates", label: "Certificates", icon: Award, requireAnyRole: ADMIN_ROLES },
     ],
   },
   {
@@ -156,40 +155,55 @@ function Shell({ children, email }: { children: ReactNode; email?: string }) {
 
   const isPendingAuth = role.loading && userPerms.isLoading;
   const isSuperAdmin = role.has("super_admin") || role.has("super");
-  const isAdminUser = isSuperAdmin || role.has("admin") || role.has("manager") || Boolean(userPerms.perms?.isAdmin) || role.roles.length === 0;
+  const isAdminUser = isSuperAdmin || role.has("admin") || role.has("manager") || Boolean(userPerms.perms?.isAdmin);
 
   const visibleNav: NavGroup[] = NAV
     .map((g) => ({
       ...g,
       items: g.items.filter((it) => {
-        // While auth roles are loading initially, keep default navigation rendered to prevent empty sidebar
-        if (isPendingAuth) return true;
-
         if (isAdminUser) {
           if (it.requireRole === "super_admin" && !isSuperAdmin) return false;
           return true;
         }
 
-        // Check custom module permissions
+        // For non-admin employees/staff:
+        // Check role requirements if specified
+        if (it.requireRole && !role.has(it.requireRole)) return false;
+        if (it.requireAnyRole && !it.requireAnyRole.some((r) => role.has(r))) return false;
+
+        // Check module permissions
         if (it.module) {
           if (userPerms.can(it.module, "view")) return true;
           if (role.can(it.module)) return true;
+          return false;
         }
 
-        // Check role requirements
-        if (it.requireRole && role.has(it.requireRole)) return true;
-        if (it.requireAnyRole && it.requireAnyRole.some((r) => role.has(r))) return true;
-
-        // If no explicit role/module requirements, show by default
-        if (!it.requireRole && !it.requireAnyRole && !it.module) return true;
-
-        return false;
+        return true;
       }),
     }))
     .filter((g) => g.items.length > 0);
 
-  // If all filtered out (e.g. initial render with empty roles), fallback to full NAV for staff
-  const displayNav = visibleNav.length > 0 ? visibleNav : NAV;
+  // Default fallback for employees during initial load
+  const defaultEmployeeNav: NavGroup[] = [
+    {
+      id: "overview",
+      label: "Overview",
+      items: [
+        { to: "/admin/my-work", label: "My Dashboard", icon: Inbox },
+        { to: "/admin/notifications", label: "Notifications", icon: Bell },
+        { to: "/admin/my-performance", label: "My Performance", icon: BarChart3 },
+      ],
+    },
+    {
+      id: "work",
+      label: "Work",
+      items: [
+        { to: "/admin/orders", label: "Orders", icon: ShoppingBag, module: "orders" },
+      ],
+    },
+  ];
+
+  const displayNav = visibleNav.length > 0 ? visibleNav : defaultEmployeeNav;
   const flatVisible = displayNav.flatMap((g) => g.items);
 
   const [paletteOpen, setPaletteOpen] = useState(false);
