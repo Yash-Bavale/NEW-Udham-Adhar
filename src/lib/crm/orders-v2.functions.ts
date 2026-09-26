@@ -543,11 +543,45 @@ export function isActionTakenOrder(row: any): boolean {
   const fs = String(row.fulfillment_status ?? "").toLowerCase();
   const stage = String(row.stage ?? "").toLowerCase();
   if (row.is_terminal || stage === "completed" || stage === "closed" || COMPLETED_FS.has(fs) || CLOSED_FS.has(fs)) return false;
+
+  // Never Action Taken if order currently needs action or is hot/reopened
+  if (isNeedsActionOrder(row)) return false;
+
+  const actionTakenStatuses = new Set([
+    "government_processing",
+    "technical_delay",
+    "customer_delay",
+    "application_rejected",
+    "certificate_rejected",
+    "under_processing",
+    "application_submitted",
+    "verification_pending",
+    "documents_received",
+    "waiting_for_customer_submission",
+    "awaiting_customer_form",
+    "form_link_sent",
+    "form_pending",
+  ]);
+
+  const actionTakenStages = new Set([
+    "technical_delay",
+    "customer_delay",
+    "consultation_completed",
+    "under_review",
+    "in_progress",
+    "submitted_to_govt",
+    "under_processing",
+    "certificate_ready",
+  ]);
+
   return Boolean(
     isTechnicalDelayOrder(row) ||
     isCustomerDelayOrder(row) ||
     isCallbackScheduledOrder(row) ||
-    row.is_callback_scheduled
+    row.is_callback_scheduled ||
+    Boolean(row.form_link_sent_at) ||
+    actionTakenStatuses.has(fs) ||
+    actionTakenStages.has(stage)
   );
 }
 
@@ -1372,33 +1406,47 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         ? (hasDateFilter ? hasCallbackInRange : isCallbackScheduledOrder(a))
         : false;
 
-      // ── 6. Determine Qualifying Action Taken In Range (Active & In-Progress only, excluding Completed & Closed) ──
+      // ── 6. Determine Qualifying Action Taken In Range (Active & In-Progress only, strictly excluding Completed, Closed, and Needs Action) ──
       let hasActionTakenInRange = false;
-      if (!inRangeCompleted && !inRangeClosed) {
-        if (inRangeCustomerDelay || inRangeTechnicalDelay || inRangeCallbackScheduled) {
-          hasActionTakenInRange = true;
-        } else if (hasDateFilter) {
-          for (const l of thisAppActionLogs) {
-            const t = new Date(l.created_at).getTime();
-            if (t >= fromTime && t <= toTime) {
+      if (!inRangeCompleted && !inRangeClosed && !isCompletedStage && !isClosedStage && !isTerminal) {
+        if (isActionTakenOrder(a)) {
+          if (hasDateFilter) {
+            if (inRangeCustomerDelay || inRangeTechnicalDelay || inRangeCallbackScheduled || Boolean((a as any).form_link_sent_at)) {
               hasActionTakenInRange = true;
-              break;
-            }
-          }
-          if (!hasActionTakenInRange) {
-            for (const ev of thisAppEvents) {
-              const t = new Date(ev.created_at).getTime();
-              if (t >= fromTime && t <= toTime) {
-                hasActionTakenInRange = true;
-                break;
+            } else {
+              for (const l of thisAppActionLogs) {
+                const t = new Date(l.created_at).getTime();
+                if (t >= fromTime && t <= toTime) {
+                  hasActionTakenInRange = true;
+                  break;
+                }
+              }
+              if (!hasActionTakenInRange) {
+                for (const ev of thisAppEvents) {
+                  const et = String(ev.event_type || "").toLowerCase();
+                  if (
+                    et !== "order_created" &&
+                    et !== "lead_created" &&
+                    et !== "payment_received" &&
+                    et !== "assignee_updated" &&
+                    et !== "order_reopened" &&
+                    et !== "status_change"
+                  ) {
+                    const t = new Date(ev.created_at).getTime();
+                    if (t >= fromTime && t <= toTime) {
+                      hasActionTakenInRange = true;
+                      break;
+                    }
+                  }
+                }
               }
             }
+          } else {
+            hasActionTakenInRange = true;
           }
-        } else {
-          hasActionTakenInRange = isActionTakenOrder(a) && !isCompletedStage && !isClosedStage;
         }
       }
-      const inRangeActionTaken = hasActionTakenInRange;
+      const inRangeActionTaken = hasActionTakenInRange && !isNeedsActionOrder(a);
 
       return {
         id: a.id,
@@ -1595,7 +1643,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
     } else if (bucket === "customer_delay") {
       filtered = filtered.filter((r) => r.in_range_customer_delay);
     } else if (bucket === "pending") {
-      filtered = filtered.filter((r) => r.in_range_action_taken);
+      filtered = filtered.filter((r) => r.in_range_action_taken && !isNeedsActionOrder(r));
     } else if (bucket === "completed") {
       filtered = filtered.filter((r) => r.in_range_completed);
     } else if (bucket === "closed") {
