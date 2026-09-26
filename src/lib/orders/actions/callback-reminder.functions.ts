@@ -37,6 +37,12 @@ export interface CallbackRemarks {
   channel?: "call" | "email" | string | null;
   created_by_name?: string;
   created_at?: string;
+  ticketNumber?: string | null;
+  ticketId?: string | null;
+  origin?: string | null;
+  reasonCategory?: string | null;
+  kind?: string | null;
+  [key: string]: any;
 }
 
 export interface CallbackHistoryItem {

@@ -467,8 +467,18 @@ export function isCallbackScheduledOrder(row: any): boolean {
   if (row.is_terminal || row.is_hot || stage === "completed" || stage === "closed" || COMPLETED_FS.has(fs) || CLOSED_FS.has(fs)) return false;
   return Boolean(
     row.is_callback_scheduled ||
-    (row.callback_reminder && !row.callback_reminder.is_due && !isTechnicalDelayOrder(row) && !isCustomerDelayOrder(row))
+    (row.callback_reminder && !row.callback_reminder.is_due)
   );
+}
+
+export function isBacklogOrder(row: any, todayIst?: string): boolean {
+  const fs = String(row.fulfillment_status ?? "").toLowerCase();
+  const stage = String(row.stage ?? "").toLowerCase();
+  if (row.is_terminal || stage === "completed" || stage === "closed" || COMPLETED_FS.has(fs) || CLOSED_FS.has(fs)) return false;
+  if (isCustomerDelayOrder(row) || isTechnicalDelayOrder(row)) return false;
+  const curToday = todayIst || istDateKey(new Date());
+  const rowDate = istDateKey(row.created_at);
+  return Boolean(rowDate && rowDate < curToday);
 }
 
 export function isActionTakenOrder(row: any): boolean {
@@ -514,14 +524,16 @@ export function bucketOfRow(
   // Technical Delay (full name)
   if (isTechnicalDelayOrder(row)) return "technical_delay";
 
-  // Action-required untouched orders (Needs Action vs Backlog)
+  // Backlog: all active non-delay orders from yesterday and before all-time
+  const curToday = todayIst || istDateKey(new Date());
+  const rowDate = istDateKey(row.created_at);
+  if (rowDate && rowDate < curToday) {
+    return "backlog";
+  }
+
+  // Today's action-required untouched orders
   const isActionStage = isNeedsActionStage(row.stage);
   if (isActionStage) {
-    const curToday = todayIst || istDateKey(new Date());
-    const rowDate = istDateKey(row.created_at);
-    if (rowDate && rowDate < curToday) {
-      return "backlog";
-    }
     return "needs_action";
   }
 
@@ -1483,7 +1495,8 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
 
       if (r.in_range_technical_delay) {
         counts.technical_delay++;
-      } else if (r.in_range_customer_delay) {
+      }
+      if (r.in_range_customer_delay) {
         counts.customer_delay++;
       }
 
@@ -1497,11 +1510,11 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       }
     }
 
-    // Backlog is intentionally derived from the complete active portfolio,
-    // independent of the current date range. It remains a subset of Need Action.
+    // Backlog: all active non-terminal orders from yesterday and before (all-time),
+    // until closed or moved to technical delay / customer delay
     counts.backlog = baseFilteredRows.filter((r) => {
       const rowDate = istDateKey(r.created_at);
-      return !r.is_terminal && isNeedsActionStage(r.stage) && !isTechnicalDelayOrder(r) && !isCustomerDelayOrder(r) && Boolean(rowDate && rowDate < todayIst);
+      return !r.is_terminal && !isTechnicalDelayOrder(r) && !isCustomerDelayOrder(r) && Boolean(rowDate && rowDate < todayIst);
     }).length;
 
     // 3. Apply bucket tab filter to obtain the table rows (guarantee 100% exact match with counts)
@@ -1513,11 +1526,11 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
     } else if (bucket === "hot_orders") {
       filtered = filtered.filter((r) => r.is_hot);
     } else if (bucket === "reminders") {
-      filtered = filtered.filter((r) => r.in_range_callback_scheduled);
+      filtered = filtered.filter((r) => !r.is_terminal && r.in_range_callback_scheduled && !r.is_hot);
     } else if (bucket === "backlog") {
       filtered = filtered.filter((r) => {
         const rowDate = istDateKey(r.created_at);
-        return !r.is_terminal && isNeedsActionStage(r.stage) && !isTechnicalDelayOrder(r) && !isCustomerDelayOrder(r) && rowDate && rowDate < todayIst;
+        return !r.is_terminal && !isTechnicalDelayOrder(r) && !isCustomerDelayOrder(r) && Boolean(rowDate && rowDate < todayIst);
       });
     } else if (bucket === "technical_delay") {
       filtered = filtered.filter((r) => r.in_range_technical_delay);
