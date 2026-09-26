@@ -20,6 +20,258 @@ async function actorName(supabase: any, userId: string): Promise<string> {
   return data?.display_name || data?.email || "Staff";
 }
 
+// ───────── Close order helper ─────────
+
+async function executeOrderClosure({
+  supabase,
+  userId,
+  data,
+}: {
+  supabase: any;
+  userId: string;
+  data: {
+    applicationId: string;
+    reasonCode: string;
+    reasonLabel: string;
+    notes?: string;
+    silent?: boolean;
+  };
+}) {
+  await assertRole(supabase, [...STAFF]);
+  const admin = await getAdmin();
+  const name = await actorName(supabase, userId);
+  const isSilent = Boolean(data.silent);
+
+  const { data: app } = await admin
+    .from("applications")
+    .select("id, lead_id, customer_id, application_code, workflow_status, fulfillment_status, order_status, created_at")
+    .eq("id", data.applicationId)
+    .maybeSingle();
+  if (!app) throw new Error("Application not found");
+
+  // Cancel reminders & stop all schedulers so hot orders stop
+  await admin
+    .from("workflow_reminders")
+    .update({ status: "cancelled" } as never)
+    .eq("application_id", app.id)
+    .in("status", ["pending", "failed"]);
+
+  await admin
+    .from("order_reminders")
+    .update({ is_active: false, stopped_at: new Date().toISOString(), stop_reason: isSilent ? "silent_order_closed" : "order_closed" } as never)
+    .eq("application_id", app.id);
+
+  try {
+    const { cancelAllForOrder } = await import("@/lib/scheduling/schedulers.server");
+    await cancelAllForOrder(app.id, isSilent ? "silent_order_closed" : "order_closed");
+  } catch (schedErr) {
+    console.warn("[closeOrder] scheduler cancel warning:", schedErr);
+  }
+
+  try {
+    const { cancelTimers } = await import("@/lib/orders/actions/timers.server");
+    await cancelTimers(app.id);
+  } catch (timerErr) {
+    console.warn("[closeOrder] timer cancel warning:", timerErr);
+  }
+
+  const closedAt = new Date().toISOString();
+  await admin
+    .from("applications")
+    .update({
+      workflow_status: "closed",
+      workflow_closed_at: closedAt,
+      fulfillment_status: "order_closed",
+      application_status: "closed",
+      order_status: "CLOSED",
+      closure_stage: "closed",
+      closure_reason_code: data.reasonCode,
+      closure_remarks: data.notes ?? data.reasonLabel,
+      customer_hold_started_at: null,
+      technical_hold_started_at: null,
+      technical_hold_kind: null,
+      awaiting_govt_started_at: null,
+      active_reason_id: null,
+      active_reason_text: null,
+      workflow_delay_reason: null,
+      workflow_expected_review_at: null,
+      updated_at: closedAt,
+    } as never)
+    .eq("id", app.id);
+
+  try {
+    await admin.from("workflow_events").insert({
+      application_id: app.id,
+      lead_id: app.lead_id,
+      event_type: isSilent ? "silent_order_closed" : "order_closed",
+      title: isSilent
+        ? `Order closed silently — ${data.reasonLabel}`
+        : `Order closed — ${data.reasonLabel}`,
+      description: data.notes ?? null,
+      customer_visible: !isSilent,
+      actor_id: userId,
+      actor_name: name,
+      is_system: false,
+      metadata: {
+        reason_code: data.reasonCode,
+        reason_label: data.reasonLabel,
+        notes: data.notes ?? null,
+        silent: isSilent,
+        previous_stage: app.fulfillment_status || app.workflow_status || "in_progress",
+        email_sent: !isSilent,
+      },
+    } as never);
+  } catch (wfEvtErr) {
+    console.warn("[closeOrder] workflow_events insert warning:", wfEvtErr);
+  }
+
+  try {
+    await admin.from("application_events").insert({
+      application_id: app.id,
+      lead_id: app.lead_id,
+      customer_id: app.customer_id,
+      event_type: "order_status_change",
+      old_value: String(app.order_status ?? "ACTIVE"),
+      new_value: "CLOSED",
+      note: isSilent
+        ? `Order silently closed (${data.reasonLabel}) — no customer email`
+        : `Order closed (${data.reasonLabel})`,
+      created_by: userId,
+      staff_name: name,
+      staff_role: "staff",
+    } as never);
+  } catch (appEvtErr) {
+    console.warn("[closeOrder] application_events insert warning:", appEvtErr);
+  }
+
+  // Record in immutable employee action audit log
+  try {
+    const { logEmployeeOrderAction } = await import("@/lib/orders/order-action-logger.server");
+    await logEmployeeOrderAction({
+      orderId: app.id,
+      leadId: app.lead_id,
+      customerId: app.customer_id,
+      employeeId: userId,
+      employeeName: name,
+      actionType: "ORDER_CLOSED",
+      previousStatus: app.workflow_status || app.order_status || "active",
+      newStatus: "CLOSED",
+      previousStage: app.fulfillment_status,
+      newStage: "Order Closed",
+      notes: `Order closed${isSilent ? " silently" : ""}: ${data.reasonLabel}${data.notes ? ` - ${data.notes}` : ""}`,
+      source: isSilent ? "admin" : "employee",
+      customMetadata: {
+        silent: isSilent,
+        reasonCode: data.reasonCode,
+        reasonLabel: data.reasonLabel,
+        emailSent: !isSilent,
+      },
+      supabase: admin,
+    });
+  } catch (auditErr) {
+    console.warn("[closeOrder] audit log error:", auditErr);
+  }
+
+  // Send closure confirmation email ONLY if not in silent mode
+  if (!isSilent) {
+    try {
+      const { data: lead } = await admin
+        .from("leads")
+        .select("name, email, mobile, service")
+        .eq("id", app.lead_id!)
+        .maybeSingle();
+      const { data: latestInvoice } = await admin
+        .from("invoices")
+        .select("invoice_number")
+        .eq("application_id", app.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (lead?.email) {
+        const { enqueueFromTemplateInternal } = await import("@/lib/emails/emails.server");
+        const { SUPPORT_EMAIL, COMPANY_NAME } = await import("@/lib/brand");
+        const istFmt = (iso: string) =>
+          new Date(iso).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium", timeStyle: "short" });
+
+        // Load standard reply / description for closure reason
+        const { data: closureReasonRow } = await admin
+          .from("workflow_closure_reasons")
+          .select("description, label")
+          .eq("code", data.reasonCode)
+          .maybeSingle();
+        let defaultClosureReply = closureReasonRow?.description;
+        if (!defaultClosureReply) {
+          const { STANDARD_CLOSE_REASONS } = await import("@/lib/orders/actions/reasons.functions");
+          const std = STANDARD_CLOSE_REASONS.find(
+            (r) => r.id === data.reasonCode || `R${r.number}` === data.reasonCode || r.label.toLowerCase() === data.reasonLabel.toLowerCase()
+          );
+          defaultClosureReply = std?.standard_reply || null;
+        }
+        const closeRemarks = (data.notes && data.notes.trim()) ? data.notes.trim() : (defaultClosureReply || data.reasonLabel || "—");
+
+        await enqueueFromTemplateInternal(
+          "order_closure_confirmation",
+          lead.email,
+          {
+            customer_name: lead.name ?? "Customer",
+            customer_email: lead.email ?? "",
+            customer_mobile: (lead as any).mobile ?? "—",
+            order_id: app.application_code ?? "",
+            order_number: app.application_code ?? "",
+            service_name: lead.service ?? "—",
+            invoice_number: latestInvoice?.invoice_number ?? "—",
+            order_created_at: app.created_at ? istFmt(app.created_at as string) : "—",
+            closure_date: istFmt(closedAt),
+            closure_reason: data.reasonLabel,
+            reason: data.reasonLabel,
+            reason_block: defaultClosureReply || data.reasonLabel,
+            employee_remarks: closeRemarks,
+            additional_remarks: closeRemarks,
+            remarks: closeRemarks,
+            date: new Date().toLocaleDateString("en-IN"),
+            company_name: COMPANY_NAME,
+            support_email: SUPPORT_EMAIL,
+          },
+          { toName: lead.name ?? undefined, leadId: app.lead_id ?? undefined, applicationId: app.id, trigger: "manual" },
+        );
+      }
+    } catch (e) {
+      console.error("[closeOrder] closure email failed", e);
+    }
+  }
+
+  try {
+    await writeAudit({
+      supabase,
+      entityType: "application",
+      entityId: app.id,
+      action: isSilent ? "workflow_silent_close_order" : "workflow_close_order",
+      oldValue: { workflow_status: app.workflow_status },
+      newValue: { workflow_status: "closed", reason: data.reasonCode, notes: data.notes ?? null, silent: isSilent },
+      actorId: userId,
+    });
+  } catch (auditErr) {
+    console.warn("[closeOrder] writeAudit warning:", auditErr);
+  }
+
+  // Automatically complete any active callback / Hot Order on order close
+  try {
+    const { completeHotOrderOnQualifyingAction } = await import("@/lib/orders/actions/callback-reminder.functions");
+    await completeHotOrderOnQualifyingAction({
+      orderId: app.id,
+      actorId: userId,
+      actorName: name,
+      actionName: isSilent ? "Silent Close" : "Order Force Closed",
+      actionReason: `Order closed (${data.reasonLabel})`,
+      supabase: admin,
+    });
+  } catch (hotErr) {
+    console.warn("[closeOrder] completeHotOrderOnQualifyingAction warning:", hotErr);
+  }
+
+  return { ok: true, silent: isSilent };
+}
+
 // ───────── Close order ─────────
 
 export const closeOrder = createServerFn({ method: "POST" })
@@ -34,232 +286,11 @@ export const closeOrder = createServerFn({ method: "POST" })
     }).parse(d),
   )
   .handler(async ({ data, context }) => {
-    await assertRole(context.supabase, [...STAFF]);
-    const admin = await getAdmin();
-    const name = await actorName(context.supabase, context.userId);
-
-    const { data: app } = await admin
-      .from("applications")
-      .select("id, lead_id, customer_id, application_code, workflow_status, fulfillment_status, order_status, created_at")
-      .eq("id", data.applicationId)
-      .maybeSingle();
-    if (!app) throw new Error("Application not found");
-
-    // Cancel reminders & stop all schedulers so hot orders stop
-    await admin
-      .from("workflow_reminders")
-      .update({ status: "cancelled" } as never)
-      .eq("application_id", app.id)
-      .in("status", ["pending", "failed"]);
-
-    await admin
-      .from("order_reminders")
-      .update({ is_active: false, stopped_at: new Date().toISOString(), stop_reason: data.silent ? "silent_order_closed" : "order_closed" } as never)
-      .eq("application_id", app.id);
-
-    try {
-      const { cancelAllForOrder } = await import("@/lib/scheduling/schedulers.server");
-      await cancelAllForOrder(app.id, data.silent ? "silent_order_closed" : "order_closed");
-    } catch (schedErr) {
-      console.warn("[closeOrder] scheduler cancel warning:", schedErr);
-    }
-
-    try {
-      const { cancelTimers } = await import("@/lib/orders/actions/timers.server");
-      await cancelTimers(app.id);
-    } catch (timerErr) {
-      console.warn("[closeOrder] timer cancel warning:", timerErr);
-    }
-
-    const closedAt = new Date().toISOString();
-    await admin
-      .from("applications")
-      .update({
-        workflow_status: "closed",
-        workflow_closed_at: closedAt,
-        fulfillment_status: "order_closed",
-        application_status: "closed",
-        order_status: "CLOSED",
-        closure_stage: "closed",
-        closure_reason_code: data.reasonCode,
-        closure_remarks: data.notes ?? data.reasonLabel,
-        customer_hold_started_at: null,
-        technical_hold_started_at: null,
-        technical_hold_kind: null,
-        awaiting_govt_started_at: null,
-        active_reason_id: null,
-        active_reason_text: null,
-        workflow_delay_reason: null,
-        workflow_expected_review_at: null,
-        updated_at: closedAt,
-      } as never)
-      .eq("id", app.id);
-
-    await admin.from("workflow_events").insert({
-      application_id: app.id,
-      lead_id: app.lead_id,
-      event_type: data.silent ? "silent_order_closed" : "order_closed",
-      title: data.silent
-        ? `Order closed silently — ${data.reasonLabel}`
-        : `Order closed — ${data.reasonLabel}`,
-      description: data.notes ?? null,
-      customer_visible: !data.silent,
-      actor_id: context.userId,
-      actor_name: name,
-      is_system: false,
-      metadata: {
-        reason_code: data.reasonCode,
-        reason_label: data.reasonLabel,
-        notes: data.notes ?? null,
-        silent: data.silent,
-        previous_stage: app.fulfillment_status || app.workflow_status || "in_progress",
-        email_sent: !data.silent,
-      },
-    } as never);
-
-    await admin.from("application_events").insert({
-      application_id: app.id,
-      lead_id: app.lead_id,
-      customer_id: app.customer_id,
-      event_type: "order_status_change",
-      old_value: String(app.order_status ?? "ACTIVE"),
-      new_value: "CLOSED",
-      note: data.silent
-        ? `Order silently closed (${data.reasonLabel}) — no customer email`
-        : `Order closed (${data.reasonLabel})`,
-      created_by: context.userId,
-      staff_name: name,
-      staff_role: "staff",
-      metadata: {
-        silent: data.silent,
-        reason_code: data.reasonCode,
-        reason_label: data.reasonLabel,
-        previous_fulfillment_status: app.fulfillment_status,
-      } as any,
-    } as never);
-
-    // Record in immutable employee action audit log
-    try {
-      const { logEmployeeOrderAction } = await import("@/lib/orders/order-action-logger.server");
-      await logEmployeeOrderAction({
-        orderId: app.id,
-        leadId: app.lead_id,
-        customerId: app.customer_id,
-        employeeId: context.userId,
-        employeeName: name,
-        actionType: "ORDER_CLOSED",
-        previousStatus: app.workflow_status || app.order_status || "active",
-        newStatus: "CLOSED",
-        previousStage: app.fulfillment_status,
-        newStage: "Order Closed",
-        notes: `Order closed${data.silent ? " silently" : ""}: ${data.reasonLabel}${data.notes ? ` - ${data.notes}` : ""}`,
-        source: data.silent ? "admin" : "employee",
-        customMetadata: {
-          silent: data.silent,
-          reasonCode: data.reasonCode,
-          reasonLabel: data.reasonLabel,
-          emailSent: !data.silent,
-        },
-        supabase: admin,
-      });
-    } catch (auditErr) {
-      console.warn("[closeOrder] audit log error:", auditErr);
-    }
-
-    // Send closure confirmation email ONLY if not in silent mode
-    if (!data.silent) {
-      try {
-        const { data: lead } = await admin
-          .from("leads")
-          .select("name, email, mobile, service")
-          .eq("id", app.lead_id!)
-          .maybeSingle();
-        const { data: latestInvoice } = await admin
-          .from("invoices")
-          .select("invoice_number")
-          .eq("application_id", app.id)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        if (lead?.email) {
-          const { enqueueFromTemplateInternal } = await import("@/lib/emails/emails.server");
-          const { SUPPORT_EMAIL, COMPANY_NAME } = await import("@/lib/brand");
-          const istFmt = (iso: string) =>
-            new Date(iso).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium", timeStyle: "short" });
-
-          // Load standard reply / description for closure reason
-          const { data: closureReasonRow } = await admin
-            .from("workflow_closure_reasons")
-            .select("description, label")
-            .eq("code", data.reasonCode)
-            .maybeSingle();
-          let defaultClosureReply = closureReasonRow?.description;
-          if (!defaultClosureReply) {
-            const { STANDARD_CLOSE_REASONS } = await import("@/lib/orders/actions/reasons.functions");
-            const std = STANDARD_CLOSE_REASONS.find(
-              (r) => r.id === data.reasonCode || `R${r.number}` === data.reasonCode || r.label.toLowerCase() === data.reasonLabel.toLowerCase()
-            );
-            defaultClosureReply = std?.standard_reply || null;
-          }
-          const closeRemarks = (data.notes && data.notes.trim()) ? data.notes.trim() : (defaultClosureReply || data.reasonLabel || "—");
-
-          await enqueueFromTemplateInternal(
-            "order_closure_confirmation",
-            lead.email,
-            {
-              customer_name: lead.name ?? "Customer",
-              customer_email: lead.email ?? "",
-              customer_mobile: (lead as any).mobile ?? "—",
-              order_id: app.application_code ?? "",
-              order_number: app.application_code ?? "",
-              service_name: lead.service ?? "—",
-              invoice_number: latestInvoice?.invoice_number ?? "—",
-              order_created_at: app.created_at ? istFmt(app.created_at as string) : "—",
-              closure_date: istFmt(closedAt),
-              closure_reason: data.reasonLabel,
-              reason: data.reasonLabel,
-              reason_block: defaultClosureReply || data.reasonLabel,
-              employee_remarks: closeRemarks,
-              additional_remarks: closeRemarks,
-              remarks: closeRemarks,
-              date: new Date().toLocaleDateString("en-IN"),
-              company_name: COMPANY_NAME,
-              support_email: SUPPORT_EMAIL,
-            },
-            { toName: lead.name ?? undefined, leadId: app.lead_id ?? undefined, applicationId: app.id, trigger: "manual" },
-          );
-        }
-      } catch (e) {
-        console.error("[closeOrder] closure email failed", e);
-      }
-    }
-
-    await writeAudit({
+    return executeOrderClosure({
       supabase: context.supabase,
-      entityType: "application",
-      entityId: app.id,
-      action: data.silent ? "workflow_silent_close_order" : "workflow_close_order",
-      oldValue: { workflow_status: app.workflow_status },
-      newValue: { workflow_status: "closed", reason: data.reasonCode, notes: data.notes ?? null, silent: data.silent },
-      actorId: context.userId,
+      userId: context.userId,
+      data,
     });
-
-    // Automatically complete any active callback / Hot Order on order close
-    try {
-      const { completeHotOrderOnQualifyingAction } = await import("@/lib/orders/actions/callback-reminder.functions");
-      await completeHotOrderOnQualifyingAction({
-        orderId: app.id,
-        actorId: context.userId,
-        actorName: name,
-        actionName: data.silent ? "Silent Close" : "Order Force Closed",
-        actionReason: `Order closed (${data.reasonLabel})`,
-        supabase: admin,
-      });
-    } catch (hotErr) {
-      console.warn("[closeOrder] completeHotOrderOnQualifyingAction warning:", hotErr);
-    }
-
-    return { ok: true, silent: data.silent };
   });
 
 // ───────── Silent Close Order (Admin Override Only) ─────────
@@ -275,7 +306,9 @@ export const silentCloseOrder = createServerFn({ method: "POST" })
     }).parse(d),
   )
   .handler(async ({ data, context }) => {
-    return closeOrder({
+    return executeOrderClosure({
+      supabase: context.supabase,
+      userId: context.userId,
       data: {
         applicationId: data.applicationId,
         reasonCode: data.reasonCode,

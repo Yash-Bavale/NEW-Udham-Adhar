@@ -747,25 +747,30 @@ export const closeTicketRestartT001 = createServerFn({ method: "POST" })
     ticketId: z.string().uuid(),
   }).parse(i))
   .handler(async ({ data, context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const ticket = await loadTicket(data.ticketId);
     if (!ticket.application_id) throw new Error("This ticket is not linked to an order.");
-    const { data: result, error } = await context.supabase.rpc("restart_order_from_ticket", {
-      _ticket_id: ticket.id,
-    });
-    if (error) throw new Error(error.message);
+    const now = new Date().toISOString();
+
+    try {
+      await context.supabase.rpc("restart_order_from_ticket", {
+        _ticket_id: ticket.id,
+      });
+    } catch (rpcErr) {
+      console.warn("[closeTicketRestartT001] restart_order_from_ticket RPC notice:", rpcErr);
+    }
 
     // Reset all workflow & closure fields so computeOrderStage & deriveJourneyLiveState recognise the order as active
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const now = new Date().toISOString();
     const { error: upErr } = await supabaseAdmin
       .from("applications")
       .update({
         order_status: "REOPENED",
-        fulfillment_status: "form_submitted",
-        workflow_status: null,
+        fulfillment_status: "order_reopened",
+        workflow_status: "order_reopened",
         closure_stage: "none",
-        application_status: "under_process",
+        application_status: "order_reopened",
         closure_reason_id: null,
+        closure_reason_code: null,
         closure_remarks: null,
         closure_next_at: null,
         cancellation_requested_at: null,
@@ -774,6 +779,9 @@ export const closeTicketRestartT001 = createServerFn({ method: "POST" })
         technical_hold_kind: null,
         active_reason_id: null,
         active_reason_text: null,
+        workflow_delay_reason: null,
+        workflow_expected_review_at: null,
+        workflow_closed_at: null,
         reopened_at: now,
         reopened_by: context.userId,
         updated_at: now,
@@ -781,6 +789,31 @@ export const closeTicketRestartT001 = createServerFn({ method: "POST" })
       .eq("id", ticket.application_id);
 
     if (upErr) throw new Error(`Failed to update application status: ${upErr.message}`);
+
+    // Update ticket to closed
+    await supabaseAdmin
+      .from("support_tickets")
+      .update({
+        status: "closed",
+        resolved_at: now,
+        resolved_by: context.userId,
+        closed_at: now,
+        updated_at: now,
+        last_staff_message_at: now,
+      } as never)
+      .eq("id", ticket.id);
+
+    try {
+      await supabaseAdmin.from("ticket_replies").insert({
+        ticket_id: ticket.id,
+        reply_text: "Closed: Restarted & reopened order to active workflow.",
+        is_internal: true,
+        created_by: context.userId,
+        direction: "note",
+      } as never);
+    } catch (replyErr) {
+      console.warn("[closeTicketRestartT001] ticket reply log warning:", replyErr);
+    }
 
     // Log to application_events & activity_logs so the timeline reflects the reopening
     try {
@@ -799,6 +832,7 @@ export const closeTicketRestartT001 = createServerFn({ method: "POST" })
           stopped_at: now,
           stop_reason: "order_reopened_from_ticket",
           stop_triggered_by: context.userId,
+          updated_at: now,
         })
         .eq("application_id", ticket.application_id)
         .in("status", ["active", "paused"]);
@@ -829,6 +863,7 @@ export const closeTicketRestartT001 = createServerFn({ method: "POST" })
         new_value: "order_reopened",
         note: `Order reopened from support ticket ${ticket.ticket_number ?? ""}`,
         staff_name: staffName,
+        staff_role: "staff",
       } as never);
 
       if ((ticket as any).lead_id) {
@@ -871,7 +906,7 @@ export const closeTicketRestartT001 = createServerFn({ method: "POST" })
       console.warn("[restartOrderFromTicket] timeline/scheduler log warning:", evtErr);
     }
 
-    return result as { ok: true; applicationId: string; cancelledCustomerDelayTimers: number };
+    return { ok: true, applicationId: ticket.application_id, ticketId: ticket.id };
   });
 
 // T001 — Consultation / Support Completed
@@ -1068,6 +1103,19 @@ export const makeOrderHotFromTicket = createServerFn({ method: "POST" })
       throw new Error("No linked order found for this ticket.");
     }
 
+    const { data: preApp } = await admin
+      .from("applications")
+      .select("id, lead_id, customer_id, application_code, order_status, fulfillment_status, workflow_status, application_status, form_submitted_at, assigned_to")
+      .eq("id", targetOrderId)
+      .maybeSingle();
+
+    if (!preApp) {
+      throw new Error("Linked order not found.");
+    }
+
+    const previousStage = preApp.fulfillment_status || preApp.workflow_status || preApp.order_status || "closed";
+    const previousStatus = preApp.order_status || "CLOSED";
+
     const { data: staffProf } = await admin
       .from("profiles")
       .select("display_name, email")
@@ -1075,13 +1123,38 @@ export const makeOrderHotFromTicket = createServerFn({ method: "POST" })
       .maybeSingle();
     const staffName = (staffProf as any)?.display_name || (staffProf as any)?.email || "Staff";
 
-    // 1. Update application updated_at timestamp
-    await admin
+    // 1. Reopen the order into active working state (reopens no matter if order was completed or closed)
+    const { error: upErr } = await admin
       .from("applications")
       .update({
+        order_status: "REOPENED",
+        fulfillment_status: "order_reopened",
+        workflow_status: "order_reopened",
+        closure_stage: "none",
+        application_status: "order_reopened",
+        closure_reason_id: null,
+        closure_reason_code: null,
+        closure_remarks: null,
+        closure_next_at: null,
+        cancellation_requested_at: null,
+        customer_hold_started_at: null,
+        technical_hold_started_at: null,
+        technical_hold_kind: null,
+        active_reason_id: null,
+        active_reason_text: null,
+        workflow_delay_reason: null,
+        workflow_expected_review_at: null,
+        workflow_closed_at: null,
+        reopened_at: now,
+        reopened_by: context.userId,
         updated_at: now,
-      })
+      } as never)
       .eq("id", targetOrderId);
+
+    if (upErr) {
+      console.error("[makeOrderHotFromTicket] update error:", upErr);
+      throw new Error(`Failed to reopen order status: ${upErr.message}`);
+    }
 
     // 2. Stop any prior open schedulers to satisfy one_open_scheduler_per_order
     await admin
@@ -1091,6 +1164,7 @@ export const makeOrderHotFromTicket = createServerFn({ method: "POST" })
         stopped_at: now,
         stop_reason: "ticket_hot_priority_override",
         stop_triggered_by: context.userId,
+        updated_at: now,
       })
       .eq("application_id", targetOrderId)
       .in("status", ["active", "paused"]);
@@ -1126,20 +1200,110 @@ export const makeOrderHotFromTicket = createServerFn({ method: "POST" })
       throw new Error(`Failed to set hot priority: ${error.message}`);
     }
 
-    // 4. Log event in application_events and activity_logs
+    // 4. Auto-reassign to active operations employee if assignee is inactive or unassigned
     try {
+      let isAssigneeActive = false;
+      const assignedToId = preApp.assigned_to;
+      if (assignedToId) {
+        const { data: assigneeProf } = await (admin
+          .from("profiles" as any) as any)
+          .select("id, is_active, employment_status")
+          .eq("id", assignedToId)
+          .maybeSingle();
+        isAssigneeActive = (assigneeProf as any)?.is_active !== false && ((assigneeProf as any)?.employment_status === "ACTIVE" || !(assigneeProf as any)?.employment_status);
+      }
+      if (!isAssigneeActive) {
+        const { assignOrderToNextEligibleEmployee } = await import("@/lib/crm/assignment-engine.server");
+        await assignOrderToNextEligibleEmployee({
+          orderId: targetOrderId,
+          changeType: assignedToId ? "AUTO_TERMINATED" : "AUTO_INITIAL_POOL",
+          reason: assignedToId ? "Ticket hot escalation: Previous assignee was inactive/exited" : "Ticket hot escalation: Assigned to active pool staff",
+          actorId: context.userId,
+        });
+      }
+    } catch (assignErr) {
+      console.warn("[makeOrderHotFromTicket] auto-reassign warning:", assignErr);
+    }
+
+    // 5. Update lead status if lead was previously closed
+    if (preApp.lead_id) {
+      try {
+        const [{ data: lead }, { data: paidPayment }] = await Promise.all([
+          admin
+            .from("leads")
+            .select("id, lead_status_v2, status")
+            .eq("id", preApp.lead_id)
+            .maybeSingle(),
+          admin
+            .from("payments")
+            .select("id")
+            .eq("lead_id", preApp.lead_id)
+            .eq("status", "paid")
+            .limit(1)
+            .maybeSingle(),
+        ]);
+
+        if (lead) {
+          const isClosedLead = ["closed", "closed_refunded", "uninterested"].includes(String(lead.lead_status_v2 ?? "")) ||
+                               ["closed", "uninterested"].includes(String(lead.status ?? ""));
+          if (isClosedLead) {
+            const nextLeadStatus = paidPayment ? "payment_successful" : "contacted";
+            await admin
+              .from("leads")
+              .update({
+                lead_status_v2: nextLeadStatus,
+                status: nextLeadStatus,
+                updated_at: now,
+              } as never)
+              .eq("id", lead.id);
+          }
+        }
+      } catch (leadErr) {
+        console.warn("[makeOrderHotFromTicket] lead status update warning:", leadErr);
+      }
+    }
+
+    // 6. Log event in workflow_events, application_events, and activity_logs
+    try {
+      await admin.from("workflow_events").insert({
+        application_id: targetOrderId,
+        lead_id: preApp.lead_id ?? null,
+        event_type: "order_reopened",
+        title: "Order Reopened & Escalated to Hot Priority",
+        description: `Order reopened and marked Hot Priority from Ticket #${ticketNumber || ""}`,
+        customer_visible: false,
+        actor_id: context.userId,
+        actor_name: staffName,
+        is_system: false,
+        metadata: {
+          event: "ORDER_REOPENED_HOT",
+          previousStage,
+          previousStatus,
+          newStage: "Order Reopened",
+          reopenedBy: context.userId,
+          reopenedAt: now,
+          ticketNumber: ticketNumber || null,
+        },
+      } as never);
+
       await admin.from("application_events").insert({
         application_id: targetOrderId,
+        lead_id: preApp.lead_id ?? null,
+        customer_id: preApp.customer_id ?? null,
         event_type: "hot_priority_escalated",
-        note: `Order escalated to Hot Priority from Ticket #${ticketNumber || ""}`,
+        old_value: String(previousStatus),
+        new_value: "REOPENED",
+        note: `Order reopened and escalated to Hot Priority from Ticket #${ticketNumber || ""}`,
+        created_by: context.userId,
         staff_name: staffName,
+        staff_role: "staff",
       } as never);
 
       if (data.ticketId) {
         await admin.from("activity_logs").insert({
           user_id: context.userId,
           activity_type: "ticket_order_hot_escalated",
-          activity_description: `Linked order was marked on HOT PRIORITY by ${staffName}`,
+          activity_description: `Linked order was reopened and marked on HOT PRIORITY by ${staffName}`,
         } as never);
       }
     } catch (e) {

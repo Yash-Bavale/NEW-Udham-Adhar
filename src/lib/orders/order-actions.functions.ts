@@ -996,22 +996,16 @@ export const reopenOrder = createServerFn({ method: "POST" })
     // 1. Snapshot previous state before modifying to preserve history
     const { data: preApp } = await supabaseAdmin
       .from("applications")
-      .select("id, lead_id, customer_id, application_code, order_status, fulfillment_status, workflow_status, application_status, form_submitted_at")
+      .select("id, lead_id, customer_id, application_code, order_status, fulfillment_status, workflow_status, application_status, form_submitted_at, assigned_to")
       .eq("id", data.orderId)
       .maybeSingle();
 
+    if (!preApp) {
+      throw new Error("Order not found");
+    }
+
     const previousStage = preApp?.fulfillment_status || preApp?.workflow_status || preApp?.order_status || "closed";
     const previousStatus = preApp?.order_status || "CLOSED";
-
-    // 2. Best-effort restart_order RPC call (wrapped in try/catch)
-    try {
-      await context.supabase.rpc("restart_order", {
-        _order_id: data.orderId,
-        _note: data.remarks ?? undefined,
-      });
-    } catch (rpcErr) {
-      console.warn("[reopenOrder] restart_order RPC notice:", rpcErr);
-    }
 
     const { data: staffProf } = await supabaseAdmin
       .from("profiles")
@@ -1020,7 +1014,7 @@ export const reopenOrder = createServerFn({ method: "POST" })
       .maybeSingle();
     const staffName = (staffProf as any)?.display_name || (staffProf as any)?.email || "Staff";
 
-    // 3. Set dedicated ORDER_REOPENED status across all status columns
+    // 2. Set dedicated ORDER_REOPENED status across all status columns and clear all hold/closure states
     const { error: upErr } = await supabaseAdmin
       .from("applications")
       .update({
@@ -1030,6 +1024,7 @@ export const reopenOrder = createServerFn({ method: "POST" })
         closure_stage: "none",
         application_status: "order_reopened",
         closure_reason_id: null,
+        closure_reason_code: null,
         closure_remarks: null,
         closure_next_at: null,
         cancellation_requested_at: null,
@@ -1038,6 +1033,9 @@ export const reopenOrder = createServerFn({ method: "POST" })
         technical_hold_kind: null,
         active_reason_id: null,
         active_reason_text: null,
+        workflow_delay_reason: null,
+        workflow_expected_review_at: null,
+        workflow_closed_at: null,
         reopened_at: now,
         reopened_by: context.userId,
         updated_at: now,
@@ -1046,7 +1044,7 @@ export const reopenOrder = createServerFn({ method: "POST" })
 
     if (upErr) throw new Error(`Failed to update application status: ${upErr.message}`);
 
-    // 4. Immediately schedule an active Hot Order reminder so the reopened order appears in Hot Orders
+    // 3. Immediately schedule an active Hot Order reminder so the reopened order appears in Hot Orders
     try {
       // Stop any prior open schedulers to satisfy one_open_scheduler_per_order
       await supabaseAdmin
@@ -1056,6 +1054,7 @@ export const reopenOrder = createServerFn({ method: "POST" })
           stopped_at: now,
           stop_reason: "order_reopened",
           stop_triggered_by: context.userId,
+          updated_at: now,
         })
         .eq("application_id", data.orderId)
         .in("status", ["active", "paused"]);
@@ -1081,10 +1080,10 @@ export const reopenOrder = createServerFn({ method: "POST" })
       console.warn("[reopenOrder] hot order scheduler insert warning:", schedErr);
     }
 
-    // 4b. If order was assigned to an inactive/exited employee (or unassigned), instantly assign to an active operations employee
+    // 4. If order was assigned to an inactive/exited employee (or unassigned), instantly assign to an active operations employee
     try {
       let isAssigneeActive = false;
-      const assignedToId = (preApp as any)?.assigned_to;
+      const assignedToId = preApp.assigned_to;
       if (assignedToId) {
         const { data: assigneeProf } = await (supabaseAdmin
           .from("profiles" as any) as any)
@@ -1107,50 +1106,54 @@ export const reopenOrder = createServerFn({ method: "POST" })
     }
 
     // 5. Audit logs: workflow_events, application_events, and employee order action log
-    await supabaseAdmin.from("workflow_events").insert({
-      application_id: data.orderId,
-      lead_id: preApp?.lead_id ?? null,
-      event_type: "order_reopened",
-      title: "Order Reopened",
-      description: data.remarks ?? "Order reopened by staff",
-      customer_visible: false,
-      actor_id: context.userId,
-      actor_name: staffName,
-      is_system: false,
-      metadata: {
-        event: "ORDER_REOPENED",
-        previousStage,
-        previousStatus,
-        newStage: "Order Reopened",
-        reopenedBy: context.userId,
-        reopenedAt: now,
-        notes: data.remarks ?? null,
-      },
-    } as never);
+    try {
+      await supabaseAdmin.from("workflow_events").insert({
+        application_id: data.orderId,
+        lead_id: preApp.lead_id ?? null,
+        event_type: "order_reopened",
+        title: "Order Reopened",
+        description: data.remarks ?? "Order reopened by staff",
+        customer_visible: false,
+        actor_id: context.userId,
+        actor_name: staffName,
+        is_system: false,
+        metadata: {
+          event: "ORDER_REOPENED",
+          previousStage,
+          previousStatus,
+          newStage: "Order Reopened",
+          reopenedBy: context.userId,
+          reopenedAt: now,
+          notes: data.remarks ?? null,
+        },
+      } as never);
+    } catch (wfErr) {
+      console.warn("[reopenOrder] workflow_events insert warning:", wfErr);
+    }
 
-    await supabaseAdmin.from("application_events").insert({
-      application_id: data.orderId,
-      lead_id: preApp?.lead_id ?? null,
-      customer_id: preApp?.customer_id ?? null,
-      event_type: "order_status_change",
-      old_value: String(previousStatus),
-      new_value: "REOPENED",
-      note: data.remarks ?? "Order reopened — entered Order Reopened stage",
-      created_by: context.userId,
-      staff_name: staffName,
-      staff_role: "staff",
-      metadata: {
-        previousStage,
-        newStage: "order_reopened",
-      } as any,
-    } as never);
+    try {
+      await supabaseAdmin.from("application_events").insert({
+        application_id: data.orderId,
+        lead_id: preApp.lead_id ?? null,
+        customer_id: preApp.customer_id ?? null,
+        event_type: "order_status_change",
+        old_value: String(previousStatus),
+        new_value: "REOPENED",
+        note: data.remarks ?? "Order reopened — entered Order Reopened stage",
+        created_by: context.userId,
+        staff_name: staffName,
+        staff_role: "staff",
+      } as never);
+    } catch (appEvtErr) {
+      console.warn("[reopenOrder] application_events insert warning:", appEvtErr);
+    }
 
     try {
       const { logEmployeeOrderAction } = await import("@/lib/orders/order-action-logger.server");
       await logEmployeeOrderAction({
         orderId: data.orderId,
-        leadId: preApp?.lead_id,
-        customerId: preApp?.customer_id,
+        leadId: preApp.lead_id,
+        customerId: preApp.customer_id,
         employeeId: context.userId,
         employeeName: staffName,
         actionType: "ORDER_REOPENED",
@@ -1172,51 +1175,53 @@ export const reopenOrder = createServerFn({ method: "POST" })
       console.warn("[reopenOrder] audit log warning:", auditErr);
     }
 
-    if (preApp?.lead_id) {
-      const [{ data: lead }, { data: paidPayment }] = await Promise.all([
-        supabaseAdmin
-          .from("leads")
-          .select("id, lead_status_v2, status")
-          .eq("id", preApp.lead_id)
-          .maybeSingle(),
-        supabaseAdmin
-          .from("payments")
-          .select("id")
-          .eq("lead_id", preApp.lead_id)
-          .eq("status", "paid")
-          .limit(1)
-          .maybeSingle(),
-      ]);
-
-      if (lead) {
-        const isClosedLead = ["closed", "closed_refunded", "uninterested"].includes(String(lead.lead_status_v2 ?? "")) ||
-                             ["closed", "uninterested"].includes(String(lead.status ?? ""));
-        if (isClosedLead) {
-          const nextLeadStatus = paidPayment ? "payment_successful" : "contacted";
-          await supabaseAdmin
+    if (preApp.lead_id) {
+      try {
+        const [{ data: lead }, { data: paidPayment }] = await Promise.all([
+          supabaseAdmin
             .from("leads")
-            .update({
-              lead_status_v2: nextLeadStatus,
-              status: nextLeadStatus,
-              updated_at: now,
-            } as never)
-            .eq("id", lead.id);
+            .select("id, lead_status_v2, status")
+            .eq("id", preApp.lead_id)
+            .maybeSingle(),
+          supabaseAdmin
+            .from("payments")
+            .select("id")
+            .eq("lead_id", preApp.lead_id)
+            .eq("status", "paid")
+            .limit(1)
+            .maybeSingle(),
+        ]);
+
+        if (lead) {
+          const isClosedLead = ["closed", "closed_refunded", "uninterested"].includes(String(lead.lead_status_v2 ?? "")) ||
+                               ["closed", "uninterested"].includes(String(lead.status ?? ""));
+          if (isClosedLead) {
+            const nextLeadStatus = paidPayment ? "payment_successful" : "contacted";
+            await supabaseAdmin
+              .from("leads")
+              .update({
+                lead_status_v2: nextLeadStatus,
+                status: nextLeadStatus,
+                updated_at: now,
+              } as never)
+              .eq("id", lead.id);
+          }
         }
+      } catch (leadErr) {
+        console.warn("[reopenOrder] lead status update warning:", leadErr);
       }
     }
 
     return {
       ok: true,
-      order: preApp
-        ? {
-            ...preApp,
-            order_status: "REOPENED",
-            fulfillment_status: "order_reopened",
-            workflow_status: "order_reopened",
-            application_status: "order_reopened",
-            updated_at: now,
-          }
-        : null,
+      order: {
+        ...preApp,
+        order_status: "REOPENED",
+        fulfillment_status: "order_reopened",
+        workflow_status: "order_reopened",
+        application_status: "order_reopened",
+        updated_at: now,
+      },
     };
   });
 

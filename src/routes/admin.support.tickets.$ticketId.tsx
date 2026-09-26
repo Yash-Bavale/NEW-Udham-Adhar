@@ -628,7 +628,18 @@ function TicketWorkspace() {
 
   const doReopenOrder = useMutation({
     mutationFn: (orderId: string) => reopenOrderFn({ data: { orderId } }),
-    onSuccess: () => { toast.success("Order reopened successfully"); invalidate(); },
+    onSuccess: () => {
+      toast.success("Order reopened successfully — active in Hot Orders");
+      invalidate();
+      if (app.id) {
+        qc.invalidateQueries({ queryKey: ["admin.order", app.id] });
+        qc.invalidateQueries({ queryKey: ["order-workflow-state", app.id] });
+        qc.invalidateQueries({ queryKey: ["order-tickets", app.id] });
+        qc.invalidateQueries({ queryKey: ["workflow-events", app.id] });
+      }
+      qc.invalidateQueries({ queryKey: ["admin.orders.v2"] });
+      qc.invalidateQueries({ queryKey: ["due-reminders-summary"] });
+    },
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -636,8 +647,14 @@ function TicketWorkspace() {
     mutationFn: (orderId?: string) =>
       makeHotOrderFn({ data: { ticketId, orderId } }),
     onSuccess: () => {
-      toast.success("🔥 Order prioritized as Hot Order! Alert ringing on server.");
+      toast.success("🔥 Order reopened & prioritized as Hot Order!");
       invalidate();
+      if (app.id) {
+        qc.invalidateQueries({ queryKey: ["admin.order", app.id] });
+        qc.invalidateQueries({ queryKey: ["order-workflow-state", app.id] });
+        qc.invalidateQueries({ queryKey: ["order-tickets", app.id] });
+        qc.invalidateQueries({ queryKey: ["workflow-events", app.id] });
+      }
       qc.invalidateQueries({ queryKey: ["admin.orders.v2"] });
       qc.invalidateQueries({ queryKey: ["due-reminders-summary"] });
     },
@@ -727,15 +744,18 @@ function TicketWorkspace() {
   const serviceName = ticket.services?.service_name ?? app.services?.service_name ?? "New Udyam Certificate Registration";
   const customerEmailAddress = ticket.ticket_email ?? cust.primary_email ?? "customer@mail.com";
 
-  // Check Reopen Rule: Order Stage must be Closed or Completed
-  const orderStageStr = String(app.fulfillment_status ?? app.order_status ?? "").toLowerCase();
+  // Check Reopen Rule: Order Stage must be Closed, Completed, Cancelled, or Rejected
+  const orderStageStr = String(app.fulfillment_status ?? app.order_status ?? app.workflow_status ?? "").toLowerCase();
   const canReopenOrder =
     Boolean(app.id) &&
     (orderStageStr.includes("completed") ||
       orderStageStr.includes("closed") ||
       orderStageStr.includes("cancelled") ||
+      orderStageStr.includes("rejected") ||
+      app.closure_stage === "closed" ||
       app.order_status === "COMPLETED" ||
-      app.order_status === "CLOSED");
+      app.order_status === "CLOSED" ||
+      app.order_status === "CANCELLED");
 
   // SLA Calculation
   const slaTargetHours = ticket.priority === "urgent" ? 4 : ticket.priority === "high" ? 8 : ticket.priority === "medium" ? 24 : 48;

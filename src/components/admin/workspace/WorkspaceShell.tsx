@@ -307,8 +307,14 @@ export function WorkspaceShell(p: Props) {
   const mutReopen = useMutation({
     mutationFn: () => fnReopen({ data: { orderId: p.orderId } }),
     onSuccess: () => {
-      toast.success("E09 sent — order reopened/restarted successfully");
+      toast.success("Order reopened successfully — active in Hot Orders");
       invalidate();
+      qc.invalidateQueries({ queryKey: ["admin.order", p.orderId] });
+      qc.invalidateQueries({ queryKey: ["admin.orders.v2"] });
+      qc.invalidateQueries({ queryKey: ["order-workflow-state", p.orderId] });
+      qc.invalidateQueries({ queryKey: ["order-tickets", p.orderId] });
+      qc.invalidateQueries({ queryKey: ["workflow-events", p.orderId] });
+      qc.invalidateQueries({ queryKey: ["due-reminders-summary"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });

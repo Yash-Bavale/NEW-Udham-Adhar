@@ -318,7 +318,16 @@ export function CustomerJourneyMap(p: Props) {
   });
   const mutReopen = useMutation({
     mutationFn: () => fnReopen({ data: { orderId: p.applicationId } }),
-    onSuccess: () => { toast.success("Order reopened successfully — active in Hot Orders"); invalidate(); },
+    onSuccess: () => {
+      toast.success("Order reopened successfully — active in Hot Orders");
+      invalidate();
+      qc.invalidateQueries({ queryKey: ["admin.order", p.applicationId] });
+      qc.invalidateQueries({ queryKey: ["admin.orders.v2"] });
+      qc.invalidateQueries({ queryKey: ["order-workflow-state", p.applicationId] });
+      qc.invalidateQueries({ queryKey: ["order-tickets", p.applicationId] });
+      qc.invalidateQueries({ queryKey: ["workflow-events", p.applicationId] });
+      qc.invalidateQueries({ queryKey: ["due-reminders-summary"] });
+    },
     onError: (e: Error) => toast.error(e.message),
   });
   const mutFormLink = useMutation({
@@ -606,7 +615,7 @@ export function CustomerJourneyMap(p: Props) {
           )}
 
           {/* Resume / Reopen Order */}
-          {closed || (completed && p.adminOverride) ? (
+          {closed || completed ? (
             <button
               type="button"
               onClick={() => mutReopen.mutate()}

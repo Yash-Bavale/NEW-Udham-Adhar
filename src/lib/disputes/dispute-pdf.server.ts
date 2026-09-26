@@ -391,7 +391,7 @@ export async function renderDisputeEvidencePackagePdf(data: DisputePackageData):
   });
 
   // ══════════════════════════════════════════════════════════════════════════
-  // 2. SELECTED SENT EMAILS
+  // 2. SELECTED SENT EMAILS (Exact Email Print Layout)
   // ══════════════════════════════════════════════════════════════════════════
   const sortedEmails = [...data.selectedEmails].sort((a, b) => {
     const ta = new Date(a.sent_at || 0).getTime();
@@ -399,119 +399,173 @@ export async function renderDisputeEvidencePackagePdf(data: DisputePackageData):
     return ta - tb;
   });
 
-  let emailIndex = 1;
+  const GOLD_LINE = rgb(0.92, 0.62, 0.15);
+  const LINK_BLUE = rgb(0.12, 0.28, 0.8);
+  const HEADER_YELLOW_BG = rgb(1, 0.99, 0.88);
+  const HEADER_YELLOW_BORDER = rgb(0.92, 0.86, 0.72);
+  const TIMELINE_BG = rgb(0.95, 0.96, 0.98);
+  const TIMELINE_BORDER = rgb(0.85, 0.88, 0.92);
+
   for (const email of sortedEmails) {
+    let emailPageNum = 1;
     let emailPage = mergedPdf.addPage([PAGE_W, PAGE_H]);
-    let ey = PAGE_H - 40;
+    let ey = PAGE_H - 28;
 
-    // Header Banner for this Email
-    emailPage.drawRectangle({
-      x: MARGIN_X,
-      y: ey - 24,
-      width: CONTENT_W,
-      height: 24,
-      color: NAVY,
-    });
-    drawText(emailPage, `EVIDENCE ITEM: SENT EMAIL #${emailIndex} of ${sortedEmails.length}`, {
-      x: MARGIN_X + 12,
-      y: ey - 16,
-      size: 9,
-      font: helvBold,
-      color: WHITE,
-    });
+    // Top Page Label
+    const drawPageLabel = (p: PDFPage, num: number) => {
+      const pStr = `Page ${num}`;
+      const pw = textWidth(helv, pStr, 8);
+      drawText(p, pStr, { x: (PAGE_W - pw) / 2, y: PAGE_H - 20, size: 8, font: helv, color: TEXT_MUTED });
+    };
 
-    ey -= 34;
+    drawPageLabel(emailPage, emailPageNum);
 
-    // Email Metadata Card (Clean layout, no Template ID, Message ID safely wrapped)
-    const subLines = wrap(email.subject || "No Subject", helvBold, 8.5, CONTENT_W - 95);
-    const subHeight = Math.max(subLines.length, 1) * 14;
-    const metaCardH = 48 + subHeight;
+    // ── Email Client Header Box (Yellow/Cream Background) ──
+    const subLines = wrap(email.subject || "Order Confirmation & Tax Invoice", helvBold, 8, CONTENT_W - 90);
+    const subHeight = Math.max(subLines.length, 1) * 13;
+    const hasAttachment = Boolean(data.invoice);
+    const attachHeight = hasAttachment ? 14 : 0;
+    const headerBoxH = 56 + subHeight + attachHeight;
 
     emailPage.drawRectangle({
       x: MARGIN_X,
-      y: ey - metaCardH,
+      y: ey - headerBoxH,
       width: CONTENT_W,
-      height: metaCardH,
-      color: LIGHT_BG,
-      borderColor: BORDER_COLOR,
+      height: headerBoxH,
+      color: HEADER_YELLOW_BG,
+      borderColor: HEADER_YELLOW_BORDER,
       borderWidth: 1,
     });
 
-    let metaY = ey - 14;
-    drawText(emailPage, "Subject", { x: MARGIN_X + 12, y: metaY, size: 8.5, font: helvBold, color: TEXT_MUTED });
-    for (let sIdx = 0; sIdx < subLines.length; sIdx++) {
-      drawText(emailPage, sIdx === 0 ? `: ${safePdfText(subLines[sIdx])}` : `  ${safePdfText(subLines[sIdx])}`, {
-        x: MARGIN_X + 75,
-        y: metaY,
-        size: 8.5,
-        font: helvBold,
-        color: NAVY,
-      });
-      metaY -= 14;
-    }
+    let hy = ey - 14;
+    const labelX = MARGIN_X + 12;
+    const valX = MARGIN_X + 70;
 
-    metaY -= 2;
-    // Row 2: From & To
-    drawText(emailPage, "From", { x: MARGIN_X + 12, y: metaY, size: 8, font: helv, color: TEXT_MUTED });
-    drawText(emailPage, `: ${safePdfText(email.from_email || COMPANY_EMAIL)}`, { x: MARGIN_X + 75, y: metaY, size: 8, font: helv, color: TEXT_DARK });
-
-    drawText(emailPage, "To", { x: MARGIN_X + 280, y: metaY, size: 8, font: helv, color: TEXT_MUTED });
-    drawText(emailPage, `: ${safePdfText(email.to_email)}`, { x: MARGIN_X + 305, y: metaY, size: 8, font: helv, color: TEXT_DARK });
-
-    metaY -= 14;
-    // Row 3: Sent Date & Message ID
-    drawText(emailPage, "Sent Date", { x: MARGIN_X + 12, y: metaY, size: 8, font: helv, color: TEXT_MUTED });
-    drawText(emailPage, `: ${formatIST(email.sent_at)}`, { x: MARGIN_X + 75, y: metaY, size: 8, font: helvBold, color: TEXT_DARK });
-
-    if (email.message_id) {
-      drawText(emailPage, "Message ID", { x: MARGIN_X + 280, y: metaY, size: 7.5, font: helv, color: TEXT_MUTED });
-      const msgLines = wrap(email.message_id, helv, 7, CONTENT_W - 350);
-      drawText(emailPage, `: ${safePdfText(msgLines[0] || email.message_id)}`, { x: MARGIN_X + 345, y: metaY, size: 7, font: helv, color: TEXT_MUTED });
-    }
-
-    ey -= (metaCardH + 12);
-
-    // Body Container Header
-    drawText(emailPage, "EMAIL BODY CONTENT:", {
-      x: MARGIN_X,
-      y: ey,
-      size: 8.5,
-      font: helvBold,
-      color: NAVY_SOFT,
+    // From
+    drawText(emailPage, "From:", { x: labelX, y: hy, size: 8, font: helvBold, color: TEXT_DARK });
+    drawText(emailPage, `"Business Help Services" <${email.from_email || COMPANY_EMAIL}>`, {
+      x: valX,
+      y: hy,
+      size: 8,
+      font: helv,
+      color: LINK_BLUE,
     });
 
-    ey -= 14;
+    hy -= 13;
+    // To
+    drawText(emailPage, "To:", { x: labelX, y: hy, size: 8, font: helvBold, color: TEXT_DARK });
+    drawText(emailPage, safePdfText(email.to_email), {
+      x: valX,
+      y: hy,
+      size: 8,
+      font: helv,
+      color: LINK_BLUE,
+    });
 
-    // Direct, faithful rendering of email body content
-    const rawContent = email.body_html || email.body_text || "No body captured for this email record.";
+    hy -= 13;
+    // Date
+    drawText(emailPage, "Date:", { x: labelX, y: hy, size: 8, font: helvBold, color: TEXT_DARK });
+    drawText(emailPage, formatIST(email.sent_at), {
+      x: valX,
+      y: hy,
+      size: 8,
+      font: helv,
+      color: TEXT_DARK,
+    });
+
+    hy -= 13;
+    // Subject
+    drawText(emailPage, "Subject:", { x: labelX, y: hy, size: 8, font: helvBold, color: TEXT_DARK });
+    for (let s = 0; s < subLines.length; s++) {
+      drawText(emailPage, safePdfText(subLines[s]), {
+        x: valX,
+        y: hy,
+        size: 8,
+        font: helvBold,
+        color: TEXT_DARK,
+      });
+      hy -= 13;
+    }
+
+    if (hasAttachment) {
+      drawText(emailPage, "Attachments:", { x: labelX, y: hy, size: 8, font: helvBold, color: TEXT_DARK });
+      drawText(emailPage, `Invoice-${data.order.applicationCode}.pdf`, {
+        x: valX,
+        y: hy,
+        size: 8,
+        font: helv,
+        color: LINK_BLUE,
+      });
+      hy -= 13;
+    }
+
+    ey -= (headerBoxH + 16);
+
+    // ── Email Body Rendering ──
+    const rawContent = email.body_html || email.body_text || "No email content recorded.";
     const blocks = parseHtmlToDocumentBlocks(rawContent);
 
-    const BODY_LEFT = MARGIN_X + 6;
-    const BODY_MAX_W = CONTENT_W - 12;
+    const BODY_LEFT = MARGIN_X;
+    const BODY_MAX_W = CONTENT_W;
 
     const ensureSpace = (requiredH: number) => {
       if (ey - requiredH < 45) {
+        emailPageNum++;
         emailPage = mergedPdf.addPage([PAGE_W, PAGE_H]);
-        ey = PAGE_H - 45;
+        drawPageLabel(emailPage, emailPageNum);
+        ey = PAGE_H - 35;
       }
     };
 
-    for (const block of blocks) {
+    // 1. Draw Navy Banner if email begins with order confirmation
+    const firstBlock = blocks[0];
+    let startIndex = 0;
+    if (firstBlock && (firstBlock.type === "heading" || firstBlock.type === "paragraph") && firstBlock.text.includes("Successfully Received")) {
+      ensureSpace(32);
+      emailPage.drawRectangle({
+        x: BODY_LEFT,
+        y: ey - 26,
+        width: BODY_MAX_W,
+        height: 26,
+        color: NAVY,
+      });
+      drawText(emailPage, firstBlock.text.toUpperCase(), {
+        x: BODY_LEFT + 14,
+        y: ey - 17,
+        size: 10,
+        font: helvBold,
+        color: WHITE,
+      });
+      ey -= 38;
+      startIndex = 1;
+    }
+
+    for (let b = startIndex; b < blocks.length; b++) {
+      const block = blocks[b];
+
       if (block.type === "heading") {
-        const wrapped = wrap(block.text, helvBold, 9.5, BODY_MAX_W);
-        ensureSpace(wrapped.length * 14 + 8);
-        ey -= 4;
+        const titleUpper = block.text.toUpperCase();
+        const wrapped = wrap(titleUpper, helvBold, 9, BODY_MAX_W);
+        ensureSpace(wrapped.length * 13 + 12);
+        ey -= 6;
         for (const line of wrapped) {
           drawText(emailPage, line, {
             x: BODY_LEFT,
             y: ey,
-            size: 9.5,
+            size: 9,
             font: helvBold,
             color: NAVY,
           });
-          ey -= 13;
+          ey -= 12;
         }
-        ey -= 3;
+        // Gold / Amber horizontal line below section header
+        emailPage.drawLine({
+          start: { x: BODY_LEFT, y: ey + 4 },
+          end: { x: BODY_LEFT + BODY_MAX_W, y: ey + 4 },
+          thickness: 1.5,
+          color: GOLD_LINE,
+        });
+        ey -= 8;
       } else if (block.type === "paragraph") {
         const wrapped = wrap(block.text, helv, 8.5, BODY_MAX_W);
         for (const line of wrapped) {
@@ -523,35 +577,35 @@ export async function renderDisputeEvidencePackagePdf(data: DisputePackageData):
             font: helv,
             color: TEXT_DARK,
           });
-          ey -= 11.5;
+          ey -= 12;
         }
-        ey -= 4;
+        ey -= 6;
       } else if (block.type === "list_item") {
-        const wrapped = wrap(block.text, helv, 8.5, BODY_MAX_W - 14);
+        const wrapped = wrap(block.text, helv, 8, BODY_MAX_W - 14);
         let first = true;
         for (const line of wrapped) {
           ensureSpace(12);
           if (first) {
-            drawText(emailPage, "*", {
+            drawText(emailPage, "-", {
               x: BODY_LEFT + 2,
               y: ey,
-              size: 9,
+              size: 8.5,
               font: helvBold,
-              color: ACCENT,
+              color: TEXT_MUTED,
             });
             drawText(emailPage, line, {
-              x: BODY_LEFT + 14,
+              x: BODY_LEFT + 12,
               y: ey,
-              size: 8.5,
+              size: 8,
               font: helv,
               color: TEXT_DARK,
             });
             first = false;
           } else {
             drawText(emailPage, line, {
-              x: BODY_LEFT + 14,
+              x: BODY_LEFT + 12,
               y: ey,
-              size: 8.5,
+              size: 8,
               font: helv,
               color: TEXT_DARK,
             });
@@ -560,22 +614,22 @@ export async function renderDisputeEvidencePackagePdf(data: DisputePackageData):
         }
         ey -= 3;
       } else if (block.type === "table_2col") {
-        const keyW = 175;
+        const keyW = 160;
         const valW = BODY_MAX_W - keyW;
 
         for (let r = 0; r < block.rows.length; r++) {
           const row = block.rows[r];
           const isEven = r % 2 === 0;
-          const isAmount = row.val.includes("Rs.") || row.val.includes("INR");
+          const isAmount = row.val.includes("Rs.") || row.val.includes("INR") || row.val.includes("₹");
 
-          const keyLines = wrap(row.key, helvBold, 8, keyW - 14);
-          const valLines = wrap(row.val, isAmount ? helvBold : helv, 8, valW - 14);
+          const keyLines = wrap(row.key, helv, 8, keyW - 14);
+          const valLines = wrap(row.val, isAmount ? helvBold : helvBold, 8, valW - 14);
           const lineCount = Math.max(keyLines.length, valLines.length, 1);
           const rowHeight = lineCount * 12 + 6;
 
           ensureSpace(rowHeight + 2);
 
-          // Subtle background for alternating rows
+          // Alternating row styling with clean border
           emailPage.drawRectangle({
             x: BODY_LEFT,
             y: ey - rowHeight + 3,
@@ -586,27 +640,27 @@ export async function renderDisputeEvidencePackagePdf(data: DisputePackageData):
             borderWidth: 0.5,
           });
 
-          // Draw all lines of Key
+          // Draw Key
           let kY = ey - 8;
           for (const kLine of keyLines) {
             drawText(emailPage, kLine, {
               x: BODY_LEFT + 8,
               y: kY,
               size: 8,
-              font: helvBold,
-              color: TEXT_MUTED,
+              font: helv,
+              color: rgb(0.35, 0.4, 0.48),
             });
             kY -= 12;
           }
 
-          // Draw all lines of Value
+          // Draw Value
           let vY = ey - 8;
           for (const vLine of valLines) {
             drawText(emailPage, vLine, {
               x: BODY_LEFT + keyW,
               y: vY,
               size: 8,
-              font: isAmount ? helvBold : helv,
+              font: helvBold,
               color: isAmount ? NAVY : TEXT_DARK,
             });
             vY -= 12;
@@ -614,30 +668,59 @@ export async function renderDisputeEvidencePackagePdf(data: DisputePackageData):
 
           ey -= rowHeight;
         }
-        ey -= 6;
+        ey -= 8;
       } else if (block.type === "table_1col") {
-        for (const item of block.rows) {
-          const isOk = item.startsWith("[OK]");
-          const isPending = item.startsWith("[Pending]");
-          const isEmail = item.startsWith("[Email]");
-          const itemFont = isOk ? helvBold : helv;
-          const itemColor = isOk ? GREEN_DARK : isPending ? rgb(0.7, 0.4, 0.05) : isEmail ? NAVY_SOFT : TEXT_DARK;
+        // Render Timeline in styled grey container box if timeline rows
+        const isTimeline = block.rows.some((r) => r.includes("Order") || r.includes("Payment") || r.includes("Review") || r.includes("[OK]"));
 
-          const wrapped = wrap(item, itemFont, 8, BODY_MAX_W - 8);
-          for (const line of wrapped) {
-            ensureSpace(12);
-            drawText(emailPage, line, {
-              x: BODY_LEFT + 4,
-              y: ey,
+        if (isTimeline) {
+          const totalBoxH = block.rows.length * 15 + 10;
+          ensureSpace(totalBoxH + 4);
+
+          emailPage.drawRectangle({
+            x: BODY_LEFT,
+            y: ey - totalBoxH + 4,
+            width: BODY_MAX_W,
+            height: totalBoxH,
+            color: TIMELINE_BG,
+            borderColor: TIMELINE_BORDER,
+            borderWidth: 0.5,
+          });
+
+          let boxY = ey - 10;
+          for (const item of block.rows) {
+            const isOk = item.startsWith("[OK]");
+            const cleanItem = item.replace(/\[OK\]\s*/g, "").replace(/\[Pending\]\s*/g, "");
+            drawText(emailPage, cleanItem, {
+              x: BODY_LEFT + 12,
+              y: boxY,
               size: 8,
-              font: itemFont,
-              color: itemColor,
+              font: isOk ? helvBold : helv,
+              color: isOk ? GREEN_DARK : TEXT_DARK,
             });
-            ey -= 11.5;
+            boxY -= 15;
           }
-          ey -= 2;
+
+          ey -= (totalBoxH + 8);
+        } else {
+          // Disclaimer rows / standard 1-col items
+          for (const item of block.rows) {
+            const wrapped = wrap(item, helv, 8, BODY_MAX_W - 8);
+            for (const line of wrapped) {
+              ensureSpace(12);
+              drawText(emailPage, line, {
+                x: BODY_LEFT + 2,
+                y: ey,
+                size: 8,
+                font: helv,
+                color: TEXT_DARK,
+              });
+              ey -= 11.5;
+            }
+            ey -= 3;
+          }
+          ey -= 4;
         }
-        ey -= 4;
       } else if (block.type === "hr") {
         ensureSpace(10);
         emailPage.drawLine({
@@ -649,8 +732,6 @@ export async function renderDisputeEvidencePackagePdf(data: DisputePackageData):
         ey -= 8;
       }
     }
-
-    emailIndex++;
   }
 
   // ══════════════════════════════════════════════════════════════════════════
