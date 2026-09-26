@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, keepPreviousData, useQueryClient } from "@tanstack/react-query";
 import { Fragment, useEffect, useMemo, useRef, useState, useCallback } from "react";
-import { ChevronLeft, ChevronRight, RotateCcw, X, Filter, Loader2, ArrowUpDown, ArrowUp, ArrowDown, ShieldAlert, Flame, PhoneCall, PhoneForwarded, Clock, Server, LayoutGrid, Inbox, Bell, Hourglass, CheckCircle2, CheckCheck, AlertTriangle, UserX, UserCheck, Scale, Sparkles, RefreshCw } from "lucide-react";
+import { ChevronLeft, ChevronRight, RotateCcw, X, Filter, Loader2, ArrowUpDown, ArrowUp, ArrowDown, ShieldAlert, Flame, PhoneCall, PhoneForwarded, Clock, Server, LayoutGrid, Inbox, Bell, Hourglass, CheckCircle2, CheckCheck, AlertTriangle, UserX, UserCheck, Scale, Sparkles, RefreshCw, LifeBuoy } from "lucide-react";
 import { formatIST, istDateKey } from "@/lib/datetime";
 import { toast } from "sonner";
 
@@ -1439,6 +1439,12 @@ function OrderCardMobile({
               <Flame className="size-2.5" /> HOT ORDER NOW
             </span>
           )}
+          {order.ticket_source && (
+            <span className="inline-flex items-center gap-1 rounded bg-rose-50 text-rose-800 border border-rose-200 px-1.5 py-0.5 text-[9px] font-bold">
+              <LifeBuoy className="size-2.5 text-rose-600" />
+              {order.ticket_source.ticketNumber ? `Ticket #${order.ticket_source.ticketNumber}` : "From Ticket"}
+            </span>
+          )}
           {!isCompletedView && !isClosedView && (!order.fulfillment_status || order.fulfillment_status === "order_received") && (
             <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-800 border border-amber-200">
               {formatOrderAge(Date.now() - new Date(order.created_at).getTime())}
@@ -1690,11 +1696,19 @@ function OrderRow({
       <td className="px-2 py-2.5 font-mono text-[12px] whitespace-nowrap">
         <div className="space-y-1">
           <div className="font-bold text-slate-900">{order.application_code}</div>
-          {order.is_hot && (
-            <span className="inline-flex items-center gap-1 rounded bg-rose-600 px-1.5 py-0.5 text-[9px] font-black uppercase text-white shadow-xs">
-              <Flame className="size-2.5" /> HOT ORDER NOW
-            </span>
-          )}
+          <div className="flex items-center gap-1 flex-wrap">
+            {order.is_hot && (
+              <span className="inline-flex items-center gap-1 rounded bg-rose-600 px-1.5 py-0.5 text-[9px] font-black uppercase text-white shadow-xs">
+                <Flame className="size-2.5" /> HOT ORDER NOW
+              </span>
+            )}
+            {order.ticket_source && (
+              <span className="inline-flex items-center gap-1 rounded bg-rose-50 text-rose-800 border border-rose-200 px-1.5 py-0.5 text-[9px] font-bold">
+                <LifeBuoy className="size-2.5 text-rose-600" />
+                {order.ticket_source.ticketNumber ? `Ticket #${order.ticket_source.ticketNumber}` : "From Ticket"}
+              </span>
+            )}
+          </div>
         </div>
       </td>
 

@@ -1337,6 +1337,20 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         is_hot,
         is_callback_scheduled,
         callback_reminder,
+        ticket_source: (parsedRemarks?.reason === "ticket_hot_priority" || parsedRemarks?.ticketNumber || (cb as any)?.ticket_id)
+          ? {
+              isHotFromTicket: true,
+              ticketNumber: parsedRemarks?.ticketNumber || null,
+              ticketId: parsedRemarks?.ticketId || (cb as any)?.ticket_id || null,
+              note: parsedRemarks?.note || null,
+            }
+          : (thisAppEvents.find((e) => (e.event_type === "hot_priority_escalated" || e.event_type === "order_reopened") && (e.note?.includes("Ticket") || e.note?.includes("ticket"))))
+          ? {
+              isReopenedFromTicket: true,
+              ticketNumber: (thisAppEvents.find((e) => (e.event_type === "hot_priority_escalated" || e.event_type === "order_reopened") && (e.note?.includes("Ticket") || e.note?.includes("ticket")))?.note?.match(/#([A-Za-z0-9\-]+)/)?.[1]) || null,
+              note: thisAppEvents.find((e) => (e.event_type === "hot_priority_escalated" || e.event_type === "order_reopened") && (e.note?.includes("Ticket") || e.note?.includes("ticket")))?.note || null,
+            }
+          : null,
         workflow_status: (a as any).workflow_status,
         technical_hold_started_at: (a as any).technical_hold_started_at,
         customer_hold_started_at: (a as any).customer_hold_started_at,
@@ -1575,7 +1589,7 @@ export const getOrderDetailV2 = createServerFn({ method: "POST" })
     if (error || !app) throw new Error("Order not found");
 
     // Core Data: Load essential display & workflow data concurrently in parallel
-    const [leadRes, custRes, svcRes, paysRes, docsRes, statusEventsRes, staffRes, refundRes] = await Promise.all([
+    const [leadRes, custRes, svcRes, paysRes, docsRes, statusEventsRes, staffRes, refundRes, schedRes, appEvRes] = await Promise.all([
       app.lead_id
         ? admin.from("leads").select("id, lead_code, name, email, mobile, total_amount, base_amount, gst_amount, lead_status_v2, status, lead_source, service, language, state").eq("id", app.lead_id).maybeSingle()
         : Promise.resolve({ data: null }),
@@ -1612,6 +1626,19 @@ export const getOrderDetailV2 = createServerFn({ method: "POST" })
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle(),
+      admin
+        .from("order_schedulers")
+        .select("id, scheduler_type, status, started_at, fires_at, remarks, ticket_id, created_at")
+        .eq("application_id", data.orderId)
+        .order("created_at", { ascending: false })
+        .limit(5),
+      admin
+        .from("application_events")
+        .select("id, event_type, old_value, new_value, note, staff_name, staff_role, created_at")
+        .eq("application_id", data.orderId)
+        .in("event_type", ["hot_priority_escalated", "order_reopened", "status_change"])
+        .order("created_at", { ascending: false })
+        .limit(10),
     ]);
 
     const refundReq = (refundRes as any)?.data;
@@ -1688,6 +1715,38 @@ export const getOrderDetailV2 = createServerFn({ method: "POST" })
       .map((p: any) => p.payment_date as string)
       .sort()[0] ?? null;
 
+    const schedulers = (schedRes as any)?.data ?? [];
+    const appEvents = (appEvRes as any)?.data ?? [];
+
+    const activeHotSched = schedulers.find((s: any) => ["active", "paused"].includes(s.status) && (s.scheduler_type === "our_side_reminder" || s.ticket_id));
+    const schedRemarks = activeHotSched?.remarks
+      ? (typeof activeHotSched.remarks === "string" ? (() => { try { return JSON.parse(activeHotSched.remarks); } catch { return null; } })() : activeHotSched.remarks)
+      : null;
+
+    const ticketEvent = appEvents.find((e: any) =>
+      (e.event_type === "hot_priority_escalated" || e.event_type === "order_reopened") &&
+      (e.note?.includes("Ticket") || e.note?.includes("ticket"))
+    );
+
+    const isFromTicket = Boolean(
+      schedRemarks?.reason === "ticket_hot_priority" ||
+      schedRemarks?.ticketNumber ||
+      activeHotSched?.ticket_id ||
+      ticketEvent
+    );
+
+    const ticketEscalation = isFromTicket
+      ? {
+          isEscalated: true,
+          ticketNumber: schedRemarks?.ticketNumber || (ticketEvent?.note?.match(/#([A-Za-z0-9\-]+)/)?.[1]) || null,
+          ticketId: schedRemarks?.ticketId || activeHotSched?.ticket_id || null,
+          note: schedRemarks?.note || ticketEvent?.note || null,
+          isHot: Boolean(activeHotSched?.status === "active"),
+          isReopened: Boolean(app.order_status === "REOPENED" || app.fulfillment_status === "form_submitted"),
+          escalatedAt: activeHotSched?.started_at || ticketEvent?.created_at || app.reopened_at || null,
+        }
+      : null;
+
     return {
       application: app,
       lead,
@@ -1701,6 +1760,7 @@ export const getOrderDetailV2 = createServerFn({ method: "POST" })
       assignedStaff: (staffRes as any).data ?? null,
       workflowStages,
       stageMeta,
+      ticketEscalation,
       // Backward compatibility fields initialized empty, populated on-demand
       events: [],
       emailLogs: [],

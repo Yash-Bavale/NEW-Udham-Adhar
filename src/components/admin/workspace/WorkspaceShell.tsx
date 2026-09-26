@@ -6,7 +6,7 @@ import {
   ArrowLeft, Copy, Phone, Mail, User2,
   FileText, Workflow, Activity, LifeBuoy, ExternalLink, BadgeDollarSign,
   ShieldAlert, ShieldOff, Clock, AlertTriangle, XCircle, CheckCircle2, RotateCcw,
-  Link2, Send, Loader2, VolumeX, History,
+  Link2, Send, Loader2, VolumeX, History, Flame,
 } from "lucide-react";
 import { OrderAssignmentHistoryTab } from "@/components/admin/workspace/OrderAssignmentHistoryTab";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -504,6 +504,48 @@ export function WorkspaceShell(p: Props) {
         </div>
         <RefundRequestDialog applicationId={p.orderId} open={refundOpen} onClose={() => setRefundOpen(false)} />
 
+
+        {/* Support Ticket Escalation Banner */}
+        {Boolean((p.data as any)?.ticketEscalation?.isEscalated) && (
+          <div className="rounded-2xl border border-rose-300 bg-rose-50/90 p-4 shadow-sm flex items-start justify-between gap-4">
+            <div className="flex items-start gap-3.5">
+              <div className="p-2.5 rounded-xl bg-rose-600 text-white shadow-xs shrink-0 mt-0.5">
+                <Flame className="size-5 animate-pulse fill-white" />
+              </div>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-extrabold text-xs uppercase tracking-wider text-rose-700 bg-rose-100/90 border border-rose-300 px-2 py-0.5 rounded-md flex items-center gap-1">
+                    <LifeBuoy className="size-3 text-rose-600" />
+                    Support Ticket Escalation
+                  </span>
+                  {(p.data as any)?.ticketEscalation?.ticketNumber && (
+                    <span className="font-mono font-bold text-xs text-rose-900 bg-white/80 border border-rose-200 px-2 py-0.5 rounded-md">
+                      Ticket #{(p.data as any).ticketEscalation.ticketNumber}
+                    </span>
+                  )}
+                  {(p.data as any)?.ticketEscalation?.ticketId && (
+                    <Link
+                      to="/admin/support/tickets/$ticketId"
+                      params={{ ticketId: (p.data as any).ticketEscalation.ticketId }}
+                      className="text-xs font-semibold text-rose-800 underline hover:text-rose-950 flex items-center gap-1"
+                    >
+                      <ExternalLink className="size-3" /> View Ticket
+                    </Link>
+                  )}
+                </div>
+                <p className="text-xs text-rose-900 font-medium">
+                  This order was <strong>{(p.data as any)?.ticketEscalation?.isReopened ? "reopened" : "marked Hot Priority"}</strong> from the Support Ticket system.
+                </p>
+                {(p.data as any)?.ticketEscalation?.note && (
+                  <div className="text-xs bg-white/95 border border-rose-200 rounded-lg p-2.5 text-slate-800 mt-1.5 leading-relaxed shadow-2xs">
+                    <span className="font-bold text-rose-900 block text-[11px] mb-0.5">Instructions from Support:</span>
+                    {(p.data as any).ticketEscalation.note}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Header card */}
         <section className="rounded-2xl border border-slate-200 bg-white p-5 md:p-6 shadow-sm">
