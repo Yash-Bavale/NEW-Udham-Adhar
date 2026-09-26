@@ -400,8 +400,15 @@ export function isNeedsActionOrder(row: any): boolean {
   // 4. Exclude Technical Delay and Customer Delay (they belong in their dedicated tabs)
   if (isTechnicalDelayOrder(row) || isCustomerDelayOrder(row)) return false;
 
-  // 5. Exclude Form Not Submitted where form link has already been sent (Action Taken)
-  if ((stage === "form_not_submitted" || fs === "form_not_submitted" || fs === "awaiting_customer_form" || fs === "form_link_sent") && Boolean(row.form_link_sent_at)) {
+  // 5. Exclude Form Not Submitted where form link has already been sent or awaiting customer form (Action Taken)
+  if (
+    Boolean(row.form_link_sent_at) ||
+    fs === "awaiting_customer_form" ||
+    fs === "waiting_for_customer_submission" ||
+    fs === "form_link_sent" ||
+    fs === "form_pending" ||
+    (stage === "form_not_submitted" && Boolean(row.form_link_sent_at))
+  ) {
     return false;
   }
 
@@ -416,6 +423,11 @@ export function isNeedsActionOrder(row: any): boolean {
     "consultation_completed",
     "refunded",
     "refund_requested",
+    "application_rejected",
+    "certificate_rejected",
+    "verification_pending",
+    "documents_received",
+    "government_processing",
   ]);
   if (progressedStages.has(stage) || progressedStages.has(fs)) return false;
 
@@ -428,8 +440,7 @@ export function isNeedsActionOrder(row: any): boolean {
     stage === "order_reopened" ||
     fs === "order_received" ||
     fs === "payment_done" ||
-    fs === "form_submitted" ||
-    fs === "form_not_submitted"
+    fs === "form_submitted"
   );
 }
 
