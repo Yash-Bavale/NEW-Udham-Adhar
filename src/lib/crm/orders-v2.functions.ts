@@ -379,22 +379,33 @@ export function isNeedsActionOrder(row: any): boolean {
   if (row.is_terminal) return false;
   const fs = String(row.fulfillment_status ?? "").toLowerCase();
   const stage = String(row.stage ?? "").toLowerCase();
+  const os = String(row.order_status ?? "").toUpperCase();
+  const ws = String(row.workflow_status ?? "").toLowerCase();
+  const isReopened =
+    stage === "order_reopened" ||
+    fs === "order_reopened" ||
+    ws === "order_reopened" ||
+    os === "REOPENED" ||
+    Boolean(row.ticket_source?.isReopenedFromTicket);
 
-  // 1. Exclude terminal states (completed / closed)
+  // 1. Reopened orders and Hot Orders ALWAYS show in Needs Action
+  if (isReopened || row.is_hot) return true;
+
+  // 2. Exclude terminal states (completed / closed)
   if (stage === "completed" || stage === "closed" || COMPLETED_FS.has(fs) || CLOSED_FS.has(fs)) return false;
 
-  // 2. Exclude orders that already have an active scheduled callback (they belong in Call Back Scheduled)
+  // 3. Exclude orders that already have an active scheduled callback (they belong in Call Back Scheduled)
   if (row.is_callback_scheduled || (row.callback_reminder && !row.callback_reminder.is_due)) return false;
 
-  // 3. Exclude Technical Delay and Customer Delay (they belong in their dedicated tabs)
+  // 4. Exclude Technical Delay and Customer Delay (they belong in their dedicated tabs)
   if (isTechnicalDelayOrder(row) || isCustomerDelayOrder(row)) return false;
 
-  // 4. Exclude Form Not Submitted where form link has already been sent (Action Taken)
+  // 5. Exclude Form Not Submitted where form link has already been sent (Action Taken)
   if ((stage === "form_not_submitted" || fs === "form_not_submitted" || fs === "awaiting_customer_form" || fs === "form_link_sent") && Boolean(row.form_link_sent_at)) {
     return false;
   }
 
-  // 5. Exclude progressed stages like Certificate Ready, Submitted to Govt, Under Processing, Refunded
+  // 6. Exclude progressed stages like Certificate Ready, Submitted to Govt, Under Processing, Refunded
   const progressedStages = new Set([
     "submitted_to_govt",
     "under_processing",
@@ -1427,6 +1438,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
               note: thisAppEvents.find((e) => (e.event_type === "hot_priority_escalated" || e.event_type === "order_reopened") && (e.note?.includes("Ticket") || e.note?.includes("ticket")))?.note || null,
             }
           : null,
+        order_status: (a as any).order_status ?? (a as any).application_status ?? null,
         workflow_status: (a as any).workflow_status,
         technical_hold_started_at: (a as any).technical_hold_started_at,
         customer_hold_started_at: (a as any).customer_hold_started_at,
