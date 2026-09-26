@@ -1411,7 +1411,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         ? (hasDateFilter ? hasCallbackInRange : isCallbackScheduledOrder(a))
         : false;
 
-      // ── 6. Collect All Distinct Manual Actions in Range (For Multi-Action & Repeat Tracking) ──
+      // ── 6. Collect All Distinct Manual Actions in Range (Strictly by human staff, NEVER System) ──
       const actionHistoryList: Array<{
         id: string;
         action_type: string;
@@ -1421,11 +1421,22 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         note?: string | null;
       }> = [];
 
-      // Action Logs
+      const isHumanStaff = (name?: string | null): boolean => {
+        if (!name) return false;
+        const n = String(name).trim().toLowerCase();
+        return n.length > 0 && n !== "system" && n !== "automated" && n !== "bot" && n !== "auto" && n !== "cron" && n !== "webhook";
+      };
+
+      // Action Logs (only if created by a human staff member)
       for (const l of thisAppActionLogs) {
+        const staffName = l.staff_name || staff?.display_name || staff?.full_name || null;
+        if (!isHumanStaff(staffName)) continue;
+
+        const at = String(l.action_type || "").toUpperCase();
+        if (at === "FORM_SUBMITTED" || at === "ORDER_CREATED" || at === "PAYMENT_RECEIVED" || at === "ORDER_REOPENED") continue;
+
         const t = new Date(l.created_at).getTime();
         if (!hasDateFilter || (t >= fromTime && t <= toTime)) {
-          const at = String(l.action_type || "").toUpperCase();
           let title = "Staff Action";
           if (at.includes("COMPLET")) title = "Order Completed";
           else if (at.includes("CLOSE")) title = "Order Closed";
@@ -1439,15 +1450,18 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
             id: `log-${l.id}`,
             action_type: l.action_type || "ACTION",
             title,
-            staff_name: l.staff_name || staff?.display_name || staff?.full_name || "Staff",
+            staff_name: staffName!,
             created_at: l.created_at,
             note: l.note || l.remarks || null,
           });
         }
       }
 
-      // Certificates
+      // Certificates (issued / uploaded by human staff)
       for (const c of thisAppCerts) {
+        const staffName = c.issued_by_name || staff?.display_name || staff?.full_name || "Staff";
+        if (!isHumanStaff(staffName)) continue;
+
         const ts = c.delivered_at || c.issued_at || c.created_at;
         const t = new Date(ts).getTime();
         if (!hasDateFilter || (t >= fromTime && t <= toTime)) {
@@ -1455,15 +1469,18 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
             id: `cert-${c.id}`,
             action_type: "CERTIFICATE_UPLOADED",
             title: "Certificate Uploaded / Delivered",
-            staff_name: c.issued_by_name || staff?.display_name || staff?.full_name || "Staff",
+            staff_name: staffName,
             created_at: ts,
             note: c.certificate_number ? `Cert #${c.certificate_number}` : null,
           });
         }
       }
 
-      // Schedulers (Delays & Callbacks)
+      // Schedulers (Delays & Callbacks manually scheduled by staff)
       for (const s of thisAppSchedulers) {
+        const staffName = (s as any).staff_name || staff?.display_name || staff?.full_name || null;
+        if (!isHumanStaff(staffName)) continue;
+
         const t = new Date(s.created_at).getTime();
         if (!hasDateFilter || (t >= fromTime && t <= toTime)) {
           const st = String(s.scheduler_type || "").toLowerCase();
@@ -1478,7 +1495,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
               id: `sched-${s.id}`,
               action_type: s.scheduler_type || "SCHEDULER",
               title,
-              staff_name: staff?.display_name || staff?.full_name || "Staff",
+              staff_name: staffName!,
               created_at: s.created_at,
               note: s.reason || null,
             });
@@ -1486,63 +1503,79 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         }
       }
 
-      // Events (Manual staff events)
+      // Events (Manual staff events ONLY, strictly excluding System and customer actions)
       for (const ev of thisAppEvents) {
-        const et = String(ev.event_type || "").toLowerCase();
-        if (
-          et !== "order_created" &&
-          et !== "lead_created" &&
-          et !== "payment_received" &&
-          et !== "assignee_updated" &&
-          et !== "order_reopened" &&
-          et !== "followup_email_sent" &&
-          et !== "email_sent" &&
-          et !== "email_failed" &&
-          et !== "email_skipped" &&
-          et !== "internal_review_due"
-        ) {
-          const t = new Date(ev.created_at).getTime();
-          if (!hasDateFilter || (t >= fromTime && t <= toTime)) {
-            const exists = actionHistoryList.some((x) => Math.abs(new Date(x.created_at).getTime() - t) < 60000);
-            if (!exists) {
-              let title = ev.event_type ? ev.event_type.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase()) : "Staff Event";
-              if (et.includes("callback_completed")) title = "Callback Completed";
-              else if (et.includes("callback_scheduled")) title = "Callback Scheduled";
-              else if (et.includes("consultation")) title = "Consultation Completed";
-              else if (et.includes("resumed")) title = "Order Resumed / Re-served";
+        const staffName = ev.staff_name || null;
+        if (!isHumanStaff(staffName)) continue;
 
-              actionHistoryList.push({
-                id: `ev-${ev.id}`,
-                action_type: ev.event_type || "EVENT",
-                title,
-                staff_name: ev.staff_name || staff?.display_name || staff?.full_name || "Staff",
-                created_at: ev.created_at,
-                note: ev.note || ev.new_value || null,
-              });
-            }
+        const et = String(ev.event_type || "").toLowerCase();
+        const nv = String(ev.new_value || "").toLowerCase();
+        const note = String(ev.note || "").toLowerCase();
+
+        if (
+          et === "order_created" ||
+          et === "lead_created" ||
+          et === "payment_received" ||
+          et === "assignee_updated" ||
+          et === "order_reopened" ||
+          et === "followup_email_sent" ||
+          et === "email_sent" ||
+          et === "email_failed" ||
+          et === "email_skipped" ||
+          et === "internal_review_due" ||
+          et === "form_submitted" ||
+          nv === "form_submitted" ||
+          nv === "order_received" ||
+          nv === "lead_received" ||
+          nv === "payment_done" ||
+          nv === "payment_pending" ||
+          note.includes("customer submitted") ||
+          note.includes("form submitted")
+        ) {
+          continue;
+        }
+
+        const t = new Date(ev.created_at).getTime();
+        if (!hasDateFilter || (t >= fromTime && t <= toTime)) {
+          const exists = actionHistoryList.some((x) => Math.abs(new Date(x.created_at).getTime() - t) < 60000);
+          if (!exists) {
+            let title = ev.event_type ? ev.event_type.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase()) : "Staff Action";
+            if (et.includes("callback_completed")) title = "Callback Completed";
+            else if (et.includes("callback_scheduled")) title = "Callback Scheduled";
+            else if (et.includes("consultation")) title = "Consultation Completed";
+            else if (et.includes("resumed")) title = "Order Resumed / Re-served";
+
+            actionHistoryList.push({
+              id: `ev-${ev.id}`,
+              action_type: ev.event_type || "EVENT",
+              title,
+              staff_name: staffName!,
+              created_at: ev.created_at,
+              note: ev.note || ev.new_value || null,
+            });
           }
         }
       }
 
-      // If completed in range and no history entry yet
-      if (inRangeCompleted && !actionHistoryList.some((x) => x.action_type.toLowerCase().includes("complet"))) {
+      // If completed in range by staff and no history entry yet
+      if (inRangeCompleted && isHumanStaff(staff?.display_name || staff?.full_name) && !actionHistoryList.some((x) => x.action_type.toLowerCase().includes("complet"))) {
         actionHistoryList.push({
           id: `comp-${a.id}`,
           action_type: "ORDER_COMPLETED",
           title: "Order Completed",
-          staff_name: staff?.display_name || staff?.full_name || "Staff",
+          staff_name: (staff?.display_name || staff?.full_name)!,
           created_at: compTimestamp ? new Date(compTimestamp).toISOString() : a.updated_at || a.created_at,
           note: "Order fulfilled and marked completed",
         });
       }
 
-      // If closed in range and no history entry yet
-      if (inRangeClosed && !actionHistoryList.some((x) => x.action_type.toLowerCase().includes("close"))) {
+      // If closed in range by staff and no history entry yet
+      if (inRangeClosed && isHumanStaff(staff?.display_name || staff?.full_name) && !actionHistoryList.some((x) => x.action_type.toLowerCase().includes("close"))) {
         actionHistoryList.push({
           id: `close-${a.id}`,
           action_type: "ORDER_CLOSED",
           title: "Order Closed",
-          staff_name: staff?.display_name || staff?.full_name || "Staff",
+          staff_name: (staff?.display_name || staff?.full_name)!,
           created_at: closeTimestamp ? new Date(closeTimestamp).toISOString() : a.updated_at || a.created_at,
           note: "Order closed / customer delay closed",
         });
@@ -1551,15 +1584,8 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       // Sort actionHistoryList newest to oldest
       actionHistoryList.sort((x, y) => new Date(y.created_at).getTime() - new Date(x.created_at).getTime());
 
-      let hasActionTakenInRange = actionHistoryList.length > 0;
-      if (!hasActionTakenInRange && !hasDateFilter) {
-        if (isActionTakenOrder(a)) {
-          hasActionTakenInRange = true;
-        }
-      }
-
-      const inRangeActionTaken = hasActionTakenInRange;
-      const actionCount = actionHistoryList.length || (inRangeActionTaken ? 1 : 0);
+      const inRangeActionTaken = actionHistoryList.length > 0;
+      const actionCount = actionHistoryList.length;
 
       return {
         id: a.id,
