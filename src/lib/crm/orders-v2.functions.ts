@@ -1438,7 +1438,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       }
 
       // Operational Queues (Live all-time active portfolio)
-      if (!r.is_terminal && isActionStage && !isTechnicalDelayOrder(r) && !isCustomerDelayOrder(r)) {
+      if (!r.is_terminal && (isActionStage || isTechnicalDelayOrder(r)) && !isCustomerDelayOrder(r)) {
         counts.needs_action++;
         counts.actionRequired++;
       }
@@ -1477,7 +1477,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
     const bucket = normalized.bucket || "all";
 
     if (bucket === "needs_action") {
-      filtered = filtered.filter((r) => !r.is_terminal && isNeedsActionStage(r.stage) && !isTechnicalDelayOrder(r) && !isCustomerDelayOrder(r));
+      filtered = filtered.filter((r) => !r.is_terminal && (isNeedsActionStage(r.stage) || isTechnicalDelayOrder(r)) && !isCustomerDelayOrder(r));
     } else if (bucket === "hot_orders") {
       filtered = filtered.filter((r) => r.is_hot);
     } else if (bucket === "reminders") {
