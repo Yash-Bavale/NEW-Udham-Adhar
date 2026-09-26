@@ -7,11 +7,10 @@ import {
   Briefcase, Receipt, CreditCard, LifeBuoy, ListChecks, BarChart3, UserCog,
   Mail, MessageCircle, Settings as SettingsIcon, LogOut, Bell, Search, Loader2,
   Inbox, Activity, FileCheck2, ClipboardList, Eye, Award,
-  Banknote, ShieldCheck, ScrollText, Globe, ShieldAlert, History,
+  Banknote, ShieldCheck, ScrollText, Globe, ShieldAlert, History, Menu, X,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { AdminThemeProvider } from "@/components/admin/theme";
-import { Menu } from "lucide-react";
 import bhsLogo from "@/assets/bhs-logo.png.asset.json";
 import { cn } from "@/lib/utils";
 import { CommandPalette } from "@/components/admin/CommandPalette";
@@ -147,10 +146,22 @@ function Shell({ children, email }: { children: ReactNode; email?: string }) {
   const path = useRouterState({ select: (s) => s.location.pathname });
   const role = useRole();
   const userPerms = usePermissions();
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  // Close mobile drawer on route navigation
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [path]);
+
+  const isPendingAuth = role.loading && userPerms.isLoading;
+
   const visibleNav: NavGroup[] = NAV
     .map((g) => ({
       ...g,
       items: g.items.filter((it) => {
+        // While auth roles are loading initially, keep default navigation rendered to prevent empty sidebar
+        if (isPendingAuth) return true;
+
         const isSuperAdmin = role.has("super_admin") || (role.roles.length === 0 && Boolean(userPerms.perms?.isAdmin));
         const isAdminUser = isSuperAdmin || role.has("admin") || Boolean(userPerms.perms?.isAdmin);
 
@@ -177,7 +188,11 @@ function Shell({ children, email }: { children: ReactNode; email?: string }) {
       }),
     }))
     .filter((g) => g.items.length > 0);
-  const flatVisible = visibleNav.flatMap((g) => g.items);
+
+  // If all filtered out (e.g. initial render with empty roles), fallback to full NAV for staff
+  const displayNav = visibleNav.length > 0 ? visibleNav : NAV;
+  const flatVisible = displayNav.flatMap((g) => g.items);
+
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
     if (typeof window === "undefined") return false;
@@ -250,8 +265,137 @@ function Shell({ children, email }: { children: ReactNode; email?: string }) {
   const isActive = (to: string) =>
     !!currentPath && (currentPath === to || (to !== "/admin/dashboard" && currentPath.startsWith(to + "/")));
 
+  const renderNavLinks = (isMobile = false) => (
+    <nav className="flex-1 overflow-y-auto py-3 px-2">
+      {displayNav.map((group, gi) => (
+        <div key={group.id}>
+          {gi > 0 && (
+            <div className="my-2 mx-2 h-px" style={{ background: "var(--admin-border)" }} />
+          )}
+          {(!sidebarCollapsed || isMobile) && (
+            <div
+              className="px-2.5 pt-1 pb-1 text-[10px] uppercase tracking-wider"
+              style={{ color: "var(--admin-sidebar-muted)" }}
+            >
+              {group.label}
+            </div>
+          )}
+          <div className="space-y-0.5">
+            {group.items.map((n) => {
+              const active = isActive(n.to);
+              const Icon = n.icon;
+              const badge = getSidebarBadge(n.to);
+              return (
+                <Link
+                  key={n.to}
+                  to={n.to}
+                  onClick={() => {
+                    if (isMobile) setMobileOpen(false);
+                    if (n.to === "/admin/orders") {
+                      clearModuleFilterState("admin.orders");
+                      if (typeof window !== "undefined") {
+                        window.dispatchEvent(new CustomEvent("reset-orders-filters"));
+                      }
+                    }
+                  }}
+                  title={sidebarCollapsed && !isMobile ? `${n.label}${badge > 0 ? ` (${badge} new)` : ""}` : undefined}
+                  className={cn(
+                    "relative flex items-center gap-2.5 rounded-md py-1.5 text-[13px] transition-colors",
+                    sidebarCollapsed && !isMobile ? "justify-center px-1.5" : "px-2.5",
+                  )}
+                  style={{
+                    background: active ? "var(--admin-accent-soft)" : "transparent",
+                    color: active ? "var(--admin-primary)" : "var(--admin-sidebar-fg)",
+                    fontWeight: active ? 500 : 400,
+                  }}
+                >
+                  <div className="relative shrink-0">
+                    <Icon className="size-4" />
+                    {sidebarCollapsed && !isMobile && badge > 0 && (
+                      <span
+                        className="absolute -top-1 -right-1 size-2 rounded-full ring-2 ring-[var(--admin-sidebar)]"
+                        style={{ background: "var(--admin-danger)" }}
+                      />
+                    )}
+                  </div>
+                  {(!sidebarCollapsed || isMobile) && <span className="truncate flex-1">{n.label}</span>}
+                  {(!sidebarCollapsed || isMobile) && badge > 0 && (
+                    <span
+                      className="min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-semibold flex items-center justify-center shrink-0"
+                      style={{ background: "var(--admin-danger)", color: "#fff" }}
+                    >
+                      {badge > 99 ? "99+" : badge}
+                    </span>
+                  )}
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+      <div className="my-2 mx-2 h-px" style={{ background: "var(--admin-border)" }} />
+      <button
+        onClick={async () => {
+          if (isMobile) setMobileOpen(false);
+          await supabase.auth.signOut();
+          navigate({ to: "/admin-login" });
+        }}
+        title={sidebarCollapsed && !isMobile ? "Logout" : undefined}
+        className={cn(
+          "w-full flex items-center gap-2.5 rounded-md py-1.5 text-[13px] transition-colors hover:bg-[var(--admin-surface-2)] cursor-pointer",
+          sidebarCollapsed && !isMobile ? "justify-center px-1.5" : "px-2.5",
+        )}
+        style={{ color: "var(--admin-sidebar-fg)" }}
+      >
+        <LogOut className="size-4 shrink-0" />
+        {(!sidebarCollapsed || isMobile) && <span className="truncate">Logout</span>}
+      </button>
+    </nav>
+  );
+
   return (
     <div className="min-h-screen flex w-full" style={{ background: "var(--admin-bg)", color: "var(--admin-fg)" }}>
+      {/* Mobile Drawer Backdrop & Slide-over Sidebar */}
+      {mobileOpen && (
+        <div className="fixed inset-0 z-50 md:hidden flex">
+          <div
+            className="fixed inset-0 bg-black/60 backdrop-blur-2xs transition-opacity"
+            onClick={() => setMobileOpen(false)}
+          />
+          <aside
+            className="relative flex flex-col w-[260px] max-w-[85vw] h-full shadow-2xl z-50 animate-in slide-in-from-left duration-200"
+            style={{
+              background: "var(--admin-sidebar)",
+              color: "var(--admin-sidebar-fg)",
+            }}
+          >
+            <div
+              className="flex items-center justify-between px-3.5 h-14 border-b shrink-0"
+              style={{ borderColor: "var(--admin-border)" }}
+            >
+              <div className="flex items-center gap-2 min-w-0 flex-1">
+                <img src={bhsLogo.url} alt="Business Help Services" className="size-8 rounded-md object-contain shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-medium leading-tight truncate">Business Help</div>
+                  <div className="text-[10px] uppercase tracking-wider" style={{ color: "var(--admin-sidebar-muted)" }}>
+                    ADMIN
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setMobileOpen(false)}
+                className="p-1.5 rounded-lg hover:bg-[var(--admin-surface-2)] text-[var(--admin-sidebar-fg)] cursor-pointer"
+                aria-label="Close sidebar"
+              >
+                <X className="size-5" />
+              </button>
+            </div>
+            {renderNavLinks(true)}
+          </aside>
+        </div>
+      )}
+
       {/* Desktop sidebar — collapsible & sticky fixed */}
       <aside
         className="hidden md:flex shrink-0 h-screen sticky top-0 flex-col border-r transition-[width] duration-200 z-30"
@@ -270,7 +414,7 @@ function Shell({ children, email }: { children: ReactNode; email?: string }) {
             type="button"
             onClick={() => setSidebarCollapsed((v) => !v)}
             aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-            className="shrink-0 rounded-full p-2 hover:bg-[var(--admin-surface-2)]"
+            className="shrink-0 rounded-full p-2 hover:bg-[var(--admin-surface-2)] cursor-pointer"
             style={{ color: "var(--admin-sidebar-fg)" }}
           >
             <Menu className="size-5" />
@@ -288,105 +432,33 @@ function Shell({ children, email }: { children: ReactNode; email?: string }) {
           )}
         </div>
 
-        <nav className="flex-1 overflow-y-auto py-3 px-2">
-          {visibleNav.map((group, gi) => (
-            <div key={group.id}>
-              {gi > 0 && (
-                <div className="my-2 mx-2 h-px" style={{ background: "var(--admin-border)" }} />
-              )}
-              {!sidebarCollapsed && (
-                <div
-                  className="px-2.5 pt-1 pb-1 text-[10px] uppercase tracking-wider"
-                  style={{ color: "var(--admin-sidebar-muted)" }}
-                >
-                  {group.label}
-                </div>
-              )}
-              <div className="space-y-0.5">
-                {group.items.map((n) => {
-                  const active = isActive(n.to);
-                  const Icon = n.icon;
-                  const badge = getSidebarBadge(n.to);
-                  return (
-                    <Link
-                      key={n.to}
-                      to={n.to}
-                      onClick={() => {
-                        if (n.to === "/admin/orders") {
-                          clearModuleFilterState("admin.orders");
-                          if (typeof window !== "undefined") {
-                            window.dispatchEvent(new CustomEvent("reset-orders-filters"));
-                          }
-                        }
-                      }}
-                      title={sidebarCollapsed ? `${n.label}${badge > 0 ? ` (${badge} new)` : ""}` : undefined}
-                      className={cn(
-                        "relative flex items-center gap-2.5 rounded-md py-1.5 text-[13px] transition-colors",
-                        sidebarCollapsed ? "justify-center px-1.5" : "px-2.5",
-                      )}
-                      style={{
-                        background: active ? "var(--admin-accent-soft)" : "transparent",
-                        color: active ? "var(--admin-primary)" : "var(--admin-sidebar-fg)",
-                        fontWeight: active ? 500 : 400,
-                      }}
-                    >
-                      <div className="relative shrink-0">
-                        <Icon className="size-4" />
-                        {sidebarCollapsed && badge > 0 && (
-                          <span
-                            className="absolute -top-1 -right-1 size-2 rounded-full ring-2 ring-[var(--admin-sidebar)]"
-                            style={{ background: "var(--admin-danger)" }}
-                          />
-                        )}
-                      </div>
-                      {!sidebarCollapsed && <span className="truncate flex-1">{n.label}</span>}
-                      {!sidebarCollapsed && badge > 0 && (
-                        <span
-                          className="min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-semibold flex items-center justify-center shrink-0"
-                          style={{ background: "var(--admin-danger)", color: "#fff" }}
-                        >
-                          {badge > 99 ? "99+" : badge}
-                        </span>
-                      )}
-                    </Link>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
-          <div className="my-2 mx-2 h-px" style={{ background: "var(--admin-border)" }} />
-          <button
-            onClick={async () => {
-              await supabase.auth.signOut();
-              navigate({ to: "/admin-login" });
-            }}
-            title={sidebarCollapsed ? "Logout" : undefined}
-            className={cn(
-              "w-full flex items-center gap-2.5 rounded-md py-1.5 text-[13px] transition-colors hover:bg-[var(--admin-surface-2)]",
-              sidebarCollapsed ? "justify-center px-1.5" : "px-2.5",
-            )}
-            style={{ color: "var(--admin-sidebar-fg)" }}
-          >
-            <LogOut className="size-4 shrink-0" />
-            {!sidebarCollapsed && <span className="truncate">Logout</span>}
-          </button>
-        </nav>
+        {renderNavLinks(false)}
       </aside>
 
       {/* Main App Container */}
       <div className="flex-1 min-w-0 flex flex-col min-h-screen">
         {/* Top bar — sticky fixed */}
         <header
-          className="sticky top-0 z-20 flex items-center gap-3 px-4 md:px-6 h-14 border-b shrink-0"
+          className="sticky top-0 z-20 flex items-center gap-2.5 sm:gap-3 px-3 sm:px-4 md:px-6 h-14 border-b shrink-0"
           style={{ background: "var(--admin-surface)", borderColor: "var(--admin-border)" }}
         >
-          <div className="md:hidden font-medium text-sm" style={{ color: "var(--admin-primary)" }}>
-            Business Help
+          <div className="flex items-center gap-1.5 md:hidden shrink-0">
+            <button
+              type="button"
+              onClick={() => setMobileOpen(true)}
+              aria-label="Open sidebar menu"
+              className="p-1.5 rounded-lg hover:bg-[var(--admin-surface-2)] text-[var(--admin-fg)] cursor-pointer"
+            >
+              <Menu className="size-5" />
+            </button>
+            <div className="font-bold text-xs sm:text-sm truncate max-w-[100px] sm:max-w-none" style={{ color: "var(--admin-primary)" }}>
+              Business Help
+            </div>
           </div>
-          <div className="flex-1 max-w-2xl">
+          <div className="flex-1 max-w-2xl min-w-0">
             <GlobalSearchInput onOpenPalette={() => setPaletteOpen(true)} />
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 shrink-0">
             <NotificationsBell />
             <UserMenu email={email} onSignOut={async () => {
               await supabase.auth.signOut();
