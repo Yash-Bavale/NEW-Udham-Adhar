@@ -1,7 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { getUserModulePermission } from "@/lib/crm/permissions.functions";
-import { rerankWithSystemOne } from "@/lib/typesafe.server";
 
 export type SearchHit = {
   kind: "application" | "lead" | "invoice" | "certificate" | "complaint" | "ticket";
@@ -303,14 +302,20 @@ export const globalSearch = createServerFn({ method: "POST" })
     }
 
     // Apply TypeSafe System One Reranking for intelligent semantic relevance
-    const reranked = await rerankWithSystemOne(q, candidateHits, {
-      timeoutMs: 2500,
-      maxCandidates: 25,
-    });
+    let reranked: any[] = candidateHits;
+    try {
+      const { rerankWithSystemOne } = await import("@/lib/typesafe.server");
+      reranked = await rerankWithSystemOne(q, candidateHits, {
+        timeoutMs: 2500,
+        maxCandidates: 25,
+      });
+    } catch (err) {
+      console.warn("[globalSearch] rerank warning:", err);
+    }
 
     // Exact identifier match boost (e.g. exact application code, email, mobile, ticket number, customer name)
     const normalizedQ = q.toLowerCase().trim();
-    const finalHits = reranked.map((h) => {
+    const finalHits = reranked.map((h: any) => {
       let score = h.relevanceScore ?? 0.5;
       const titleLower = (h.title || "").toLowerCase();
       const codeLower = (h.code || "").toLowerCase();
@@ -337,9 +342,9 @@ export const globalSearch = createServerFn({ method: "POST" })
       return { ...h, finalScore: score };
     });
 
-    finalHits.sort((a, b) => b.finalScore - a.finalScore);
+    finalHits.sort((a: any, b: any) => b.finalScore - a.finalScore);
 
     return {
-      hits: finalHits.map(({ details, finalScore, ...rest }) => rest),
+      hits: finalHits.map(({ details, finalScore, ...rest }: any) => rest as SearchHit),
     };
   });
