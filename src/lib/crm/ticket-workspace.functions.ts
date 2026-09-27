@@ -231,7 +231,7 @@ export const getTicketWorkspace = createServerFn({ method: "POST" })
         if (customerData) {
           customerData.name = leadData.name;
           if (customerData.id) {
-            admin.from("customers").update({ name: leadData.name } as never).eq("id", customerData.id).then(() => {}).catch(() => {});
+            admin.from("customers").update({ name: leadData.name } as never).eq("id", customerData.id).then(() => {}, () => {});
           }
         } else {
           customerData = {
