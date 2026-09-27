@@ -89,17 +89,12 @@ const RANGE_PRESETS: { value: RangePreset; label: string }[] = [
   { value: "custom", label: "Custom" },
 ];
 
-type Bucket = "all" | "new" | "unread" | "awaiting_action" | "awaiting_customer" | "replied" | "open" | "closed";
+type Bucket = "all" | "new" | "closed";
 
 const BUCKETS: { id: Bucket; label: string }[] = [
-  { id: "all",               label: "All Tickets" },
-  { id: "new",               label: "New" },
-  { id: "unread",            label: "Unread" },
-  { id: "awaiting_action",    label: "Awaiting Action" },
-  { id: "awaiting_customer",  label: "Awaiting Customer" },
-  { id: "replied",           label: "Replied" },
-  { id: "open",              label: "Open" },
-  { id: "closed",            label: "Closed" },
+  { id: "all",    label: "Total Tickets" },
+  { id: "new",    label: "New" },
+  { id: "closed", label: "Closed" },
 ];
 
 const STATUS_PILL: Record<TicketStatus, { bg: string; fg: string; border: string; label: string }> = {
@@ -405,21 +400,14 @@ function SupportTicketsOperationsPage() {
     let effectiveRespState: ResponseState = "all";
 
     if (bucket === "all") {
-      effectiveStatuses = ["open", "in_progress", "waiting_customer"];
-    } else if (bucket === "open") {
-      effectiveStatuses = ["open", "in_progress", "waiting_customer"];
-    } else if (bucket === "closed") {
-      effectiveStatuses = ["resolved", "closed"];
+      effectiveStatuses = undefined;
+      effectiveStatus = undefined;
+      effectiveRespState = "all";
     } else if (bucket === "new") {
       effectiveRespState = "new";
-    } else if (bucket === "unread") {
-      effectiveRespState = "unread";
-    } else if (bucket === "awaiting_action") {
-      effectiveRespState = "awaiting_action";
-    } else if (bucket === "awaiting_customer") {
-      effectiveRespState = "awaiting_customer";
-    } else if (bucket === "replied") {
-      effectiveRespState = "replied";
+      effectiveStatuses = undefined;
+    } else if (bucket === "closed") {
+      effectiveStatuses = ["resolved", "closed"];
     }
 
     if (statusFilter !== "all") {
@@ -560,9 +548,6 @@ function SupportTicketsOperationsPage() {
                 </span>
               )}
             </div>
-            <p className="text-xs text-slate-500 mt-0.5 font-normal">
-              Manage customer conversations, resolve issues and <span className="text-emerald-600 font-medium">deliver better support</span> · times in IST
-            </p>
           </div>
         </div>
 
@@ -635,18 +620,13 @@ function SupportTicketsOperationsPage() {
         </div>
       </div>
 
-      {/* ── 2. Clickable KPI Stat Cards (Matching Mockup) ─────── */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2.5 pt-1">
+      {/* ── 2. Clickable KPI Stat Cards (Total, New, Closed) ─────── */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
         {BUCKETS.map((b) => {
           const active = bucket === b.id;
-          let count = statsData?.open ?? 0;
-          if (b.id === "all") count = statsData?.open ?? 0;
+          let count = 0;
+          if (b.id === "all") count = statsData?.total ?? 0;
           else if (b.id === "new") count = statsData?.new ?? 0;
-          else if (b.id === "unread") count = statsData?.unread ?? 0;
-          else if (b.id === "awaiting_action") count = statsData?.awaiting_action ?? 0;
-          else if (b.id === "awaiting_customer") count = statsData?.awaiting_customer ?? 0;
-          else if (b.id === "replied") count = statsData?.replied ?? 0;
-          else if (b.id === "open") count = statsData?.open ?? 0;
           else if (b.id === "closed") count = statsData?.closed ?? 0;
 
           // Distinct color themes per bucket
@@ -666,46 +646,6 @@ function SupportTicketsOperationsPage() {
               text: "text-rose-700",
               countColor: "text-rose-600",
               icon: "🚨",
-            },
-            unread: {
-              bg: "bg-rose-50/40 hover:bg-rose-50",
-              border: "border-rose-100",
-              activeBorder: "ring-2 ring-rose-500 border-rose-400 bg-rose-50",
-              text: "text-rose-700",
-              countColor: "text-rose-600",
-              icon: "✉️",
-            },
-            awaiting_action: {
-              bg: "bg-amber-50/40 hover:bg-amber-50",
-              border: "border-amber-100",
-              activeBorder: "ring-2 ring-amber-500 border-amber-400 bg-amber-50",
-              text: "text-amber-700",
-              countColor: "text-amber-600",
-              icon: "⚡",
-            },
-            awaiting_customer: {
-              bg: "bg-sky-50/40 hover:bg-sky-50",
-              border: "border-sky-100",
-              activeBorder: "ring-2 ring-sky-500 border-sky-400 bg-sky-50",
-              text: "text-sky-700",
-              countColor: "text-sky-600",
-              icon: "⏳",
-            },
-            replied: {
-              bg: "bg-purple-50/40 hover:bg-purple-50",
-              border: "border-purple-100",
-              activeBorder: "ring-2 ring-purple-500 border-purple-400 bg-purple-50",
-              text: "text-purple-700",
-              countColor: "text-purple-600",
-              icon: "💬",
-            },
-            open: {
-              bg: "bg-blue-50/40 hover:bg-blue-50",
-              border: "border-blue-100",
-              activeBorder: "ring-2 ring-blue-500 border-blue-400 bg-blue-50",
-              text: "text-blue-700",
-              countColor: "text-blue-600",
-              icon: "📂",
             },
             closed: {
               bg: "bg-emerald-50/40 hover:bg-emerald-50",

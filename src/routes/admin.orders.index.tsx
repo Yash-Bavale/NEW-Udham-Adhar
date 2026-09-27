@@ -688,18 +688,6 @@ return (
             </span>
           )}
         </div>
-        <p className="text-xs text-slate-500 mt-0.5">
-          {isLoading ? (
-            "Loading orders…"
-          ) : (
-            <>
-              <span className="font-semibold text-slate-800">{(counts.all ?? counts.totalAll ?? 0).toLocaleString("en-IN")}</span> total in period ·{" "}
-              <span className="font-semibold text-blue-700">{Math.max(0, (counts.all ?? counts.totalAll ?? 0) - (counts.completed ?? 0) - (counts.closed ?? 0)).toLocaleString("en-IN")}</span> active portfolio ·{" "}
-              <span className="font-semibold text-emerald-700">{(counts.completed ?? 0).toLocaleString("en-IN")}</span> completed ·{" "}
-              <span className="font-semibold text-slate-600">{(counts.closed ?? 0).toLocaleString("en-IN")}</span> closed · times in IST
-            </>
-          )}
-        </p>
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
