@@ -12,7 +12,7 @@ import {
   MapPin, ShieldAlert, FileText, ChevronLeft, ChevronRight, Plus, Download,
   Bold, Italic, Underline, Strikethrough, List, ListOrdered, Quote,
   AlignLeft, AlignCenter, AlignRight, Image as ImageIcon, Search, Tag,
-  ChevronRight as ChevronRightIcon, RefreshCw, Flame, Reply
+  ChevronRight as ChevronRightIcon, RefreshCw, Flame, Reply, XCircle
 } from "lucide-react";
 import { getTicketWorkspace } from "@/lib/crm/ticket-workspace.functions";
 import {
@@ -871,8 +871,8 @@ function TicketWorkspace() {
                 disabled={isClosed}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-rose-300 bg-rose-50 hover:bg-rose-100 text-rose-800 text-xs font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs shrink-0 cursor-pointer"
               >
-                <Send className="size-3.5 text-rose-600" />
-                Refund Reply &amp; Close (R002)
+                <XCircle className="size-3.5 text-rose-600" />
+                Refund Rejected
               </button>
 
               {Boolean(app.id) && (
@@ -2647,12 +2647,12 @@ function RefundRejectDialog({
         <div className="flex items-center justify-between border-b border-slate-100 pb-3">
           <div className="flex items-center gap-2.5">
             <div className="p-2 rounded-lg bg-rose-100 text-rose-600 shadow-2xs">
-              <Send className="size-4 text-rose-600" />
+              <XCircle className="size-4 text-rose-600" />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-slate-900">Refund Reply &amp; Close (R002)</h3>
+              <h3 className="text-sm font-bold text-slate-900">Refund Rejected (R002)</h3>
               <p className="text-[11px] text-slate-500">
-                Sends R002 refund status email to the customer and closes this ticket under Refund KPI
+                Sends official R002 refund rejection email to the customer and closes this ticket under Refund KPI
               </p>
             </div>
           </div>
@@ -2719,7 +2719,7 @@ function RefundRejectDialog({
               </>
             ) : (
               <>
-                <Send className="size-3.5" />
+                <XCircle className="size-3.5" />
                 <span>Send R002 &amp; Close Ticket</span>
               </>
             )}

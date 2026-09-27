@@ -1044,25 +1044,35 @@ export const closeTicketRefundR002 = createServerFn({ method: "POST" })
     const ticket = await loadTicket(data.ticketId);
     const now = new Date().toISOString();
 
+    const remarks = data.reasonLabel?.trim() || data.replyBody?.trim() || "Refund request reviewed & closed";
     const replyText =
       data.replyBody?.trim() ||
-      "Dear Customer,\n\nWe have thoroughly reviewed your refund request. As per our service terms and policy, this service has already been initiated/processed, and therefore your refund request cannot be approved at this stage.\n\nIf you have any further questions, please reply to this message.\n\nRegards,\nSupport Team";
+      "Dear Customer,\n\nWe have reviewed your refund request and regret to inform you that your refund request cannot be approved at this stage as per our service and refund policy.\n\nRegards,\nSupport Team";
 
     const { data: replyRow, error: replyErr } = await admin.from("ticket_replies").insert({
       ticket_id: ticket.id,
-      reply_text: replyText,
+      reply_text: `R002 Refund Rejected: ${remarks}`,
       is_internal: false,
       created_by: context.userId,
       direction: "refund_rejected",
     } as never).select("id").single();
     if (replyErr) throw new Error(replyErr.message);
 
-    // Send the real email to customer with threading and delivery log tracking
-    await sendTicketAdHocReply({
+    // Send the official R002 Refund Rejected template email to customer
+    await sendTicketTemplateEmail({
       ticket,
+      code: "R002",
       actorId: context.userId,
       replyId: (replyRow as { id: string }).id,
-      message: replyText,
+      extraVars: {
+        ticket_close_variant: "refund_rejected",
+        employee_remarks: remarks,
+        additional_remarks: remarks,
+        remarks,
+        reason: remarks,
+        selected_reason: remarks,
+        replyMessage: replyText,
+      },
     });
 
     const patch: Record<string, unknown> = {
