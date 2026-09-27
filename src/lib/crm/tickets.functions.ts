@@ -98,7 +98,7 @@ export const listTickets = createServerFn({ method: "POST" })
       const { data: replies } = await admin
         .from("ticket_replies")
         .select("ticket_id")
-        .or("direction.eq.refund_rejected,reply_text.ilike.%refund%");
+        .or("direction.eq.refund_rejected,template_code.eq.R002,reply_text.ilike.%Refund Rejected%");
       bucketTicketIds = Array.from(new Set((replies ?? []).map((r: any) => r.ticket_id).filter(Boolean)));
       if (bucketTicketIds.length === 0) {
         return { tickets: [], total: 0, page: data.page, pageSize: data.pageSize };
@@ -157,7 +157,7 @@ export const listTickets = createServerFn({ method: "POST" })
       q = q.not("status", "in", '("resolved","closed")').lt("created_at", todayStartUtc);
     } else if (data.bucket === "need_action" || data.bucket === "open") {
       q = q.not("status", "in", '("resolved","closed")');
-    } else if (data.bucket === "closed") {
+    } else if (data.bucket === "closed" || data.bucket === "refund") {
       q = q.in("status", ["resolved", "closed"]);
     } else if (data.status) {
       q = q.eq("status", data.status);
@@ -367,7 +367,7 @@ export const getTicketStats = createServerFn({ method: "POST" })
       admin.from("support_tickets").select("id", { count: "exact", head: true }).not("status", "in", '("resolved","closed")'),
       admin.from("support_tickets").select("id", { count: "exact", head: true }).not("status", "in", '("resolved","closed")').lt("created_at", todayStartUtc),
       admin.from("ticket_replies").select("ticket_id").or("direction.eq.reopened_order,reply_text.ilike.%reopened order%"),
-      admin.from("ticket_replies").select("ticket_id").or("direction.eq.refund_rejected,reply_text.ilike.%refund%"),
+      admin.from("ticket_replies").select("ticket_id").or("direction.eq.refund_rejected,template_code.eq.R002,reply_text.ilike.%Refund Rejected%"),
       admin.from("support_tickets").select("id", { count: "exact", head: true }).is("first_response_at", null).not("status", "in", '("resolved","closed")'),
       admin.from("support_tickets").select("id", { count: "exact", head: true }).eq("status", "waiting_customer"),
       admin.from("support_tickets").select("id, status, first_response_at, last_customer_message_at, last_staff_message_at").not("status", "in", '("resolved","closed")'),
@@ -380,8 +380,27 @@ export const getTicketStats = createServerFn({ method: "POST" })
     const newCount = newRes.count ?? 0;
     const awaitingCustomerCount = awaitingCustRes.count ?? 0;
 
-    const reopenedTicketIds = Array.from(new Set((reopenedRepliesRes.data ?? []).map((r: any) => r.ticket_id).filter(Boolean)));
-    const refundTicketIds = Array.from(new Set((refundRepliesRes.data ?? []).map((r: any) => r.ticket_id).filter(Boolean)));
+    const reopenedTicketIdsRaw = Array.from(new Set((reopenedRepliesRes.data ?? []).map((r: any) => r.ticket_id).filter(Boolean)));
+    const refundTicketIdsRaw = Array.from(new Set((refundRepliesRes.data ?? []).map((r: any) => r.ticket_id).filter(Boolean)));
+
+    let refundCount = 0;
+    if (refundTicketIdsRaw.length > 0) {
+      const { count: rfClosedCount } = await admin
+        .from("support_tickets")
+        .select("id", { count: "exact", head: true })
+        .in("id", refundTicketIdsRaw)
+        .in("status", ["resolved", "closed"]);
+      refundCount = rfClosedCount ?? 0;
+    }
+
+    let reopenedCount = 0;
+    if (reopenedTicketIdsRaw.length > 0) {
+      const { count: roCount } = await admin
+        .from("support_tickets")
+        .select("id", { count: "exact", head: true })
+        .in("id", reopenedTicketIdsRaw);
+      reopenedCount = roCount ?? 0;
+    }
 
     let unreadCount = 0;
     let awaitingActionCount = 0;
@@ -405,8 +424,8 @@ export const getTicketStats = createServerFn({ method: "POST" })
       need_action: openCount,
       open: openCount,
       backlog: backlogCount,
-      reopened: reopenedTicketIds.length,
-      refund: refundTicketIds.length,
+      reopened: reopenedCount,
+      refund: refundCount,
       new: newCount,
       unread: unreadCount,
       awaiting_action: awaitingActionCount,
