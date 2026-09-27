@@ -57,7 +57,7 @@ export const listTickets = createServerFn({ method: "POST" })
         page: z.number().int().min(1).default(1),
         pageSize: z.number().int().min(1).max(100).default(50),
         q: z.string().default(""),
-        bucket: z.enum(["all", "need_action", "reopened", "refund", "closed", "open", "new"]).optional(),
+        bucket: z.enum(["all", "need_action", "backlog", "reopened", "refund", "closed", "open", "new"]).optional(),
         status: z.enum(TICKET_STATUSES).optional(),
         statuses: z.array(z.enum(TICKET_STATUSES)).optional(),
         responseState: z.enum(RESPONSE_STATES).optional().default("all"),
@@ -77,6 +77,11 @@ export const listTickets = createServerFn({ method: "POST" })
     const admin = await getAdmin();
     const from = (data.page - 1) * data.pageSize;
     const to = from + data.pageSize - 1;
+
+    const istOffset = 5.5 * 3600 * 1000;
+    const nowUtc = Date.now();
+    const istNow = new Date(nowUtc + istOffset);
+    const todayStartUtc = new Date(Date.UTC(istNow.getUTCFullYear(), istNow.getUTCMonth(), istNow.getUTCDate(), 0, 0, 0) - istOffset).toISOString();
 
     // Filter by bucket if specified
     let bucketTicketIds: string[] | null = null;
@@ -148,7 +153,9 @@ export const listTickets = createServerFn({ method: "POST" })
     }
 
     // Status filter
-    if (data.bucket === "need_action" || data.bucket === "open") {
+    if (data.bucket === "backlog") {
+      q = q.not("status", "in", '("resolved","closed")').lt("created_at", todayStartUtc);
+    } else if (data.bucket === "need_action" || data.bucket === "open") {
       q = q.not("status", "in", '("resolved","closed")');
     } else if (data.bucket === "closed") {
       q = q.in("status", ["resolved", "closed"]);
@@ -169,15 +176,17 @@ export const listTickets = createServerFn({ method: "POST" })
     }
 
     // Date range filter
-    if (data.dateFrom) {
-      const fromIso = data.dateFrom.includes("T") ? data.dateFrom : `${data.dateFrom}T00:00:00+05:30`;
-      const dateField = data.bucket === "closed" ? "closed_at" : "created_at";
-      q = q.gte(dateField, new Date(fromIso).toISOString());
-    }
-    if (data.dateTo) {
-      const toIso = data.dateTo.includes("T") ? data.dateTo : `${data.dateTo}T23:59:59+05:30`;
-      const dateField = data.bucket === "closed" ? "closed_at" : "created_at";
-      q = q.lte(dateField, new Date(toIso).toISOString());
+    if (data.bucket !== "backlog") {
+      if (data.dateFrom) {
+        const fromIso = data.dateFrom.includes("T") ? data.dateFrom : `${data.dateFrom}T00:00:00+05:30`;
+        const dateField = data.bucket === "closed" ? "closed_at" : "created_at";
+        q = q.gte(dateField, new Date(fromIso).toISOString());
+      }
+      if (data.dateTo) {
+        const toIso = data.dateTo.includes("T") ? data.dateTo : `${data.dateTo}T23:59:59+05:30`;
+        const dateField = data.bucket === "closed" ? "closed_at" : "created_at";
+        q = q.lte(dateField, new Date(toIso).toISOString());
+      }
     }
 
     // Scope filter

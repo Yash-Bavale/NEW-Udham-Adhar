@@ -89,11 +89,12 @@ const RANGE_PRESETS: { value: RangePreset; label: string }[] = [
   { value: "custom", label: "Custom" },
 ];
 
-type Bucket = "all" | "need_action" | "reopened" | "refund" | "closed";
+type Bucket = "all" | "need_action" | "backlog" | "reopened" | "refund" | "closed";
 
 const BUCKETS: { id: Bucket; label: string }[] = [
   { id: "all",         label: "All Tickets" },
   { id: "need_action", label: "Need Action" },
+  { id: "backlog",     label: "Backlog" },
   { id: "reopened",    label: "Reopened" },
   { id: "refund",      label: "Refund" },
   { id: "closed",      label: "Closed" },
@@ -636,8 +637,8 @@ function SupportTicketsOperationsPage() {
         </div>
       </div>
 
-      {/* ── 2. Clickable KPI Stat Cards (All Tickets, Need Action, Reopened, Refund, Closed) ─────── */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 pt-1">
+      {/* ── 2. Clickable KPI Stat Cards (All Tickets, Need Action, Backlog, Reopened, Refund, Closed) ─────── */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 pt-1">
         {BUCKETS.map((b) => {
           const active = bucket === b.id;
           let count = 0;
@@ -647,8 +648,8 @@ function SupportTicketsOperationsPage() {
             count = statsData?.total ?? 0;
           } else if (b.id === "need_action") {
             count = statsData?.need_action ?? statsData?.open ?? 0;
-            const backlog = statsData?.backlog ?? 0;
-            if (backlog > 0) subBadge = `Backlog: ${backlog}`;
+          } else if (b.id === "backlog") {
+            count = statsData?.backlog ?? 0;
           } else if (b.id === "reopened") {
             count = statsData?.reopened ?? 0;
           } else if (b.id === "refund") {
@@ -674,6 +675,14 @@ function SupportTicketsOperationsPage() {
               text: "text-blue-700",
               countColor: "text-blue-700",
               icon: "📬",
+            },
+            backlog: {
+              bg: "bg-orange-50/50 hover:bg-orange-50",
+              border: "border-orange-100",
+              activeBorder: "ring-2 ring-orange-600 border-orange-500 bg-orange-50",
+              text: "text-orange-800",
+              countColor: "text-orange-800",
+              icon: "⏳",
             },
             reopened: {
               bg: "bg-violet-50/50 hover:bg-violet-50",
