@@ -94,24 +94,28 @@ export const getTicketWorkspace = createServerFn({ method: "POST" })
             }
           }
         } else if (t.ticket_email) {
-          const { data: matchedLead } = await admin
-            .from("leads")
-            .select("id, customer_id")
-            .eq("email", t.ticket_email.trim().toLowerCase())
-            .order("created_at", { ascending: false })
-            .limit(1)
+          const email = t.ticket_email.trim().toLowerCase();
+          // First check customer record
+          const { data: custRecord } = await admin
+            .from("customers")
+            .select("id")
+            .ilike("primary_email", email)
             .maybeSingle();
-          if (matchedLead) {
-            const { data: foundApp } = await admin
+
+          const resolvedCustId = (custRecord as any)?.id ?? null;
+          if (resolvedCustId) {
+            if (!customerId) customerId = resolvedCustId;
+            const { data: activeApps } = await admin
               .from("applications")
               .select("id, application_code, order_status, fulfillment_status, assigned_to, created_at, service_id, customer_id, lead_id, is_hot")
-              .eq("lead_id", (matchedLead as any).id)
-              .order("created_at", { ascending: false })
-              .limit(1)
-              .maybeSingle();
-            if (foundApp) {
-              applicationId = (foundApp as any).id;
-              if (!customerId) customerId = (foundApp as any).customer_id || (matchedLead as any).customer_id;
+              .eq("customer_id", resolvedCustId)
+              .not("order_status", "in", "(COMPLETED,CLOSED,REFUND_PROCESSED)")
+              .order("created_at", { ascending: false });
+
+            const apps = (activeApps ?? []) as any[];
+            // If customer has exactly 1 active order, safely auto-link it
+            if (apps.length === 1) {
+              applicationId = apps[0].id;
               await admin
                 .from("support_tickets")
                 .update({
@@ -121,6 +125,50 @@ export const getTicketWorkspace = createServerFn({ method: "POST" })
                   order_link_status: "linked",
                 } as never)
                 .eq("id", data.ticketId);
+            } else {
+              // If customer has multiple active orders or 0 active orders:
+              // Link customer_id only so all orders are visible in workspace
+              await admin
+                .from("support_tickets")
+                .update({
+                  customer_id: customerId,
+                  order_link_status: apps.length > 1 ? "needs_review" : "unlinked",
+                } as never)
+                .eq("id", data.ticketId);
+            }
+          } else {
+            // Fallback to leads table
+            const { data: matchedLeads } = await admin
+              .from("leads")
+              .select("id, customer_id")
+              .eq("email", email)
+              .order("created_at", { ascending: false })
+              .limit(5);
+
+            if (matchedLeads && matchedLeads.length === 1) {
+              const leadId = matchedLeads[0].id;
+              const custId = matchedLeads[0].customer_id;
+              const { data: foundApp } = await admin
+                .from("applications")
+                .select("id, application_code, order_status, fulfillment_status, assigned_to, created_at, service_id, customer_id, lead_id, is_hot")
+                .eq("lead_id", leadId)
+                .order("created_at", { ascending: false })
+                .limit(1)
+                .maybeSingle();
+
+              if (foundApp) {
+                applicationId = (foundApp as any).id;
+                if (!customerId) customerId = (foundApp as any).customer_id || custId;
+                await admin
+                  .from("support_tickets")
+                  .update({
+                    application_id: applicationId,
+                    customer_id: customerId,
+                    is_unlinked: false,
+                    order_link_status: "linked",
+                  } as never)
+                  .eq("id", data.ticketId);
+              }
             }
           }
         }
