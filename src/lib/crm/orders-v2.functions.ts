@@ -1424,25 +1424,39 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       const isHumanStaff = (name?: string | null): boolean => {
         if (!name) return false;
         const n = String(name).trim().toLowerCase();
-        return n.length > 0 && n !== "system" && n !== "automated" && n !== "bot" && n !== "auto" && n !== "cron" && n !== "webhook";
+        return n.length > 0 && n !== "system" && n !== "automated" && n !== "bot" && n !== "auto" && n !== "cron" && n !== "webhook" && n !== "system_job";
       };
 
-      // Action Logs (only if created by a human staff member)
+      // Action Logs (only if created by a human staff member, never automated cron/timeout)
       for (const l of thisAppActionLogs) {
-        const staffName = l.staff_name || staff?.display_name || staff?.full_name || null;
+        const staffName = l.staff_name || null;
         if (!isHumanStaff(staffName)) continue;
 
         const at = String(l.action_type || "").toUpperCase();
-        if (at === "FORM_SUBMITTED" || at === "ORDER_CREATED" || at === "PAYMENT_RECEIVED" || at === "ORDER_REOPENED") continue;
+        const note = String(l.note || l.remarks || "").toLowerCase();
+
+        // Exclude system events, automated closures, form submissions
+        if (
+          at === "FORM_SUBMITTED" ||
+          at === "ORDER_CREATED" ||
+          at === "PAYMENT_RECEIVED" ||
+          at === "ORDER_REOPENED" ||
+          note.includes("customer delay closed") ||
+          note.includes("auto closed") ||
+          note.includes("timeout") ||
+          note.includes("system")
+        ) {
+          continue;
+        }
 
         const t = new Date(l.created_at).getTime();
         if (!hasDateFilter || (t >= fromTime && t <= toTime)) {
           let title = "Staff Action";
           if (at.includes("COMPLET")) title = "Order Completed";
-          else if (at.includes("CLOSE")) title = "Order Closed";
           else if (at.includes("CUSTOMER_DELAY")) title = "Customer Delay Added";
           else if (at.includes("TECHNICAL_DELAY")) title = "Technical Delay Added";
           else if (at.includes("CALLBACK")) title = "Callback Scheduled";
+          else if (at.includes("CLOSE")) title = "Order Closed";
           else if (at.includes("FORM")) title = "Form Link Sent";
           else if (l.action_type) title = l.action_type.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase());
 
@@ -1450,10 +1464,56 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
             id: `log-${l.id}`,
             action_type: l.action_type || "ACTION",
             title,
-            staff_name: staffName!,
+            staff_name: staffName,
             created_at: l.created_at,
             note: l.note || l.remarks || null,
           });
+        }
+      }
+
+      // Manual Customer Delay marked by employee
+      if (a.customer_hold_started_at) {
+        const holdTime = new Date(a.customer_hold_started_at).getTime();
+        if (!hasDateFilter || (holdTime >= fromTime && holdTime <= toTime)) {
+          const staffName = staff?.display_name || staff?.full_name || null;
+          if (isHumanStaff(staffName)) {
+            const exists = actionHistoryList.some(
+              (x) => x.action_type.toUpperCase().includes("CUSTOMER_DELAY") && Math.abs(new Date(x.created_at).getTime() - holdTime) < 120000
+            );
+            if (!exists) {
+              actionHistoryList.push({
+                id: `cust-delay-${a.id}`,
+                action_type: "CUSTOMER_DELAY_ADDED",
+                title: "Customer Delay Added",
+                staff_name: staffName!,
+                created_at: a.customer_hold_started_at,
+                note: a.active_reason_text || a.workflow_delay_reason || "Customer delay placed by employee",
+              });
+            }
+          }
+        }
+      }
+
+      // Manual Technical Delay marked by employee
+      if (a.technical_hold_started_at) {
+        const holdTime = new Date(a.technical_hold_started_at).getTime();
+        if (!hasDateFilter || (holdTime >= fromTime && holdTime <= toTime)) {
+          const staffName = staff?.display_name || staff?.full_name || null;
+          if (isHumanStaff(staffName)) {
+            const exists = actionHistoryList.some(
+              (x) => x.action_type.toUpperCase().includes("TECHNICAL_DELAY") && Math.abs(new Date(x.created_at).getTime() - holdTime) < 120000
+            );
+            if (!exists) {
+              actionHistoryList.push({
+                id: `tech-delay-${a.id}`,
+                action_type: "TECHNICAL_DELAY_ADDED",
+                title: "Technical Delay Added",
+                staff_name: staffName!,
+                created_at: a.technical_hold_started_at,
+                note: a.active_reason_text || a.workflow_delay_reason || "Technical delay placed by employee",
+              });
+            }
+          }
         }
       }
 
@@ -1485,9 +1545,9 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         if (!hasDateFilter || (t >= fromTime && t <= toTime)) {
           const st = String(s.scheduler_type || "").toLowerCase();
           let title = "Workflow Scheduler";
-          if (st.includes("customer")) title = "Customer Delay Active";
-          else if (st.includes("technical") || st.includes("our_side")) title = "Technical Delay Active";
-          else if (st.includes("callback")) title = "Callback Reminder Active";
+          if (st.includes("customer")) title = "Customer Delay Added";
+          else if (st.includes("technical") || st.includes("our_side")) title = "Technical Delay Added";
+          else if (st.includes("callback")) title = "Callback Scheduled";
 
           const exists = actionHistoryList.some((x) => Math.abs(new Date(x.created_at).getTime() - t) < 60000);
           if (!exists) {
@@ -1503,7 +1563,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         }
       }
 
-      // Events (Manual staff events ONLY, strictly excluding System and customer actions)
+      // Events (Manual staff events ONLY, strictly excluding System, automated closures, and customer actions)
       for (const ev of thisAppEvents) {
         const staffName = ev.staff_name || null;
         if (!isHumanStaff(staffName)) continue;
@@ -1524,13 +1584,18 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
           et === "email_skipped" ||
           et === "internal_review_due" ||
           et === "form_submitted" ||
+          et === "order_closed" ||
+          et === "workflow_closed" ||
           nv === "form_submitted" ||
           nv === "order_received" ||
           nv === "lead_received" ||
           nv === "payment_done" ||
           nv === "payment_pending" ||
           note.includes("customer submitted") ||
-          note.includes("form submitted")
+          note.includes("form submitted") ||
+          note.includes("customer delay closed") ||
+          note.includes("auto closed") ||
+          note.includes("timeout")
         ) {
           continue;
         }
@@ -1566,18 +1631,6 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
           staff_name: (staff?.display_name || staff?.full_name)!,
           created_at: compTimestamp ? new Date(compTimestamp).toISOString() : a.updated_at || a.created_at,
           note: "Order fulfilled and marked completed",
-        });
-      }
-
-      // If closed in range by staff and no history entry yet
-      if (inRangeClosed && isHumanStaff(staff?.display_name || staff?.full_name) && !actionHistoryList.some((x) => x.action_type.toLowerCase().includes("close"))) {
-        actionHistoryList.push({
-          id: `close-${a.id}`,
-          action_type: "ORDER_CLOSED",
-          title: "Order Closed",
-          staff_name: (staff?.display_name || staff?.full_name)!,
-          created_at: closeTimestamp ? new Date(closeTimestamp).toISOString() : a.updated_at || a.created_at,
-          note: "Order closed / customer delay closed",
         });
       }
 
