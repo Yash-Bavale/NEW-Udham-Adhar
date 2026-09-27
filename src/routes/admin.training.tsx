@@ -536,9 +536,9 @@ function TrainingPage() {
         </div>
       )}
 
-      {/* ── Document Reader Modal with In-App Preview ── */}
+      {/* ── Document Reader Modal ── */}
       <Dialog open={!!activeReadingDoc} onOpenChange={(open) => !open && setActiveReadingDoc(null)}>
-        <DialogContent className="max-w-5xl w-[96vw] max-h-[92vh] overflow-y-auto p-0 bg-white rounded-2xl shadow-2xl border border-slate-200">
+        <DialogContent className="max-w-3xl max-h-[88vh] overflow-y-auto p-0 bg-white rounded-2xl shadow-2xl border border-slate-200">
           {activeReadingDoc && (
             <div>
               {/* Reader Header */}
@@ -577,58 +577,51 @@ function TrainingPage() {
               </div>
 
               {/* Reader Body Content */}
-              <div className="p-5 sm:p-6 space-y-6">
-                {/* Embedded In-App PDF / Document Viewer Preview */}
+              <div className="p-6 space-y-6">
+                {/* Attached Document Card (Open in New Tab) */}
                 {activeReadingDoc.document_url && (
-                  <div className="rounded-xl border border-slate-300 overflow-hidden bg-slate-900 shadow-md">
-                    {/* Viewer Toolbar Header */}
-                    <div className="flex items-center justify-between px-4 py-2.5 bg-slate-950 text-white text-xs border-b border-slate-800">
-                      <div className="flex items-center gap-2 truncate pr-2">
-                        <FileText className="size-4 text-indigo-400 shrink-0" />
-                        <span className="font-semibold text-slate-200 truncate">
-                          {activeReadingDoc.file_name || "Attached Training Document / PDF"}
-                        </span>
+                  <div className="p-4 sm:p-5 rounded-2xl border border-indigo-200/90 bg-gradient-to-r from-indigo-50/80 via-white to-indigo-50/50 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                    <div className="flex items-center gap-3.5 min-w-0">
+                      <div className="p-3 rounded-xl bg-indigo-600 text-white shadow-md shadow-indigo-200 shrink-0">
+                        <FileText className="size-6" />
                       </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        {resolvedDocViewUrl && (
-                          <a
-                            href={resolvedDocViewUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs transition-colors shadow-2xs"
-                          >
-                            <ExternalLink className="size-3.5" /> Open in New Tab
-                          </a>
-                        )}
+                      <div className="min-w-0 space-y-0.5">
+                        <div className="text-sm font-bold text-slate-900 truncate">
+                          {activeReadingDoc.file_name || "Official Training Document / File"}
+                        </div>
+                        <div className="text-xs text-slate-500 flex items-center gap-2">
+                          <span>Attached Document</span>
+                          {activeReadingDoc.file_size_bytes ? (
+                            <>
+                              <span>•</span>
+                              <span className="font-mono text-[11px] text-slate-600 font-semibold">
+                                {(activeReadingDoc.file_size_bytes / (1024 * 1024)).toFixed(2)} MB
+                              </span>
+                            </>
+                          ) : null}
+                        </div>
                       </div>
                     </div>
 
-                    {/* In-Modal Viewer Canvas */}
-                    {loadingDocView ? (
-                      <div className="h-[550px] flex flex-col items-center justify-center bg-slate-900 text-slate-400 space-y-3">
-                        <Loader2 className="size-8 animate-spin text-indigo-500" />
-                        <p className="text-xs font-medium">Loading document viewer…</p>
-                      </div>
-                    ) : resolvedDocViewUrl ? (
-                      activeReadingDoc.file_name?.match(/\.(png|jpe?g|webp|gif)$/i) ? (
-                        <div className="p-4 bg-slate-950 flex items-center justify-center min-h-[400px]">
-                          <img
-                            src={resolvedDocViewUrl}
-                            alt={activeReadingDoc.title}
-                            className="max-h-[650px] max-w-full rounded-lg object-contain"
-                          />
-                        </div>
-                      ) : (
-                        <iframe
-                          src={`${resolvedDocViewUrl}#toolbar=1&navpanes=0`}
-                          title={activeReadingDoc.title}
-                          className="w-full h-[600px] sm:h-[680px] border-0 bg-white"
-                        />
-                      )
+                    {/* Open in New Tab Button */}
+                    {resolvedDocViewUrl ? (
+                      <a
+                        href={resolvedDocViewUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md shadow-indigo-200 transition-all active:scale-95 shrink-0 cursor-pointer"
+                      >
+                        <ExternalLink className="size-4" />
+                        <span>Open Document in New Tab</span>
+                      </a>
                     ) : (
-                      <div className="h-[200px] flex items-center justify-center bg-slate-900 text-slate-400 text-xs">
-                        Unable to load document preview.
-                      </div>
+                      <button
+                        disabled
+                        className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-200 text-slate-400 font-bold text-xs shrink-0 cursor-not-allowed"
+                      >
+                        <Loader2 className="size-4 animate-spin" />
+                        <span>Preparing Link…</span>
+                      </button>
                     )}
                   </div>
                 )}
