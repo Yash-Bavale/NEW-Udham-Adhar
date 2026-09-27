@@ -677,8 +677,8 @@ if (!userPerms.isLoading && !userPerms.can("orders", "view")) {
 
 return (
   <div className="w-full space-y-4">
-    {/* Header & Reset Button */}
-    <div className="flex flex-wrap items-center justify-between gap-3">
+    {/* Header & Date Range Selector */}
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
       <div>
         <div className="flex items-center gap-2">
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">Orders</h1>
@@ -701,69 +701,69 @@ return (
           )}
         </p>
       </div>
-      {isFilterActive && (
-        <button
-          type="button"
-          onClick={resetFilters}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 transition-colors"
+
+      <div className="flex flex-wrap items-center gap-2">
+        <Tabs
+          value={datePreset}
+          onValueChange={(v) => applyDatePreset(v as RangePreset)}
         >
-          <RotateCcw className="size-3.5" /> Reset Filters
-        </button>
-      )}
+          <TabsList className="h-9">
+            {RANGE_PRESETS.map((p) => (
+              <TabsTrigger
+                key={p.value}
+                value={p.value}
+                className="text-xs px-2.5"
+              >
+                {p.label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
+
+        {datePreset === "custom" && (
+          <DateRangePicker
+            value={dateRangeValue}
+            onChange={(range) => {
+              if (!range.from) {
+                setDateFrom("");
+                setDateTo("");
+              } else {
+                setDateFrom(istDateKey(range.from));
+                setDateTo(range.to ? istDateKey(range.to) : istDateKey(range.from));
+              }
+            }}
+          />
+        )}
+
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            qc.invalidateQueries({ queryKey: ["admin.orders.v2"] });
+            toast.success("Refreshing orders…");
+          }}
+          className="h-9 gap-1.5 text-xs text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 border-slate-200 shadow-2xs"
+          title="Refresh orders"
+        >
+          <RefreshCw className={`size-3.5 ${isFetching && !isLoading ? "animate-spin text-indigo-600" : "text-slate-500"}`} />
+          <span>Refresh</span>
+        </Button>
+
+        {isFilterActive && (
+          <button
+            type="button"
+            onClick={resetFilters}
+            className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg text-xs font-medium border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 transition-colors"
+          >
+            <RotateCcw className="size-3.5" /> Reset Filters
+          </button>
+        )}
+      </div>
     </div>
 
     {/* Modern Filter Card */}
     <div className="rounded-xl border border-slate-200 bg-white p-3.5 shadow-xs space-y-3">
       <div className="flex flex-wrap gap-2.5 items-center">
-        {/* Date Preset Selector */}
-        <div className="flex items-center gap-1.5 flex-wrap">
-          <Tabs
-            value={datePreset}
-            onValueChange={(v) => applyDatePreset(v as RangePreset)}
-          >
-            <TabsList className="h-9 bg-slate-100/90 p-0.5 rounded-lg border border-slate-200">
-              {RANGE_PRESETS.map((p) => (
-                <TabsTrigger
-                  key={p.value}
-                  value={p.value}
-                  className="text-xs px-2.5 py-1 font-medium data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-xs rounded-md"
-                >
-                  {p.label}
-                </TabsTrigger>
-              ))}
-            </TabsList>
-          </Tabs>
-
-          {datePreset === "custom" && (
-            <DateRangePicker
-              value={dateRangeValue}
-              onChange={(range) => {
-                if (!range.from) {
-                  setDateFrom("");
-                  setDateTo("");
-                } else {
-                  setDateFrom(istDateKey(range.from));
-                  setDateTo(range.to ? istDateKey(range.to) : istDateKey(range.from));
-                }
-              }}
-            />
-          )}
-
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              qc.invalidateQueries({ queryKey: ["admin.orders.v2"] });
-              toast.success("Refreshing orders…");
-            }}
-            className="h-9 gap-1.5 text-xs text-slate-700 hover:text-slate-900 bg-slate-50/50 hover:bg-slate-100 border-slate-200 shadow-2xs"
-            title="Refresh orders"
-          >
-            <RefreshCw className={`size-3.5 ${isFetching && !isLoading ? "animate-spin text-indigo-600" : "text-slate-500"}`} />
-            <span>Refresh</span>
-          </Button>
-        </div>
-
         {/* Stage Filter */}
         <Select value={stageFilter} onValueChange={setStageFilter}>
           <SelectTrigger className="h-9 w-[160px] text-xs bg-slate-50/50 border-slate-200">
