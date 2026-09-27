@@ -291,6 +291,9 @@ function TrainingPage() {
     onSuccess: () => {
       toast.success(editingItem ? "Training document updated successfully" : "Training document published successfully");
       setEditorOpen(false);
+      if (activeReadingDoc && editingItem && activeReadingDoc.id === editingItem.id) {
+        setActiveReadingDoc(null);
+      }
       qc.invalidateQueries({ queryKey: ["admin.training.materials"] });
     },
     onError: (err: any) => {

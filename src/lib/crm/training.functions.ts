@@ -178,36 +178,96 @@ Before uploading the final PDF certificate:
 
 const STORAGE_BLOCK_KEY = "training_library_documents";
 
+function cleanStoragePath(urlOrPath?: string | null): string | null {
+  if (!urlOrPath) return null;
+  const trimmed = urlOrPath.trim();
+  if (!trimmed) return null;
+
+  // Extract storage relative path if a full Supabase storage signed/public URL was passed
+  if (trimmed.includes("/documents/")) {
+    const extracted = trimmed.split("/documents/")[1].split("?")[0];
+    return decodeURIComponent(extracted);
+  }
+  return trimmed;
+}
+
+async function getTargetWebsiteId(admin: any): Promise<string> {
+  const { data: websites } = await admin
+    .from("websites")
+    .select("id")
+    .order("created_at", { ascending: true })
+    .limit(1);
+
+  if (websites && websites.length > 0 && websites[0].id) {
+    return websites[0].id;
+  }
+  return "00000000-0000-0000-0000-000000000000";
+}
+
 async function loadPersistedTrainingMaterials(admin: any): Promise<TrainingMaterial[]> {
   try {
-    const { data: block } = await admin
+    const { data: block, error } = await admin
       .from("site_content_blocks")
       .select("content")
       .eq("block_key", STORAGE_BLOCK_KEY)
+      .limit(1)
       .maybeSingle();
 
-    if (block?.content && Array.isArray(block.content)) {
+    if (error) {
+      console.warn("Could not query training block:", error.message);
+    }
+
+    if (block?.content && Array.isArray(block.content) && block.content.length > 0) {
       return block.content as TrainingMaterial[];
     }
-  } catch {
-    // fallback
+  } catch (err) {
+    console.error("loadPersistedTrainingMaterials error:", err);
   }
   return DEFAULT_TRAINING_MATERIALS;
 }
 
 async function savePersistedTrainingMaterials(admin: any, list: TrainingMaterial[]): Promise<void> {
-  try {
-    const { data: website } = await admin.from("websites").select("id").limit(1).maybeSingle();
-    const websiteId = website?.id || "00000000-0000-0000-0000-000000000000";
+  // 1. Check if a block with STORAGE_BLOCK_KEY already exists
+  const { data: existing, error: findError } = await admin
+    .from("site_content_blocks")
+    .select("id, website_id")
+    .eq("block_key", STORAGE_BLOCK_KEY)
+    .limit(1)
+    .maybeSingle();
 
-    await admin.from("site_content_blocks").upsert({
+  if (existing?.id) {
+    const { error: updateError } = await admin
+      .from("site_content_blocks")
+      .update({
+        content: list as never,
+        is_active: true,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", existing.id);
+
+    if (updateError) {
+      console.error("Failed to update training site_content_blocks:", updateError);
+      throw new Error(`Failed to update training materials: ${updateError.message}`);
+    }
+    return;
+  }
+
+  // 2. Otherwise insert a new record with a valid website_id
+  const websiteId = await getTargetWebsiteId(admin);
+
+  const { error: insertError } = await admin.from("site_content_blocks").upsert(
+    {
       website_id: websiteId,
       block_key: STORAGE_BLOCK_KEY,
       content: list as never,
       is_active: true,
-    });
-  } catch (err) {
-    console.error("Failed to save training materials to site_content_blocks:", err);
+    },
+    { onConflict: "website_id,block_key" }
+  );
+
+  if (insertError) {
+    console.error("Failed to insert training site_content_blocks:", insertError);
+    throw new Error(`Failed to save training materials: ${insertError.message}`);
   }
 }
 
@@ -350,9 +410,12 @@ export const createTrainingMaterial = createServerFn({ method: "POST" })
     const staffName = profile?.display_name || profile?.email?.split("@")[0] || "Admin";
     const materials = await loadPersistedTrainingMaterials(admin);
 
+    const cleanDocUrl = cleanStoragePath(data.document_url);
+
     const newMaterial: TrainingMaterial = {
       id: `training-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
       ...data,
+      document_url: cleanDocUrl,
       created_by_name: staffName,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
@@ -401,9 +464,15 @@ export const updateTrainingMaterial = createServerFn({ method: "POST" })
     if (idx === -1) throw new Error("Training material not found");
 
     const existing = materials[idx];
+    const cleanDocUrl =
+      data.document_url !== undefined
+        ? cleanStoragePath(data.document_url)
+        : existing.document_url;
+
     const updated: TrainingMaterial = {
       ...existing,
       ...data,
+      document_url: cleanDocUrl,
       updated_at: new Date().toISOString(),
     };
 
