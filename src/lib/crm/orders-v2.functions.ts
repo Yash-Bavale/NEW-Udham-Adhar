@@ -1807,14 +1807,14 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
 
       if (r.is_hot) {
         counts.hot_orders++;
-      } else if (r.in_range_callback_scheduled) {
+      } else if (isCallbackScheduledOrder(r)) {
         counts.reminders++;
       }
 
-      if (r.in_range_technical_delay) {
+      if (isTechnicalDelayOrder(r)) {
         counts.technical_delay++;
       }
-      if (r.in_range_customer_delay) {
+      if (isCustomerDelayOrder(r)) {
         counts.customer_delay++;
       }
 
@@ -1843,16 +1843,16 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
     } else if (bucket === "hot_orders") {
       filtered = filtered.filter((r) => r.is_hot);
     } else if (bucket === "reminders") {
-      filtered = filtered.filter((r) => !r.is_terminal && r.in_range_callback_scheduled && !r.is_hot);
+      filtered = filtered.filter((r) => isCallbackScheduledOrder(r));
     } else if (bucket === "backlog") {
       filtered = filtered.filter((r) => {
         const rowDate = istDateKey(r.created_at);
         return isNeedsActionOrder(r) && Boolean(rowDate && rowDate < todayIst);
       });
     } else if (bucket === "technical_delay") {
-      filtered = filtered.filter((r) => r.in_range_technical_delay);
+      filtered = filtered.filter((r) => isTechnicalDelayOrder(r));
     } else if (bucket === "customer_delay") {
-      filtered = filtered.filter((r) => r.in_range_customer_delay);
+      filtered = filtered.filter((r) => isCustomerDelayOrder(r));
     } else if (bucket === "pending") {
       filtered = filtered.filter((r) => r.in_range_action_taken);
     } else if (bucket === "completed") {

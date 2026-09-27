@@ -1015,13 +1015,11 @@ return (
         } else if (b.id === "reminders") {
           cardContainerCls = active
             ? "bg-indigo-50 border-indigo-400 text-indigo-950 shadow-sm ring-2 ring-indigo-300"
-            : countVal > 0
-              ? "bg-indigo-50/40 border-indigo-200/90 text-indigo-950 hover:bg-indigo-50/80 hover:border-indigo-300"
-              : "bg-white border-slate-200 text-slate-800 hover:border-slate-300 hover:bg-slate-50/70";
-          headerCls = active || countVal > 0 ? "text-indigo-600 font-bold" : "text-slate-500";
-          iconCls = active || countVal > 0 ? "text-indigo-600" : "text-slate-400";
-          countCls = active || countVal > 0 ? "text-indigo-950" : "text-slate-900";
-          subtitleCls = active || countVal > 0 ? "text-indigo-600/70" : "text-slate-400";
+            : "bg-indigo-50/40 border-indigo-200/90 text-indigo-950 hover:bg-indigo-50/80 hover:border-indigo-300";
+          headerCls = "text-indigo-600 font-bold";
+          iconCls = "text-indigo-600";
+          countCls = "text-indigo-950";
+          subtitleCls = "text-indigo-600/70";
         } else if (b.id === "technical_delay") {
           cardContainerCls = active
             ? "bg-sky-100/80 border-sky-500 text-sky-950 shadow-sm ring-2 ring-sky-300"
@@ -1033,13 +1031,11 @@ return (
         } else if (b.id === "backlog") {
           cardContainerCls = active
             ? "bg-amber-100 border-amber-500 text-amber-950 shadow-sm ring-2 ring-amber-300"
-            : countVal > 0
-              ? "bg-amber-50/60 border-amber-200/90 text-amber-950 hover:bg-amber-100/60 hover:border-amber-300"
-              : "bg-white border-slate-200 text-slate-800 hover:border-slate-300 hover:bg-slate-50/70";
-          headerCls = active || countVal > 0 ? "text-amber-800 font-bold" : "text-slate-500";
-          iconCls = active || countVal > 0 ? "text-amber-700" : "text-slate-400";
-          countCls = active || countVal > 0 ? "text-amber-950" : "text-slate-900";
-          subtitleCls = active || countVal > 0 ? "text-amber-700/80" : "text-slate-400";
+            : "bg-amber-50/60 border-amber-200/90 text-amber-950 hover:bg-amber-100/60 hover:border-amber-300";
+          headerCls = "text-amber-800 font-bold";
+          iconCls = "text-amber-700";
+          countCls = "text-amber-950";
+          subtitleCls = "text-amber-700/80";
         } else if (b.id === "customer_delay") {
           cardContainerCls = active
             ? "bg-orange-50 border-orange-500 text-orange-950 shadow-sm ring-2 ring-orange-300"
