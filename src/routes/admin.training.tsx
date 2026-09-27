@@ -19,6 +19,7 @@ import {
   type TrainingMaterial,
   type TrainingCategory,
 } from "@/lib/crm/training.functions";
+import { TrainingMarkdownViewer } from "@/components/admin/TrainingMarkdownViewer";
 import { formatIST } from "@/lib/datetime";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -584,8 +585,8 @@ function TrainingPage() {
 
                 {/* Formatted Content Body */}
                 {activeReadingDoc.content && activeReadingDoc.content.trim() && (
-                  <div className="prose prose-sm max-w-none text-slate-800 leading-relaxed space-y-3 whitespace-pre-wrap font-sans text-sm">
-                    {activeReadingDoc.content}
+                  <div className="pt-2">
+                    <TrainingMarkdownViewer content={activeReadingDoc.content} />
                   </div>
                 )}
 
