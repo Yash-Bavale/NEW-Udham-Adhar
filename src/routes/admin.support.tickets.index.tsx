@@ -46,6 +46,7 @@ export const Route = createFileRoute("/admin/support/tickets/")({
   validateSearch: (
     search: Record<string, unknown>
   ): {
+    bucket?: string;
     status?: string;
     responseState?: string;
     priority?: string;
@@ -57,6 +58,7 @@ export const Route = createFileRoute("/admin/support/tickets/")({
     dateTo?: string;
     preset?: string;
   } => ({
+    bucket: typeof search.bucket === "string" ? search.bucket : undefined,
     status: typeof search.status === "string" ? search.status : undefined,
     responseState: typeof search.responseState === "string" ? search.responseState : undefined,
     priority: typeof search.priority === "string" ? search.priority : undefined,
@@ -245,7 +247,31 @@ function SupportTicketsOperationsPage() {
     return "today";
   });
 
-  const [bucket, setBucket] = useState<Bucket>("need_action");
+  const [bucket, setBucketState] = useState<Bucket>(() => {
+    if (routeSearch.bucket && ["all", "need_action", "backlog", "reopened", "refund", "closed"].includes(routeSearch.bucket)) {
+      return routeSearch.bucket as Bucket;
+    }
+    if (typeof window !== "undefined") {
+      try {
+        const saved = sessionStorage.getItem("bhs_support_active_bucket");
+        if (saved && ["all", "need_action", "backlog", "reopened", "refund", "closed"].includes(saved)) {
+          return saved as Bucket;
+        }
+      } catch {}
+    }
+    return "need_action";
+  });
+
+  const setBucket = useCallback((newBucket: Bucket) => {
+    setBucketState(newBucket);
+    try {
+      sessionStorage.setItem("bhs_support_active_bucket", newBucket);
+    } catch {}
+    navigate({
+      search: (prev: any) => ({ ...prev, bucket: newBucket }),
+      replace: true,
+    });
+  }, [navigate]);
   const [search, setSearch] = useState<string>(routeSearch.search ?? "");
   const [debouncedSearch, setDebouncedSearch] = useState<string>(routeSearch.search ?? "");
   const [statusFilter, setStatusFilter] = useState<string>(routeSearch.status ?? "all");

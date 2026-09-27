@@ -808,8 +808,14 @@ function TicketWorkspace() {
           {/* Row 1: Back to Tickets Link */}
           <div className="flex items-center justify-between mb-1.5">
             <button
-              onClick={() => navigate({ to: "/admin/support/tickets" })}
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-900 transition-colors"
+              onClick={() => {
+                if (typeof window !== "undefined" && window.history.length > 1) {
+                  window.history.back();
+                } else {
+                  navigate({ to: "/admin/support/tickets" });
+                }
+              }}
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-900 transition-colors cursor-pointer"
             >
               <ArrowLeft className="size-3.5" /> Back to Tickets
             </button>
