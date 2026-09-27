@@ -1279,7 +1279,24 @@ return (
             {!isLoading && rows.length === 0 && (
               <tr><td colSpan={colCount} className="px-4 py-12 text-center text-slate-500">No orders in this view.</td></tr>
             )}
-            {!isLoading && groups.map(([day, items]) => (
+            {!isLoading && bucket === "hot_orders" &&
+              rows.map((r) => (
+                <OrderRow
+                  key={r.id}
+                  order={r}
+                  bucket={bucket}
+                  hideMoney={hideMoney}
+                  isAdmin={isAdmin}
+                  selected={selectedOrderIds.includes(r.id)}
+                  onToggleSelect={(id, checked) =>
+                    setSelectedOrderIds((prev) =>
+                      checked ? [...prev, id] : prev.filter((x) => x !== id),
+                    )
+                  }
+                  onOpen={(id) => navigate({ to: `/admin/orders/${id}` as any })}
+                />
+              ))}
+            {!isLoading && bucket !== "hot_orders" && groups.map(([day, items]) => (
               <Fragment key={`g-${day}`}>
                 <tr className="bg-slate-900 text-white border-b border-slate-800">
                   <td colSpan={colCount} className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wider">
@@ -1321,7 +1338,27 @@ return (
           No orders match the selected filters.
         </div>
       )}
-      {!isLoading && groups.map(([day, items]) => (
+      {!isLoading && bucket === "hot_orders" && (
+        <div className="space-y-2.5">
+          {rows.map((r) => (
+            <OrderCardMobile
+              key={r.id}
+              order={r}
+              bucket={bucket}
+              hideMoney={hideMoney}
+              isAdmin={isAdmin}
+              selected={selectedOrderIds.includes(r.id)}
+              onToggleSelect={(id, checked) =>
+                setSelectedOrderIds((prev) =>
+                  checked ? [...prev, id] : prev.filter((x) => x !== id),
+                )
+              }
+              onOpen={(id) => navigate({ to: `/admin/orders/${id}` as any })}
+            />
+          ))}
+        </div>
+      )}
+      {!isLoading && bucket !== "hot_orders" && groups.map(([day, items]) => (
         <div key={`m-g-${day}`} className="space-y-2">
           <div className="sticky top-0 z-10 bg-slate-900 text-white px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider rounded-lg shadow-xs">
             {formatDayHeader(day)}
