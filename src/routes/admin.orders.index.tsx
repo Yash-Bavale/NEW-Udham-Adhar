@@ -602,8 +602,9 @@ const colCount = 6 + (isAdmin ? 2 : 0) + (hideMoney ? 0 : 1);
 
 const groups = useMemo(() => {
   const g = new Map<string, any[]>();
+  const list = bucket === "needs_action" ? rows.filter((r) => !r.is_hot) : rows;
 
-  for (const r of rows) {
+  for (const r of list) {
     const rawKey =
       bucket === "completed"
         ? (r.completed_at || r.created_at)
@@ -617,6 +618,10 @@ const groups = useMemo(() => {
   }
 
   return Array.from(g.entries());
+}, [rows, bucket]);
+
+const hotRows = useMemo(() => {
+  return bucket === "needs_action" ? rows.filter((r) => r.is_hot) : [];
 }, [rows, bucket]);
 
   const isFilterActive =
@@ -1280,7 +1285,52 @@ return (
                   onOpen={(id) => navigate({ to: `/admin/orders/${id}` as any })}
                 />
               ))}
-            {!isLoading && bucket !== "hot_orders" && groups.map(([day, items]) => (
+            {!isLoading && bucket === "needs_action" && (
+              <>
+                {hotRows.map((r) => (
+                  <OrderRow
+                    key={r.id}
+                    order={r}
+                    bucket={bucket}
+                    hideMoney={hideMoney}
+                    isAdmin={isAdmin}
+                    selected={selectedOrderIds.includes(r.id)}
+                    onToggleSelect={(id, checked) =>
+                      setSelectedOrderIds((prev) =>
+                        checked ? [...prev, id] : prev.filter((x) => x !== id),
+                      )
+                    }
+                    onOpen={(id) => navigate({ to: `/admin/orders/${id}` as any })}
+                  />
+                ))}
+                {groups.map(([day, items]) => (
+                  <Fragment key={`g-${day}`}>
+                    <tr className="bg-slate-900 text-white border-b border-slate-800">
+                      <td colSpan={colCount} className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wider">
+                        {formatDayHeader(day)}
+                      </td>
+                    </tr>
+                    {items.map((r) => (
+                      <OrderRow
+                        key={r.id}
+                        order={r}
+                        bucket={bucket}
+                        hideMoney={hideMoney}
+                        isAdmin={isAdmin}
+                        selected={selectedOrderIds.includes(r.id)}
+                        onToggleSelect={(id, checked) =>
+                          setSelectedOrderIds((prev) =>
+                            checked ? [...prev, id] : prev.filter((x) => x !== id),
+                          )
+                        }
+                        onOpen={(id) => navigate({ to: `/admin/orders/${id}` as any })}
+                      />
+                    ))}
+                  </Fragment>
+                ))}
+              </>
+            )}
+            {!isLoading && bucket !== "hot_orders" && bucket !== "needs_action" && groups.map(([day, items]) => (
               <Fragment key={`g-${day}`}>
                 <tr className="bg-slate-900 text-white border-b border-slate-800">
                   <td colSpan={colCount} className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wider">
@@ -1342,7 +1392,52 @@ return (
           ))}
         </div>
       )}
-      {!isLoading && bucket !== "hot_orders" && groups.map(([day, items]) => (
+      {!isLoading && bucket === "needs_action" && (
+        <div className="space-y-2.5">
+          {hotRows.map((r) => (
+            <OrderCardMobile
+              key={r.id}
+              order={r}
+              bucket={bucket}
+              hideMoney={hideMoney}
+              isAdmin={isAdmin}
+              selected={selectedOrderIds.includes(r.id)}
+              onToggleSelect={(id, checked) =>
+                setSelectedOrderIds((prev) =>
+                  checked ? [...prev, id] : prev.filter((x) => x !== id),
+                )
+              }
+              onOpen={(id) => navigate({ to: `/admin/orders/${id}` as any })}
+            />
+          ))}
+          {groups.map(([day, items]) => (
+            <div key={`m-g-${day}`} className="space-y-2">
+              <div className="sticky top-0 z-10 bg-slate-900 text-white px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider rounded-lg shadow-xs">
+                {formatDayHeader(day)}
+              </div>
+              <div className="space-y-2.5">
+                {items.map((r) => (
+                  <OrderCardMobile
+                    key={r.id}
+                    order={r}
+                    bucket={bucket}
+                    hideMoney={hideMoney}
+                    isAdmin={isAdmin}
+                    selected={selectedOrderIds.includes(r.id)}
+                    onToggleSelect={(id, checked) =>
+                      setSelectedOrderIds((prev) =>
+                        checked ? [...prev, id] : prev.filter((x) => x !== id),
+                      )
+                    }
+                    onOpen={(id) => navigate({ to: `/admin/orders/${id}` as any })}
+                  />
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      {!isLoading && bucket !== "hot_orders" && bucket !== "needs_action" && groups.map(([day, items]) => (
         <div key={`m-g-${day}`} className="space-y-2">
           <div className="sticky top-0 z-10 bg-slate-900 text-white px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider rounded-lg shadow-xs">
             {formatDayHeader(day)}

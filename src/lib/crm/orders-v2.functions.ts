@@ -1877,7 +1877,22 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       filtered = filtered.filter((r) => r.in_range_created);
     }
 
-    if (bucket === "backlog" && (!normalized.sortField || normalized.sortField === "created_at")) {
+    if (bucket === "needs_action" && (!normalized.sortField || normalized.sortField === "created_at")) {
+      // Hot orders on TOP (oldest hot first), then regular orders (newest created first)
+      filtered.sort((a, b) => {
+        if (a.is_hot && !b.is_hot) return -1;
+        if (!a.is_hot && b.is_hot) return 1;
+        if (a.is_hot && b.is_hot) {
+          const hA = a.hot_started_at ? new Date(a.hot_started_at).getTime() : new Date(a.created_at).getTime();
+          const hB = b.hot_started_at ? new Date(b.hot_started_at).getTime() : new Date(b.created_at).getTime();
+          if (hA !== hB) return hA - hB;
+          return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+        }
+        const tA = new Date(a.created_at).getTime();
+        const tB = new Date(b.created_at).getTime();
+        return normalized.sortOrder === "asc" ? tA - tB : tB - tA;
+      });
+    } else if (bucket === "backlog" && (!normalized.sortField || normalized.sortField === "created_at")) {
       // Oldest created order first in backlog
       filtered.sort((a, b) => {
         const tA = new Date(a.created_at).getTime();
