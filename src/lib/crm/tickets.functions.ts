@@ -57,6 +57,7 @@ export const listTickets = createServerFn({ method: "POST" })
         page: z.number().int().min(1).default(1),
         pageSize: z.number().int().min(1).max(100).default(50),
         q: z.string().default(""),
+        bucket: z.enum(["all", "need_action", "reopened", "refund", "closed", "open", "new"]).optional(),
         status: z.enum(TICKET_STATUSES).optional(),
         statuses: z.array(z.enum(TICKET_STATUSES)).optional(),
         responseState: z.enum(RESPONSE_STATES).optional().default("all"),
@@ -77,10 +78,32 @@ export const listTickets = createServerFn({ method: "POST" })
     const from = (data.page - 1) * data.pageSize;
     const to = from + data.pageSize - 1;
 
+    // Filter by bucket if specified
+    let bucketTicketIds: string[] | null = null;
+    if (data.bucket === "reopened") {
+      const { data: replies } = await admin
+        .from("ticket_replies")
+        .select("ticket_id")
+        .or("direction.eq.reopened_order,reply_text.ilike.%reopened order%");
+      bucketTicketIds = Array.from(new Set((replies ?? []).map((r: any) => r.ticket_id).filter(Boolean)));
+      if (bucketTicketIds.length === 0) {
+        return { tickets: [], total: 0, page: data.page, pageSize: data.pageSize };
+      }
+    } else if (data.bucket === "refund") {
+      const { data: replies } = await admin
+        .from("ticket_replies")
+        .select("ticket_id")
+        .or("direction.eq.refund_rejected,reply_text.ilike.%refund%");
+      bucketTicketIds = Array.from(new Set((replies ?? []).map((r: any) => r.ticket_id).filter(Boolean)));
+      if (bucketTicketIds.length === 0) {
+        return { tickets: [], total: 0, page: data.page, pageSize: data.pageSize };
+      }
+    }
+
     let q = admin
       .from("support_tickets")
       .select(
-        `id, ticket_number, subject, description, status, priority, assigned_to, created_at, updated_at, 
+        `id, ticket_number, subject, description, status, priority, assigned_to, created_at, updated_at, closed_at, resolved_at,
          first_response_at, last_customer_message_at, last_staff_message_at, ticket_email, source,
          customer_id, application_id, service_id,
          customers(id, name, primary_email, primary_mobile),
@@ -89,8 +112,14 @@ export const listTickets = createServerFn({ method: "POST" })
         { count: "exact" }
       );
 
+    if (bucketTicketIds && bucketTicketIds.length > 0) {
+      q = q.in("id", bucketTicketIds);
+    }
+
     // Sorting
-    if (data.sort === "oldest") {
+    if (data.bucket === "closed") {
+      q = q.order("closed_at", { ascending: false, nullsFirst: false }).order("updated_at", { ascending: false });
+    } else if (data.sort === "oldest") {
       q = q.order("created_at", { ascending: true });
     } else if (data.sort === "updated") {
       q = q.order("updated_at", { ascending: false });
@@ -119,7 +148,11 @@ export const listTickets = createServerFn({ method: "POST" })
     }
 
     // Status filter
-    if (data.status) {
+    if (data.bucket === "need_action" || data.bucket === "open") {
+      q = q.not("status", "in", '("resolved","closed")');
+    } else if (data.bucket === "closed") {
+      q = q.in("status", ["resolved", "closed"]);
+    } else if (data.status) {
       q = q.eq("status", data.status);
     } else if (data.statuses && data.statuses.length) {
       q = q.in("status", data.statuses);
@@ -138,11 +171,13 @@ export const listTickets = createServerFn({ method: "POST" })
     // Date range filter
     if (data.dateFrom) {
       const fromIso = data.dateFrom.includes("T") ? data.dateFrom : `${data.dateFrom}T00:00:00+05:30`;
-      q = q.gte("created_at", new Date(fromIso).toISOString());
+      const dateField = data.bucket === "closed" ? "closed_at" : "created_at";
+      q = q.gte(dateField, new Date(fromIso).toISOString());
     }
     if (data.dateTo) {
       const toIso = data.dateTo.includes("T") ? data.dateTo : `${data.dateTo}T23:59:59+05:30`;
-      q = q.lte("created_at", new Date(toIso).toISOString());
+      const dateField = data.bucket === "closed" ? "closed_at" : "created_at";
+      q = q.lte(dateField, new Date(toIso).toISOString());
     }
 
     // Scope filter
@@ -312,10 +347,18 @@ export const getTicketStats = createServerFn({ method: "POST" })
   .handler(async () => {
     const admin = await getAdmin();
 
-    const [totalRes, closedRes, openRes, newRes, awaitingCustRes, activeRowsRes] = await Promise.all([
+    const istOffset = 5.5 * 3600 * 1000;
+    const nowUtc = Date.now();
+    const istNow = new Date(nowUtc + istOffset);
+    const todayStartUtc = new Date(Date.UTC(istNow.getUTCFullYear(), istNow.getUTCMonth(), istNow.getUTCDate(), 0, 0, 0) - istOffset).toISOString();
+
+    const [totalRes, closedRes, openRes, backlogRes, reopenedRepliesRes, refundRepliesRes, newRes, awaitingCustRes, activeRowsRes] = await Promise.all([
       admin.from("support_tickets").select("id", { count: "exact", head: true }),
       admin.from("support_tickets").select("id", { count: "exact", head: true }).in("status", ["resolved", "closed"]),
       admin.from("support_tickets").select("id", { count: "exact", head: true }).not("status", "in", '("resolved","closed")'),
+      admin.from("support_tickets").select("id", { count: "exact", head: true }).not("status", "in", '("resolved","closed")').lt("created_at", todayStartUtc),
+      admin.from("ticket_replies").select("ticket_id").or("direction.eq.reopened_order,reply_text.ilike.%reopened order%"),
+      admin.from("ticket_replies").select("ticket_id").or("direction.eq.refund_rejected,reply_text.ilike.%refund%"),
       admin.from("support_tickets").select("id", { count: "exact", head: true }).is("first_response_at", null).not("status", "in", '("resolved","closed")'),
       admin.from("support_tickets").select("id", { count: "exact", head: true }).eq("status", "waiting_customer"),
       admin.from("support_tickets").select("id, status, first_response_at, last_customer_message_at, last_staff_message_at").not("status", "in", '("resolved","closed")'),
@@ -324,8 +367,12 @@ export const getTicketStats = createServerFn({ method: "POST" })
     const total = totalRes.count ?? 0;
     const closedCount = closedRes.count ?? 0;
     const openCount = openRes.count ?? 0;
+    const backlogCount = backlogRes.count ?? 0;
     const newCount = newRes.count ?? 0;
     const awaitingCustomerCount = awaitingCustRes.count ?? 0;
+
+    const reopenedTicketIds = Array.from(new Set((reopenedRepliesRes.data ?? []).map((r: any) => r.ticket_id).filter(Boolean)));
+    const refundTicketIds = Array.from(new Set((refundRepliesRes.data ?? []).map((r: any) => r.ticket_id).filter(Boolean)));
 
     let unreadCount = 0;
     let awaitingActionCount = 0;
@@ -346,12 +393,16 @@ export const getTicketStats = createServerFn({ method: "POST" })
 
     return {
       total,
+      need_action: openCount,
+      open: openCount,
+      backlog: backlogCount,
+      reopened: reopenedTicketIds.length,
+      refund: refundTicketIds.length,
       new: newCount,
       unread: unreadCount,
       awaiting_action: awaitingActionCount,
       awaiting_customer: awaitingCustomerCount,
       replied: repliedCount,
-      open: openCount,
       closed: closedCount,
     };
   });

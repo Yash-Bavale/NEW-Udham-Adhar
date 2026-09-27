@@ -991,6 +991,77 @@ export const closeTicketReplyReasonT002 = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+// R002 — Refund Rejected / Closed
+export const closeTicketRefundR002 = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        ticketId: z.string().uuid(),
+        replyBody: z.string().optional(),
+        reasonLabel: z.string().max(200).optional(),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    const admin = await getAdmin();
+    const ticket = await loadTicket(data.ticketId);
+    const now = new Date().toISOString();
+
+    const replyText =
+      data.replyBody?.trim() ||
+      "Dear Customer,\n\nWe have thoroughly reviewed your refund request. As per our service terms and policy, this service has already been initiated/processed, and therefore your refund request cannot be approved at this stage.\n\nIf you have any further questions, please reply to this message.\n\nRegards,\nSupport Team";
+
+    const { data: replyRow, error: replyErr } = await admin.from("ticket_replies").insert({
+      ticket_id: ticket.id,
+      reply_text: replyText,
+      is_internal: false,
+      created_by: context.userId,
+      direction: "refund_rejected",
+    } as never).select("id").single();
+    if (replyErr) throw new Error(replyErr.message);
+
+    try {
+      await sendTicketTemplateEmail({
+        ticket,
+        code: BHS_EMAILS.R002_REFUND_REJECTED ?? "R002",
+        actorId: context.userId,
+        replyId: (replyRow as { id: string }).id,
+        extraVars: {
+          ticket_close_variant: "refund_rejected",
+          reason: data.reasonLabel ?? "Refund Request Reviewed & Closed",
+          selected_reason: data.reasonLabel ?? "Refund Request Reviewed & Closed",
+          employee_reply: replyText,
+          employee_remarks: replyText,
+          replyMessage: replyText,
+          followup_date: formatTicketDate(now),
+        },
+      });
+    } catch (mailErr) {
+      console.warn("[closeTicketRefundR002] email dispatch warning:", mailErr);
+    }
+
+    const patch: Record<string, unknown> = {
+      status: "closed",
+      resolved_at: now,
+      resolved_by: context.userId,
+      closed_at: now,
+      updated_at: now,
+      last_staff_message_at: now,
+    };
+    if (!ticket.first_response_at) patch.first_response_at = now;
+    await admin.from("support_tickets").update(patch as never).eq("id", ticket.id);
+
+    try {
+      const { cancelTicketAutocloseByTicket } = await import("@/lib/scheduling/schedulers.server");
+      await cancelTicketAutocloseByTicket(ticket.id, "closed_refund_r002");
+    } catch {
+      /* non-fatal */
+    }
+
+    return { ok: true };
+  });
+
 export const getTicketAttachmentUploadUrl = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) =>
@@ -1314,6 +1385,36 @@ export const makeOrderHotFromTicket = createServerFn({ method: "POST" })
           activity_type: "ticket_order_hot_escalated",
           activity_description: `Linked order was reopened and marked on HOT PRIORITY by ${staffName}${data.note ? ` (Note: ${data.note})` : ""}`,
         } as never);
+
+        // 8. Close the ticket and log internal note
+        const noteText = data.note
+          ? `Closed: Reopened order & prioritized as Hot Order. Note: ${data.note}`
+          : "Closed: Reopened order & prioritized as Hot Order";
+
+        await admin.from("ticket_replies").insert({
+          ticket_id: data.ticketId,
+          reply_text: noteText,
+          is_internal: true,
+          created_by: context.userId,
+          direction: "reopened_order",
+        } as never);
+
+        const patch: Record<string, unknown> = {
+          status: "closed",
+          resolved_at: now,
+          resolved_by: context.userId,
+          closed_at: now,
+          updated_at: now,
+          last_staff_message_at: now,
+        };
+        await admin.from("support_tickets").update(patch as never).eq("id", data.ticketId);
+
+        try {
+          const { cancelTicketAutocloseByTicket } = await import("@/lib/scheduling/schedulers.server");
+          await cancelTicketAutocloseByTicket(data.ticketId, "closed_reopened_hot");
+        } catch {
+          /* non-fatal */
+        }
       }
 
       // 7. Send notification to assigned employee

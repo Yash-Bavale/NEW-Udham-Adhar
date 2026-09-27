@@ -22,6 +22,7 @@ import {
 import {
   closeTicketNormalT001, closeTicketRestartT001,
   closeTicketConsultationT001, closeTicketReplyReasonT002,
+  closeTicketRefundR002,
   getTicketAttachmentUploadUrl, confirmTicketAttachment,
   makeOrderHotFromTicket,
 } from "@/lib/tickets/ticket-actions.functions";
@@ -180,6 +181,7 @@ function TicketWorkspace() {
   const closeRestart = useServerFn(closeTicketRestartT001);
   const closeConsult = useServerFn(closeTicketConsultationT001);
   const closeReply = useServerFn(closeTicketReplyReasonT002);
+  const closeRefund = useServerFn(closeTicketRefundR002);
 
   // Queries
   const { data, isLoading, isError, refetch } = useQuery({
@@ -627,6 +629,23 @@ function TicketWorkspace() {
     onError: (e: Error) => { toast.error(e.message); invalidate(); },
   });
 
+  const doCloseRefund = useMutation({
+    mutationFn: (v: { reasonLabel?: string; replyBody?: string }) =>
+      closeRefund({ data: { ticketId, reasonLabel: v.reasonLabel, replyBody: v.replyBody } }),
+    onMutate: () => {
+      setLocalTicketStatus("closed");
+    },
+    onSuccess: () => {
+      toast.success("R002 Refund Rejected email sent & ticket closed");
+      setReasonOpen(false);
+      invalidate();
+    },
+    onError: (e: Error) => {
+      toast.error(e.message);
+      invalidate();
+    },
+  });
+
   const doReopenOrder = useMutation({
     mutationFn: (orderId: string) => reopenOrderFn({ data: { orderId } }),
     onSuccess: () => {
@@ -817,12 +836,12 @@ function TicketWorkspace() {
               )}
             </div>
 
-            {/* Action Buttons: Close Ticket | TB01 | TB02 | Reopen */}
+            {/* Action Buttons: Close Ticket | TB01 | R002 Refund | Reopen & Hot */}
             <div className="flex items-center gap-2 flex-wrap">
               <button
                 onClick={() => doCloseNormal.mutate()}
                 disabled={isClosed || doCloseNormal.isPending}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs shrink-0"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs shrink-0 cursor-pointer"
               >
                 {doCloseNormal.isPending ? (
                   <Loader2 className="size-3.5 animate-spin" />
@@ -835,7 +854,7 @@ function TicketWorkspace() {
               <button
                 onClick={() => setConsultOpen(true)}
                 disabled={isClosed}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-blue-300 bg-blue-50 hover:bg-blue-100 text-blue-800 text-xs font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs shrink-0"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-blue-300 bg-blue-50 hover:bg-blue-100 text-blue-800 text-xs font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs shrink-0 cursor-pointer"
               >
                 <FileText className="size-3.5 text-blue-600" />
                 Consultation Completed (TB01)
@@ -844,10 +863,10 @@ function TicketWorkspace() {
               <button
                 onClick={() => setReasonOpen(true)}
                 disabled={isClosed}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-rose-300 bg-rose-50 hover:bg-rose-100 text-rose-800 text-xs font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs shrink-0"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-rose-300 bg-rose-50 hover:bg-rose-100 text-rose-800 text-xs font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs shrink-0 cursor-pointer"
               >
                 <Send className="size-3.5 text-rose-600" />
-                Reply &amp; Close (TB02)
+                Refund Reply &amp; Close (R002)
               </button>
 
               {Boolean(app.id) && (
@@ -855,25 +874,14 @@ function TicketWorkspace() {
                   onClick={() => setHotOrderModalOpen(true)}
                   disabled={doMakeHotOrder.isPending}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-rose-500/80 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-2xs shrink-0 cursor-pointer"
-                  title="Immediately escalate this linked order to Hot Priority (sounds alarm & moves to top)"
+                  title="Reopen order, escalate to Hot Priority (sounds alarm), and close ticket"
                 >
                   {doMakeHotOrder.isPending ? (
                     <Loader2 className="size-3.5 animate-spin" />
                   ) : (
                     <Flame className="size-3.5 text-amber-300 fill-amber-300" />
                   )}
-                  Make Hot Order 🔥
-                </button>
-              )}
-
-              {canReopenOrder && (
-                <button
-                  onClick={() => setReopenConfirm(true)}
-                  disabled={doReopenOrder.isPending}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs shrink-0"
-                >
-                  <RotateCcw className="size-3.5 text-slate-500" />
-                  Reopen Order
+                  Reopen &amp; Hot 🔥
                 </button>
               )}
             </div>
@@ -1709,14 +1717,15 @@ function TicketWorkspace() {
         />
       )}
 
-      {/* Reason Picker Dialog (TB02) */}
+      {/* Refund Reject Dialog (R002) */}
       {reasonOpen && (
-        <ReasonPickerDialog
+        <RefundRejectDialog
           onCancel={() => setReasonOpen(false)}
           onSend={(v) => {
             setReasonOpen(false);
-            doCloseReply.mutate(v);
+            doCloseRefund.mutate(v);
           }}
+          isPending={doCloseRefund.isPending}
         />
       )}
 
@@ -2604,53 +2613,116 @@ function ConsultDialog({
   );
 }
 
-function ReasonPickerDialog({
+function RefundRejectDialog({
   onCancel,
   onSend,
+  isPending,
 }: {
   onCancel: () => void;
-  onSend: (v: { reasonId: string | null; reasonLabel: string; replyBody: string }) => void;
+  onSend: (v: { reasonLabel: string; replyBody: string }) => void;
+  isPending?: boolean;
 }) {
-  const [reasonId, setReasonId] = useState<string | null>(null);
-  const [reasonLabel, setReasonLabel] = useState<string>("");
-  const [reply, setReply] = useState<string>("");
+  const [reasonLabel, setReasonLabel] = useState<string>("Refund Request Reviewed & Closed");
+  const [reply, setReply] = useState<string>(
+    "Dear Customer,\n\nWe have thoroughly reviewed your refund request. As per our service terms and policy, this service has already been initiated/processed, and therefore your refund request cannot be approved at this stage.\n\nIf you have any further questions, please reply to this message.\n\nRegards,\nSupport Team"
+  );
+
+  const presetReasons = [
+    "Service already initiated / processed with government portal",
+    "Application under active verification / processing",
+    "Customer requested cancellation post document submission",
+    "Non-refundable government statutory fee already incurred",
+  ];
 
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-2xs" onClick={onCancel}>
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg p-5 animate-in zoom-in-95 duration-100" onClick={(e) => e.stopPropagation()}>
-        <h3 className="text-base font-bold text-slate-900">Reply &amp; Close (TB02)</h3>
-        <p className="mt-1 text-xs text-slate-600 leading-relaxed">
-          Pick a reason. The TB02 email will be dispatched to the customer with your reply, and a 24-hour auto-close timer will be armed.
-        </p>
-        <div className="mt-4">
-          <ReasonPicker
-            value={reasonId}
-            onChange={(id, reason) => {
-              setReasonId(id);
-              setReasonLabel(reason?.label ?? "");
-            }}
-            reply={reply}
-            onReplyChange={setReply}
-          />
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg p-5 animate-in zoom-in-95 duration-100 flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 rounded-lg bg-rose-100 text-rose-600 shadow-2xs">
+              <Send className="size-4 text-rose-600" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-slate-900">Refund Reply &amp; Close (R002)</h3>
+              <p className="text-[11px] text-slate-500">
+                Sends R002 refund status email to the customer and closes this ticket under Refund KPI
+              </p>
+            </div>
+          </div>
+          <button onClick={onCancel} className="p-1 rounded-md text-slate-400 hover:text-slate-700 transition-colors">
+            <X className="size-4" />
+          </button>
         </div>
-        <div className="mt-4 flex justify-end gap-2">
-          <button onClick={onCancel} className="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-slate-700 hover:bg-slate-100">
+
+        {/* Content */}
+        <div className="py-3.5 space-y-3.5 text-xs">
+          {/* Reason Selection */}
+          <div className="space-y-1.5">
+            <label className="font-bold text-slate-800 text-xs">Rejection / Review Reason</label>
+            <input
+              type="text"
+              value={reasonLabel}
+              onChange={(e) => setReasonLabel(e.target.value)}
+              className="w-full text-xs p-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-rose-500"
+              placeholder="e.g. Service already initiated / processed"
+            />
+            <div className="flex flex-wrap gap-1.5 pt-1">
+              {presetReasons.map((preset, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => setReasonLabel(preset)}
+                  className="text-[10px] px-2 py-0.5 rounded-md bg-slate-100 hover:bg-rose-50 hover:text-rose-700 border border-slate-200 text-slate-600 transition-all text-left cursor-pointer"
+                >
+                  {preset}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Email Body */}
+          <div className="space-y-1.5">
+            <label className="font-bold text-slate-800 text-xs flex items-center justify-between">
+              <span>Customer Email Message (Standard R002)</span>
+              <span className="text-[10px] text-slate-400 font-normal">{reply.length} chars</span>
+            </label>
+            <textarea
+              value={reply}
+              onChange={(e) => setReply(e.target.value)}
+              rows={6}
+              className="w-full text-xs p-2.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-rose-500 font-sans leading-relaxed resize-none"
+            />
+          </div>
+        </div>
+
+        {/* Footer Actions */}
+        <div className="pt-3 border-t border-slate-100 flex justify-end gap-2">
+          <button onClick={onCancel} disabled={isPending} className="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-slate-700 hover:bg-slate-100 transition-colors disabled:opacity-50">
             Cancel
           </button>
           <button
-            onClick={() => onSend({ reasonId, reasonLabel, replyBody: reply })}
-            disabled={!reasonId || !reply.trim()}
-            className="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            onClick={() => onSend({ reasonLabel: reasonLabel.trim(), replyBody: reply.trim() })}
+            disabled={isPending || !reply.trim()}
+            className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
           >
-            Send &amp; Arm 24h Close
+            {isPending ? (
+              <>
+                <Loader2 className="size-3.5 animate-spin" />
+                <span>Sending &amp; Closing...</span>
+              </>
+            ) : (
+              <>
+                <Send className="size-3.5" />
+                <span>Send R002 &amp; Close Ticket</span>
+              </>
+            )}
           </button>
         </div>
       </div>
     </div>
   );
 }
-
-
 
 // ── Hot Order Escalation Modal with Custom Note for Assignee ────────────
 
@@ -2696,9 +2768,9 @@ function HotOrderModal({
               <Flame className="size-4 text-rose-600 fill-rose-600 animate-pulse" />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-slate-900">Escalate to Hot Order 🔥</h3>
+              <h3 className="text-sm font-bold text-slate-900">Reopen Order &amp; Escalate to Hot 🔥</h3>
               <p className="text-[11px] text-slate-500">
-                Moves order to the top of the Hot Orders queue with immediate sound alerts
+                Reopens the linked order, prioritizes it in Hot Orders with sound alerts, and closes this ticket
               </p>
             </div>
           </div>
@@ -2810,7 +2882,7 @@ function HotOrderModal({
             ) : (
               <>
                 <Flame className="size-3.5 fill-current" />
-                <span>Confirm &amp; Make Hot Order 🔥</span>
+                <span>Confirm &amp; Reopen Order Hot 🔥</span>
               </>
             )}
           </button>

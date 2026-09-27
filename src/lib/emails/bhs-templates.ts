@@ -39,6 +39,8 @@ export const BHS_EMAILS = {
   T003_TICKET_CLOSED: 'T003',
   /** R001 — Refund approved / processed. */
   R001_REFUND_PROCESSED: 'R001',
+  /** R002 — Refund rejected / closed. */
+  R002_REFUND_REJECTED: 'R002',
 
   // ── Backwards-compatible aliases (deprecated names still referenced in
   //    older call-sites). All resolve to the new canonical codes above.

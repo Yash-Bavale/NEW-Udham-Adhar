@@ -89,13 +89,14 @@ const RANGE_PRESETS: { value: RangePreset; label: string }[] = [
   { value: "custom", label: "Custom" },
 ];
 
-type Bucket = "all" | "open" | "new" | "closed";
+type Bucket = "all" | "need_action" | "reopened" | "refund" | "closed";
 
 const BUCKETS: { id: Bucket; label: string }[] = [
-  { id: "all",    label: "Total Tickets" },
-  { id: "open",   label: "Open Tickets" },
-  { id: "new",    label: "New" },
-  { id: "closed", label: "Closed" },
+  { id: "all",         label: "All Tickets" },
+  { id: "need_action", label: "Need Action" },
+  { id: "reopened",    label: "Reopened" },
+  { id: "refund",      label: "Refund" },
+  { id: "closed",      label: "Closed" },
 ];
 
 const STATUS_PILL: Record<TicketStatus, { bg: string; fg: string; border: string; label: string }> = {
@@ -243,7 +244,7 @@ function SupportTicketsOperationsPage() {
     return "today";
   });
 
-  const [bucket, setBucket] = useState<Bucket>("all");
+  const [bucket, setBucket] = useState<Bucket>("need_action");
   const [search, setSearch] = useState<string>(routeSearch.search ?? "");
   const [debouncedSearch, setDebouncedSearch] = useState<string>(routeSearch.search ?? "");
   const [statusFilter, setStatusFilter] = useState<string>(routeSearch.status ?? "all");
@@ -320,7 +321,7 @@ function SupportTicketsOperationsPage() {
   useEffect(() => {
     if (routeSearch.status) {
       if (routeSearch.status === "closed") setBucket("closed");
-      else if (routeSearch.status === "open") setBucket("open");
+      else if (routeSearch.status === "open" || routeSearch.status === "need_action") setBucket("need_action");
       else setStatusFilter(routeSearch.status);
     }
     if (routeSearch.responseState) setResponseStateFilter(routeSearch.responseState);
@@ -406,14 +407,18 @@ function SupportTicketsOperationsPage() {
       effectiveStatus = undefined;
       effectiveRespState = "all";
       effectiveDateFrom = dateFrom || undefined;
-    } else if (bucket === "open") {
+    } else if (bucket === "need_action") {
       effectiveStatuses = ["open", "in_progress", "waiting_customer"];
       effectiveRespState = "all";
-      effectiveDateFrom = undefined;
-    } else if (bucket === "new") {
-      effectiveRespState = "new";
+      effectiveDateFrom = undefined; // all open tickets till date
+    } else if (bucket === "reopened") {
       effectiveStatuses = undefined;
-      effectiveDateFrom = undefined;
+      effectiveRespState = "all";
+      effectiveDateFrom = dateFrom || undefined;
+    } else if (bucket === "refund") {
+      effectiveStatuses = undefined;
+      effectiveRespState = "all";
+      effectiveDateFrom = dateFrom || undefined;
     } else if (bucket === "closed") {
       effectiveStatuses = ["resolved", "closed"];
       effectiveDateFrom = dateFrom || undefined;
@@ -431,6 +436,7 @@ function SupportTicketsOperationsPage() {
       page,
       pageSize,
       q: debouncedSearch,
+      bucket,
       status: effectiveStatus,
       statuses: effectiveStatuses,
       responseState: effectiveRespState,
@@ -453,17 +459,18 @@ function SupportTicketsOperationsPage() {
   const tickets = data?.tickets ?? [];
   const total = data?.total ?? 0;
 
-  // Day grouping (similar to orders)
+  // Day grouping (by closed_at when bucket is closed, else by created_at)
   const groups = useMemo(() => {
     const map = new Map<string, typeof tickets>();
     for (const t of tickets) {
-      const key = istDateKey(new Date(t.created_at));
+      const dateVal = bucket === "closed" ? (t.closed_at || t.updated_at || t.created_at) : t.created_at;
+      const key = istDateKey(new Date(dateVal));
       const arr = map.get(key) ?? [];
       arr.push(t);
       map.set(key, arr);
     }
     return Array.from(map.entries()).sort((a, b) => b[0].localeCompare(a[0]));
-  }, [tickets]);
+  }, [tickets, bucket]);
 
   // Bulk mutations
   const assignMutation = useMutation({
@@ -507,7 +514,7 @@ function SupportTicketsOperationsPage() {
   });
 
   const handleResetFilters = () => {
-    setBucket("all");
+    setBucket("need_action");
     setSearch("");
     setDebouncedSearch("");
     setStatusFilter("all");
@@ -523,7 +530,7 @@ function SupportTicketsOperationsPage() {
   };
 
   const isFiltering =
-    bucket !== "all" ||
+    bucket !== "need_action" ||
     search !== "" ||
     statusFilter !== "all" ||
     responseStateFilter !== "all" ||
@@ -629,15 +636,26 @@ function SupportTicketsOperationsPage() {
         </div>
       </div>
 
-      {/* ── 2. Clickable KPI Stat Cards (Total, Open, New, Closed) ─────── */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
+      {/* ── 2. Clickable KPI Stat Cards (All Tickets, Need Action, Reopened, Refund, Closed) ─────── */}
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 pt-1">
         {BUCKETS.map((b) => {
           const active = bucket === b.id;
           let count = 0;
-          if (b.id === "all") count = statsData?.total ?? 0;
-          else if (b.id === "open") count = statsData?.open ?? 0;
-          else if (b.id === "new") count = statsData?.new ?? 0;
-          else if (b.id === "closed") count = statsData?.closed ?? 0;
+          let subBadge = "";
+
+          if (b.id === "all") {
+            count = statsData?.total ?? 0;
+          } else if (b.id === "need_action") {
+            count = statsData?.need_action ?? statsData?.open ?? 0;
+            const backlog = statsData?.backlog ?? 0;
+            if (backlog > 0) subBadge = `Backlog: ${backlog}`;
+          } else if (b.id === "reopened") {
+            count = statsData?.reopened ?? 0;
+          } else if (b.id === "refund") {
+            count = statsData?.refund ?? 0;
+          } else if (b.id === "closed") {
+            count = statsData?.closed ?? 0;
+          }
 
           // Distinct color themes per bucket
           const themeMap: Record<Bucket, { bg: string; border: string; activeBorder: string; text: string; countColor: string; icon: string }> = {
@@ -649,28 +667,36 @@ function SupportTicketsOperationsPage() {
               countColor: "text-slate-900",
               icon: "📁",
             },
-            open: {
+            need_action: {
               bg: "bg-blue-50/40 hover:bg-blue-50",
               border: "border-blue-100",
-              activeBorder: "ring-2 ring-blue-500 border-blue-400 bg-blue-50",
+              activeBorder: "ring-2 ring-blue-600 border-blue-500 bg-blue-50",
               text: "text-blue-700",
-              countColor: "text-blue-600",
+              countColor: "text-blue-700",
               icon: "📬",
             },
-            new: {
-              bg: "bg-rose-50/50 hover:bg-rose-50",
-              border: "border-rose-100",
-              activeBorder: "ring-2 ring-rose-500 border-rose-400 bg-rose-50",
-              text: "text-rose-700",
-              countColor: "text-rose-600",
-              icon: "🚨",
+            reopened: {
+              bg: "bg-violet-50/50 hover:bg-violet-50",
+              border: "border-violet-100",
+              activeBorder: "ring-2 ring-violet-600 border-violet-500 bg-violet-50",
+              text: "text-violet-700",
+              countColor: "text-violet-700",
+              icon: "🔥",
+            },
+            refund: {
+              bg: "bg-amber-50/50 hover:bg-amber-50",
+              border: "border-amber-100",
+              activeBorder: "ring-2 ring-amber-600 border-amber-500 bg-amber-50",
+              text: "text-amber-800",
+              countColor: "text-amber-800",
+              icon: "💳",
             },
             closed: {
               bg: "bg-emerald-50/40 hover:bg-emerald-50",
               border: "border-emerald-100",
-              activeBorder: "ring-2 ring-emerald-500 border-emerald-400 bg-emerald-50",
+              activeBorder: "ring-2 ring-emerald-600 border-emerald-500 bg-emerald-50",
               text: "text-emerald-700",
-              countColor: "text-emerald-600",
+              countColor: "text-emerald-700",
               icon: "✅",
             },
           };
@@ -697,8 +723,15 @@ function SupportTicketsOperationsPage() {
                 </span>
                 <span className="text-xs opacity-75">{theme.icon}</span>
               </div>
-              <div className={`text-xl font-extrabold tracking-tight ${theme.countColor}`}>
-                {count.toLocaleString("en-IN")}
+              <div className="flex items-baseline justify-between gap-1">
+                <div className={`text-xl font-extrabold tracking-tight ${theme.countColor}`}>
+                  {count.toLocaleString("en-IN")}
+                </div>
+                {subBadge && (
+                  <span className="text-[10px] font-bold text-amber-800 bg-amber-100/90 px-1.5 py-0.5 rounded-full border border-amber-200 truncate" title="Unresolved tickets created before today">
+                    {subBadge}
+                  </span>
+                )}
               </div>
             </button>
           );
@@ -991,7 +1024,7 @@ function SupportTicketsOperationsPage() {
                   />
                 </th>
                 <th className="text-left font-semibold px-3 py-2.5">Ticket #</th>
-                <th className="text-left font-semibold px-3 py-2.5">Created</th>
+                <th className="text-left font-semibold px-3 py-2.5">{bucket === "closed" ? "Closed Date" : "Created"}</th>
                 <th className="text-left font-semibold px-3 py-2.5">Customer</th>
                 <th className="text-left font-semibold px-3 py-2.5 min-w-[220px]">Subject</th>
                 <th className="text-left font-semibold px-3 py-2.5">Order & Service</th>
@@ -1049,6 +1082,7 @@ function SupportTicketsOperationsPage() {
                       <TicketTableRow
                         key={t.id}
                         ticket={t}
+                        bucket={bucket}
                         selected={selectedTicketIds.includes(t.id)}
                         onToggleSelect={(id, checked) =>
                           setSelectedTicketIds((prev) =>
@@ -1094,6 +1128,7 @@ function SupportTicketsOperationsPage() {
                   <TicketMobileCard
                     key={t.id}
                     ticket={t}
+                    bucket={bucket}
                     selected={selectedTicketIds.includes(t.id)}
                     onToggleSelect={(id, checked) =>
                       setSelectedTicketIds((prev) =>
@@ -1156,11 +1191,13 @@ function SupportTicketsOperationsPage() {
 
 function TicketTableRow({
   ticket,
+  bucket,
   selected,
   onToggleSelect,
   onOpen,
 }: {
   ticket: any;
+  bucket?: Bucket;
   selected?: boolean;
   onToggleSelect?: (id: string, checked: boolean) => void;
   onOpen: (id: string) => void;
@@ -1185,6 +1222,7 @@ function TicketTableRow({
   const stageTone = stageToneMap[stageMeta?.tone ?? "emerald"] ?? "bg-slate-100 text-slate-700 border-slate-200";
 
   const isUnreadOrNew = ticket.is_unread || ticket.is_new;
+  const displayDate = bucket === "closed" && ticket.closed_at ? ticket.closed_at : ticket.created_at;
 
   return (
     <tr
@@ -1228,18 +1266,18 @@ function TicketTableRow({
         </div>
       </td>
 
-      {/* Created */}
+      {/* Created / Closed Date */}
       <td className="px-3 py-2.5 text-[11px] text-slate-600 whitespace-nowrap leading-tight">
         <div className="flex items-center gap-1.5">
           <div>
-            <div>{formatIST(ticket.created_at, { dateOnly: true })}</div>
-            <div className="text-slate-400">{formatIST(ticket.created_at, { timeOnly: true })} IST</div>
+            <div>{formatIST(displayDate, { dateOnly: true })}</div>
+            <div className="text-slate-400">{formatIST(displayDate, { timeOnly: true })} IST</div>
           </div>
           <span
             className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-700 border border-slate-200"
-            title="Time since ticket created"
+            title={bucket === "closed" ? "Time since closed" : "Time since ticket created"}
           >
-            {formatAge(Date.now() - new Date(ticket.created_at).getTime())}
+            {formatAge(Date.now() - new Date(displayDate).getTime())}
           </span>
         </div>
       </td>
@@ -1374,11 +1412,13 @@ function TicketTableRow({
 
 function TicketMobileCard({
   ticket,
+  bucket,
   selected,
   onToggleSelect,
   onOpen,
 }: {
   ticket: any;
+  bucket?: Bucket;
   selected?: boolean;
   onToggleSelect?: (id: string, checked: boolean) => void;
   onOpen: (id: string) => void;
@@ -1386,6 +1426,7 @@ function TicketMobileCard({
   const statusPill = STATUS_PILL[ticket.status as TicketStatus] ?? STATUS_PILL.open;
   const priorityPill = PRIORITY_PILL[ticket.priority as TicketPriority] ?? PRIORITY_PILL.medium;
   const responseBadge = getResponseStateBadge(ticket);
+  const displayDate = bucket === "closed" && ticket.closed_at ? ticket.closed_at : ticket.created_at;
 
   return (
     <div
@@ -1413,7 +1454,7 @@ function TicketMobileCard({
           )}
         </div>
         <span className="text-[11px] text-slate-400">
-          {formatAge(Date.now() - new Date(ticket.created_at).getTime())}
+          {formatAge(Date.now() - new Date(displayDate).getTime())}
         </span>
       </div>
 
