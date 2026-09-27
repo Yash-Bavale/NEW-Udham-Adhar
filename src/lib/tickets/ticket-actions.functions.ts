@@ -179,43 +179,79 @@ async function sendTicketTemplateEmail(opts: {
     ? (thread.threadSubject.toLowerCase().startsWith("re:") ? thread.threadSubject : `Re: ${thread.threadSubject}`)
     : `Re: [#${ticketNumber}] ${opts.ticket.subject}`;
 
-  const { enqueueFromTemplateInternal } = await import("@/lib/emails/emails.server");
-  const result = await enqueueFromTemplateInternal(
-    opts.code,
-    recipient,
-    {
-      customer_name: cust.name,
-      customerName: cust.name,
-      customer_email: cust.email ?? "",
-      customerEmail: cust.email ?? "",
-      customer_mobile: cust.mobile ?? "",
-      customerMobile: cust.mobile ?? "",
-      ticket_number: ticketNumber,
-      ticketNumber,
-      ticket_subject: opts.ticket.subject,
-      ticketSubject: opts.ticket.subject,
-      closure_date: formatTicketDate(),
-      closureDate: formatTicketDate(),
-      fromName: `${actorName} · Business Help Services`,
-      executive_name: actorName,
-      ...(opts.extraVars ?? {}),
-    },
-    {
-      toName: cust.name,
-      applicationId: opts.ticket.application_id ?? undefined,
-      inReplyTo: thread.inReplyTo,
-      references: thread.references,
-      threadSubject: threadedSubject,
-      requireImmediateSuccess: true,
-      trigger: "manual",
-    },
-  );
+  const { enqueueFromTemplateInternal, enqueueEmailInternal } = await import("@/lib/emails/emails.server");
+  try {
+    const result = await enqueueFromTemplateInternal(
+      opts.code,
+      recipient,
+      {
+        customer_name: cust.name,
+        customerName: cust.name,
+        customer_email: cust.email ?? "",
+        customerEmail: cust.email ?? "",
+        customer_mobile: cust.mobile ?? "",
+        customerMobile: cust.mobile ?? "",
+        ticket_number: ticketNumber,
+        ticketNumber,
+        ticket_subject: opts.ticket.subject,
+        ticketSubject: opts.ticket.subject,
+        closure_date: formatTicketDate(),
+        closureDate: formatTicketDate(),
+        fromName: `${actorName} · Business Help Services`,
+        executive_name: actorName,
+        ...(opts.extraVars ?? {}),
+      },
+      {
+        toName: cust.name,
+        applicationId: opts.ticket.application_id ?? undefined,
+        inReplyTo: thread.inReplyTo,
+        references: thread.references,
+        threadSubject: threadedSubject,
+        requireImmediateSuccess: true,
+        trigger: "manual",
+      },
+    );
 
-  const queueId = (result as { queueId?: string | null } | undefined)?.queueId ?? null;
-  if (opts.replyId) {
-    await stampReplyEmailDelivery({ replyId: opts.replyId, queueId, inReplyTo: thread.inReplyTo });
+    const queueId = (result as { queueId?: string | null } | undefined)?.queueId ?? null;
+    if (opts.replyId) {
+      await stampReplyEmailDelivery({ replyId: opts.replyId, queueId, inReplyTo: thread.inReplyTo });
+    }
+    return { emailed: true, recipient, queueId };
+  } catch (templateErr) {
+    console.warn(`[tickets] template '${opts.code}' failed or not found in DB, falling back to direct email delivery:`, templateErr);
+    const fallbackMessage = String(
+      opts.extraVars?.replyMessage ||
+      opts.extraVars?.employee_reply ||
+      opts.extraVars?.employeeReply ||
+      opts.ticket.subject ||
+      "Support Ticket Update",
+    );
+    const isHtml = /<[a-z][\s\S]*>/i.test(fallbackMessage);
+    const bodyHtml = isHtml
+      ? `<div style="font-family:Arial,sans-serif;font-size:14px;line-height:1.6">${fallbackMessage}</div>`
+      : `<div style="font-family:Arial,sans-serif;font-size:14px;line-height:1.6">${escapeHtml(fallbackMessage).replace(/\n/g, "<br />")}</div>`;
+
+    const result = await enqueueEmailInternal({
+      toEmail: recipient,
+      toName: cust.name,
+      subject: threadedSubject,
+      bodyHtml,
+      bodyText: fallbackMessage,
+      applicationId: opts.ticket.application_id ?? undefined,
+      variables: {
+        __allow_without_template: true,
+        __in_reply_to: thread.inReplyTo,
+        __references: thread.references,
+      },
+      allowWithoutTemplate: true,
+      requireImmediateSuccess: true,
+    });
+    const queueId = (result as { queueId?: string | null } | undefined)?.queueId ?? null;
+    if (opts.replyId) {
+      await stampReplyEmailDelivery({ replyId: opts.replyId, queueId, inReplyTo: thread.inReplyTo });
+    }
+    return { emailed: true, recipient, queueId };
   }
-  return { emailed: true, recipient, queueId };
 }
 
 function escapeHtml(input: string) {
@@ -1021,25 +1057,13 @@ export const closeTicketRefundR002 = createServerFn({ method: "POST" })
     } as never).select("id").single();
     if (replyErr) throw new Error(replyErr.message);
 
-    try {
-      await sendTicketTemplateEmail({
-        ticket,
-        code: BHS_EMAILS.R002_REFUND_REJECTED ?? "R002",
-        actorId: context.userId,
-        replyId: (replyRow as { id: string }).id,
-        extraVars: {
-          ticket_close_variant: "refund_rejected",
-          reason: data.reasonLabel ?? "Refund Request Reviewed & Closed",
-          selected_reason: data.reasonLabel ?? "Refund Request Reviewed & Closed",
-          employee_reply: replyText,
-          employee_remarks: replyText,
-          replyMessage: replyText,
-          followup_date: formatTicketDate(now),
-        },
-      });
-    } catch (mailErr) {
-      console.warn("[closeTicketRefundR002] email dispatch warning:", mailErr);
-    }
+    // Send the real email to customer with threading and delivery log tracking
+    await sendTicketAdHocReply({
+      ticket,
+      actorId: context.userId,
+      replyId: (replyRow as { id: string }).id,
+      message: replyText,
+    });
 
     const patch: Record<string, unknown> = {
       status: "closed",
@@ -1057,6 +1081,24 @@ export const closeTicketRefundR002 = createServerFn({ method: "POST" })
       await cancelTicketAutocloseByTicket(ticket.id, "closed_refund_r002");
     } catch {
       /* non-fatal */
+    }
+
+    if (ticket.application_id) {
+      try {
+        const { dispatchEvent } = await import("@/lib/workflow/engine.server");
+        await dispatchEvent(
+          {
+            type: "TicketClosed",
+            applicationId: ticket.application_id,
+            ticketId: ticket.id,
+            outcome: "not_cooperating",
+            actorId: context.userId,
+          },
+          context.userId,
+        );
+      } catch (e) {
+        console.error("[workflow] TicketClosed dispatch failed", e);
+      }
     }
 
     return { ok: true };
