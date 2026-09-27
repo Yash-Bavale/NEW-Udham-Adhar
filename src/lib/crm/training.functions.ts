@@ -173,7 +173,7 @@ Before uploading the final PDF certificate:
     created_by_name: "Super Admin",
     created_at: "2026-09-06T14:00:00.000Z",
     updated_at: "2026-09-22T11:00:00.000Z",
-  }
+  },
 ];
 
 const STORAGE_BLOCK_KEY = "training_library_documents";
@@ -197,7 +197,6 @@ async function loadPersistedTrainingMaterials(admin: any): Promise<TrainingMater
 
 async function savePersistedTrainingMaterials(admin: any, list: TrainingMaterial[]): Promise<void> {
   try {
-    // Get existing site or default
     const { data: website } = await admin.from("websites").select("id").limit(1).maybeSingle();
     const websiteId = website?.id || "00000000-0000-0000-0000-000000000000";
 
@@ -210,6 +209,25 @@ async function savePersistedTrainingMaterials(admin: any, list: TrainingMaterial
   } catch (err) {
     console.error("Failed to save training materials to site_content_blocks:", err);
   }
+}
+
+async function attachSignedUrlIfNeeded(admin: any, item: TrainingMaterial): Promise<TrainingMaterial> {
+  if (!item.document_url) return item;
+
+  const docUrl = item.document_url;
+  // If it's a storage path or contains /documents/
+  if (docUrl.startsWith("training/") || docUrl.startsWith("documents/training/")) {
+    const path = docUrl.startsWith("documents/") ? docUrl.replace(/^documents\//, "") : docUrl;
+    try {
+      const { data: signed } = await admin.storage.from("documents").createSignedUrl(path, 60 * 60 * 24 * 7);
+      if (signed?.signedUrl) {
+        return { ...item, document_url: signed.signedUrl };
+      }
+    } catch {
+      // ignore error, keep original
+    }
+  }
+  return item;
 }
 
 // ── 1. List Training Materials (All Staff & Admins) ──
@@ -227,9 +245,9 @@ export const listTrainingMaterials = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const admin = await getAdmin();
     const isAdmin = await isUserAdmin(context.supabase, context.userId);
-    const materials = await loadPersistedTrainingMaterials(admin);
+    const rawMaterials = await loadPersistedTrainingMaterials(admin);
 
-    let result = materials;
+    let result = rawMaterials;
 
     // Non-admins can only see published materials
     if (!isAdmin && !data.includeDrafts) {
@@ -258,8 +276,10 @@ export const listTrainingMaterials = createServerFn({ method: "POST" })
       return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
     });
 
+    const enriched = await Promise.all(result.map((m) => attachSignedUrlIfNeeded(admin, m)));
+
     return {
-      materials: result,
+      materials: enriched,
       isAdmin,
       categories: [
         "All",
@@ -286,13 +306,14 @@ export const getTrainingMaterial = createServerFn({ method: "POST" })
     if (!item) throw new Error("Training material not found");
     if (!item.is_published && !isAdmin) throw new Error("Document is currently in draft");
 
-    return { material: item, isAdmin };
+    const enriched = await attachSignedUrlIfNeeded(admin, item);
+    return { material: enriched, isAdmin };
   });
 
 // ── 3. Create Training Material (Admin / SuperAdmin) ──
 const TrainingCreateSchema = z.object({
-  title: z.string().trim().min(3, "Title must be at least 3 characters").max(180),
-  description: z.string().trim().min(5, "Description is required").max(600),
+  title: z.string().trim().min(2, "Title must be at least 2 characters").max(200),
+  description: z.string().trim().max(1000).default(""),
   category: z.enum([
     "General SOPs",
     "Process & Portals",
@@ -302,8 +323,8 @@ const TrainingCreateSchema = z.object({
     "Scripts & Templates",
   ]),
   content_type: z.enum(["rich_text", "document", "external_link"]).default("rich_text"),
-  content: z.string().min(1, "Document content is required"),
-  document_url: z.string().url().nullable().optional(),
+  content: z.string().default(""),
+  document_url: z.string().nullable().optional(),
   file_name: z.string().nullable().optional(),
   file_size_bytes: z.number().nullable().optional(),
   tags: z.array(z.string()).default([]),
@@ -346,8 +367,8 @@ export const createTrainingMaterial = createServerFn({ method: "POST" })
 // ── 4. Update Training Material (Admin / SuperAdmin) ──
 const TrainingUpdateSchema = z.object({
   id: z.string(),
-  title: z.string().trim().min(3).max(180).optional(),
-  description: z.string().trim().min(5).max(600).optional(),
+  title: z.string().trim().min(2).max(200).optional(),
+  description: z.string().trim().max(1000).optional(),
   category: z.enum([
     "General SOPs",
     "Process & Portals",
@@ -358,7 +379,7 @@ const TrainingUpdateSchema = z.object({
   ]).optional(),
   content_type: z.enum(["rich_text", "document", "external_link"]).optional(),
   content: z.string().optional(),
-  document_url: z.string().url().nullable().optional(),
+  document_url: z.string().nullable().optional(),
   file_name: z.string().nullable().optional(),
   file_size_bytes: z.number().nullable().optional(),
   tags: z.array(z.string()).optional(),
@@ -408,7 +429,59 @@ export const deleteTrainingMaterial = createServerFn({ method: "POST" })
     return { success: true };
   });
 
-// ── 6. Request Signed Upload URL for Attachments / PDFs ──
+// ── 6. Direct Upload Training Document (PDF, Word, Images, etc.) ──
+export const uploadTrainingDocument = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        fileName: z.string().min(1),
+        fileBase64: z.string().min(1),
+        contentType: z.string().default("application/pdf"),
+      })
+      .parse(i)
+  )
+  .handler(async ({ data, context }) => {
+    const admin = await getAdmin();
+    const isAdmin = await isUserAdmin(context.supabase, context.userId);
+    if (!isAdmin) throw new Error("Forbidden: Only administrators can upload training documents.");
+
+    const safeName = data.fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
+    const filePath = `training/${Date.now()}-${safeName}`;
+
+    // Clean base64 header if present (e.g. data:application/pdf;base64,...)
+    const base64Data = data.fileBase64.includes(",")
+      ? data.fileBase64.split(",")[1]
+      : data.fileBase64;
+    const fileBuffer = Buffer.from(base64Data, "base64");
+
+    const { error: uploadError } = await admin.storage
+      .from("documents")
+      .upload(filePath, fileBuffer, {
+        contentType: data.contentType,
+        upsert: true,
+      });
+
+    if (uploadError) {
+      console.error("Storage upload failed:", uploadError);
+      throw new Error(`Failed to upload document: ${uploadError.message}`);
+    }
+
+    // Generate signed download URL (valid for 7 days)
+    const { data: signedData } = await admin.storage
+      .from("documents")
+      .createSignedUrl(filePath, 60 * 60 * 24 * 7);
+
+    return {
+      success: true,
+      filePath,
+      fileName: data.fileName,
+      fileSizeBytes: fileBuffer.length,
+      downloadUrl: signedData?.signedUrl || filePath,
+    };
+  });
+
+// ── 7. Request Signed Upload URL for Attachments / PDFs (Fallback) ──
 export const getTrainingDocUploadUrl = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) =>
@@ -428,12 +501,50 @@ export const getTrainingDocUploadUrl = createServerFn({ method: "POST" })
 
     if (error) throw new Error(error.message);
 
-    const { data: publicData } = admin.storage.from("documents").getPublicUrl(path);
+    const { data: signedView } = await admin.storage
+      .from("documents")
+      .createSignedUrl(path, 60 * 60 * 24 * 7);
 
     return {
       path,
       uploadUrl: signed.signedUrl,
       token: signed.token,
-      publicUrl: publicData.publicUrl,
+      downloadUrl: signedView?.signedUrl || path,
     };
+  });
+
+// ── 8. Resolve Fresh Signed Download URL on Demand ──
+export const getTrainingDocDownloadUrl = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z.object({ documentUrlOrPath: z.string().min(1) }).parse(i)
+  )
+  .handler(async ({ data }) => {
+    const admin = await getAdmin();
+    const target = data.documentUrlOrPath;
+
+    // If it's already an external HTTP/HTTPS URL not in Supabase storage, return as is
+    if (
+      target.startsWith("http://") ||
+      (target.startsWith("https://") &&
+        !target.includes("/storage/v1/object/") &&
+        !target.includes("supabase.co/storage"))
+    ) {
+      return { url: target };
+    }
+
+    let storagePath = target;
+    if (target.includes("/documents/")) {
+      storagePath = target.split("/documents/")[1].split("?")[0];
+    }
+
+    const { data: signed, error } = await admin.storage
+      .from("documents")
+      .createSignedUrl(storagePath, 60 * 60 * 24 * 7);
+
+    if (error || !signed?.signedUrl) {
+      return { url: target };
+    }
+
+    return { url: signed.signedUrl };
   });
