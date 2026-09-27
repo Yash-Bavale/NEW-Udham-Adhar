@@ -322,7 +322,7 @@ export const sendOrderTemplateEmail = createServerFn({ method: "POST" })
 
 const TemplateInput = z.object({
   id: z.string().uuid().optional(),
-  code: z.string().trim().min(2).max(80).regex(/^[a-z0-9_]+$/, "code must be lowercase a-z, 0-9, _"),
+  code: z.string().trim().min(2).max(80).regex(/^[a-zA-Z0-9_-]+$/, "code must contain only letters, numbers, hyphens or underscores"),
   name: z.string().trim().min(2).max(120),
   subject: z.string().trim().min(2).max(200),
   body_html: z.string().min(2).max(120_000),
