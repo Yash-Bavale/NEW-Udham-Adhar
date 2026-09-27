@@ -1521,9 +1521,21 @@ function OrderCardMobile({
               {order.ticket_source.ticketNumber ? `Ticket #${order.ticket_source.ticketNumber}` : "From Ticket"}
             </span>
           )}
-          {!isCompletedView && !isClosedView && (!order.fulfillment_status || order.fulfillment_status === "order_received") && (
-            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-800 border border-amber-200">
-              {formatOrderAge(Date.now() - new Date(order.created_at).getTime())}
+          {!isCompletedView && !isClosedView && !order.is_terminal && (
+            <span
+              className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-800 border border-amber-200"
+              title={
+                order.is_hot && (order as any).hot_started_at
+                  ? `Time since order became HOT / escalated: ${formatOrderAge(Date.now() - new Date((order as any).hot_started_at).getTime())}`
+                  : `Time since order created: ${formatOrderAge(Date.now() - new Date(order.created_at).getTime())}`
+              }
+            >
+              {formatOrderAge(
+                Date.now() -
+                  new Date(
+                    order.is_hot && (order as any).hot_started_at ? (order as any).hot_started_at : order.created_at
+                  ).getTime()
+              )}
             </span>
           )}
         </div>
@@ -1797,12 +1809,21 @@ function OrderRow({
             <div>{formatIST(dateToShow, { dateOnly: true })}</div>
             <div className="text-slate-400">{formatIST(dateToShow, { timeOnly: true })} IST</div>
           </div>
-          {!isCompletedView && !isClosedView && (!order.fulfillment_status || order.fulfillment_status === "order_received") && (
+          {!isCompletedView && !isClosedView && !order.is_terminal && (
             <span
               className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-800 border border-amber-200"
-              title="Time since order created — clears once first action is taken"
+              title={
+                order.is_hot && (order as any).hot_started_at
+                  ? `Time since order became HOT / escalated: ${formatOrderAge(Date.now() - new Date((order as any).hot_started_at).getTime())}`
+                  : `Time since order created: ${formatOrderAge(Date.now() - new Date(order.created_at).getTime())}`
+              }
             >
-              {formatOrderAge(Date.now() - new Date(order.created_at).getTime())}
+              {formatOrderAge(
+                Date.now() -
+                  new Date(
+                    order.is_hot && (order as any).hot_started_at ? (order as any).hot_started_at : order.created_at
+                  ).getTime()
+              )}
             </span>
           )}
         </div>

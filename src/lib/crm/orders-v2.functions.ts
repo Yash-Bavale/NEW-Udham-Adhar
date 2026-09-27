@@ -1180,6 +1180,20 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         );
 
       const is_hot = !isTerminal && (is_due || is_reopened);
+      let hot_started_at: string | null = null;
+      if (is_hot) {
+        if (is_reopened) {
+          const reopenEv = thisAppEvents.find(
+            (e) => e.event_type === "order_reopened" || e.event_type === "hot_priority_escalated"
+          );
+          hot_started_at = reopenEv?.created_at || a.updated_at || a.created_at;
+        } else if (cb) {
+          hot_started_at = cb.created_at || (cb.fires_at ? new Date(cb.fires_at).toISOString() : null) || a.updated_at || a.created_at;
+        } else {
+          hot_started_at = a.updated_at || a.created_at;
+        }
+      }
+
       const is_callback_scheduled = !isTerminal && !is_hot && !!cb && firesAtTime > now;
       const callback_reminder = !isTerminal && cb
         ? {
@@ -1662,6 +1676,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         assigned_name: staff ? (staff.display_name || staff.full_name || staff.email?.split("@")[0] || "Staff") : null,
         stage,
         is_hot,
+        hot_started_at,
         is_callback_scheduled,
         callback_reminder,
         ticket_source: (parsedRemarks?.reason === "ticket_hot_priority" || parsedRemarks?.ticketNumber || (cb as any)?.ticket_id)
@@ -1852,16 +1867,18 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
     }
 
     if (bucket === "backlog" && (!normalized.sortField || normalized.sortField === "created_at")) {
+      // Oldest created order first in backlog
       filtered.sort((a, b) => {
         const tA = new Date(a.created_at).getTime();
         const tB = new Date(b.created_at).getTime();
-        return normalized.sortOrder === "desc" ? tB - tA : tA - tB;
+        return tA - tB;
       });
     } else if (bucket === "hot_orders" && (!normalized.sortField || normalized.sortField === "created_at")) {
+      // Oldest HOT order first (the order waiting longest as HOT)
       filtered.sort((a, b) => {
-        const fA = a.callback_reminder?.fires_at ? new Date(a.callback_reminder.fires_at).getTime() : Infinity;
-        const fB = b.callback_reminder?.fires_at ? new Date(b.callback_reminder.fires_at).getTime() : Infinity;
-        if (fA !== fB) return fA - fB;
+        const hA = a.hot_started_at ? new Date(a.hot_started_at).getTime() : new Date(a.created_at).getTime();
+        const hB = b.hot_started_at ? new Date(b.hot_started_at).getTime() : new Date(b.created_at).getTime();
+        if (hA !== hB) return hA - hB;
         return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
       });
     } else if (bucket === "completed" && (!normalized.sortField || normalized.sortField === "created_at")) {
