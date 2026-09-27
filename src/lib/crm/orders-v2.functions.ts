@@ -1651,8 +1651,20 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       // Sort actionHistoryList newest to oldest
       actionHistoryList.sort((x, y) => new Date(y.created_at).getTime() - new Date(x.created_at).getTime());
 
-      const inRangeActionTaken = actionHistoryList.length > 0;
-      const actionCount = actionHistoryList.length;
+      const fsLower = String(a.fulfillment_status ?? "").toLowerCase();
+      const stageLower = String(stage ?? "").toLowerCase();
+      const isReopenedOrder =
+        stageLower === "order_reopened" ||
+        fsLower === "order_reopened" ||
+        String((a as any).workflow_status ?? "").toLowerCase() === "order_reopened" ||
+        String((a as any).order_status ?? "").toUpperCase() === "REOPENED" ||
+        String((a as any).application_status ?? "").toLowerCase() === "order_reopened" ||
+        Boolean(parsedRemarks?.reason === "ticket_hot_priority" || (cb as any)?.ticket_id) ||
+        Boolean(thisAppEvents.some((e) => (e.event_type === "hot_priority_escalated" || e.event_type === "order_reopened")));
+
+      // Reopened orders must NEVER show in Action Taken / pending
+      const inRangeActionTaken = !isReopenedOrder && actionHistoryList.length > 0;
+      const actionCount = isReopenedOrder ? 0 : actionHistoryList.length;
 
       return {
         id: a.id,

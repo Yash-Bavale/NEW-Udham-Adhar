@@ -1412,6 +1412,12 @@ return (
 }
 
 function OrderActionHistoryBadge({ order }: { order: any }) {
+  const isReopened =
+    order.stage === "order_reopened" ||
+    order.fulfillment_status === "order_reopened" ||
+    Boolean(order.ticket_source?.isReopenedFromTicket);
+  if (isReopened) return null;
+
   const history = order.action_history ?? [];
   const count = order.action_count ?? history.length;
   if (!count || count <= 0) return null;
