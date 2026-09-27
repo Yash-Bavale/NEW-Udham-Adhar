@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Search, ChevronLeft, ChevronRight, RotateCcw, X, Filter, Loader2,
   ArrowUpDown, ArrowUp, ArrowDown, Inbox, Plus, UserCheck, CheckCircle2,
@@ -32,6 +32,7 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { DateRangePicker } from "@/components/ui/DateRangePicker";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel,
 } from "@/components/ui/select";
@@ -76,6 +77,17 @@ export const Route = createFileRoute("/admin/support/tickets/")({
   }),
   component: SupportTicketsOperationsPage,
 });
+
+type RangePreset = "today" | "yesterday" | "7d" | "15d" | "30d" | "mtd" | "custom";
+const RANGE_PRESETS: { value: RangePreset; label: string }[] = [
+  { value: "today", label: "Today" },
+  { value: "yesterday", label: "Yesterday" },
+  { value: "7d", label: "7 days" },
+  { value: "15d", label: "15 days" },
+  { value: "30d", label: "30 days" },
+  { value: "mtd", label: "This month" },
+  { value: "custom", label: "Custom" },
+];
 
 type Bucket = "all" | "new" | "unread" | "awaiting_action" | "awaiting_customer" | "replied" | "open" | "closed";
 
@@ -225,6 +237,15 @@ function SupportTicketsOperationsPage() {
   const bulkReadFn = useServerFn(bulkMarkTicketsRead);
 
   const routeSearch = Route.useSearch();
+  const todayKey = useMemo(() => istDateKey(new Date()), []);
+
+  const [datePreset, setDatePreset] = useState<RangePreset>(() => {
+    if (routeSearch.preset && ["today", "yesterday", "7d", "15d", "30d", "mtd", "custom"].includes(routeSearch.preset)) {
+      return routeSearch.preset as RangePreset;
+    }
+    if (routeSearch.dateFrom && routeSearch.dateFrom !== istDateKey(new Date())) return "custom";
+    return "today";
+  });
 
   const [bucket, setBucket] = useState<Bucket>("all");
   const [search, setSearch] = useState<string>(routeSearch.search ?? "");
@@ -235,14 +256,63 @@ function SupportTicketsOperationsPage() {
   const [assignedTo, setAssignedTo] = useState<string>(routeSearch.assignedTo ?? "all");
   const [serviceId, setServiceId] = useState<string>(routeSearch.serviceId ?? "all");
   const [stageFilter, setStageFilter] = useState<string>(routeSearch.stage ?? "all");
-  const [dateFrom, setDateFrom] = useState<string>(routeSearch.dateFrom ?? "");
-  const [dateTo, setDateTo] = useState<string>(routeSearch.dateTo ?? "");
+  const [dateFrom, setDateFrom] = useState<string>(() => {
+    if (routeSearch.dateFrom) return routeSearch.dateFrom;
+    if (routeSearch.preset === "yesterday") return istDateKey(new Date(Date.now() - 86400000));
+    if (routeSearch.preset === "7d") return istDateKey(new Date(Date.now() - 6 * 86400000));
+    if (routeSearch.preset === "15d") return istDateKey(new Date(Date.now() - 14 * 86400000));
+    if (routeSearch.preset === "30d") return istDateKey(new Date(Date.now() - 29 * 86400000));
+    if (routeSearch.preset === "custom") return "";
+    return todayKey;
+  });
+  const [dateTo, setDateTo] = useState<string>(() => {
+    if (routeSearch.dateTo) return routeSearch.dateTo;
+    if (routeSearch.preset === "yesterday") return istDateKey(new Date(Date.now() - 86400000));
+    if (routeSearch.preset === "custom") return "";
+    return todayKey;
+  });
   const [sortField, setSortField] = useState<"last_activity" | "newest" | "oldest" | "highest_priority" | "unassigned" | "updated">("last_activity");
   const [page, setPage] = useState<number>(1);
   const pageSize = 50;
 
   const [selectedTicketIds, setSelectedTicketIds] = useState<string[]>([]);
   const [addTicketOpen, setAddTicketOpen] = useState(false);
+
+  const applyDatePreset = useCallback((p: RangePreset) => {
+    setDatePreset(p);
+    const now = new Date();
+    const tKey = istDateKey(now);
+    if (p === "today") {
+      setDateFrom(tKey);
+      setDateTo(tKey);
+    } else if (p === "yesterday") {
+      const yKey = istDateKey(new Date(now.getTime() - 86400000));
+      setDateFrom(yKey);
+      setDateTo(yKey);
+    } else if (p === "7d") {
+      const startKey = istDateKey(new Date(now.getTime() - 6 * 86400000));
+      setDateFrom(startKey);
+      setDateTo(tKey);
+    } else if (p === "15d") {
+      const startKey = istDateKey(new Date(now.getTime() - 14 * 86400000));
+      setDateFrom(startKey);
+      setDateTo(tKey);
+    } else if (p === "30d") {
+      const startKey = istDateKey(new Date(now.getTime() - 29 * 86400000));
+      setDateFrom(startKey);
+      setDateTo(tKey);
+    } else if (p === "mtd") {
+      const ist = new Date(now.getTime() + 5.5 * 3600 * 1000);
+      const monthStart = new Date(Date.UTC(ist.getUTCFullYear(), ist.getUTCMonth(), 1));
+      setDateFrom(istDateKey(monthStart));
+      setDateTo(tKey);
+    }
+  }, []);
+
+  const dateRangeValue = useMemo(() => ({
+    from: dateFrom ? new Date(dateFrom.includes("T") ? dateFrom : `${dateFrom}T00:00:00+05:30`) : undefined,
+    to: dateTo ? new Date(dateTo.includes("T") ? dateTo : `${dateTo}T23:59:59+05:30`) : undefined,
+  }), [dateFrom, dateTo]);
 
   // Debounce search
   useEffect(() => {
@@ -263,12 +333,12 @@ function SupportTicketsOperationsPage() {
     if (routeSearch.serviceId) setServiceId(routeSearch.serviceId);
     if (routeSearch.stage) setStageFilter(routeSearch.stage);
     if (routeSearch.search) setSearch(routeSearch.search);
-    if (routeSearch.preset === "today") {
-      const todayKey = istDateKey(new Date());
-      setDateFrom(todayKey);
-      setDateTo(todayKey);
+    if (routeSearch.preset && ["today", "yesterday", "7d", "15d", "30d", "mtd", "custom"].includes(routeSearch.preset)) {
+      applyDatePreset(routeSearch.preset as RangePreset);
     }
-  }, [routeSearch]);
+    if (routeSearch.dateFrom) setDateFrom(routeSearch.dateFrom);
+    if (routeSearch.dateTo) setDateTo(routeSearch.dateTo);
+  }, [routeSearch, applyDatePreset]);
 
   // Reset page when filters change
   useEffect(() => {
@@ -449,8 +519,7 @@ function SupportTicketsOperationsPage() {
     setAssignedTo("all");
     setServiceId("all");
     setStageFilter("all");
-    setDateFrom("");
-    setDateTo("");
+    applyDatePreset("today");
     setSortField("last_activity");
     setPage(1);
     setSelectedTicketIds([]);
@@ -465,40 +534,84 @@ function SupportTicketsOperationsPage() {
     assignedTo !== "all" ||
     serviceId !== "all" ||
     stageFilter !== "all" ||
-    dateFrom !== "" ||
-    dateTo !== "" ||
+    datePreset !== "today" ||
+    (dateFrom !== "" && dateFrom !== todayKey) ||
+    (dateTo !== "" && dateTo !== todayKey) ||
     sortField !== "last_activity";
 
   const colCount = 13;
 
   return (
     <div className="p-4 md:p-6 space-y-4 w-full min-w-0">
-      {/* ── 1. Top Header ───────────────────────────────────── */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      {/* ── 1. Top Header & Date Range Selector ─────────────── */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div className="flex items-center gap-3">
           <div className="p-2.5 rounded-xl bg-[#1e3a5f] text-white shadow-sm flex items-center justify-center">
             <Inbox className="h-6 w-6" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2.5">
-              Support / Tickets
-            </h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
+                Support / Tickets
+              </h1>
+              {isFetching && !isLoading && (
+                <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-600 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-full animate-pulse">
+                  <Loader2 className="size-3 animate-spin text-indigo-600" /> Updating…
+                </span>
+              )}
+            </div>
             <p className="text-xs text-slate-500 mt-0.5 font-normal">
-              Manage customer conversations, resolve issues and <span className="text-emerald-600 font-medium">deliver better support</span>.
+              Manage customer conversations, resolve issues and <span className="text-emerald-600 font-medium">deliver better support</span> · times in IST
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2.5">
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => invalidate()}
-            disabled={isFetching}
-            className="h-9 px-3.5 text-xs font-medium text-slate-700 bg-white border-slate-200 hover:bg-slate-50 shadow-2xs rounded-lg transition-all"
+        <div className="flex flex-wrap items-center gap-2">
+          <Tabs
+            value={datePreset}
+            onValueChange={(v) => applyDatePreset(v as RangePreset)}
           >
-            <RotateCcw className={`size-3.5 mr-1.5 ${isFetching ? "animate-spin" : ""}`} />
-            Refresh
+            <TabsList className="h-9">
+              {RANGE_PRESETS.map((p) => (
+                <TabsTrigger
+                  key={p.value}
+                  value={p.value}
+                  className="text-xs px-2.5"
+                >
+                  {p.label}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </Tabs>
+
+          {datePreset === "custom" && (
+            <DateRangePicker
+              value={dateRangeValue}
+              onChange={(range) => {
+                if (!range.from) {
+                  setDateFrom("");
+                  setDateTo("");
+                } else {
+                  setDateFrom(istDateKey(range.from));
+                  setDateTo(range.to ? istDateKey(range.to) : istDateKey(range.from));
+                }
+              }}
+            />
+          )}
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              invalidate();
+              toast.success("Refreshing tickets…");
+            }}
+            disabled={isFetching}
+            className="h-9 gap-1.5 text-xs text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 border-slate-200 shadow-2xs"
+            title="Refresh tickets"
+          >
+            <RotateCcw className={`size-3.5 ${isFetching && !isLoading ? "animate-spin text-indigo-600" : "text-slate-500"}`} />
+            <span>Refresh</span>
           </Button>
 
           <Button
@@ -509,6 +622,16 @@ function SupportTicketsOperationsPage() {
             <Plus className="size-3.5 mr-1.5" />
             New Ticket
           </Button>
+
+          {isFiltering && (
+            <button
+              type="button"
+              onClick={handleResetFilters}
+              className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg text-xs font-medium border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 transition-colors"
+            >
+              <RotateCcw className="size-3.5" /> Reset Filters
+            </button>
+          )}
         </div>
       </div>
 
@@ -725,36 +848,6 @@ function SupportTicketsOperationsPage() {
               <SelectItem value="closed">Closed</SelectItem>
             </SelectContent>
           </Select>
-
-          {/* Date Range Picker */}
-          <DateRangePicker
-            value={{
-              from: dateFrom ? new Date(dateFrom.includes("T") ? dateFrom : `${dateFrom}T00:00:00+05:30`) : undefined,
-              to: dateTo ? new Date(dateTo.includes("T") ? dateTo : `${dateTo}T23:59:59+05:30`) : undefined,
-            }}
-            onChange={(range) => {
-              if (!range.from) {
-                setDateFrom("");
-                setDateTo("");
-              } else {
-                setDateFrom(istDateKey(range.from));
-                setDateTo(range.to ? istDateKey(range.to) : istDateKey(range.from));
-              }
-              setPage(1);
-            }}
-          />
-
-          {/* Reset button */}
-          {isFiltering && (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={handleResetFilters}
-              className="h-9 px-3 text-xs text-slate-600 hover:text-slate-900 border-slate-200 hover:bg-slate-50"
-            >
-              <X className="size-3.5 mr-1 text-slate-400" /> Clear
-            </Button>
-          )}
         </div>
 
         {/* Row 2: Search, Sort & Counter / Pagination */}
