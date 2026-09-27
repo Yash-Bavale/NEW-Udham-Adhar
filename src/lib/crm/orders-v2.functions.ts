@@ -1651,7 +1651,6 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       // Sort actionHistoryList newest to oldest
       actionHistoryList.sort((x, y) => new Date(y.created_at).getTime() - new Date(x.created_at).getTime());
 
-      const fsLower = String(a.fulfillment_status ?? "").toLowerCase();
       const stageLower = String(stage ?? "").toLowerCase();
       const isReopenedOrder =
         stageLower === "order_reopened" ||
