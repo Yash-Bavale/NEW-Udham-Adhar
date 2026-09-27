@@ -129,7 +129,7 @@ function DonePage() {
                   <h3 className="text-sm font-semibold text-slate-800">Business Operating Hours</h3>
                   <div className="text-sm text-slate-600 mt-1 font-medium text-[#0f1f38]">
                     Monday – Saturday
-                    <div className="font-bold">10:00 AM – 7:00 PM IST</div>
+                    <div className="font-bold">10:00 AM – 6:00 PM IST</div>
                   </div>
                   <div className="mt-3 inline-flex items-center text-xs font-medium text-amber-800 bg-amber-50 border border-amber-200/60 px-2.5 py-0.5 rounded-md">
                     Sunday &amp; National Holidays: Closed
