@@ -268,7 +268,7 @@ function SupportTicketsOperationsPage() {
       sessionStorage.setItem("bhs_support_active_bucket", newBucket);
     } catch {}
     navigate({
-      search: (prev: any) => ({ ...prev, bucket: newBucket }),
+      search: ((prev: any) => ({ ...prev, bucket: newBucket })) as any,
       replace: true,
     });
   }, [navigate]);
@@ -490,7 +490,7 @@ function SupportTicketsOperationsPage() {
   const groups = useMemo(() => {
     const map = new Map<string, typeof tickets>();
     for (const t of tickets) {
-      const dateVal = bucket === "closed" ? (t.closed_at || t.updated_at || t.created_at) : t.created_at;
+      const dateVal = bucket === "closed" ? ((t as any).closed_at || t.updated_at || t.created_at) : t.created_at;
       const key = istDateKey(new Date(dateVal));
       const arr = map.get(key) ?? [];
       arr.push(t);

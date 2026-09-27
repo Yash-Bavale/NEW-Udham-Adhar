@@ -716,7 +716,8 @@ export async function enqueueFromTemplateInternal(
   const effectiveCode = resolved.code ?? code;
   const enriched = await backfillCommonVariables(rawVariables, opts?.leadId, opts?.applicationId);
   const variables = await enforceApplicationOrderNumber(withBothCases(enriched), opts?.leadId, opts?.applicationId);
-  let tpl: { subject: string; body_html: string | null; body_text?: string | null; is_enabled: boolean; dispatch_mode?: string } | null = null;
+  type Tpl = { subject: string; body_html: string | null; body_text?: string | null; is_enabled: boolean; dispatch_mode?: string };
+  let tpl: Tpl;
   const { data: dbTpl, error } = await supabaseAdmin
     .from("email_templates")
     .select("subject, body_html, body_text, is_enabled, dispatch_mode")
@@ -724,7 +725,7 @@ export async function enqueueFromTemplateInternal(
     .maybeSingle();
   if (error) throw new Error(error.message);
   if (dbTpl) {
-    tpl = dbTpl as typeof tpl;
+    tpl = dbTpl as Tpl;
   } else if (BUILTIN_TEMPLATES[effectiveCode]) {
     tpl = BUILTIN_TEMPLATES[effectiveCode];
   } else {
