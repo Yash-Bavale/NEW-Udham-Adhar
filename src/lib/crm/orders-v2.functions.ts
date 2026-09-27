@@ -1179,6 +1179,11 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
           (Boolean((a as any).closure_stage) && (a as any).closure_stage !== "none")
         );
 
+      const thisAppActionLogs = appActionLogsMap.get(a.id) ?? [];
+      const thisAppEvents = appEventsMap.get(a.id) ?? [];
+      const thisAppSchedulers = appSchedulersMap.get(a.id) ?? [];
+      const thisAppCerts = appCertsMap.get(a.id) ?? [];
+
       const is_hot = !isTerminal && (is_due || is_reopened);
       let hot_started_at: string | null = null;
       if (is_hot) {
@@ -1227,11 +1232,6 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         CLOSED_FS.has(String((a as any).order_status ?? "").toLowerCase()) ||
         CLOSED_FS.has(String((a as any).workflow_status ?? "").toLowerCase()) ||
         (Boolean((a as any).closure_stage) && (a as any).closure_stage !== "none");
-
-      const thisAppActionLogs = appActionLogsMap.get(a.id) ?? [];
-      const thisAppEvents = appEventsMap.get(a.id) ?? [];
-      const thisAppSchedulers = appSchedulersMap.get(a.id) ?? [];
-      const thisAppCerts = appCertsMap.get(a.id) ?? [];
 
       // ── 1. Determine exact completion timestamp & in_range_completed ──
       let compTimestamp: number | null = null;
