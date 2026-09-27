@@ -189,7 +189,7 @@ const BUCKET_CARDS: BucketCardItem[] = [
 
 const STAGE_FILTER_OPTIONS: Array<{ id: string; label: string; tone: string }> = [
   { id: "all", label: "All Stages", tone: "slate" },
-  { id: "payment_done", label: "Payment Done", tone: "emerald" },
+  { id: "payment_done", label: "Order Received", tone: "emerald" },
   { id: "form_not_submitted", label: "Form Not Submitted", tone: "amber" },
   { id: "order_reopened", label: "Order Reopened", tone: "violet" },
   { id: "form_submitted", label: "Form Submitted", tone: "indigo" },

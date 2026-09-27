@@ -194,7 +194,7 @@ export const STAGE_META: Record<
 > = {
   lead_received:     { label: "Lead Received",      short: "Lead",       order: 0, tone: "blue",    side: "customer" },
   payment_pending:   { label: "Payment Pending",    short: "Payment",    order: 1, tone: "amber",   side: "customer" },
-  payment_done:      { label: "Payment Done",       short: "Paid",       order: 2, tone: "emerald", side: "customer" },
+  payment_done:      { label: "Order Received",     short: "Order Recv", order: 2, tone: "emerald", side: "customer" },
   form_not_submitted: { label: "Form Not Submitted", short: "Form Pending", order: 3, tone: "amber", side: "customer" },
   order_reopened:    { label: "Order Reopened",     short: "Reopened",   order: 4, tone: "violet",  side: "employee" },
   customer_delay:    { label: "Customer Delay",     short: "Delay",      order: 4, tone: "amber",   side: "customer" },

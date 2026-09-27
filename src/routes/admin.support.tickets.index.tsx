@@ -119,7 +119,7 @@ const PRIORITY_PILL: Record<TicketPriority, { bg: string; fg: string; border: st
 
 const STAGE_FILTER_OPTIONS: Array<{ id: string; label: string }> = [
   { id: "all", label: "All Order Stages" },
-  { id: "payment_done", label: "Payment Done" },
+  { id: "payment_done", label: "Order Received" },
   { id: "form_not_submitted", label: "Form Not Submitted" },
   { id: "form_submitted", label: "Form Submitted" },
   { id: "technical_delay", label: "Technical Delay" },

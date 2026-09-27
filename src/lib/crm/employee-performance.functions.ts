@@ -183,7 +183,7 @@ const STAGE_DISPLAY_NAMES: Record<string, string> = {
   closed: "Order Closed",
   cancelled: "Order Cancelled",
   payment_pending: "Payment Pending",
-  payment_done: "Payment Done",
+  payment_done: "Order Received",
   order_reopened: "Order Reopened",
   new_lead: "New Lead",
   send_form_link: "Form Link Resent",
