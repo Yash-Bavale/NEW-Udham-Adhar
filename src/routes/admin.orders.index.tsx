@@ -1547,6 +1547,12 @@ function OrderCardMobile({
             </div>
           )}
           <span className="font-mono text-xs font-bold text-slate-900">{order.application_code}</span>
+          {order.ticket_source && (
+            <span className="inline-flex items-center gap-1 rounded bg-purple-50 text-purple-700 border border-purple-200 px-1.5 py-0.5 text-[9px] font-bold">
+              <LifeBuoy className="size-2.5 text-purple-600" />
+              {order.ticket_source.ticketNumber ? `Ticket #${order.ticket_source.ticketNumber}` : "From Ticket"}
+            </span>
+          )}
           {order.is_hot && (
             <span className="inline-flex items-center gap-1.5 flex-wrap">
               <span className="inline-flex items-center gap-1 rounded bg-rose-600 px-1.5 py-0.5 text-[9px] font-black uppercase text-white shadow-xs">
@@ -1560,12 +1566,6 @@ function OrderCardMobile({
                   {formatOrderAge(Date.now() - new Date((order as any).hot_started_at).getTime())}
                 </span>
               )}
-            </span>
-          )}
-          {order.ticket_source && (
-            <span className="inline-flex items-center gap-1 rounded bg-rose-50 text-rose-800 border border-rose-200 px-1.5 py-0.5 text-[9px] font-bold">
-              <LifeBuoy className="size-2.5 text-rose-600" />
-              {order.ticket_source.ticketNumber ? `Ticket #${order.ticket_source.ticketNumber}` : "From Ticket"}
             </span>
           )}
           {!isCompletedView && !isClosedView && !order.is_terminal && (
@@ -1823,30 +1823,30 @@ function OrderRow({
       {/* 1. Order # */}
       <td className="px-2 py-2.5 font-mono text-[12px] whitespace-nowrap">
         <div className="space-y-1">
-          <div className="font-bold text-slate-900">{order.application_code}</div>
-          <div className="flex items-center gap-1 flex-wrap">
-            {order.is_hot && (
-              <span className="inline-flex items-center gap-1.5 flex-wrap">
-                <span className="inline-flex items-center gap-1 rounded bg-rose-600 px-1.5 py-0.5 text-[9px] font-black uppercase text-white shadow-xs">
-                  <Flame className="size-2.5" /> HOT ORDER NOW
-                </span>
-                {(order as any).hot_started_at && (
-                  <span
-                    className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-800 border border-amber-200"
-                    title={`Time since order became HOT / escalated: ${formatOrderAge(Date.now() - new Date((order as any).hot_started_at).getTime())}`}
-                  >
-                    {formatOrderAge(Date.now() - new Date((order as any).hot_started_at).getTime())}
-                  </span>
-                )}
-              </span>
-            )}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="font-bold text-slate-900">{order.application_code}</span>
             {order.ticket_source && (
-              <span className="inline-flex items-center gap-1 rounded bg-rose-50 text-rose-800 border border-rose-200 px-1.5 py-0.5 text-[9px] font-bold">
-                <LifeBuoy className="size-2.5 text-rose-600" />
+              <span className="inline-flex items-center gap-1 rounded bg-purple-50 text-purple-700 border border-purple-200 px-1.5 py-0.5 text-[9px] font-bold">
+                <LifeBuoy className="size-2.5 text-purple-600" />
                 {order.ticket_source.ticketNumber ? `Ticket #${order.ticket_source.ticketNumber}` : "From Ticket"}
               </span>
             )}
           </div>
+          {order.is_hot && (
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="inline-flex items-center gap-1 rounded bg-rose-600 px-1.5 py-0.5 text-[9px] font-black uppercase text-white shadow-xs">
+                <Flame className="size-2.5" /> HOT ORDER NOW
+              </span>
+              {(order as any).hot_started_at && (
+                <span
+                  className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-800 border border-amber-200"
+                  title={`Time since order became HOT / escalated: ${formatOrderAge(Date.now() - new Date((order as any).hot_started_at).getTime())}`}
+                >
+                  {formatOrderAge(Date.now() - new Date((order as any).hot_started_at).getTime())}
+                </span>
+              )}
+            </div>
+          )}
         </div>
       </td>
 
