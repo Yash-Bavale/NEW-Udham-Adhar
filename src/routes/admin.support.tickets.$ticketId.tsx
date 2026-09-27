@@ -1455,7 +1455,7 @@ function TicketWorkspace() {
                 Order Information
               </h2>
             </div>
-            {app.id && (
+            {app?.id && (
               <Link
                 to="/admin/orders/$orderId"
                 params={{ orderId: app.id } as any}
@@ -1466,84 +1466,93 @@ function TicketWorkspace() {
             )}
           </div>
 
-          <div className="space-y-1.5 text-xs">
-            <div className="flex items-center justify-between gap-2 py-0.5">
-              <span className="text-slate-500 text-[11px]">Order No.</span>
-              {app.application_code ? (
+          {app?.id ? (
+            <div className="space-y-1.5 text-xs">
+              <div className="flex items-center justify-between gap-2 py-0.5">
+                <span className="text-slate-500 text-[11px]">Order No.</span>
                 <div className="flex items-center gap-1">
                   <Link
                     to="/admin/orders/$orderId"
                     params={{ orderId: app.id } as any}
                     className="font-mono font-bold text-blue-700 hover:underline text-[11px]"
                   >
-                    {app.application_code}
+                    {app.application_code || "—"}
                   </Link>
-                  <button
-                    onClick={() => {
-                      navigator.clipboard.writeText(app.application_code);
-                      toast.success("Order number copied");
-                    }}
-                    className="text-slate-400 hover:text-slate-700 p-0.5"
-                    title="Copy order number"
-                  >
-                    <Copy className="size-2.5" />
-                  </button>
+                  {app.application_code && (
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(app.application_code);
+                        toast.success("Order number copied");
+                      }}
+                      className="text-slate-400 hover:text-slate-700 p-0.5"
+                      title="Copy order number"
+                    >
+                      <Copy className="size-2.5" />
+                    </button>
+                  )}
                 </div>
-              ) : (
-                <span className="text-slate-400 italic text-[11px]">—</span>
-              )}
-            </div>
+              </div>
 
-            <div className="flex items-center justify-between gap-2 py-0.5">
-              <span className="text-slate-500 text-[11px]">Service</span>
-              <span className="font-medium text-slate-800 text-right truncate max-w-[170px] text-[11px]">
-                {serviceName}
-              </span>
-            </div>
-
-            <div className="flex items-center justify-between gap-2 py-0.5">
-              <span className="text-slate-500 text-[11px]">Order Date</span>
-              <span className="text-slate-700 text-right text-[11px]">
-                {ist(app.created_at || ticket.created_at)}
-              </span>
-            </div>
-
-            <div className="flex items-center justify-between gap-2 py-0.5">
-              <span className="text-slate-500 text-[11px]">Order Stage</span>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-50 text-amber-800 border border-amber-200 capitalize">
-                {app.fulfillment_status ? app.fulfillment_status.replace(/_/g, " ") : "Customer Delay"}
-              </span>
-            </div>
-
-            <div className="flex items-center justify-between gap-2 py-0.5">
-              <span className="text-slate-500 text-[11px]">Order Assignee</span>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 text-slate-700 border border-slate-200 flex items-center gap-1">
-                <User className="size-2.5 text-slate-400" />
-                <span>{ticket.executive_name || "Unassigned"}</span>
-              </span>
-            </div>
-
-            {Boolean(app.is_hot) ? (
-              <div className="flex items-center justify-between gap-2 py-1.5 px-2.5 rounded-lg bg-rose-50 border border-rose-200">
-                <span className="text-rose-700 text-[11px] font-bold flex items-center gap-1.5">
-                  <Flame className="size-3.5 text-rose-600 fill-rose-600 animate-pulse shrink-0" />
-                  🔥 Hot Priority Active
-                </span>
-                <span className="text-[10px] font-semibold text-rose-600 bg-rose-100/80 px-1.5 py-0.5 rounded uppercase tracking-wider">
-                  Needs Action
+              <div className="flex items-center justify-between gap-2 py-0.5">
+                <span className="text-slate-500 text-[11px]">Service</span>
+                <span className="font-medium text-slate-800 text-right truncate max-w-[170px] text-[11px]">
+                  {serviceName || "—"}
                 </span>
               </div>
-            ) : app.id ? (
-              <button
-                type="button"
-                onClick={() => setHotOrderModalOpen(true)}
-                className="w-full mt-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-[11px] font-semibold transition-all cursor-pointer shadow-2xs"
-              >
-                <Flame className="size-3 text-rose-600" />
-                <span>Escalate to Hot Order 🔥</span>
-              </button>
-            ) : null}
-          </div>
+
+              <div className="flex items-center justify-between gap-2 py-0.5">
+                <span className="text-slate-500 text-[11px]">Order Date</span>
+                <span className="text-slate-700 text-right text-[11px]">
+                  {ist(app.created_at || ticket.created_at)}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between gap-2 py-0.5">
+                <span className="text-slate-500 text-[11px]">Order Stage</span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-50 text-amber-800 border border-amber-200 capitalize">
+                  {app.fulfillment_status ? app.fulfillment_status.replace(/_/g, " ") : (app.order_status || "Processing")}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between gap-2 py-0.5">
+                <span className="text-slate-500 text-[11px]">Order Assignee</span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 text-slate-700 border border-slate-200 flex items-center gap-1">
+                  <User className="size-2.5 text-slate-400" />
+                  <span>{ticket.executive_name || "Unassigned"}</span>
+                </span>
+              </div>
+
+              {Boolean(app.is_hot) ? (
+                <div className="flex items-center justify-between gap-2 py-1.5 px-2.5 rounded-lg bg-rose-50 border border-rose-200">
+                  <span className="text-rose-700 text-[11px] font-bold flex items-center gap-1.5">
+                    <Flame className="size-3.5 text-rose-600 fill-rose-600 animate-pulse shrink-0" />
+                    🔥 Hot Priority Active
+                  </span>
+                  <span className="text-[10px] font-semibold text-rose-600 bg-rose-100/80 px-1.5 py-0.5 rounded uppercase tracking-wider">
+                    Needs Action
+                  </span>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setHotOrderModalOpen(true)}
+                  className="w-full mt-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-[11px] font-semibold transition-all cursor-pointer shadow-2xs"
+                >
+                  <Flame className="size-3 text-rose-600" />
+                  <span>Escalate to Hot Order 🔥</span>
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="py-3 px-2 text-center space-y-1">
+              <p className="text-xs font-semibold text-slate-600">
+                No order found for this ticket
+              </p>
+              <p className="text-[11px] text-slate-400">
+                No connected order is linked to this ticket.
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Card 3: Ticket Information */}

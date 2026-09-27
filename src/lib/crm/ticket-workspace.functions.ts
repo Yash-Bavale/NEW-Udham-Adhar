@@ -53,7 +53,7 @@ export const getTicketWorkspace = createServerFn({ method: "POST" })
       }
     }
 
-    // 3. Fetch linked or fallback application
+    // 3. Fetch linked application (Only if explicitly set on ticket)
     let applicationData: any = null;
     if (applicationId) {
       try {
@@ -65,23 +65,6 @@ export const getTicketWorkspace = createServerFn({ method: "POST" })
         applicationData = app;
       } catch (e) {
         console.warn("[getTicketWorkspace] application fetch warning:", e);
-      }
-    } else if (customerId) {
-      try {
-        const { data: latestApp } = await admin
-          .from("applications")
-          .select("id, application_code, order_status, fulfillment_status, assigned_to, created_at, service_id")
-          .eq("customer_id", customerId)
-          .eq("is_deleted", false)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        if (latestApp) {
-          applicationData = latestApp;
-          applicationId = latestApp.id;
-        }
-      } catch (e) {
-        console.warn("[getTicketWorkspace] fallback application fetch warning:", e);
       }
     }
 
