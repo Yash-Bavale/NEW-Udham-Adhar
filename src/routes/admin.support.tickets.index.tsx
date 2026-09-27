@@ -89,10 +89,11 @@ const RANGE_PRESETS: { value: RangePreset; label: string }[] = [
   { value: "custom", label: "Custom" },
 ];
 
-type Bucket = "all" | "new" | "closed";
+type Bucket = "all" | "open" | "new" | "closed";
 
 const BUCKETS: { id: Bucket; label: string }[] = [
   { id: "all",    label: "Total Tickets" },
+  { id: "open",   label: "Open Tickets" },
   { id: "new",    label: "New" },
   { id: "closed", label: "Closed" },
 ];
@@ -398,16 +399,24 @@ function SupportTicketsOperationsPage() {
     let effectiveStatus: TicketStatus | undefined = undefined;
     let effectiveStatuses: TicketStatus[] | undefined = undefined;
     let effectiveRespState: ResponseState = "all";
+    let effectiveDateFrom: string | undefined = dateFrom || undefined;
 
     if (bucket === "all") {
       effectiveStatuses = undefined;
       effectiveStatus = undefined;
       effectiveRespState = "all";
+      effectiveDateFrom = dateFrom || undefined;
+    } else if (bucket === "open") {
+      effectiveStatuses = ["open", "in_progress", "waiting_customer"];
+      effectiveRespState = "all";
+      effectiveDateFrom = undefined;
     } else if (bucket === "new") {
       effectiveRespState = "new";
       effectiveStatuses = undefined;
+      effectiveDateFrom = undefined;
     } else if (bucket === "closed") {
       effectiveStatuses = ["resolved", "closed"];
+      effectiveDateFrom = dateFrom || undefined;
     }
 
     if (statusFilter !== "all") {
@@ -429,7 +438,7 @@ function SupportTicketsOperationsPage() {
       assignedTo: assignedTo === "all" ? undefined : assignedTo,
       serviceId: serviceId === "all" ? undefined : serviceId,
       stage: stageFilter === "all" ? undefined : stageFilter,
-      dateFrom: dateFrom || undefined,
+      dateFrom: effectiveDateFrom,
       dateTo: dateTo || undefined,
       sort: sortField,
       scope: "all" as const,
@@ -620,12 +629,13 @@ function SupportTicketsOperationsPage() {
         </div>
       </div>
 
-      {/* ── 2. Clickable KPI Stat Cards (Total, New, Closed) ─────── */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
+      {/* ── 2. Clickable KPI Stat Cards (Total, Open, New, Closed) ─────── */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
         {BUCKETS.map((b) => {
           const active = bucket === b.id;
           let count = 0;
           if (b.id === "all") count = statsData?.total ?? 0;
+          else if (b.id === "open") count = statsData?.open ?? 0;
           else if (b.id === "new") count = statsData?.new ?? 0;
           else if (b.id === "closed") count = statsData?.closed ?? 0;
 
@@ -638,6 +648,14 @@ function SupportTicketsOperationsPage() {
               text: "text-slate-600",
               countColor: "text-slate-900",
               icon: "📁",
+            },
+            open: {
+              bg: "bg-blue-50/40 hover:bg-blue-50",
+              border: "border-blue-100",
+              activeBorder: "ring-2 ring-blue-500 border-blue-400 bg-blue-50",
+              text: "text-blue-700",
+              countColor: "text-blue-600",
+              icon: "📬",
             },
             new: {
               bg: "bg-rose-50/50 hover:bg-rose-50",
@@ -687,134 +705,112 @@ function SupportTicketsOperationsPage() {
         })}
       </div>
 
-      {/* ── 3. Filters Toolbar (Matching Mockup) ─────────────── */}
-      <div className="rounded-xl border border-slate-200 bg-white p-3.5 shadow-2xs space-y-3">
-        {/* Row 1: Dropdown Filters & Date Range */}
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Service Filter */}
-          <Select value={serviceId} onValueChange={(v) => { setServiceId(v); setPage(1); }}>
-            <SelectTrigger className="h-9 w-[160px] text-xs bg-slate-50/60 border-slate-200 hover:bg-slate-50 font-medium">
-              <SelectValue placeholder="All Services" />
-            </SelectTrigger>
-            <SelectContent className="max-h-[380px]">
-              <SelectItem value="all" className="font-bold text-slate-700">All Services</SelectItem>
-              {groupedServices.map((g) => (
-                <SelectGroup key={g.id}>
-                  <SelectLabel className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-indigo-700 bg-indigo-50/80 rounded-md my-1 flex items-center gap-1">
-                    🌐 {g.websiteName} {g.domain ? `(${g.domain})` : ""}
-                  </SelectLabel>
-                  {g.services.map((svc: any) => (
-                    <SelectItem key={svc.id} value={svc.id} className="pl-3 text-xs">
-                      {svc.service_name}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              ))}
-            </SelectContent>
-          </Select>
+      {/* ── 3. Filters Toolbar (Single Line Toolbar) ─────────────── */}
+      <div className="rounded-xl border border-slate-200 bg-white p-2.5 sm:p-3 shadow-2xs">
+        <div className="flex flex-wrap items-center justify-between gap-2.5">
+          {/* Filter Dropdowns + Sort in 1 line */}
+          <div className="flex flex-wrap items-center gap-2 flex-1 min-w-0">
+            {/* Service Filter */}
+            <Select value={serviceId} onValueChange={(v) => { setServiceId(v); setPage(1); }}>
+              <SelectTrigger className="h-8 w-[150px] text-xs bg-slate-50/60 border-slate-200 hover:bg-slate-50 font-medium">
+                <SelectValue placeholder="All Services" />
+              </SelectTrigger>
+              <SelectContent className="max-h-[380px]">
+                <SelectItem value="all" className="font-bold text-slate-700">All Services</SelectItem>
+                {groupedServices.map((g) => (
+                  <SelectGroup key={g.id}>
+                    <SelectLabel className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-indigo-700 bg-indigo-50/80 rounded-md my-1 flex items-center gap-1">
+                      🌐 {g.websiteName} {g.domain ? `(${g.domain})` : ""}
+                    </SelectLabel>
+                    {g.services.map((svc: any) => (
+                      <SelectItem key={svc.id} value={svc.id} className="pl-3 text-xs">
+                        {svc.service_name}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                ))}
+              </SelectContent>
+            </Select>
 
-          {/* Order Stage Filter */}
-          <Select value={stageFilter} onValueChange={(v) => { setStageFilter(v); setPage(1); }}>
-            <SelectTrigger className="h-9 w-[150px] text-xs bg-slate-50/60 border-slate-200 hover:bg-slate-50 font-medium">
-              <SelectValue placeholder="All Order Stages" />
-            </SelectTrigger>
-            <SelectContent>
-              {STAGE_FILTER_OPTIONS.map((st) => (
-                <SelectItem key={st.id} value={st.id}>
-                  {st.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            {/* Order Stage Filter */}
+            <Select value={stageFilter} onValueChange={(v) => { setStageFilter(v); setPage(1); }}>
+              <SelectTrigger className="h-8 w-[145px] text-xs bg-slate-50/60 border-slate-200 hover:bg-slate-50 font-medium">
+                <SelectValue placeholder="All Order Stages" />
+              </SelectTrigger>
+              <SelectContent>
+                {STAGE_FILTER_OPTIONS.map((st) => (
+                  <SelectItem key={st.id} value={st.id}>
+                    {st.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
-          {/* Priority Filter */}
-          <Select value={priorityFilter} onValueChange={(v) => { setPriorityFilter(v); setPage(1); }}>
-            <SelectTrigger className="h-9 w-[130px] text-xs bg-slate-50/60 border-slate-200 hover:bg-slate-50 font-medium">
-              <SelectValue placeholder="All Priorities" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Priorities</SelectItem>
-              {PRIORITIES.map((p) => (
-                <SelectItem key={p} value={p}>
-                  {PRIORITY_PILL[p].label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            {/* Priority Filter */}
+            <Select value={priorityFilter} onValueChange={(v) => { setPriorityFilter(v); setPage(1); }}>
+              <SelectTrigger className="h-8 w-[125px] text-xs bg-slate-50/60 border-slate-200 hover:bg-slate-50 font-medium">
+                <SelectValue placeholder="All Priorities" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Priorities</SelectItem>
+                {PRIORITIES.map((p) => (
+                  <SelectItem key={p} value={p}>
+                    {PRIORITY_PILL[p].label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
-          {/* Ticket Status Filter */}
-          <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setPage(1); }}>
-            <SelectTrigger className="h-9 w-[135px] text-xs bg-slate-50/60 border-slate-200 hover:bg-slate-50 font-medium">
-              <SelectValue placeholder="All Statuses" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Statuses</SelectItem>
-              {TICKET_STATUSES.map((s) => (
-                <SelectItem key={s} value={s}>
-                  {STATUS_PILL[s].label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            {/* Ticket Status Filter */}
+            <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setPage(1); }}>
+              <SelectTrigger className="h-8 w-[130px] text-xs bg-slate-50/60 border-slate-200 hover:bg-slate-50 font-medium">
+                <SelectValue placeholder="All Statuses" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Statuses</SelectItem>
+                {TICKET_STATUSES.map((s) => (
+                  <SelectItem key={s} value={s}>
+                    {STATUS_PILL[s].label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
-          {/* Assigned Staff Filter */}
-          <Select value={assignedTo} onValueChange={(v) => { setAssignedTo(v); setPage(1); }}>
-            <SelectTrigger className="h-9 w-[135px] text-xs bg-slate-50/60 border-slate-200 hover:bg-slate-50 font-medium">
-              <SelectValue placeholder="All Staff" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Staff</SelectItem>
-              <SelectItem value="unassigned">❌ Unassigned</SelectItem>
-              {staffProfiles.map((s: any) => (
-                <SelectItem key={s.id} value={s.id}>
-                  👤 {s.display_name || s.name || s.email}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            {/* Assigned Staff Filter */}
+            <Select value={assignedTo} onValueChange={(v) => { setAssignedTo(v); setPage(1); }}>
+              <SelectTrigger className="h-8 w-[130px] text-xs bg-slate-50/60 border-slate-200 hover:bg-slate-50 font-medium">
+                <SelectValue placeholder="All Staff" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Staff</SelectItem>
+                <SelectItem value="unassigned">❌ Unassigned</SelectItem>
+                {staffProfiles.map((s: any) => (
+                  <SelectItem key={s.id} value={s.id}>
+                    👤 {s.display_name || s.name || s.email}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
-          {/* Response State Filter */}
-          <Select value={responseStateFilter} onValueChange={(v) => { setResponseStateFilter(v); setPage(1); }}>
-            <SelectTrigger className="h-9 w-[145px] text-xs bg-slate-50/60 border-slate-200 hover:bg-slate-50 font-medium">
-              <SelectValue placeholder="All Responses" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Responses</SelectItem>
-              <SelectItem value="new">NEW (Unreplied)</SelectItem>
-              <SelectItem value="unread">Unread by Staff</SelectItem>
-              <SelectItem value="awaiting_action">Awaiting Action</SelectItem>
-              <SelectItem value="awaiting_customer">Awaiting Customer</SelectItem>
-              <SelectItem value="replied">Staff Replied</SelectItem>
-              <SelectItem value="closed">Closed</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* Row 2: Search, Sort & Counter / Pagination */}
-        <div className="flex flex-wrap items-center justify-between gap-3 pt-1 border-t border-slate-100">
-          <div className="flex items-center gap-2 flex-1 min-w-[280px]">
-            {/* Search Box */}
-            <div className="relative flex-1 max-w-md">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
-              <Input
-                value={search}
-                onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-                placeholder="Search ticket, customer, email, mobile, order no, subject…"
-                className="h-8 pl-8 pr-8 text-xs bg-slate-50/50 border-slate-200 focus:bg-white rounded-lg"
-              />
-              {search && (
-                <button
-                  onClick={() => { setSearch(""); setPage(1); }}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                >
-                  <X className="size-3.5" />
-                </button>
-              )}
-            </div>
+            {/* Response State Filter */}
+            <Select value={responseStateFilter} onValueChange={(v) => { setResponseStateFilter(v); setPage(1); }}>
+              <SelectTrigger className="h-8 w-[140px] text-xs bg-slate-50/60 border-slate-200 hover:bg-slate-50 font-medium">
+                <SelectValue placeholder="All Responses" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Responses</SelectItem>
+                <SelectItem value="new">NEW (Unreplied)</SelectItem>
+                <SelectItem value="unread">Unread by Staff</SelectItem>
+                <SelectItem value="awaiting_action">Awaiting Action</SelectItem>
+                <SelectItem value="awaiting_customer">Awaiting Customer</SelectItem>
+                <SelectItem value="replied">Staff Replied</SelectItem>
+                <SelectItem value="closed">Closed</SelectItem>
+              </SelectContent>
+            </Select>
 
             {/* Sort Selector */}
             <Select value={sortField} onValueChange={(v: any) => setSortField(v)}>
-              <SelectTrigger className="h-8 w-[165px] text-xs bg-slate-50/50 border-slate-200 rounded-lg">
+              <SelectTrigger className="h-8 w-[155px] text-xs bg-slate-50/60 border-slate-200 hover:bg-slate-50 font-medium">
                 <ArrowUpDown className="w-3.5 h-3.5 mr-1 text-slate-500 shrink-0" />
                 <SelectValue placeholder="Sort order" />
               </SelectTrigger>
@@ -829,9 +825,9 @@ function SupportTicketsOperationsPage() {
             </Select>
           </div>
 
-          {/* Ticket Count & Compact Pagination */}
-          <div className="flex items-center gap-3 text-xs text-slate-500">
-            <span className="font-semibold text-slate-700">
+          {/* Right End: Ticket Count & Compact Pagination */}
+          <div className="flex items-center gap-3 text-xs text-slate-500 shrink-0 ml-auto">
+            <span className="font-semibold text-slate-700 whitespace-nowrap">
               {total.toLocaleString("en-IN")} {total === 1 ? "ticket" : "tickets"}
             </span>
 
