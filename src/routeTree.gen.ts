@@ -92,6 +92,7 @@ import { Route as AdminSettingsRouteImport } from './routes/admin.settings'
 import { Route as AdminSubmissionsRouteImport } from './routes/admin.submissions'
 import { Route as AdminSuperRouteImport } from './routes/admin.super'
 import { Route as AdminTasksRouteImport } from './routes/admin.tasks'
+import { Route as AdminTrainingRouteImport } from './routes/admin.training'
 import { Route as AdminUsersRouteImport } from './routes/admin.users'
 import { Route as AdminWebsitesRouteImport } from './routes/admin.websites'
 import { Route as AdminWhatsappTemplatesRouteImport } from './routes/admin.whatsapp-templates'
@@ -580,6 +581,11 @@ const AdminTasksRoute = AdminTasksRouteImport.update({
   path: '/tasks',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminTrainingRoute = AdminTrainingRouteImport.update({
+  id: '/training',
+  path: '/training',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminUsersRoute = AdminUsersRouteImport.update({
   id: '/users',
   path: '/users',
@@ -1013,6 +1019,7 @@ export interface FileRoutesByFullPath {
   '/admin/submissions': typeof AdminSubmissionsRouteWithChildren
   '/admin/super': typeof AdminSuperRoute
   '/admin/tasks': typeof AdminTasksRoute
+  '/admin/training': typeof AdminTrainingRoute
   '/admin/users': typeof AdminUsersRoute
   '/admin/websites': typeof AdminWebsitesRoute
   '/admin/whatsapp-templates': typeof AdminWhatsappTemplatesRoute
@@ -1158,6 +1165,7 @@ export interface FileRoutesByTo {
   '/admin/submissions': typeof AdminSubmissionsRouteWithChildren
   '/admin/super': typeof AdminSuperRoute
   '/admin/tasks': typeof AdminTasksRoute
+  '/admin/training': typeof AdminTrainingRoute
   '/admin/users': typeof AdminUsersRoute
   '/admin/websites': typeof AdminWebsitesRoute
   '/admin/whatsapp-templates': typeof AdminWhatsappTemplatesRoute
@@ -1307,6 +1315,7 @@ export interface FileRoutesById {
   '/admin/submissions': typeof AdminSubmissionsRouteWithChildren
   '/admin/super': typeof AdminSuperRoute
   '/admin/tasks': typeof AdminTasksRoute
+  '/admin/training': typeof AdminTrainingRoute
   '/admin/users': typeof AdminUsersRoute
   '/admin/websites': typeof AdminWebsitesRoute
   '/admin/whatsapp-templates': typeof AdminWhatsappTemplatesRoute
@@ -1458,6 +1467,7 @@ export interface FileRouteTypes {
     | '/admin/submissions'
     | '/admin/super'
     | '/admin/tasks'
+    | '/admin/training'
     | '/admin/users'
     | '/admin/websites'
     | '/admin/whatsapp-templates'
@@ -1603,6 +1613,7 @@ export interface FileRouteTypes {
     | '/admin/submissions'
     | '/admin/super'
     | '/admin/tasks'
+    | '/admin/training'
     | '/admin/users'
     | '/admin/websites'
     | '/admin/whatsapp-templates'
@@ -1751,6 +1762,7 @@ export interface FileRouteTypes {
     | '/admin/submissions'
     | '/admin/super'
     | '/admin/tasks'
+    | '/admin/training'
     | '/admin/users'
     | '/admin/websites'
     | '/admin/whatsapp-templates'
@@ -2488,6 +2500,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminTasksRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/training': {
+      id: '/admin/training'
+      path: '/training'
+      fullPath: '/admin/training'
+      preLoaderRoute: typeof AdminTrainingRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/users': {
       id: '/admin/users'
       path: '/users'
@@ -3096,6 +3115,7 @@ interface AdminRouteChildren {
   AdminSubmissionsRoute: typeof AdminSubmissionsRouteWithChildren
   AdminSuperRoute: typeof AdminSuperRoute
   AdminTasksRoute: typeof AdminTasksRoute
+  AdminTrainingRoute: typeof AdminTrainingRoute
   AdminUsersRoute: typeof AdminUsersRoute
   AdminWebsitesRoute: typeof AdminWebsitesRoute
   AdminWhatsappTemplatesRoute: typeof AdminWhatsappTemplatesRoute
@@ -3147,6 +3167,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminSubmissionsRoute: AdminSubmissionsRouteWithChildren,
   AdminSuperRoute: AdminSuperRoute,
   AdminTasksRoute: AdminTasksRoute,
+  AdminTrainingRoute: AdminTrainingRoute,
   AdminUsersRoute: AdminUsersRoute,
   AdminWebsitesRoute: AdminWebsitesRoute,
   AdminWhatsappTemplatesRoute: AdminWhatsappTemplatesRoute,
