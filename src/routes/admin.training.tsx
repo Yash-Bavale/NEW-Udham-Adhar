@@ -1,13 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { toast } from "sonner";
 import {
   GraduationCap, BookOpen, FileText, Search, Plus, Trash2, Edit3,
   Pin, ExternalLink, Download, CheckCircle2, Eye, Tag, Sparkles,
   Clock, User, ShieldCheck, ChevronRight, X, Loader2, ArrowUpRight,
-  BookMarked, HelpCircle, Layers, FileCheck, RefreshCw, Upload, File
+  BookMarked, HelpCircle, Layers, FileCheck, RefreshCw, Upload, File,
+  Maximize2
 } from "lucide-react";
 import {
   listTrainingMaterials,
@@ -109,6 +110,38 @@ function TrainingPage() {
 
   // Active Reader Document
   const [activeReadingDoc, setActiveReadingDoc] = useState<TrainingMaterial | null>(null);
+  const [resolvedDocViewUrl, setResolvedDocViewUrl] = useState<string | null>(null);
+  const [loadingDocView, setLoadingDocView] = useState(false);
+
+  // Resolve signed download/view URL when active reading doc changes
+  useEffect(() => {
+    if (!activeReadingDoc?.document_url) {
+      setResolvedDocViewUrl(null);
+      setLoadingDocView(false);
+      return;
+    }
+
+    let isMounted = true;
+    setLoadingDocView(true);
+    getDownloadUrlFn({ data: { documentUrlOrPath: activeReadingDoc.document_url } })
+      .then((res) => {
+        if (isMounted) {
+          setResolvedDocViewUrl(res?.url || activeReadingDoc.document_url || null);
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          setResolvedDocViewUrl(activeReadingDoc.document_url || null);
+        }
+      })
+      .finally(() => {
+        if (isMounted) setLoadingDocView(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [activeReadingDoc?.id, activeReadingDoc?.document_url]);
 
   // Edit / Create Dialog State
   const [editorOpen, setEditorOpen] = useState(false);
@@ -227,19 +260,6 @@ function TrainingPage() {
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }
-    }
-  };
-
-  const handleOpenDocument = async (docUrl: string, fileName?: string | null) => {
-    try {
-      const res = await getDownloadUrlFn({ data: { documentUrlOrPath: docUrl } });
-      if (res?.url) {
-        window.open(res.url, "_blank", "noopener,noreferrer");
-      } else {
-        window.open(docUrl, "_blank", "noopener,noreferrer");
-      }
-    } catch {
-      window.open(docUrl, "_blank", "noopener,noreferrer");
     }
   };
 
@@ -477,7 +497,6 @@ function TrainingPage() {
                 isAdmin={isAdmin}
                 onRead={() => setActiveReadingDoc(item)}
                 onEdit={() => openEditModal(item)}
-                onOpenDoc={() => item.document_url && handleOpenDocument(item.document_url, item.file_name)}
                 onDelete={() => {
                   if (confirm(`Are you sure you want to delete "${item.title}"?`)) {
                     deleteMutation.mutate(item.id);
@@ -506,7 +525,6 @@ function TrainingPage() {
                 isAdmin={isAdmin}
                 onRead={() => setActiveReadingDoc(item)}
                 onEdit={() => openEditModal(item)}
-                onOpenDoc={() => item.document_url && handleOpenDocument(item.document_url, item.file_name)}
                 onDelete={() => {
                   if (confirm(`Are you sure you want to delete "${item.title}"?`)) {
                     deleteMutation.mutate(item.id);
@@ -518,13 +536,13 @@ function TrainingPage() {
         </div>
       )}
 
-      {/* ── Document Reader Modal ── */}
+      {/* ── Document Reader Modal with In-App Preview ── */}
       <Dialog open={!!activeReadingDoc} onOpenChange={(open) => !open && setActiveReadingDoc(null)}>
-        <DialogContent className="max-w-3xl max-h-[88vh] overflow-y-auto p-0 bg-white rounded-2xl shadow-2xl border border-slate-200">
+        <DialogContent className="max-w-5xl w-[96vw] max-h-[92vh] overflow-y-auto p-0 bg-white rounded-2xl shadow-2xl border border-slate-200">
           {activeReadingDoc && (
             <div>
               {/* Reader Header */}
-              <div className="p-6 bg-gradient-to-b from-slate-50 to-white border-b border-slate-100 space-y-3">
+              <div className="p-5 sm:p-6 bg-gradient-to-b from-slate-50 to-white border-b border-slate-100 space-y-3">
                 <div className="flex items-center justify-between gap-2">
                   <span className={cn("text-[10px] font-bold px-2.5 py-0.5 rounded-full border", CATEGORY_STYLES[activeReadingDoc.category]?.badge)}>
                     {activeReadingDoc.category}
@@ -541,7 +559,7 @@ function TrainingPage() {
                 </DialogTitle>
 
                 {activeReadingDoc.description && (
-                  <p className="text-xs text-slate-600 leading-relaxed">
+                  <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
                     {activeReadingDoc.description}
                   </p>
                 )}
@@ -559,30 +577,59 @@ function TrainingPage() {
               </div>
 
               {/* Reader Body Content */}
-              <div className="p-6 space-y-6">
-                {/* External Document / PDF Download Banner if present */}
+              <div className="p-5 sm:p-6 space-y-6">
+                {/* Embedded In-App PDF / Document Viewer Preview */}
                 {activeReadingDoc.document_url && (
-                  <div className="p-4 rounded-xl border border-indigo-200 bg-indigo-50/60 flex items-center justify-between gap-3 shadow-xs">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2.5 rounded-lg bg-indigo-600 text-white shadow-2xs">
-                        <FileText className="size-5" />
+                  <div className="rounded-xl border border-slate-300 overflow-hidden bg-slate-900 shadow-md">
+                    {/* Viewer Toolbar Header */}
+                    <div className="flex items-center justify-between px-4 py-2.5 bg-slate-950 text-white text-xs border-b border-slate-800">
+                      <div className="flex items-center gap-2 truncate pr-2">
+                        <FileText className="size-4 text-indigo-400 shrink-0" />
+                        <span className="font-semibold text-slate-200 truncate">
+                          {activeReadingDoc.file_name || "Attached Training Document / PDF"}
+                        </span>
                       </div>
-                      <div>
-                        <div className="text-xs font-bold text-indigo-950">
-                          {activeReadingDoc.file_name || "Official PDF / Training Attachment"}
-                        </div>
-                        <div className="text-[10px] text-indigo-700">
-                          Click below to open and view the full document
-                        </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        {resolvedDocViewUrl && (
+                          <a
+                            href={resolvedDocViewUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs transition-colors shadow-2xs"
+                          >
+                            <ExternalLink className="size-3.5" /> Open in New Tab
+                          </a>
+                        )}
                       </div>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => handleOpenDocument(activeReadingDoc.document_url!, activeReadingDoc.file_name)}
-                      className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-xs transition-colors cursor-pointer"
-                    >
-                      <Download className="size-3.5" /> View / Download File
-                    </button>
+
+                    {/* In-Modal Viewer Canvas */}
+                    {loadingDocView ? (
+                      <div className="h-[550px] flex flex-col items-center justify-center bg-slate-900 text-slate-400 space-y-3">
+                        <Loader2 className="size-8 animate-spin text-indigo-500" />
+                        <p className="text-xs font-medium">Loading document viewer…</p>
+                      </div>
+                    ) : resolvedDocViewUrl ? (
+                      activeReadingDoc.file_name?.match(/\.(png|jpe?g|webp|gif)$/i) ? (
+                        <div className="p-4 bg-slate-950 flex items-center justify-center min-h-[400px]">
+                          <img
+                            src={resolvedDocViewUrl}
+                            alt={activeReadingDoc.title}
+                            className="max-h-[650px] max-w-full rounded-lg object-contain"
+                          />
+                        </div>
+                      ) : (
+                        <iframe
+                          src={`${resolvedDocViewUrl}#toolbar=1&navpanes=0`}
+                          title={activeReadingDoc.title}
+                          className="w-full h-[600px] sm:h-[680px] border-0 bg-white"
+                        />
+                      )
+                    ) : (
+                      <div className="h-[200px] flex items-center justify-center bg-slate-900 text-slate-400 text-xs">
+                        Unable to load document preview.
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -613,21 +660,23 @@ function TrainingPage() {
                   onClick={() => setActiveReadingDoc(null)}
                   className="text-xs font-semibold cursor-pointer"
                 >
-                  Close
+                  Close Document
                 </Button>
 
-                {isAdmin && (
-                  <Button
-                    onClick={() => {
-                      const doc = activeReadingDoc;
-                      setActiveReadingDoc(null);
-                      openEditModal(doc);
-                    }}
-                    className="gap-1.5 text-xs font-bold cursor-pointer"
-                  >
-                    <Edit3 className="size-3.5" /> Edit Document
-                  </Button>
-                )}
+                <div className="flex items-center gap-2">
+                  {isAdmin && (
+                    <Button
+                      onClick={() => {
+                        const doc = activeReadingDoc;
+                        setActiveReadingDoc(null);
+                        openEditModal(doc);
+                      }}
+                      className="gap-1.5 text-xs font-bold cursor-pointer"
+                    >
+                      <Edit3 className="size-3.5" /> Edit Document
+                    </Button>
+                  )}
+                </div>
               </div>
             </div>
           )}
@@ -853,14 +902,12 @@ function TrainingCard({
   isAdmin,
   onRead,
   onEdit,
-  onOpenDoc,
   onDelete,
 }: {
   item: TrainingMaterial;
   isAdmin: boolean;
   onRead: () => void;
   onEdit: () => void;
-  onOpenDoc: () => void;
   onDelete: () => void;
 }) {
   const catStyle = CATEGORY_STYLES[item.category] ?? CATEGORY_STYLES["General SOPs"];
