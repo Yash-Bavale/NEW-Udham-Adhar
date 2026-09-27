@@ -35,17 +35,137 @@ export const getTicketWorkspace = createServerFn({ method: "POST" })
     }
 
     const t = ticket as any;
-    const customerId = t.customer_id as string | null;
+    let customerId = t.customer_id as string | null;
     let applicationId = t.application_id as string | null;
 
-    // 2. Fetch customer details
+    // 2. Order Resolution & Self-Healing (If unlinked, extract AP code from subject/body/sender)
+    if (!applicationId) {
+      try {
+        const { extractOrderCodes } = await import("@/lib/mail/email-normalizer");
+        const { applicationCode, leadCode } = extractOrderCodes(t.subject, t.description);
+        if (applicationCode) {
+          const { data: foundApp } = await admin
+            .from("applications")
+            .select("id, application_code, order_status, fulfillment_status, assigned_to, created_at, service_id, customer_id, lead_id, is_hot")
+            .eq("application_code", applicationCode)
+            .maybeSingle();
+          if (foundApp) {
+            applicationId = (foundApp as any).id;
+            if (!customerId && (foundApp as any).customer_id) {
+              customerId = (foundApp as any).customer_id;
+            }
+            // Auto-heal support_tickets in database so subsequent loads are instant
+            await admin
+              .from("support_tickets")
+              .update({
+                application_id: applicationId,
+                customer_id: customerId || (foundApp as any).customer_id || null,
+                is_unlinked: false,
+                order_link_status: "linked",
+              } as never)
+              .eq("id", data.ticketId);
+          }
+        } else if (leadCode) {
+          const { data: foundLead } = await admin
+            .from("leads")
+            .select("id, customer_id")
+            .eq("lead_code", leadCode)
+            .maybeSingle();
+          if (foundLead) {
+            const { data: foundApp } = await admin
+              .from("applications")
+              .select("id, application_code, order_status, fulfillment_status, assigned_to, created_at, service_id, customer_id, lead_id, is_hot")
+              .eq("lead_id", (foundLead as any).id)
+              .order("created_at", { ascending: false })
+              .limit(1)
+              .maybeSingle();
+            if (foundApp) {
+              applicationId = (foundApp as any).id;
+              if (!customerId) customerId = (foundApp as any).customer_id || (foundLead as any).customer_id;
+              await admin
+                .from("support_tickets")
+                .update({
+                  application_id: applicationId,
+                  customer_id: customerId,
+                  is_unlinked: false,
+                  order_link_status: "linked",
+                } as never)
+                .eq("id", data.ticketId);
+            }
+          }
+        } else if (t.ticket_email) {
+          const { data: matchedLead } = await admin
+            .from("leads")
+            .select("id, customer_id")
+            .eq("email", t.ticket_email.trim().toLowerCase())
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          if (matchedLead) {
+            const { data: foundApp } = await admin
+              .from("applications")
+              .select("id, application_code, order_status, fulfillment_status, assigned_to, created_at, service_id, customer_id, lead_id, is_hot")
+              .eq("lead_id", (matchedLead as any).id)
+              .order("created_at", { ascending: false })
+              .limit(1)
+              .maybeSingle();
+            if (foundApp) {
+              applicationId = (foundApp as any).id;
+              if (!customerId) customerId = (foundApp as any).customer_id || (matchedLead as any).customer_id;
+              await admin
+                .from("support_tickets")
+                .update({
+                  application_id: applicationId,
+                  customer_id: customerId,
+                  is_unlinked: false,
+                  order_link_status: "linked",
+                } as never)
+                .eq("id", data.ticketId);
+            }
+          }
+        }
+      } catch (e) {
+        console.warn("[getTicketWorkspace] auto-heal order linking warning:", e);
+      }
+    }
+
+    // 3. Fetch linked application and associated lead
+    let applicationData: any = null;
+    let leadData: any = null;
+    if (applicationId) {
+      try {
+        const { data: app } = await admin
+          .from("applications")
+          .select("id, application_code, order_status, fulfillment_status, assigned_to, created_at, service_id, lead_id, customer_id, is_hot")
+          .eq("id", applicationId)
+          .maybeSingle();
+        applicationData = app;
+
+        if (app?.lead_id) {
+          const { data: lead } = await admin
+            .from("leads")
+            .select("id, name, email, mobile, service, total_amount, lead_code")
+            .eq("id", app.lead_id)
+            .maybeSingle();
+          leadData = lead;
+        }
+        if (!customerId && app?.customer_id) {
+          customerId = app.customer_id;
+        }
+      } catch (e) {
+        console.warn("[getTicketWorkspace] application fetch warning:", e);
+      }
+    }
+
+    // 4. Fetch customer details
     let customerData: any = null;
-    if (customerId) {
+    const effectiveCustomerId = customerId || applicationData?.customer_id;
+    if (effectiveCustomerId) {
       try {
         const { data: cust } = await admin
           .from("customers")
           .select("id, name, primary_email, primary_mobile, state, language, created_at, lifetime_value, total_applications, completed_applications")
-          .eq("id", customerId)
+          .eq("id", effectiveCustomerId)
           .maybeSingle();
         customerData = cust;
       } catch (e) {
@@ -53,22 +173,36 @@ export const getTicketWorkspace = createServerFn({ method: "POST" })
       }
     }
 
-    // 3. Fetch linked application (Only if explicitly set on ticket)
-    let applicationData: any = null;
-    if (applicationId) {
-      try {
-        const { data: app } = await admin
-          .from("applications")
-          .select("id, application_code, order_status, fulfillment_status, assigned_to, created_at, service_id")
-          .eq("id", applicationId)
-          .maybeSingle();
-        applicationData = app;
-      } catch (e) {
-        console.warn("[getTicketWorkspace] application fetch warning:", e);
+    // Customer name resolution: if customer record has placeholder/test name (like 'Tesr'/'Test') or is missing,
+    // sync with authoritative applicant name from leadData
+    if (leadData) {
+      const isPlaceholderName =
+        !customerData?.name ||
+        /^(tesr|test|customer|demo|null|undefined)$/i.test(customerData.name.trim());
+      if (isPlaceholderName && leadData.name) {
+        if (customerData) {
+          customerData.name = leadData.name;
+          if (customerData.id) {
+            admin.from("customers").update({ name: leadData.name } as never).eq("id", customerData.id).then(() => {}).catch(() => {});
+          }
+        } else {
+          customerData = {
+            id: effectiveCustomerId || null,
+            name: leadData.name,
+            primary_email: leadData.email || t.ticket_email,
+            primary_mobile: leadData.mobile,
+            state: null,
+            language: null,
+            created_at: null,
+            lifetime_value: leadData.total_amount,
+            total_applications: 1,
+            completed_applications: 0,
+          };
+        }
       }
     }
 
-    // 4. Fetch service details
+    // 5. Fetch service details
     const effectiveServiceId = t.service_id || applicationData?.service_id || null;
     let serviceData: any = null;
     if (effectiveServiceId) {

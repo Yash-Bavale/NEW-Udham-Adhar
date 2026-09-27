@@ -750,16 +750,43 @@ export async function createNewTicketFromClosedTicketReply(input: {
     isAlternateSender,
   } = input;
 
-  const isUnlinked = !ticketMatch.customerId && !ticketMatch.applicationId;
-  const orderLinkStatus = ticketMatch.applicationId ? "linked" : "unlinked";
+  let resolvedApplicationId = ticketMatch.applicationId;
+  let resolvedCustomerId = ticketMatch.customerId;
+  let resolvedLeadId = ticketMatch.leadId;
+
+  // If parent ticket had no order linked or incoming subject/body has explicit order code, resolve order
+  if (!resolvedApplicationId) {
+    try {
+      const matchedOrder = await matchOrderByContext({
+        subject,
+        inReplyTo,
+        references,
+        fromEmail: senderInfo.effectiveEmail,
+        xBhsOrder: null,
+        xBhsCustomer: null,
+        bodySnippet: bodyText.slice(0, 1000),
+      });
+
+      if (matchedOrder?.applicationId) {
+        resolvedApplicationId = matchedOrder.applicationId;
+        if (matchedOrder.customerId) resolvedCustomerId = matchedOrder.customerId;
+        if (matchedOrder.leadId) resolvedLeadId = matchedOrder.leadId;
+      }
+    } catch (e) {
+      console.warn("[inbox-matcher] matchOrderByContext in closed reply warning:", e);
+    }
+  }
+
+  const isUnlinked = !resolvedCustomerId && !resolvedApplicationId;
+  const orderLinkStatus = resolvedApplicationId ? "linked" : "unlinked";
 
   // 1. Create the new support ticket linked to parent_ticket_id
   const { data: createdTicket, error: tErr } = await supabaseAdmin
     .from("support_tickets")
     .insert({
       parent_ticket_id: ticketMatch.ticketId,
-      application_id: ticketMatch.applicationId ?? null,
-      customer_id: ticketMatch.customerId ?? null,
+      application_id: resolvedApplicationId ?? null,
+      customer_id: resolvedCustomerId ?? null,
       subject: subject.slice(0, 250),
       description: bodyText.slice(0, 4000),
       status: "open",
@@ -817,8 +844,9 @@ export async function createNewTicketFromClosedTicketReply(input: {
     in_reply_to: inReplyTo,
     references_header: references.join(" ") || null,
     zoho_mail_uid: zohoUid,
-    application_id: ticketMatch.applicationId,
-    customer_id: ticketMatch.customerId,
+    application_id: resolvedApplicationId,
+    lead_id: resolvedLeadId,
+    customer_id: resolvedCustomerId,
     sent_at: receivedAt,
     received_at: receivedAt,
   } as never);
@@ -834,12 +862,12 @@ export async function createNewTicketFromClosedTicketReply(input: {
   });
 
   // 6. Workflow event if linked to order
-  if (ticketMatch.applicationId) {
+  if (resolvedApplicationId) {
     try {
       const { dispatchEvent } = await import("@/lib/workflow/engine.server");
       await dispatchEvent({
         type: "TicketOpened",
-        applicationId: ticketMatch.applicationId,
+        applicationId: resolvedApplicationId,
         ticketId: newTicket.id,
       });
     } catch (e) {
@@ -857,8 +885,8 @@ export async function createNewTicketFromClosedTicketReply(input: {
     subject,
     stage: "CLOSED_TICKET_REPLY_NEW_TICKET",
     matchedTicketId: newTicket.id,
-    matchedApplicationId: ticketMatch.applicationId,
-    matchedCustomerId: ticketMatch.customerId,
+    matchedApplicationId: resolvedApplicationId,
+    matchedCustomerId: resolvedCustomerId,
     metadata: {
       action: "created_new_ticket_from_closed_parent",
       parentTicketId: ticketMatch.ticketId,
@@ -879,8 +907,8 @@ export async function createNewTicketFromClosedTicketReply(input: {
     subject,
     stage: "COMPLETED",
     matchedTicketId: newTicket.id,
-    matchedApplicationId: ticketMatch.applicationId,
-    matchedCustomerId: ticketMatch.customerId,
+    matchedApplicationId: resolvedApplicationId,
+    matchedCustomerId: resolvedCustomerId,
     metadata: {
       isReplyToClosedTicket: true,
       parentTicketId: ticketMatch.ticketId,
@@ -926,12 +954,32 @@ async function matchExistingTicket(input: {
 
     if (data) {
       const r = data as any;
+      let appId = r.application_id;
+      let custId = r.customer_id;
+      if (!appId) {
+        const { applicationCode } = extractOrderCodes(input.subject, input.bodySnippet);
+        if (applicationCode) {
+          const { data: app } = await supabaseAdmin
+            .from("applications")
+            .select("id, customer_id")
+            .eq("application_code", applicationCode)
+            .maybeSingle();
+          if (app) {
+            appId = (app as any).id;
+            if (!custId) custId = (app as any).customer_id;
+            await supabaseAdmin
+              .from("support_tickets")
+              .update({ application_id: appId, customer_id: custId, is_unlinked: false, order_link_status: "linked" } as never)
+              .eq("id", r.id);
+          }
+        }
+      }
       return {
         ticketId: r.id,
         ticketNumber: r.ticket_number,
         ticketEmail: r.ticket_email,
-        applicationId: r.application_id,
-        customerId: r.customer_id,
+        applicationId: appId,
+        customerId: custId,
         leadId: null,
         status: r.status,
         reopenCount: r.reopen_count,
@@ -960,12 +1008,32 @@ async function matchExistingTicket(input: {
 
         if (t) {
           const r = t as any;
+          let appId = r.application_id;
+          let custId = r.customer_id;
+          if (!appId) {
+            const { applicationCode } = extractOrderCodes(input.subject, input.bodySnippet);
+            if (applicationCode) {
+              const { data: app } = await supabaseAdmin
+                .from("applications")
+                .select("id, customer_id")
+                .eq("application_code", applicationCode)
+                .maybeSingle();
+              if (app) {
+                appId = (app as any).id;
+                if (!custId) custId = (app as any).customer_id;
+                await supabaseAdmin
+                  .from("support_tickets")
+                  .update({ application_id: appId, customer_id: custId, is_unlinked: false, order_link_status: "linked" } as never)
+                  .eq("id", r.id);
+              }
+            }
+          }
           return {
             ticketId: r.id,
             ticketNumber: r.ticket_number,
             ticketEmail: r.ticket_email,
-            applicationId: r.application_id,
-            customerId: r.customer_id,
+            applicationId: appId,
+            customerId: custId,
             leadId: null,
             status: r.status,
             reopenCount: r.reopen_count,
