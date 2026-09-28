@@ -60,7 +60,7 @@ export const getTicketWorkspace = createServerFn({ method: "POST" })
         const { data: app } = await admin
           .from("applications")
           .select(
-            "id, application_code, order_status, fulfillment_status, assigned_to, created_at, service_id, lead_id, customer_id, is_hot, form_submitted_at, certificate_uploaded_at, application_status, workflow_status, refund_approved_at, refund_processed_at, closure_stage, refund_status, technical_hold_started_at, customer_hold_started_at"
+            "id, application_code, order_status, fulfillment_status, assigned_to, created_at, service_id, lead_id, customer_id, is_hot, form_submitted_at, certificate_uploaded_at, application_status, workflow_status, refund_approved_at, refund_processed_at, closure_stage, technical_hold_started_at, customer_hold_started_at"
           )
           .eq("id", applicationId)
           .maybeSingle();
@@ -164,7 +164,7 @@ export const getTicketWorkspace = createServerFn({ method: "POST" })
       try {
         const { data: candidates } = await admin
           .from("applications")
-          .select("id, application_code, order_status, fulfillment_status, created_at, service_id, lead_id, form_submitted_at, certificate_uploaded_at, application_status, workflow_status, refund_approved_at, refund_processed_at, closure_stage, refund_status, technical_hold_started_at, customer_hold_started_at")
+          .select("id, application_code, order_status, fulfillment_status, created_at, service_id, lead_id, form_submitted_at, certificate_uploaded_at, application_status, workflow_status, refund_approved_at, refund_processed_at, closure_stage, technical_hold_started_at, customer_hold_started_at")
           .eq("customer_id", effectiveCustomerId)
           .eq("is_deleted", false)
           .not("order_status", "in", `(${INACTIVE_ORDER_STATUSES.join(",")})`)
