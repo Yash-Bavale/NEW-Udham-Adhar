@@ -14,7 +14,7 @@ import {
   AlignLeft, AlignCenter, AlignRight, Image as ImageIcon, Search, Tag,
   ChevronRight as ChevronRightIcon, RefreshCw, Flame, Reply, XCircle
 } from "lucide-react";
-import { getTicketWorkspace, linkTicketToApplication } from "@/lib/crm/ticket-workspace.functions";
+import { getTicketWorkspace, linkTicketToApplication, unlinkTicketFromApplication } from "@/lib/crm/ticket-workspace.functions";
 import {
   replyToTicket, updateTicket, getAdjacentTickets,
   type TicketStatus, type TicketPriority
@@ -175,6 +175,7 @@ function TicketWorkspace() {
   const reopenOrderFn = useServerFn(reopenOrder);
   const makeHotOrderFn = useServerFn(makeOrderHotFromTicket);
   const linkOrderFn = useServerFn(linkTicketToApplication);
+  const unlinkOrderFn = useServerFn(unlinkTicketFromApplication);
   const getAttachmentUploadUrlFn = useServerFn(getTicketAttachmentUploadUrl);
   const confirmAttachmentFn = useServerFn(confirmTicketAttachment);
 
@@ -697,6 +698,17 @@ function TicketWorkspace() {
       qc.invalidateQueries({ queryKey: ["support-tickets-ops"] });
     },
     onError: (e: Error) => toast.error(e.message || "Failed to link order"),
+  });
+
+  const doUnlinkOrder = useMutation({
+    mutationFn: () => unlinkOrderFn({ data: { ticketId } }),
+    onSuccess: () => {
+      toast.success("Order unlinked from ticket");
+      invalidate();
+      qc.invalidateQueries({ queryKey: ["support-workspace", ticketId] });
+      qc.invalidateQueries({ queryKey: ["support-tickets-ops"] });
+    },
+    onError: (e: Error) => toast.error(e.message || "Failed to unlink order"),
   });
 
   // execCommand-based rich text formatting for contenteditable
@@ -1469,13 +1481,24 @@ function TicketWorkspace() {
               </h2>
             </div>
             {app?.id && (
-              <Link
-                to="/admin/orders/$orderId"
-                params={{ orderId: app.id } as any}
-                className="text-[11px] font-semibold text-blue-600 hover:underline"
-              >
-                View Order
-              </Link>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => doUnlinkOrder.mutate()}
+                  disabled={doUnlinkOrder.isPending}
+                  className="text-[11px] font-semibold text-slate-500 hover:text-rose-600 transition-colors cursor-pointer disabled:opacity-50"
+                  title="Unlink this order from ticket"
+                >
+                  {doUnlinkOrder.isPending ? "Unlinking…" : "Unlink"}
+                </button>
+                <Link
+                  to="/admin/orders/$orderId"
+                  params={{ orderId: app.id } as any}
+                  className="text-[11px] font-semibold text-blue-600 hover:underline"
+                >
+                  View Order
+                </Link>
+              </div>
             )}
           </div>
 

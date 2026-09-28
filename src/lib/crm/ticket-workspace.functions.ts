@@ -62,15 +62,45 @@ export const getTicketWorkspace = createServerFn({ method: "POST" })
           .select("id, application_code, order_status, fulfillment_status, assigned_to, created_at, service_id, lead_id, customer_id, is_hot")
           .eq("id", applicationId)
           .maybeSingle();
-        applicationData = app;
 
         if (app?.lead_id) {
           const { data: lead } = await admin
             .from("leads")
-            .select("id, name, email, mobile, service, total_amount, lead_code")
+            .select("id, name, email, mobile, service, total_amount, lead_code, lead_status_v2, status")
             .eq("id", app.lead_id)
             .maybeSingle();
           leadData = lead;
+        }
+
+        if (app) {
+          // Check whether the linked application has a paid payment or paid lead status
+          let isPaid = false;
+          try {
+            const { data: pay } = await admin
+              .from("payments")
+              .select("id")
+              .or(`application_id.eq.${app.id}${app.lead_id ? `,lead_id.eq.${app.lead_id}` : ""}`)
+              .eq("status", "paid")
+              .limit(1)
+              .maybeSingle();
+
+            const isPaidLead =
+              (leadData as any)?.lead_status_v2 === "payment_successful" ||
+              (leadData as any)?.status === "payment_successful";
+
+            isPaid = Boolean(pay || isPaidLead);
+          } catch (payCheckErr) {
+            console.warn("[getTicketWorkspace] payment check warning:", payCheckErr);
+            isPaid = true;
+          }
+
+          if (isPaid) {
+            applicationData = app;
+          } else {
+            // Unpaid draft application — do not display as active order
+            applicationData = null;
+            leadData = null;
+          }
         }
       } catch (e) {
         console.warn("[getTicketWorkspace] application fetch warning:", e);
@@ -621,4 +651,31 @@ export const linkTicketToApplication = createServerFn({ method: "POST" })
       applicationId: data.applicationId,
       applicationCode: app.application_code ?? null,
     };
+  });
+
+// ──────────────────────────────────────────────────────────────────────────────
+// unlinkTicketFromApplication
+//
+// Allows staff to unlink an attached application from a ticket and reset its status
+// to "unlinked" (or "needs_review" if customer has candidates).
+// ──────────────────────────────────────────────────────────────────────────────
+export const unlinkTicketFromApplication = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z.object({ ticketId: z.string().uuid() }).parse(i)
+  )
+  .handler(async ({ data }) => {
+    const admin = await getAdmin();
+    const { error } = await admin
+      .from("support_tickets")
+      .update({
+        application_id: null,
+        order_link_status: "unlinked",
+        is_unlinked: true,
+        updated_at: new Date().toISOString(),
+      } as never)
+      .eq("id", data.ticketId);
+
+    if (error) throw new Error(error.message);
+    return { ok: true, ticketId: data.ticketId };
   });
