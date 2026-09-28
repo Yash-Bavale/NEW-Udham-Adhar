@@ -35,6 +35,7 @@ import { useRole } from "@/hooks/useRole";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useRealtimeTable } from "@/hooks/useRealtimeTable";
 import { usePreserveScroll, saveModuleFilterState, getModuleFilterState, clearModuleFilterState } from "@/hooks/usePreserveScroll";
+import { useFinancialVisibility } from "@/hooks/useFinancialVisibility";
 import { formatMobile55, cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/admin/orders/")({
@@ -1586,6 +1587,7 @@ function OrderCardMobile({
   const stage: OrderStage = order.stage;
   const meta = STAGE_META[stage];
   const actionStatus = getOrderActionStatus(order);
+  const { formatINR } = useFinancialVisibility();
 
   const isCompletedView = bucket === "completed";
   const isClosedView = bucket === "closed";
@@ -1664,7 +1666,7 @@ function OrderCardMobile({
         </div>
         {!hideMoney && (
           <span className="font-semibold text-slate-900 text-sm">
-            {`₹${Number(order.total_amount ?? 0).toLocaleString("en-IN")}`}
+            {formatINR(order.total_amount)}
           </span>
         )}
       </div>
@@ -1862,6 +1864,7 @@ function OrderRow({
 }) {
   const stage: OrderStage = order.stage;
   const meta = STAGE_META[stage];
+  const { formatINR } = useFinancialVisibility();
 
   const isCompletedView = bucket === "completed";
   const isClosedView = bucket === "closed";
@@ -2052,7 +2055,7 @@ function OrderRow({
       {/* 8. Amount */}
       {!hideMoney && (
         <td className="px-2 py-2.5 text-right font-semibold text-slate-900 whitespace-nowrap text-[13px]">
-          {`₹${Number(order.total_amount ?? 0).toLocaleString("en-IN")}`}
+          {formatINR(order.total_amount)}
         </td>
       )}
     </tr>

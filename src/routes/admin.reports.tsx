@@ -85,13 +85,8 @@ function ReportsPage() {
   );
 }
 
-function fmtINR(n: number) {
-  return new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    maximumFractionDigits: 0,
-  }).format(n || 0);
-}
+import { useFinancialVisibility } from "@/hooks/useFinancialVisibility";
+
 function fmtN(n: number) {
   return new Intl.NumberFormat("en-IN").format(n || 0);
 }
@@ -126,6 +121,7 @@ function monthIST(): string {
 
 // ─────────────────────────── DAILY TAB ───────────────────────────
 function DailyTab() {
+  const { formatINR } = useFinancialVisibility();
   const [date, setDate] = useState(todayIST());
   const fn = useServerFn(getDailyReport);
   const { data, isLoading } = useQuery({
@@ -136,7 +132,7 @@ function DailyTab() {
   const cards = [
     { label: "New Leads", icon: Users, value: data?.counts.leads, fmt: fmtN },
     { label: "New Orders", icon: Receipt, value: data?.counts.orders, fmt: fmtN },
-    { label: "Revenue", icon: IndianRupee, value: data?.counts.revenue, fmt: fmtINR },
+    { label: "Revenue", icon: IndianRupee, value: data?.counts.revenue, fmt: (v: number) => formatINR(v) },
     { label: "Pending Cases", icon: Activity, value: data?.counts.pending, fmt: fmtN },
   ];
 
@@ -212,7 +208,7 @@ function DailyTab() {
         rows={(data?.payments ?? []).map((p: any) => ({
           id: p.id,
           primary: p.leads?.name ?? p.leads?.lead_code ?? "—",
-          secondary: fmtINR(Number(p.amount ?? 0)),
+          secondary: formatINR(Number(p.amount ?? 0)),
           tail: formatIST(p.created_at),
         }))}
       />
@@ -291,6 +287,7 @@ function Expandable({
 
 // ─────────────────────────── MONTHLY TAB ───────────────────────────
 function MonthlyTab() {
+  const { formatINR } = useFinancialVisibility();
   const [month, setMonth] = useState(monthIST());
   const fn = useServerFn(getMonthlyReport);
   const { data, isLoading } = useQuery({
@@ -314,7 +311,7 @@ function MonthlyTab() {
       <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
         <Stat
           label="Total Revenue"
-          value={data ? fmtINR(data.totalRevenue) : "—"}
+          value={data ? formatINR(data.totalRevenue) : "—"}
           loading={isLoading}
         />
         <Stat
@@ -374,7 +371,7 @@ function MonthlyTab() {
                   {s.service}
                 </td>
                 <td className="px-4 py-2 text-right tabular-nums">{fmtN(s.count)}</td>
-                <td className="px-4 py-2 text-right tabular-nums">{fmtINR(s.revenue)}</td>
+                <td className="px-4 py-2 text-right tabular-nums">{formatINR(s.revenue)}</td>
               </tr>
             ))}
           </tbody>
@@ -498,6 +495,7 @@ function Stat({
 
 // ─────────────────────────── FINANCE TAB ───────────────────────────
 function FinanceTab() {
+  const { formatINR } = useFinancialVisibility();
   const today = todayIST();
   const [from, setFrom] = useState(monthIST() + "-01");
   const [to, setTo] = useState(today);
@@ -536,23 +534,23 @@ function FinanceTab() {
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <Stat
           label="Total Revenue"
-          value={data ? fmtINR(data.revenue) : "—"}
+          value={data ? formatINR(data.revenue) : "—"}
           loading={isLoading}
         />
         <Stat
           label="GST Collected"
-          value={data ? fmtINR(data.gst.total) : "—"}
+          value={data ? formatINR(data.gst.total) : "—"}
           loading={isLoading}
         />
         <Stat
           label="Refunds Issued"
-          value={data ? fmtINR(data.refunds.total) : "—"}
+          value={data ? formatINR(data.refunds.total) : "—"}
           loading={isLoading}
           hint={data ? `${data.refunds.count} refunds` : undefined}
         />
         <Stat
           label="Pending Payments"
-          value={data ? fmtINR(data.pending.total) : "—"}
+          value={data ? formatINR(data.pending.total) : "—"}
           loading={isLoading}
           hint={data ? `${data.pending.count} unpaid` : undefined}
         />
@@ -579,7 +577,7 @@ function FinanceTab() {
                 <td className="px-4 py-2" style={{ color: "var(--admin-fg)" }}>
                   {label}
                 </td>
-                <td className="px-4 py-2 text-right tabular-nums">{fmtINR(val as number)}</td>
+                <td className="px-4 py-2 text-right tabular-nums">{formatINR(val as number)}</td>
               </tr>
             ))}
           </tbody>
@@ -592,7 +590,7 @@ function FinanceTab() {
         rows={(data?.refunds.rows ?? []).map((r: any) => ({
           id: r.id,
           primary: r.leads?.name ?? r.leads?.lead_code ?? "—",
-          secondary: fmtINR(Number(r.amount ?? 0)),
+          secondary: formatINR(Number(r.amount ?? 0)),
           tail: formatIST(r.created_at),
         }))}
       />
@@ -602,7 +600,7 @@ function FinanceTab() {
         rows={(data?.pending.rows ?? []).map((p: any) => ({
           id: p.id,
           primary: p.leads?.name ?? p.leads?.lead_code ?? "—",
-          secondary: fmtINR(Number(p.amount ?? 0)),
+          secondary: formatINR(Number(p.amount ?? 0)),
           tail: formatIST(p.created_at),
         }))}
       />

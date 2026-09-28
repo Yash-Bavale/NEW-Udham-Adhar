@@ -18,14 +18,14 @@ const VERDICT_LABEL: Record<string, string> = {
   mismatch: "Mismatches found",
 };
 
-function fmtMoney(n: number) {
-  return `₹${n.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
-}
+import { useFinancialVisibility } from "@/hooks/useFinancialVisibility";
+
 function fmtDate(s: string | null) {
   return s ? new Date(s).toLocaleString("en-IN") : "—";
 }
 
 function PaymentAuditPage() {
+  const { formatINR } = useFinancialVisibility();
   const auditFn = useServerFn(auditOrderPayments);
   const [code, setCode] = useState("");
 
@@ -114,7 +114,7 @@ function PaymentAuditPage() {
               head={["When", "Amount", "Status", "Gateway", "Reference", "Type", "Invoice"]}
               rows={result.payments.map((p) => [
                 fmtDate(p.at),
-                fmtMoney(p.amount),
+                formatINR(p.amount, { maximumFractionDigits: 2 }),
                 p.status,
                 p.gateway ?? "—",
                 p.reference ?? "—",
@@ -127,7 +127,7 @@ function PaymentAuditPage() {
           <Section title={`Payment links (${result.links.length})`}>
             <Table
               head={["Created", "Txn ID", "Amount", "Status"]}
-              rows={result.links.map((l) => [fmtDate(l.createdAt), l.txnid, fmtMoney(l.amount), l.status])}
+              rows={result.links.map((l) => [fmtDate(l.createdAt), l.txnid, formatINR(l.amount, { maximumFractionDigits: 2 }), l.status])}
             />
           </Section>
 
@@ -137,7 +137,7 @@ function PaymentAuditPage() {
               rows={result.invoices.map((i) => [
                 fmtDate(i.issuedAt),
                 i.number ?? "—",
-                fmtMoney(i.total),
+                formatINR(i.total, { maximumFractionDigits: 2 }),
                 fmtDate(i.emailedAt),
               ])}
             />

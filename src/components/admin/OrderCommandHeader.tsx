@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { ExternalLink, AlertCircle, Clock } from "lucide-react";
 import { STAGE_META, STAGE_BADGE_CLASS, type OrderStage } from "@/lib/crm/computeOrderStage";
 import { formatIST, relativeIST } from "@/lib/datetime";
+import { useFinancialVisibility } from "@/hooks/useFinancialVisibility";
 
 interface StaffOption {
   id: string;
@@ -110,7 +111,7 @@ export function OrderCommandHeader({
           {!hideAmount && (
             <Meta label="Total">
               <span className="font-semibold text-sm" style={{ color: "var(--admin-fg)" }}>
-                ₹{Number(total ?? 0).toLocaleString("en-IN")}
+                {formatINR(total)}
               </span>
             </Meta>
           )}

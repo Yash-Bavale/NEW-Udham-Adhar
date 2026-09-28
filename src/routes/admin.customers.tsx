@@ -24,11 +24,10 @@ export const Route = createFileRoute("/admin/customers")({
   component: CustomersPage,
 });
 
-function fmtINR(n: number) {
-  return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(n || 0);
-}
+import { useFinancialVisibility } from "@/hooks/useFinancialVisibility";
 
 function CustomersPage() {
+  const { formatINR } = useFinancialVisibility();
   const [q, setQ] = useState("");
   const [status, setStatus] = useState<string>("all");
   const list = useServerFn(listCustomers);
@@ -57,8 +56,8 @@ function CustomersPage() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <StatCard index={0} label="Total Customers" value={m?.totalCustomers ?? 0} icon={<Users className="size-4" />} gradient="primary" loading={!m} />
         <StatCard index={1} label="Repeat Customers" value={m?.repeatCustomers ?? 0} icon={<Repeat className="size-4" />} gradient="success" loading={!m} hint={m ? `${Math.round((m.repeatRate ?? 0) * 100)}% repeat rate` : undefined} />
-        <StatCard index={2} label="Lifetime Value" value={fmtINR(m?.lifetimeValue ?? 0)} icon={<Wallet className="size-4" />} gradient="primary" loading={!m} />
-        <StatCard index={3} label="Avg LTV" value={fmtINR(m?.avgLtv ?? 0)} icon={<TrendingUp className="size-4" />} gradient="warn" loading={!m} />
+        <StatCard index={2} label="Lifetime Value" value={formatINR(m?.lifetimeValue ?? 0)} icon={<Wallet className="size-4" />} gradient="primary" loading={!m} />
+        <StatCard index={3} label="Avg LTV" value={formatINR(m?.avgLtv ?? 0)} icon={<TrendingUp className="size-4" />} gradient="warn" loading={!m} />
       </div>
 
       <SectionCard title="All customers" action={<div className="text-xs" style={{ color: "var(--admin-fg-muted)" }}>{rows.length} shown</div>}>

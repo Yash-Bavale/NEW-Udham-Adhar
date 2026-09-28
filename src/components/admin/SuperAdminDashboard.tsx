@@ -35,17 +35,11 @@ import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { formatIST } from "@/lib/datetime";
 import { DateRangePicker } from "./DateRangePicker";
+import { FinancialPrivacySwitch } from "@/components/admin/FinancialPrivacySwitch";
+import { useFinancialVisibility } from "@/hooks/useFinancialVisibility";
 import { cn } from "@/lib/utils";
 
 const fmtN = (n: number) => new Intl.NumberFormat("en-IN").format(n || 0);
-const fmtINR = (n: number) =>
-  new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(n || 0);
-const fmtShortINR = (n: number) => {
-  if (n >= 10_000_000) return `₹${(n / 10_000_000).toFixed(2)}Cr`;
-  if (n >= 100_000) return `₹${(n / 100_000).toFixed(2)}L`;
-  if (n >= 1000) return `₹${(n / 1000).toFixed(1)}k`;
-  return `₹${Math.round(n)}`;
-};
 
 function pctDelta(curr: number, prev: number): { pct: number; up: boolean } | null {
   if (!prev && !curr) return null;
@@ -193,6 +187,7 @@ export function SuperAdminDashboard({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <FinancialPrivacySwitch />
           <Tabs
             value={range.preset}
             onValueChange={(v) =>
@@ -357,6 +352,7 @@ function ModernKpi({
 }
 
 const KpiGrid = memo(function KpiGrid({ data, loading, range }: { data?: DashboardKpisResult; loading: boolean; range: DashboardRange }) {
+  const { formatShortINR } = useFinancialVisibility();
   if (loading || !data) {
     return (
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 auto-rows-fr">
@@ -463,11 +459,11 @@ const KpiGrid = memo(function KpiGrid({ data, loading, range }: { data?: Dashboa
         </>}
       />
       <ModernKpi
-        icon={<Wallet className="size-4" />} label="Revenue (excl. Tax)" value={fmtShortINR(m.revenueExclTax)} tone="emerald" delta={revDelta}
+        icon={<Wallet className="size-4" />} label="Revenue (excl. Tax)" value={formatShortINR(m.revenueExclTax)} tone="emerald" delta={revDelta}
         href="/admin/finance"
         subs={<>
-          <StatChip label="Incl. Tax" value={fmtShortINR(m.revenueInclTax)} tone="emerald" href="/admin/finance" />
-          <StatChip label="Tax" value={fmtShortINR(m.taxCollected)} tone="slate" href="/admin/finance/gst" />
+          <StatChip label="Incl. Tax" value={formatShortINR(m.revenueInclTax)} tone="emerald" href="/admin/finance" />
+          <StatChip label="Tax" value={formatShortINR(m.taxCollected)} tone="slate" href="/admin/finance/gst" />
         </>}
       />
       <ModernKpi
@@ -495,7 +491,7 @@ const KpiGrid = memo(function KpiGrid({ data, loading, range }: { data?: Dashboa
             <StatChip
               key={gw.code}
               label={gw.name}
-              value={fmtShortINR(gw.revenue)}
+              value={formatShortINR(gw.revenue)}
               tone={gw.revenue > 0 ? "emerald" : "slate"}
               href="/admin/settings?tab=gateways"
             />
@@ -510,6 +506,7 @@ const KpiGrid = memo(function KpiGrid({ data, loading, range }: { data?: Dashboa
 /* ---------------- Custom Tooltip for Chart ---------------- */
 
 function CustomTrendTooltip({ active, payload, label }: any) {
+  const { formatINR } = useFinancialVisibility();
   if (!active || !payload || !payload.length) return null;
 
   const leads = payload.find((p: any) => p.dataKey === "Leads")?.value ?? 0;
@@ -539,7 +536,7 @@ function CustomTrendTooltip({ active, payload, label }: any) {
           <span className="flex items-center gap-1.5 text-slate-700 font-semibold">
             <span className="size-2 rounded-full bg-emerald-500" /> Revenue
           </span>
-          <span className="font-extrabold font-mono text-emerald-600">{fmtINR(revenue)}</span>
+          <span className="font-extrabold font-mono text-emerald-600">{formatINR(revenue)}</span>
         </div>
       </div>
     </div>
@@ -549,6 +546,7 @@ function CustomTrendTooltip({ active, payload, label }: any) {
 /* ---------------- Trend (Day-wise & Hourly Time-wise) ---------------- */
 
 const TrendCard = memo(function TrendCard({ data, rangePreset = "today", loading, className }: { data?: DashboardChartsResult; rangePreset?: RangePreset; loading: boolean; className?: string }) {
+  const { formatShortINR } = useFinancialVisibility();
   const isSingleDay = rangePreset === "today" || rangePreset === "yesterday";
   const [viewMode, setViewMode] = useState<"days" | "hourly">("days");
 
@@ -649,7 +647,7 @@ const TrendCard = memo(function TrendCard({ data, rangePreset = "today", loading
                   orientation="right"
                   tick={{ fontSize: 11, fill: "#64748b" }}
                   stroke="#cbd5e1"
-                  tickFormatter={(v) => fmtShortINR(Number(v))}
+                  tickFormatter={(v) => formatShortINR(Number(v))}
                   domain={[0, (dataMax: number) => Math.ceil(Math.max(dataMax * 1.15, 1000))]}
                 />
                 <Tooltip content={<CustomTrendTooltip />} />
@@ -668,6 +666,7 @@ const TrendCard = memo(function TrendCard({ data, rangePreset = "today", loading
 /* ---------------- Top services ---------------- */
 
 const TopServicesCard = memo(function TopServicesCard({ data, loading }: { data?: DashboardTopServicesResult; loading: boolean }) {
+  const { formatShortINR } = useFinancialVisibility();
   const rows = data ?? [];
   const max = Math.max(1, ...rows.map((r) => r.revenueInr));
   return (
@@ -687,7 +686,7 @@ const TopServicesCard = memo(function TopServicesCard({ data, loading }: { data?
               <div className="flex justify-between text-xs">
                 <span className="truncate pr-2 font-medium">{r.name}</span>
                 <span className="font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">
-                  {fmtShortINR(r.revenueInr)}
+                  {formatShortINR(r.revenueInr)}
                 </span>
               </div>
               <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-muted">

@@ -30,12 +30,13 @@ export const Route = createFileRoute("/admin/payments")({
   component: PaymentsPage,
 });
 
-const fmtINR = (n: number) =>
-  `₹${Math.abs(Number(n || 0)).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+import { useFinancialVisibility } from "@/hooks/useFinancialVisibility";
+
 const fmtDate = (s?: string | null) =>
   s ? new Date(s).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "2-digit" }) : "—";
 
 function PaymentsPage() {
+  const { formatINR } = useFinancialVisibility();
   const listFn = useServerFn(listPaymentsAdmin);
   const metaFn = useServerFn(getPaymentsFilterMeta);
   const genFn = useServerFn(generateInvoice);
@@ -219,9 +220,9 @@ function PaymentsPage() {
                   <div className="text-[10px] text-slate-500">{r.lead_code}</div>
                 </td>
                 <td className="px-3 py-2">{r.service}</td>
-                <td className="px-3 py-2 text-right">{fmtINR(r.base_amount)}</td>
-                <td className="px-3 py-2 text-right">{fmtINR(r.gst_amount)}</td>
-                <td className="px-3 py-2 text-right font-semibold">{fmtINR(r.amount)}</td>
+                <td className="px-3 py-2 text-right">{formatINR(r.base_amount, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                <td className="px-3 py-2 text-right">{formatINR(r.gst_amount, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                <td className="px-3 py-2 text-right font-semibold">{formatINR(r.amount, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                 <td className="px-3 py-2 capitalize">{r.gateway_name}</td>
                 <td className="px-3 py-2">{statusBadge(r.status)}</td>
                 <td className="px-3 py-2 text-slate-600">{fmtDate(r.payment_date ?? r.created_at)}</td>

@@ -35,6 +35,7 @@ export const Route = createFileRoute("/admin")({
 });
 
 import { useEmployeePresence } from "@/hooks/useEmployeePresence";
+import { FinancialVisibilityProvider } from "@/hooks/useFinancialVisibility";
 
 function AdminLayout() {
   const [email, setEmail] = useState<string>();
@@ -66,8 +67,11 @@ function AdminLayout() {
     );
   }, []);
   return (
-    <AdminShell email={email}>
-      <Outlet />
-    </AdminShell>
+    <FinancialVisibilityProvider>
+      <AdminShell email={email}>
+        <Outlet />
+      </AdminShell>
+    </FinancialVisibilityProvider>
   );
 }
+

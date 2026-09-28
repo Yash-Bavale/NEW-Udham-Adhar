@@ -22,6 +22,7 @@ import { controlTimer, controlAutomation } from "@/lib/workflow/engine.functions
 import { useOrderWorkflow } from "@/hooks/useOrderWorkflow";
 import { STAGE_LABEL, TIMER_LABEL, AUTO_LABEL } from "@/lib/workflow/engine-view";
 import { formatIST, relativeIST } from "@/lib/datetime";
+import { useFinancialVisibility } from "@/hooks/useFinancialVisibility";
 import type { FulfillmentStatus } from "@/lib/crm/fulfillment-transitions";
 
 export function OrderWorkflowPanel(_props: {
@@ -226,10 +227,11 @@ function IconBtn({ onClick, label, tone, children }: { onClick: () => void; labe
 }
 
 function PaymentInline({ payments, hideAmount }: { payments: any[]; hideAmount: boolean }) {
+  const { formatINR } = useFinancialVisibility();
   const paid = payments.filter((p) => (p.status === "success" || p.status === "captured" || p.status === "completed") && Number(p.amount ?? 0) > 0);
   const total = paid.reduce((s, p) => s + Number(p.amount ?? 0), 0);
   const latest = paid[0] ?? payments[0] ?? null;
-  const fmt = (n: number) => (hideAmount ? "₹••••" : `₹${n.toLocaleString("en-IN")}`);
+  const fmt = (n: number) => (hideAmount ? "₹••••••" : formatINR(n));
 
   if (payments.length === 0) {
     return (
