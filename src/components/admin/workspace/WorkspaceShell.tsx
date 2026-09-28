@@ -77,7 +77,7 @@ interface Props {
 
 const TAB_DEFS = [
   { id: "form" as const, label: "Forms & Docs", icon: FileText, tooltip: "View the submitted service form and uploaded documents" },
-  { id: "workflow" as const, label: "Employee Task", icon: Workflow, tooltip: "Move the order through its workflow stages" },
+  { id: "customer" as const, label: "Customer Details", icon: User2, tooltip: "View customer info, contact details and quick actions" },
   { id: "assignment" as const, label: "Assignment History", icon: History, tooltip: "View employee assignment transitions and history" },
   { id: "emails" as const, label: "Emails", icon: Mail, tooltip: "All emails sent or received for this order" },
   { id: "invoices" as const, label: "Invoices", icon: BadgeDollarSign, tooltip: "View, download, resend, or replace invoices for this order", moneyOnly: true },
@@ -549,124 +549,6 @@ export function WorkspaceShell(p: Props) {
           </div>
         )}
 
-        {/* Header card */}
-        <section className="rounded-2xl border border-slate-200 bg-white p-5 md:p-6 shadow-sm">
-          {/* Meta grid */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-4">
-            <HeaderMeta label="Order No.">
-              <div className="flex items-center gap-1.5">
-                <span className="font-mono text-[15px] font-extrabold text-slate-900 tracking-tight">
-                  {application.application_code}
-                </span>
-                <button onClick={() => copy(application.application_code)} className="text-slate-400 hover:text-indigo-600">
-                  <Copy className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            </HeaderMeta>
-            <HeaderMeta label="Payment Status">
-              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ring-1 ${paymentPillCls}`}>
-                {paymentStatus}
-              </span>
-            </HeaderMeta>
-            <HeaderMeta label="Current Stage">
-              {/* Single source of truth — computeOrderStage → STAGE_META */}
-              <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold ring-1 ${statusPillCls}`}>
-                {meta.label}
-              </span>
-            </HeaderMeta>
-
-            <HeaderMeta label="Order Created">
-              <div className="text-sm text-slate-800">
-                {formatIST(application.created_at)}
-                <span className="ml-2 text-[11px] font-semibold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded">
-                  {relativeIST(application.created_at)}
-                </span>
-              </div>
-            </HeaderMeta>
-          </div>
-
-          <div className="mt-5 border-t border-slate-100 pt-5 grid lg:grid-cols-[minmax(0,1fr)_auto] gap-6">
-            {/* Customer fields */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-2.5 min-w-0">
-              <InfoRow icon={<User2 className="w-3.5 h-3.5" />} label="Customer Name" value={cName} />
-              <InfoRow icon={<Phone className="w-3.5 h-3.5" />} label="Mobile Number" value={cMobile ? <a href={`tel:${cMobile}`} className="font-mono hover:text-indigo-700">{cMobile}</a> : "—"} />
-              <InfoRow icon={<Mail className="w-3.5 h-3.5" />} label="Email ID" value={cEmail ? <span className="truncate block">{cEmail}</span> : "—"} />
-              <InfoRow label="State" value={cState} />
-              <InfoRow label="Language" value={cLanguage} />
-              {!hideForEmployee && <InfoRow label="Source" value={cSource} />}
-              <InfoRow label="Selected Service" value={svcName} />
-              <InfoRow label="Lead Code" value={<span className="font-mono">{cLeadCode}</span>} />
-              <InfoRow
-                label="Assigned To"
-                value={
-                  <select
-                    value={application.assigned_to ?? ""}
-                    onChange={(e) => p.onAssign(e.target.value || null)}
-                    className="rounded-md border border-slate-200 bg-white px-2 py-0.5 text-xs font-semibold text-slate-800 shadow-xs focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                  >
-                    <option value="">Unassigned</option>
-                    {application.assigned_to && !p.staff.some((s: any) => s.id === application.assigned_to) && (
-                      <option value={application.assigned_to}>
-                        {(p.data as any)?.assignedStaff?.display_name || (p.data as any)?.assignedStaff?.full_name || (p.data as any)?.assignedStaff?.email || "Archived Staff"} (Archived)
-                      </option>
-                    )}
-                    {(Array.isArray(p.staff) ? p.staff : []).map((s: any) => (
-                      <option key={s.id} value={s.id}>{s.display_name || s.full_name || s.name || s.email}</option>
-                    ))}
-                  </select>
-                }
-              />
-            </div>
-
-            {/* Unified action area — every tile is map-driven and always toasts. Visually attached to header (no border). */}
-            <div className="pl-4 lg:border-l lg:border-slate-100 h-fit min-w-[300px]">
-              <div className="text-[10px] uppercase tracking-[0.14em] font-bold text-slate-500 mb-2">Quick Actions</div>
-              <div className="grid grid-cols-6 gap-1.5">
-                {QUICK_ACTIONS.map((spec) => {
-                  const built = spec.build(quickCtx);
-                  const disabled = !!built.disabledReason;
-                  const onClick = () => {
-                    if (spec.key === "print") {
-                      runQuickAction(spec.key, built, () => window.print());
-                    } else {
-                      // Contact / link tiles: navigate manually so we can toast first.
-                      runQuickAction(spec.key, built, () => {
-                        if (built.to) {
-                          window.location.assign(built.to);
-                        } else if (built.href) {
-                          if (built.external) {
-                            window.open(built.href, "_blank", "noopener,noreferrer");
-                          } else {
-                            window.location.assign(built.href);
-                          }
-                        }
-                      });
-                    }
-                  };
-                  return (
-                    <Tooltip key={spec.key}>
-                      <TooltipTrigger asChild>
-                        <span>
-                          <QuickTile
-                            icon={spec.icon}
-                            label={spec.label}
-                            tint={spec.tint}
-                            disabled={disabled}
-                            onClick={onClick}
-                          />
-                        </span>
-                      </TooltipTrigger>
-                      <TooltipContent>{built.disabledReason ?? spec.tooltip}</TooltipContent>
-                    </Tooltip>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-          {/* Employee actions live in one place only — inside the Employee Workflow tab
-            (OrderWorkflowPanel). This card is header info only. */}
-        </section>
-
         {/* ── SINGLE SOURCE OF TRUTH: Customer Journey Map ──────────── */}
         <CustomerJourneyMap
           applicationId={application.id}
@@ -783,268 +665,121 @@ export function WorkspaceShell(p: Props) {
 
           <div className="w-full mt-5 space-y-5">
 
-            <TabsContent value="workflow" className="space-y-4 mt-0 animate-fade-in">
-              {/* ── B1 to B10 Task Actions Bar ── */}
-              <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">
-                <div className="flex items-center justify-between gap-2 flex-wrap border-b border-slate-100 pb-2.5">
-                  <div className="flex items-center gap-2">
-                    <Workflow className="size-4 text-indigo-600" />
-                    <span className="text-xs font-bold uppercase tracking-wider text-slate-800">
-                      Task Actions (B1 – B10)
-                    </span>
-                    <span className="text-[11px] text-slate-500 font-normal hidden sm:inline">
-                      Stage & journey triggers
-                    </span>
-                  </div>
-                  {isAdmin && (
+            <TabsContent value="customer" className="space-y-4 mt-0 animate-fade-in">
+              <section className="rounded-2xl border border-slate-200 bg-white p-5 md:p-6 shadow-sm">
+                {/* Meta grid */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-4">
+                  <HeaderMeta label="Order No.">
                     <div className="flex items-center gap-1.5">
-                      <span className="text-[11px] text-slate-500 font-medium">Admin Override:</span>
-                      <button
-                        type="button"
-                        onClick={() => setAdminOverride(!adminOverride)}
-                        className={cn(
-                          "px-2 py-0.5 rounded text-[11px] font-bold border transition",
-                          adminOverride
-                            ? "bg-orange-100 border-orange-300 text-orange-800"
-                            : "bg-slate-100 border-slate-200 text-slate-600 hover:bg-slate-200"
-                        )}
-                      >
-                        {adminOverride ? "ON" : "OFF"}
+                      <span className="font-mono text-[15px] font-extrabold text-slate-900 tracking-tight">
+                        {application.application_code}
+                      </span>
+                      <button onClick={() => copy(application.application_code)} className="text-slate-400 hover:text-indigo-600">
+                        <Copy className="w-3.5 h-3.5" />
                       </button>
                     </div>
-                  )}
+                  </HeaderMeta>
+                  <HeaderMeta label="Payment Status">
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ring-1 ${paymentPillCls}`}>
+                      {paymentStatus}
+                    </span>
+                  </HeaderMeta>
+                  <HeaderMeta label="Current Stage">
+                    {/* Single source of truth — computeOrderStage → STAGE_META */}
+                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold ring-1 ${statusPillCls}`}>
+                      {meta.label}
+                    </span>
+                  </HeaderMeta>
+
+                  <HeaderMeta label="Order Created">
+                    <div className="text-sm text-slate-800">
+                      {formatIST(application.created_at)}
+                      <span className="ml-2 text-[11px] font-semibold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded">
+                        {relativeIST(application.created_at)}
+                      </span>
+                    </div>
+                  </HeaderMeta>
                 </div>
 
-                {adminOverride && (
-                  <div className="rounded-lg border border-orange-200 bg-orange-50/70 px-3 py-1.5 text-[11px] text-orange-800 flex items-center justify-between gap-2 flex-wrap">
-                    <div className="flex items-center gap-1.5">
-                      <ShieldAlert className="size-3.5 shrink-0" />
-                      <span><strong>Admin override active:</strong> Actions B01 – B08 unlocked regardless of current stage.</span>
-                    </div>
-                    {isAdmin && (
-                      <button
-                        type="button"
-                        onClick={() => setDialog({ kind: "silent_close" })}
-                        disabled={closed}
-                        className="inline-flex items-center gap-1 rounded bg-slate-900 px-2 py-1 text-[10px] font-bold text-amber-400 hover:bg-black border border-slate-700 transition disabled:opacity-40 cursor-pointer shadow-xs"
-                        title="Close order silently with no customer email (Admin Override only)"
-                      >
-                        <VolumeX className="size-3 text-amber-400" />
-                        Silent Close (No Email)
-                      </button>
-                    )}
-                  </div>
-                )}
-
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
-                  {(() => {
-                    const isB09Enabled = closed || completed;
-                    const isB10Enabled = !closed;
-
-                    const gateWithOverride = (code: ButtonCode | "B09" | "B10") => {
-                      if (code === "B09") return isB09Enabled;
-                      if (code === "B10") return isB10Enabled;
-                      return gate(code as ButtonCode);
-                    };
-
-                    const buttonHandlers: Record<
-                      string,
-                      {
-                        code: ButtonCode | "B09" | "B10";
-                        label: string;
-                        emailCode: string;
-                        onClick: () => void;
-                        pending?: boolean;
-                        variant: "amber" | "sky" | "emerald" | "violet" | "rose" | "indigo";
-                        tooltip: string;
+                <div className="mt-5 border-t border-slate-100 pt-5 grid lg:grid-cols-[minmax(0,1fr)_auto] gap-6">
+                  {/* Customer fields */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-2.5 min-w-0">
+                    <InfoRow icon={<User2 className="w-3.5 h-3.5" />} label="Customer Name" value={cName} />
+                    <InfoRow icon={<Phone className="w-3.5 h-3.5" />} label="Mobile Number" value={cMobile ? <a href={`tel:${cMobile}`} className="font-mono hover:text-indigo-700">{cMobile}</a> : "—"} />
+                    <InfoRow icon={<Mail className="w-3.5 h-3.5" />} label="Email ID" value={cEmail ? <span className="truncate block">{cEmail}</span> : "—"} />
+                    <InfoRow label="State" value={cState} />
+                    <InfoRow label="Language" value={cLanguage} />
+                    {!hideForEmployee && <InfoRow label="Source" value={cSource} />}
+                    <InfoRow label="Selected Service" value={svcName} />
+                    <InfoRow label="Lead Code" value={<span className="font-mono">{cLeadCode}</span>} />
+                    <InfoRow
+                      label="Assigned To"
+                      value={
+                        <select
+                          value={application.assigned_to ?? ""}
+                          onChange={(e) => p.onAssign(e.target.value || null)}
+                          className="rounded-md border border-slate-200 bg-white px-2 py-0.5 text-xs font-semibold text-slate-800 shadow-xs focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                        >
+                          <option value="">Unassigned</option>
+                          {application.assigned_to && !p.staff.some((s: any) => s.id === application.assigned_to) && (
+                            <option value={application.assigned_to}>
+                              {(p.data as any)?.assignedStaff?.display_name || (p.data as any)?.assignedStaff?.full_name || (p.data as any)?.assignedStaff?.email || "Archived Staff"} (Archived)
+                            </option>
+                          )}
+                          {(Array.isArray(p.staff) ? p.staff : []).map((s: any) => (
+                            <option key={s.id} value={s.id}>{s.display_name || s.full_name || s.name || s.email}</option>
+                          ))}
+                        </select>
                       }
-                    > = {
-                      B1: {
-                        code: "B01",
-                        label: "Form Not Submitted",
-                        emailCode: "E002",
-                        onClick: () => mutFormLink.mutate(),
-                        pending: mutFormLink.isPending,
-                        variant: "amber",
-                        tooltip: "Send Form Link / Reminder email (E002)",
-                      },
-                      B2: {
-                        code: "B02",
-                        label: "Technical Delay",
-                        emailCode: "E003",
-                        onClick: () => setDialog({ kind: "technical_delay" }),
-                        variant: "sky",
-                        tooltip: "Mark technical delay and select reason (E003)",
-                      },
-                      B3: {
-                        code: "B03",
-                        label: "Issue Resolved",
-                        emailCode: "E011",
-                        onClick: () => mutResume.mutate(),
-                        pending: mutResume.isPending,
-                        variant: "emerald",
-                        tooltip: "Resolve technical delay & resume order (E011)",
-                      },
-                      B4: phase === "customer_delay"
-                        ? {
-                          code: "B04" as const,
-                          label: "Resume Order",
-                          emailCode: "",
-                          onClick: () => mutResumeCustomer.mutate(),
-                          pending: mutResumeCustomer.isPending,
-                          variant: "emerald" as const,
-                          tooltip: "Customer responded — resume order to Form Submitted",
-                        }
-                        : {
-                          code: "B04" as const,
-                          label: "Customer Delay",
-                          emailCode: "E004",
-                          onClick: () => setDialog({ kind: "customer_delay" }),
-                          variant: "amber" as const,
-                          tooltip: "Mark customer side delay and select reason (E004)",
-                        },
-                      B5: {
-                        code: "B05",
-                        label: "Submitted to Govt",
-                        emailCode: "E006",
-                        onClick: () => mutSubmit.mutate(),
-                        pending: mutSubmit.isPending,
-                        variant: "violet",
-                        tooltip: "Mark application as submitted to govt portal (E006)",
-                      },
-                      B6: {
-                        code: "B06",
-                        label: "Consultation Done",
-                        emailCode: "E005",
-                        onClick: () => mutConsultation.mutate(),
-                        pending: mutConsultation.isPending,
-                        variant: "violet",
-                        tooltip: "Mark consultation fulfilled (E005)",
-                      },
-                      B7: {
-                        code: "B07",
-                        label: "App Accepted",
-                        emailCode: "E007",
-                        onClick: () => setDialog({ kind: "complete_with_cert" }),
-                        variant: "emerald",
-                        tooltip: "Upload final certificate & complete order (E007)",
-                      },
-                      B8: {
-                        code: "B08",
-                        label: "App Rejected",
-                        emailCode: "E008",
-                        onClick: () => setDialog({ kind: "govt_rejected" }),
-                        variant: "rose",
-                        tooltip: "Mark govt rejection & select reason (E008)",
-                      },
-                      B9: {
-                        code: "B09",
-                        label: "Reopen Order",
-                        emailCode: "E09",
-                        onClick: () => mutReopen.mutate(),
-                        pending: mutReopen.isPending,
-                        variant: "indigo",
-                        tooltip: "Reopen order back to Form Submitted (E09)",
-                      },
-                      B10: {
-                        code: "B10",
-                        label: "Force Close",
-                        emailCode: "E010",
-                        onClick: () => setDialog({ kind: "force_close" }),
-                        variant: "rose",
-                        tooltip: "Force close order with reason (E010)",
-                      },
-                    };
+                    />
+                  </div>
 
-                    const TINT_STYLES: Record<string, { active: string; badge: string }> = {
-                      amber: {
-                        active: "bg-amber-50/90 border-amber-300 text-amber-900 hover:bg-amber-100 hover:border-amber-400",
-                        badge: "bg-amber-600 text-white",
-                      },
-                      sky: {
-                        active: "bg-sky-50/90 border-sky-300 text-sky-900 hover:bg-sky-100 hover:border-sky-400",
-                        badge: "bg-sky-600 text-white",
-                      },
-                      emerald: {
-                        active: "bg-emerald-50/90 border-emerald-300 text-emerald-900 hover:bg-emerald-100 hover:border-emerald-400",
-                        badge: "bg-emerald-600 text-white",
-                      },
-                      violet: {
-                        active: "bg-purple-50/90 border-purple-300 text-purple-900 hover:bg-purple-100 hover:border-purple-400",
-                        badge: "bg-purple-600 text-white",
-                      },
-                      rose: {
-                        active: "bg-rose-50/90 border-rose-300 text-rose-900 hover:bg-rose-100 hover:border-rose-400",
-                        badge: "bg-rose-600 text-white",
-                      },
-                      indigo: {
-                        active: "bg-indigo-50/90 border-indigo-300 text-indigo-900 hover:bg-indigo-100 hover:border-indigo-400",
-                        badge: "bg-indigo-600 text-white",
-                      },
-                    };
-
-                    return Object.entries(buttonHandlers).map(([bKey, btn]) => {
-                      const enabled = gateWithOverride(btn.code);
-                      const style = TINT_STYLES[btn.variant] || TINT_STYLES.indigo;
-
-                      return (
-                        <Tooltip key={bKey}>
-                          <TooltipTrigger asChild>
-                            <button
-                              type="button"
-                              onClick={btn.onClick}
-                              disabled={!enabled || btn.pending}
-                              className={cn(
-                                "h-9 px-2.5 rounded-lg border text-xs font-semibold flex items-center justify-between gap-1.5 transition-all shadow-xs disabled:opacity-40 disabled:cursor-not-allowed select-none",
-                                enabled ? cn(style.active, "cursor-pointer") : "bg-slate-50 border-slate-200 text-slate-400 cursor-not-allowed"
-                              )}
-                            >
-                              <div className="flex items-center gap-1.5 min-w-0">
-                                <span className={cn("px-1 py-0.5 rounded text-[10px] font-extrabold font-mono leading-none shrink-0", enabled ? style.badge : "bg-slate-300 text-slate-700")}>
-                                  {bKey}
-                                </span>
-                                <span className="truncate text-left text-[11px] font-semibold">{btn.label}</span>
-                              </div>
-                              <span className="text-[9px] font-mono opacity-60 shrink-0 font-medium">
-                                {btn.emailCode}
+                  {/* Unified action area — every tile is map-driven and always toasts. Visually attached to header (no border). */}
+                  <div className="pl-4 lg:border-l lg:border-slate-100 h-fit min-w-[300px]">
+                    <div className="text-[10px] uppercase tracking-[0.14em] font-bold text-slate-500 mb-2">Quick Actions</div>
+                    <div className="grid grid-cols-6 gap-1.5">
+                      {QUICK_ACTIONS.map((spec) => {
+                        const built = spec.build(quickCtx);
+                        const disabled = !!built.disabledReason;
+                        const onClick = () => {
+                          if (spec.key === "print") {
+                            runQuickAction(spec.key, built, () => window.print());
+                          } else {
+                            // Contact / link tiles: navigate manually so we can toast first.
+                            runQuickAction(spec.key, built, () => {
+                              if (built.to) {
+                                window.location.assign(built.to);
+                              } else if (built.href) {
+                                if (built.external) {
+                                  window.open(built.href, "_blank", "noopener,noreferrer");
+                                } else {
+                                  window.location.assign(built.href);
+                                }
+                              }
+                            });
+                          }
+                        };
+                        return (
+                          <Tooltip key={spec.key}>
+                            <TooltipTrigger asChild>
+                              <span>
+                                <QuickTile
+                                  icon={spec.icon}
+                                  label={spec.label}
+                                  tint={spec.tint}
+                                  disabled={disabled}
+                                  onClick={onClick}
+                                />
                               </span>
-                            </button>
-                          </TooltipTrigger>
-                          <TooltipContent>{btn.tooltip}{!enabled ? " (Disabled for current stage)" : ""}</TooltipContent>
-                        </Tooltip>
-                      );
-                    })
-                  })()}
+                            </TooltipTrigger>
+                            <TooltipContent>{built.disabledReason ?? spec.tooltip}</TooltipContent>
+                          </Tooltip>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
-              </div>
-
-              {p.showConsultationPanel ? (
-                <ConvertConsultationPanel
-                  leadId={lead.id} leadCode={lead.lead_code}
-                  mode={p.consultationMode}
-                  customerName={cName}
-                  customerMobile={cMobile}
-                  service={svcName}
-                  totalAmount={total ?? (lead?.total_amount != null ? Number(lead.total_amount) : null)}
-                />
-              ) : (
-                <>
-                  {p.notesNode}
-
-                  <OrderWorkflowPanel
-                    applicationId={application.id}
-                    payments={payments}
-                    hideAmount={p.hideAmount}
-                    current={current}
-                    workflowStatus={(application as any).workflow_status}
-                    closureStage={(application as any).closure_stage}
-                    closureNextAt={(application as any).closure_next_at}
-                    cancellationRequestedAt={(application as any).cancellation_requested_at}
-                    reasonCode={(application as any).closure_reason_code}
-                    reasonText={(application as any).closure_reason_text}
-                  />
-                </>
-              )}
+              </section>
             </TabsContent>
 
             <TabsContent value="form" className="space-y-4 mt-0 animate-fade-in">
