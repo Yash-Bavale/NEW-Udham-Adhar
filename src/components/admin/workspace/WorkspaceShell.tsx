@@ -230,6 +230,8 @@ export function WorkspaceShell(p: Props) {
     qc.invalidateQueries({ queryKey: ["workflow-timers", p.orderId] });
     qc.invalidateQueries({ queryKey: ["workflow-events", p.orderId] });
     qc.invalidateQueries({ queryKey: ["due-reminders-summary"] });
+    qc.invalidateQueries({ queryKey: ["admin.lead.emails"] });
+    qc.invalidateQueries({ queryKey: ["admin.order.timeline", p.orderId] });
   }, [qc, p.orderId]);
 
   const [sendingUpdateEmail, setSendingUpdateEmail] = useState(false);

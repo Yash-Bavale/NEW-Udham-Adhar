@@ -3,6 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
 import { listLeadEmails, sendLeadEmail } from "@/lib/crm/emails-admin.functions";
 import { listEmailTemplates, sendOrderTemplateEmail } from "@/lib/emails/emails.functions";
+import { useRealtimeTable } from "@/hooks/useRealtimeTable";
 
 import {
   Table,
@@ -40,6 +41,13 @@ export function LeadEmailsTab({ leadId, leadService, orderId }: { leadId: string
   const qc = useQueryClient();
   const listFn = useServerFn(listLeadEmails);
   const sendFn = useServerFn(sendLeadEmail);
+
+  useRealtimeTable("email_logs", () => qc.invalidateQueries({ queryKey: ["admin.lead.emails", leadId] }), {
+    filter: `lead_id=eq.${leadId}`,
+  });
+  useRealtimeTable("email_queue", () => qc.invalidateQueries({ queryKey: ["admin.lead.emails", leadId] }), {
+    filter: `lead_id=eq.${leadId}`,
+  });
 
   const { data, isLoading } = useQuery({
     queryKey: ["admin.lead.emails", leadId],

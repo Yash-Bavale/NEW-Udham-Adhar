@@ -342,6 +342,8 @@ export function CustomerJourneyMap(p: Props) {
     qc.invalidateQueries({ queryKey: ["due-reminders-summary"] });
     qc.invalidateQueries({ queryKey: ["active-order-callback", p.applicationId] });
     qc.invalidateQueries({ queryKey: ["order-callback-history", p.applicationId] });
+    qc.invalidateQueries({ queryKey: ["admin.lead.emails"] });
+    qc.invalidateQueries({ queryKey: ["admin.order.timeline", p.applicationId] });
   };
 
   const fnFormLink = useServerFn(sendFormLink);
