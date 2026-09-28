@@ -1747,6 +1747,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         in_range_technical_delay: inRangeTechnicalDelay,
         in_range_callback_scheduled: inRangeCallbackScheduled,
         in_range_action_taken: inRangeActionTaken,
+        latest_action_at: actionHistoryList[0]?.created_at ?? null,
         action_count: actionCount,
         action_history: actionHistoryList,
       };
@@ -1946,6 +1947,31 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       filtered.sort((a, b) => {
         const tA = a.closed_at ? new Date(a.closed_at).getTime() : new Date(a.created_at).getTime();
         const tB = b.closed_at ? new Date(b.closed_at).getTime() : new Date(b.created_at).getTime();
+        return normalized.sortOrder === "asc" ? tA - tB : tB - tA;
+      });
+    } else if (
+      (bucket === "pending" ||
+        bucket === "customer_delay" ||
+        bucket === "technical_delay" ||
+        normalized.actionStatus === "processed" ||
+        normalized.actionStatus === "action_taken") &&
+      (!normalized.sortField || normalized.sortField === "created_at")
+    ) {
+      filtered.sort((a, b) => {
+        const tA = a.latest_action_at
+          ? new Date(a.latest_action_at).getTime()
+          : a.customer_hold_started_at
+            ? new Date(a.customer_hold_started_at).getTime()
+            : a.technical_hold_started_at
+              ? new Date(a.technical_hold_started_at).getTime()
+              : new Date(a.created_at).getTime();
+        const tB = b.latest_action_at
+          ? new Date(b.latest_action_at).getTime()
+          : b.customer_hold_started_at
+            ? new Date(b.customer_hold_started_at).getTime()
+            : b.technical_hold_started_at
+              ? new Date(b.technical_hold_started_at).getTime()
+              : new Date(b.created_at).getTime();
         return normalized.sortOrder === "asc" ? tA - tB : tB - tA;
       });
     } else if (normalized.sortField === "stage") {

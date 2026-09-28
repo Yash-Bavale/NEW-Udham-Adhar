@@ -947,10 +947,26 @@ return (
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="created_desc">
-              {bucket === "completed" ? "Latest Completed (Newest)" : bucket === "closed" ? "Latest Closed (Newest)" : "Latest First (Newest)"}
+              {bucket === "completed"
+                ? "Latest Completed (Newest)"
+                : bucket === "closed"
+                  ? "Latest Closed (Newest)"
+                  : bucket === "pending"
+                    ? "Latest Action First (Newest)"
+                    : bucket === "customer_delay" || bucket === "technical_delay"
+                      ? "Latest Delay First (Newest)"
+                      : "Latest First (Newest)"}
             </SelectItem>
             <SelectItem value="created_asc">
-              {bucket === "completed" ? "Older Completed (Oldest)" : bucket === "closed" ? "Older Closed (Oldest)" : "Older First (Oldest)"}
+              {bucket === "completed"
+                ? "Older Completed (Oldest)"
+                : bucket === "closed"
+                  ? "Older Closed (Oldest)"
+                  : bucket === "pending"
+                    ? "Older Action First (Oldest)"
+                    : bucket === "customer_delay" || bucket === "technical_delay"
+                      ? "Older Delay First (Oldest)"
+                      : "Older First (Oldest)"}
             </SelectItem>
             <SelectItem value="stage_asc">Stage (A → Z)</SelectItem>
             <SelectItem value="stage_desc">Stage (Z → A)</SelectItem>
@@ -1220,10 +1236,30 @@ return (
               <th
                 onClick={() => handleSortToggle("created_at")}
                 className="text-left font-semibold px-3 py-2.5 cursor-pointer hover:bg-slate-100/80 transition-colors select-none group"
-                title={`Click to toggle sorting by ${bucket === "completed" ? "Completed" : bucket === "closed" ? "Closed" : "Created"} time`}
+                title={`Click to toggle sorting by ${
+                  bucket === "completed"
+                    ? "Completed"
+                    : bucket === "closed"
+                      ? "Closed"
+                      : bucket === "pending"
+                        ? "Last Action"
+                        : bucket === "customer_delay" || bucket === "technical_delay"
+                          ? "Delay"
+                          : "Created"
+                } time`}
               >
                 <div className="inline-flex items-center gap-1">
-                  <span>{bucket === "completed" ? "Completed" : bucket === "closed" ? "Closed" : "Created"}</span>
+                  <span>
+                    {bucket === "completed"
+                      ? "Completed"
+                      : bucket === "closed"
+                        ? "Closed"
+                        : bucket === "pending"
+                          ? "Last Action"
+                          : bucket === "customer_delay" || bucket === "technical_delay"
+                            ? "Delayed"
+                            : "Created"}
+                  </span>
                   {sortField === "created_at" ? (
                     sortOrder === "desc" ? (
                       <ArrowDown className="w-3 h-3 text-indigo-600" />
@@ -1862,11 +1898,20 @@ function OrderRow({
 
   const isCompletedView = bucket === "completed";
   const isClosedView = bucket === "closed";
+  const isPendingActionView = bucket === "pending";
+  const isCustomerDelayView = bucket === "customer_delay";
+  const isTechnicalDelayView = bucket === "technical_delay";
   const dateToShow = isCompletedView
     ? (order.completed_at || order.created_at)
     : isClosedView
       ? (order.closed_at || order.created_at)
-      : order.created_at;
+      : isPendingActionView
+        ? (order.latest_action_at || order.created_at)
+        : isCustomerDelayView
+          ? (order.customer_hold_started_at || order.latest_action_at || order.created_at)
+          : isTechnicalDelayView
+            ? (order.technical_hold_started_at || order.latest_action_at || order.created_at)
+            : order.created_at;
 
   const stageToneMap: Record<string, string> = {
     emerald: "bg-emerald-50 text-emerald-700",
