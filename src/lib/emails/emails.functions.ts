@@ -187,11 +187,57 @@ export const listEmailTemplates = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { supabase } = context;
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from("email_templates")
       .select("id, code, name, subject, body_html, body_text, description, variables, is_enabled, is_system, updated_at, disabled_reason, last_toggled_by, last_toggled_at, last_sent_at, total_sent, category, flow_id, sr_no, dispatch_mode")
       .order("name", { ascending: true });
     if (error) throw new Error(error.message);
+
+    const codes = new Set((data ?? []).map((t) => t.code));
+    if (!codes.has("R002") || !codes.has("E011")) {
+      try {
+        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+        const { BUILTIN_TEMPLATES } = await import("./emails.server");
+        if (!codes.has("R002") && BUILTIN_TEMPLATES.R002) {
+          await supabaseAdmin.from("email_templates").upsert({
+            code: "R002",
+            name: "R002 – Refund Request Not Approved / Rejected",
+            subject: BUILTIN_TEMPLATES.R002.subject,
+            body_html: BUILTIN_TEMPLATES.R002.body_html,
+            category: "Refunds",
+            flow_id: "R002",
+            sr_no: 2,
+            dispatch_mode: "manual",
+            is_enabled: true,
+            is_system: true,
+            variables: ["order_number", "customer_name", "invoice_number", "service_name", "order_created_at", "closure_date", "customer_email", "customer_mobile", "employee_remarks", "executive_name"],
+          } as never, { onConflict: "code" });
+        }
+        if (!codes.has("E011") && BUILTIN_TEMPLATES.E011) {
+          await supabaseAdmin.from("email_templates").upsert({
+            code: "E011",
+            name: "E011 – Technical Delay Resolved",
+            subject: BUILTIN_TEMPLATES.E011.subject,
+            body_html: BUILTIN_TEMPLATES.E011.body_html,
+            category: "Delay & Hold",
+            flow_id: "E011",
+            sr_no: 11,
+            dispatch_mode: "manual",
+            is_enabled: true,
+            is_system: true,
+            variables: ["order_number", "customer_name", "service_name", "resolved_at", "customer_email", "customer_mobile", "executive_name"],
+          } as never, { onConflict: "code" });
+        }
+        const refetch = await supabase
+          .from("email_templates")
+          .select("id, code, name, subject, body_html, body_text, description, variables, is_enabled, is_system, updated_at, disabled_reason, last_toggled_by, last_toggled_at, last_sent_at, total_sent, category, flow_id, sr_no, dispatch_mode")
+          .order("name", { ascending: true });
+        if (refetch.data) data = refetch.data;
+      } catch (err) {
+        console.warn("[listEmailTemplates] Auto-seed error:", err);
+      }
+    }
+
     return { rows: data ?? [] };
   });
 

@@ -30,8 +30,10 @@ const EMAILS: EmailRow[] = [
   { code: "E008", name: "Ticket Reply", trigger: "manual", when: "Reply from ticket workspace", audience: "Customer" },
   { code: "E009", name: "Ticket Resolved", trigger: "auto/manual", when: "On ticket resolve", audience: "Customer" },
   { code: "E010", name: "Ticket Closed", trigger: "auto/manual", when: "On ticket close", audience: "Customer" },
-  { code: "E011", name: "Refund Approved", trigger: "auto", when: "Transition → REFUND_APPROVED", audience: "Customer + finance" },
+  { code: "E011", name: "Technical Delay Resolved", trigger: "manual", when: "Resolved technical delay in workspace", audience: "Customer" },
   { code: "E012", name: "Service Changed", trigger: "auto", when: "Change Service in order workspace (same / downgrade / upgrade)", audience: "Customer" },
+  { code: "R001", name: "Refund Approved", trigger: "manual", when: "Refund processed & confirmed", audience: "Customer" },
+  { code: "R002", name: "Refund Rejected / Closed", trigger: "manual", when: "Refund rejected button in support ticket / workspace", audience: "Customer" },
 ];
 
 const STATUSES: { code: string; description: string; nextAllowed: string }[] = [

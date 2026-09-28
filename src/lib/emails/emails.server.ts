@@ -72,7 +72,7 @@ function resolveTemplateCode(code: string | null | undefined): { code: string | 
   return { code: trimmed, drop: false };
 }
 
-const BUILTIN_TEMPLATES: Record<string, { subject: string; body_html: string; body_text?: string; is_enabled: boolean; dispatch_mode: string }> = {
+export const BUILTIN_TEMPLATES: Record<string, { subject: string; body_html: string; body_text?: string; is_enabled: boolean; dispatch_mode: string }> = {
   E011: {
     subject: "Update on Your Order – Technical Issue Resolved (Order No. {{order_number}})",
     body_html: `<!DOCTYPE html>

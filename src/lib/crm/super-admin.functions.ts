@@ -976,7 +976,30 @@ export const seedMissingEmailTemplates = createServerFn({ method: "POST" })
   .handler(async ({ context }) => {
     await requireSuper(context.supabase, context.userId);
     const admin = await getAdmin();
-    const seeds: Array<{ code: string; name: string; subject: string; body_html: string; variables: string[] }> = [
+    const { BUILTIN_TEMPLATES } = await import("@/lib/emails/emails.server");
+    const seeds: Array<{ code: string; name: string; subject: string; body_html: string; variables: string[]; category?: string; flow_id?: string; sr_no?: number; dispatch_mode?: string }> = [
+      {
+        code: "R002",
+        name: "R002 – Refund Request Not Approved / Rejected",
+        subject: BUILTIN_TEMPLATES.R002?.subject ?? "Refund Request Update – Order No. {{order_number}}",
+        body_html: BUILTIN_TEMPLATES.R002?.body_html ?? "",
+        category: "Refunds",
+        flow_id: "R002",
+        sr_no: 2,
+        dispatch_mode: "manual",
+        variables: ["order_number", "customer_name", "invoice_number", "service_name", "order_created_at", "closure_date", "customer_email", "customer_mobile", "employee_remarks", "executive_name"],
+      },
+      {
+        code: "E011",
+        name: "E011 – Technical Delay Resolved",
+        subject: BUILTIN_TEMPLATES.E011?.subject ?? "Update on Your Order – Technical Issue Resolved (Order No. {{order_number}})",
+        body_html: BUILTIN_TEMPLATES.E011?.body_html ?? "",
+        category: "Delay & Hold",
+        flow_id: "E011",
+        sr_no: 11,
+        dispatch_mode: "manual",
+        variables: ["order_number", "customer_name", "service_name", "resolved_at", "customer_email", "customer_mobile", "executive_name"],
+      },
       {
         code: "document_submission_approved",
         name: "Documents Approved",
@@ -1001,7 +1024,7 @@ export const seedMissingEmailTemplates = createServerFn({ method: "POST" })
     ];
     let inserted = 0;
     for (const s of seeds) {
-      const { error } = await admin.from("email_templates").insert({ ...s, is_enabled: true, is_system: true } as never);
+      const { error } = await admin.from("email_templates").upsert({ ...s, is_enabled: true, is_system: true } as never, { onConflict: "code" });
       if (!error) inserted += 1;
     }
     return { ok: true, inserted, total: seeds.length };
