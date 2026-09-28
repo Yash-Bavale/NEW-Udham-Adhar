@@ -18,6 +18,206 @@ interface Props {
   applicationId?: string;
 }
 
+export interface ButtonActionTagProps {
+  code?: string | null;
+  label: string;
+  variant?: "emerald" | "violet" | "sky" | "amber" | "rose" | "indigo" | "blue" | "slate";
+}
+
+function ButtonActionTag({ code, label, variant = "blue" }: ButtonActionTagProps) {
+  const variantStyles: Record<string, string> = {
+    emerald: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    violet: "bg-purple-50 text-purple-700 border-purple-200",
+    sky: "bg-sky-50 text-sky-700 border-sky-200",
+    amber: "bg-amber-50 text-amber-800 border-amber-200",
+    rose: "bg-rose-50 text-rose-700 border-rose-200",
+    indigo: "bg-indigo-50 text-indigo-700 border-indigo-200",
+    blue: "bg-blue-50 text-blue-700 border-blue-200",
+    slate: "bg-slate-100 text-slate-700 border-slate-200",
+  };
+  const cls = variantStyles[variant] || variantStyles.blue;
+  return (
+    <span className={`inline-flex items-center gap-1 font-sans text-[10.5px] font-semibold px-2 py-0.5 rounded-md border shadow-2xs ${cls}`}>
+      {code ? (
+        <>
+          <span className="font-mono font-bold tracking-tight">{code}</span>
+          <span className="opacity-40">·</span>
+          <span>{label}</span>
+        </>
+      ) : (
+        <span>{label}</span>
+      )}
+    </span>
+  );
+}
+
+function resolveEventButtonTag(e: any): ButtonActionTagProps | null {
+  const et = String(e.event_type || "").toLowerCase();
+  const nv = String(e.new_value || "").toLowerCase();
+  const note = String(e.note || e.remarks || "").toLowerCase();
+
+  // B07 - App Accepted / Application Accepted / Completed
+  if (
+    et === "application_completed" ||
+    et === "complete_with_cert" ||
+    nv === "order_completed" ||
+    nv === "completed" ||
+    note.includes("application accepted")
+  ) {
+    return { code: "B07", label: "App Accepted", variant: "emerald" };
+  }
+
+  // B06 - Consultation Done
+  if (
+    et === "consultation_completed" ||
+    et === "consultation_done" ||
+    nv === "consultation_completed" ||
+    note.includes("consultation done") ||
+    note.includes("consultation completed")
+  ) {
+    return { code: "B06", label: "Consultation Done", variant: "violet" };
+  }
+
+  // B05 - Submitted to Govt
+  if (
+    et === "submitted_to_govt" ||
+    et === "application_submitted" ||
+    nv === "submitted_to_govt" ||
+    nv === "application_submitted" ||
+    note.includes("submitted to govt")
+  ) {
+    return { code: "B05", label: "Submitted to Govt", variant: "violet" };
+  }
+
+  // B08 - App Rejected / Govt Rejected
+  if (
+    et === "govt_rejected" ||
+    et === "application_rejected" ||
+    nv === "application_rejected" ||
+    note.includes("application rejected") ||
+    note.includes("govt rejected")
+  ) {
+    return { code: "B08", label: "App Rejected", variant: "rose" };
+  }
+
+  // B02 - Technical Delay
+  if (
+    et === "technical_delay" ||
+    et === "technical_hold" ||
+    nv === "technical_delay" ||
+    nv === "technical_hold" ||
+    (note.includes("technical delay") && !note.includes("resolved"))
+  ) {
+    return { code: "B02", label: "Technical Delay", variant: "sky" };
+  }
+
+  // B03 - Issue Resolved
+  if (
+    et === "technical_delay_resumed" ||
+    et === "resume_technical_delay" ||
+    et === "issue_resolved" ||
+    note.includes("issue resolved") ||
+    note.includes("technical delay resolved")
+  ) {
+    return { code: "B03", label: "Issue Resolved", variant: "emerald" };
+  }
+
+  // B04 - Customer Delay / Resume
+  if (et === "customer_delay_resumed" || et === "resume_customer_delay" || note.includes("customer responded")) {
+    return { code: "B04", label: "Resume Order", variant: "emerald" };
+  }
+  if (
+    et === "customer_delay" ||
+    et === "customer_hold" ||
+    nv === "customer_delay" ||
+    nv === "customer_hold" ||
+    note.includes("customer delay")
+  ) {
+    return { code: "B04", label: "Customer Delay", variant: "amber" };
+  }
+
+  // B01 - Form Not Submitted
+  if (
+    et === "form_not_submitted" ||
+    et === "form_link_sent" ||
+    note.includes("form link sent") ||
+    note.includes("form not submitted")
+  ) {
+    return { code: "B01", label: "Form Not Submitted", variant: "amber" };
+  }
+
+  // B09 - Reopen Order
+  if (et === "order_reopened" || nv === "order_reopened" || note.includes("order reopened")) {
+    return { code: "B09", label: "Reopen Order", variant: "indigo" };
+  }
+
+  // B10 - Order Closed / Force Close
+  if (et === "order_closed" || et === "workflow_closed" || nv === "order_closed" || nv === "closed" || note.includes("order closed")) {
+    return { code: "B10", label: "Force Close", variant: "rose" };
+  }
+
+  // Callbacks & Tasks
+  if (et === "callback_completed") {
+    return { label: "Callback Completed", variant: "emerald" };
+  }
+  if (et === "callback_scheduled" || et === "callback_rescheduled") {
+    return { label: "Add Task / Follow-up", variant: "violet" };
+  }
+
+  // Service & Refund
+  if (et === "service_changed" || note.includes("service changed")) {
+    return { label: "Change Service", variant: "blue" };
+  }
+  if (et === "refund_rejected" || note.includes("refund rejected")) {
+    return { label: "Refund Rejected (R002)", variant: "rose" };
+  }
+  if (et === "refund_approved" || et === "refund_processed" || note.includes("refund approved")) {
+    return { label: "Refund Approved", variant: "slate" };
+  }
+  if (et.includes("refund")) {
+    return { label: "Refund", variant: "rose" };
+  }
+
+  // Documents / Certs
+  if (et === "certificate_uploaded" || note.includes("certificate uploaded")) {
+    return { label: "Upload Certificate", variant: "emerald" };
+  }
+  if (et === "document_uploaded" || note.includes("document uploaded")) {
+    return { label: "Upload Document", variant: "violet" };
+  }
+
+  return null;
+}
+
+function resolveEmailButtonTag(templateCode?: string | null): ButtonActionTagProps | null {
+  if (!templateCode) return null;
+  const tc = templateCode.toUpperCase();
+  if (tc === "E007" || tc === "BHS_E007") return { code: "B07", label: "App Accepted", variant: "emerald" };
+  if (tc === "E006" || tc === "BHS_E006") return { code: "B05", label: "Submitted to Govt", variant: "violet" };
+  if (tc === "E005" || tc === "BHS_E005") return { code: "B06", label: "Consultation Done", variant: "violet" };
+  if (tc === "E003" || tc === "BHS_E003") return { code: "B02", label: "Technical Delay", variant: "sky" };
+  if (tc === "E004" || tc === "BHS_E004") return { code: "B04", label: "Customer Delay", variant: "amber" };
+  if (tc === "E002" || tc === "BHS_E002") return { code: "B01", label: "Form Not Submitted", variant: "amber" };
+  if (tc === "E011" || tc === "BHS_E011") return { code: "B03", label: "Issue Resolved", variant: "emerald" };
+  if (tc === "E008" || tc === "BHS_E008") return { code: "B08", label: "App Rejected", variant: "rose" };
+  if (tc === "E009" || tc === "E09" || tc === "BHS_E009") return { code: "B09", label: "Reopen Order", variant: "indigo" };
+  if (tc === "E010" || tc === "BHS_E010") return { code: "B10", label: "Force Close", variant: "rose" };
+  if (tc === "R002" || tc === "BHS_R002") return { label: "Refund Rejected (R002)", variant: "rose" };
+  if (tc === "E012" || tc === "BHS_E012") return { label: "Refund Approved", variant: "slate" };
+  return null;
+}
+
+function resolveWorkflowButtonTag(w: any): ButtonActionTagProps | null {
+  const type = String(w.event_type ?? "");
+  if (type === "callback_scheduled") return { label: "Add Task / Follow-up", variant: "violet" };
+  if (type === "GovApproved" || type === "CertificateUploaded") return { code: "B07", label: "App Accepted", variant: "emerald" };
+  if (type === "GovRejected") return { code: "B08", label: "App Rejected", variant: "rose" };
+  if (type === "OrderClosed") return { code: "B10", label: "Force Close", variant: "rose" };
+  if (type === "TechnicalDelay") return { code: "B02", label: "Technical Delay", variant: "sky" };
+  if (type === "CustomerDelay") return { code: "B04", label: "Customer Delay", variant: "amber" };
+  return null;
+}
+
 type Item = {
   id: string;
   ts: string;
@@ -26,6 +226,7 @@ type Item = {
   title: React.ReactNode;
   detail?: React.ReactNode;
   actor?: string | null;
+  buttonTag?: ButtonActionTagProps | null;
 };
 
 const TONE: Record<Item["tone"], { ring: string; bg: string; fg: string }> = {
@@ -69,17 +270,24 @@ export function UnifiedTimeline({ events, payments, documents, emailLogs, create
         tone: isRefund ? "rose" : "emerald",
         title: isRefund ? "Refund processed" : "Payment received",
         detail: `${amountStr} · ${p.gateway_name ?? "—"} · ${String(p.status).replace(/_/g, " ")}`,
+        buttonTag: isRefund
+          ? { label: "Refund", variant: "rose" }
+          : { label: "Payment Paid", variant: "emerald" },
       });
     }
 
     for (const d of documents ?? []) {
+      const isCert = d.doc_type === "certificate";
       out.push({
         id: `doc-${d.id}`,
         ts: d.uploaded_at || d.created_at,
-        icon: d.doc_type === "certificate" ? FileCheck2 : Upload,
-        tone: d.doc_type === "certificate" ? "emerald" : "violet",
-        title: d.doc_type === "certificate" ? "Certificate uploaded" : "Document uploaded",
+        icon: isCert ? FileCheck2 : Upload,
+        tone: isCert ? "emerald" : "violet",
+        title: isCert ? "Certificate uploaded" : "Document uploaded",
         detail: `${d.doc_type?.replace(/_/g, " ")} · ${d.file_name}`,
+        buttonTag: isCert
+          ? { label: "Upload Certificate", variant: "emerald" }
+          : { label: "Upload Document", variant: "violet" },
       });
     }
 
@@ -125,6 +333,7 @@ export function UnifiedTimeline({ events, payments, documents, emailLogs, create
             )}
           </div>
         ),
+        buttonTag: resolveEmailButtonTag(l.template_code),
       });
     }
 
@@ -159,10 +368,17 @@ export function UnifiedTimeline({ events, payments, documents, emailLogs, create
         continue;
       } else if (e.event_type === "document_uploaded") {
         icon = Upload; tone = "violet"; title = "Document uploaded";
+      } else if (e.event_type === "certificate_uploaded") {
+        icon = FileCheck2; tone = "emerald"; title = "Certificate uploaded";
+      } else if (e.event_type === "application_completed" || e.event_type === "complete_with_cert") {
+        icon = FileCheck2; tone = "emerald"; title = "Application completed";
       } else if (e.event_type === "form_submitted") {
         icon = FileText; tone = "emerald"; title = "Form submitted";
       } else if (e.event_type === "callback_scheduled") {
         icon = PhoneCall; tone = "violet"; title = "Callback scheduled";
+        detail = <span className="whitespace-pre-wrap text-[11px] font-medium text-slate-700">{e.note}</span>;
+      } else if (e.event_type === "callback_completed") {
+        icon = PhoneCall; tone = "emerald"; title = "Callback completed";
         detail = <span className="whitespace-pre-wrap text-[11px] font-medium text-slate-700">{e.note}</span>;
       }
 
@@ -176,9 +392,9 @@ export function UnifiedTimeline({ events, payments, documents, emailLogs, create
         title,
         detail,
         actor: e.staff_name ?? null,
+        buttonTag: resolveEventButtonTag(e),
       });
     }
-
 
     // Workflow engine events — stage transitions, timers fired, automations, etc.
     for (const w of workflowEvents ?? []) {
@@ -214,13 +430,13 @@ export function UnifiedTimeline({ events, payments, documents, emailLogs, create
             : null
         ),
         actor: w.actor_name ?? (w.is_system ? "System" : null),
+        buttonTag: resolveWorkflowButtonTag(w),
       });
     }
 
     out.sort((a, b) => new Date(b.ts).getTime() - new Date(a.ts).getTime());
     return out;
   }, [events, payments, documents, emailLogs, createdAt, hideMoney, workflowEvents]);
-
 
   const visible = showAll ? items : items.slice(0, 12);
 
@@ -261,8 +477,13 @@ export function UnifiedTimeline({ events, payments, documents, emailLogs, create
                 >
                   <Icon className="size-3.5" />
                 </span>
-                <div className="text-[13px] leading-snug" style={{ color: "var(--admin-fg)" }}>
-                  {it.title}
+                <div className="text-[13px] leading-snug flex items-center justify-between gap-2 flex-wrap font-medium" style={{ color: "var(--admin-fg)" }}>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span>{it.title}</span>
+                    {it.buttonTag && (
+                      <ButtonActionTag code={it.buttonTag.code} label={it.buttonTag.label} variant={it.buttonTag.variant} />
+                    )}
+                  </div>
                 </div>
                 {it.detail && (
                   <div className="text-xs mt-0.5" style={{ color: "var(--admin-fg-muted)" }}>
