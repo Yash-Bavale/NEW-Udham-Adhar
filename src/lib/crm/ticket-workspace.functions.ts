@@ -157,12 +157,58 @@ export const getTicketWorkspace = createServerFn({ method: "POST" })
       try {
         const { data: candidates } = await admin
           .from("applications")
-          .select("id, application_code, order_status, fulfillment_status, created_at, service_id")
+          .select("id, application_code, order_status, fulfillment_status, created_at, service_id, lead_id")
           .eq("customer_id", effectiveCustomerId)
+          .eq("is_deleted", false)
           .not("order_status", "in", `(${INACTIVE_ORDER_STATUSES.join(",")})`)
           .order("created_at", { ascending: false })
           .limit(20);
-        candidateOrders = (candidates ?? []) as typeof candidateOrders;
+
+        const rawCandidates = (candidates ?? []) as any[];
+        if (rawCandidates.length > 0) {
+          const appIds = rawCandidates.map((c) => c.id);
+          const leadIds = rawCandidates.map((c) => c.lead_id).filter(Boolean);
+          const orList: string[] = [];
+          if (appIds.length) orList.push(`application_id.in.(${appIds.join(",")})`);
+          if (leadIds.length) orList.push(`lead_id.in.(${leadIds.join(",")})`);
+
+          const paidAppIds = new Set<string>();
+          const paidLeadIds = new Set<string>();
+
+          if (orList.length) {
+            const { data: pays } = await admin
+              .from("payments")
+              .select("application_id, lead_id, status")
+              .or(orList.join(","))
+              .eq("status", "paid");
+
+            for (const p of (pays ?? []) as Array<{ application_id: string | null; lead_id: string | null; status: string }>) {
+              if (p.application_id) paidAppIds.add(p.application_id);
+              if (p.lead_id) paidLeadIds.add(p.lead_id);
+            }
+          }
+
+          if (leadIds.length) {
+            const { data: leads } = await admin
+              .from("leads")
+              .select("id, lead_status_v2, status")
+              .in("id", leadIds);
+
+            for (const l of (leads ?? []) as Array<{ id: string; lead_status_v2: string | null; status: string | null }>) {
+              if (
+                l.lead_status_v2 === "payment_successful" ||
+                l.lead_status_v2 === "welcome_mail_sent" ||
+                l.status === "payment_successful"
+              ) {
+                paidLeadIds.add(l.id);
+              }
+            }
+          }
+
+          candidateOrders = rawCandidates
+            .filter((c) => paidAppIds.has(c.id) || (c.lead_id && paidLeadIds.has(c.lead_id)))
+            .map(({ lead_id, ...rest }) => rest);
+        }
       } catch (e) {
         console.warn("[getTicketWorkspace] candidateOrders fetch warning:", e);
       }

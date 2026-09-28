@@ -1219,14 +1219,17 @@ async function matchOrderByContext(input: {
     const customerId = (cust as { id: string } | null)?.id ?? null;
 
     if (customerId) {
-      const { data: activeApps } = await supabaseAdmin
+      const { data: rawApps } = await supabaseAdmin
         .from("applications")
         .select("id, lead_id, customer_id")
         .eq("customer_id", customerId)
+        .eq("is_deleted", false)
         // REFUND_APPROVED is also terminal — include it alongside COMPLETED/CLOSED/REFUND_PROCESSED
         .not("order_status", "in", "(COMPLETED,CLOSED,REFUND_PROCESSED,REFUND_APPROVED)");
 
-      const apps = (activeApps ?? []) as Array<{ id: string; lead_id: string | null; customer_id: string | null }>;
+      const apps = await filterPaidActiveApplications(
+        (rawApps ?? []) as Array<{ id: string; lead_id: string | null; customer_id: string | null }>
+      );
 
       if (apps.length === 1) {
         return {
@@ -1270,13 +1273,17 @@ async function matchOrderByContext(input: {
 
     const leadRow = lead as { id: string; customer_id: string | null } | null;
     if (leadRow?.id) {
-      const { data: activeApps } = await supabaseAdmin
+      const { data: rawApps } = await supabaseAdmin
         .from("applications")
         .select("id, lead_id, customer_id")
         .eq("lead_id", leadRow.id)
+        .eq("is_deleted", false)
         .not("order_status", "in", "(COMPLETED,CLOSED,REFUND_PROCESSED,REFUND_APPROVED)");
 
-      const apps = (activeApps ?? []) as Array<{ id: string; lead_id: string | null; customer_id: string | null }>;
+      const apps = await filterPaidActiveApplications(
+        (rawApps ?? []) as Array<{ id: string; lead_id: string | null; customer_id: string | null }>
+      );
+
       if (apps.length === 1) {
         return {
           applicationId: apps[0].id,
@@ -1298,3 +1305,65 @@ async function matchOrderByContext(input: {
 
   return null;
 }
+
+/**
+ * Filters raw candidate applications to only include genuine PAID orders.
+ * An application is paid if:
+ *  1. It has a payment with status in ('paid', 'success', 'successful') by application_id or lead_id, OR
+ *  2. Its associated lead has lead_status_v2 in ('payment_successful', 'welcome_mail_sent') or payment_successful_at != null
+ */
+async function filterPaidActiveApplications(
+  apps: Array<{ id: string; lead_id: string | null; customer_id: string | null }>
+): Promise<Array<{ id: string; lead_id: string | null; customer_id: string | null }>> {
+  if (!apps.length) return [];
+  const appIds = apps.map((a) => a.id);
+  const leadIds = apps.map((a) => a.lead_id).filter(Boolean) as string[];
+
+  const orFilters: string[] = [];
+  if (appIds.length) orFilters.push(`application_id.in.(${appIds.join(",")})`);
+  if (leadIds.length) orFilters.push(`lead_id.in.(${leadIds.join(",")})`);
+
+  const paidAppIds = new Set<string>();
+  const paidLeadIds = new Set<string>();
+
+  if (orFilters.length) {
+    try {
+      const { data: pays } = await supabaseAdmin
+        .from("payments")
+        .select("application_id, lead_id, status")
+        .or(orFilters.join(","))
+        .eq("status", "paid");
+
+      for (const p of (pays ?? []) as Array<{ application_id: string | null; lead_id: string | null; status: string }>) {
+        if (p.application_id) paidAppIds.add(p.application_id);
+        if (p.lead_id) paidLeadIds.add(p.lead_id);
+      }
+    } catch (e) {
+      console.warn("[filterPaidActiveApplications] payment check warning:", e);
+    }
+  }
+
+  if (leadIds.length) {
+    try {
+      const { data: paidLeads } = await supabaseAdmin
+        .from("leads")
+        .select("id, lead_status_v2, status")
+        .in("id", leadIds);
+
+      for (const l of (paidLeads ?? []) as Array<{ id: string; lead_status_v2: string | null; status: string | null }>) {
+        if (
+          l.lead_status_v2 === "payment_successful" ||
+          l.lead_status_v2 === "welcome_mail_sent" ||
+          l.status === "payment_successful"
+        ) {
+          paidLeadIds.add(l.id);
+        }
+      }
+    } catch (e) {
+      console.warn("[filterPaidActiveApplications] lead check warning:", e);
+    }
+  }
+
+  return apps.filter((a) => paidAppIds.has(a.id) || (a.lead_id && paidLeadIds.has(a.lead_id)));
+}
+

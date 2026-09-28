@@ -1100,8 +1100,13 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       if (p && p.id) allPaymentsMap.set(p.id, p);
     }
 
+    const leadToAppMap = new Map<string, string>();
+    for (const a of appList) {
+      if (a.lead_id) leadToAppMap.set(a.lead_id, a.id);
+    }
+
     for (const p of allPaymentsMap.values()) {
-      const appId = p.application_id;
+      const appId = p.application_id || (p.lead_id ? leadToAppMap.get(p.lead_id) : null);
       if (appId) {
         const arr = payByApp.get(appId) ?? [];
         arr.push({ status: p.status as string, amount: Number(p.amount || 0) });
@@ -1975,11 +1980,17 @@ export const getOrderDetailV2 = createServerFn({ method: "POST" })
       app.service_id
         ? admin.from("services").select("id, service_code, service_name, govt_portal_url").eq("id", app.service_id).maybeSingle()
         : Promise.resolve({ data: null }),
-      admin
-        .from("payments")
-        .select("id, status, amount, gateway_name, transaction_id, payment_date, created_at, parent_payment_id, refund_reason, currency")
-        .eq("application_id", data.orderId)
-        .order("created_at", { ascending: false }),
+      app.lead_id
+        ? admin
+            .from("payments")
+            .select("id, status, amount, gateway_name, transaction_id, payment_date, created_at, parent_payment_id, refund_reason, currency")
+            .or(`application_id.eq.${data.orderId},lead_id.eq.${app.lead_id}`)
+            .order("created_at", { ascending: false })
+        : admin
+            .from("payments")
+            .select("id, status, amount, gateway_name, transaction_id, payment_date, created_at, parent_payment_id, refund_reason, currency")
+            .eq("application_id", data.orderId)
+            .order("created_at", { ascending: false }),
       admin
         .from("documents")
         .select("id, doc_type, file_path, file_name, mime_type, size_bytes, status, uploaded_at, created_at")

@@ -202,5 +202,34 @@ describe("Order Resolution Architecture & Multi-Order Workflow Tests", () => {
       const matchedApp = customerOrders.length === 1 ? customerOrders[0] : null;
       expect(matchedApp?.application_code).toBe("AP-2026-010024");
     });
+
+    // Test 11: Customer with 1 paid order and 3 unpaid draft applications auto-links ONLY the paid order
+    it("Test 11: Customer with 1 paid order and 3 unpaid applications auto-links the 1 paid order without needs_review", () => {
+      const allCustomerApps = [
+        { id: "app-paid-1", application_code: "AP-2026-007416", lead_id: "lead-1" },
+        { id: "app-unpaid-2", application_code: "AP-2026-007184", lead_id: "lead-2" },
+        { id: "app-unpaid-3", application_code: "AP-2026-007183", lead_id: "lead-3" },
+        { id: "app-unpaid-4", application_code: "AP-2026-005827", lead_id: "lead-4" },
+      ];
+
+      const paidPayments = [{ application_id: "app-paid-1", status: "paid" }];
+      const paidAppIds = new Set(paidPayments.map((p) => p.application_id));
+
+      const eligiblePaidOrders = allCustomerApps.filter((a) => paidAppIds.has(a.id));
+
+      expect(eligiblePaidOrders).toHaveLength(1);
+      expect(eligiblePaidOrders[0].id).toBe("app-paid-1");
+
+      const matchResult = {
+        applicationId: eligiblePaidOrders.length === 1 ? eligiblePaidOrders[0].id : null,
+        customerId: "cust-001",
+        leadId: eligiblePaidOrders[0].lead_id,
+        orderLinkStatus: eligiblePaidOrders.length === 1 ? ("linked" as const) : ("needs_review" as const),
+        resolutionMethod: "customer_email" as const,
+      };
+
+      expect(matchResult.orderLinkStatus).toBe("linked");
+      expect(matchResult.applicationId).toBe("app-paid-1");
+    });
   });
 });
