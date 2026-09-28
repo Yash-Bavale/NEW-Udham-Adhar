@@ -15,6 +15,7 @@ import {
   PhoneCall, Flame, VolumeX, Loader2, Server, History,
   type LucideIcon,
 } from "lucide-react";
+import { Link } from "@tanstack/react-router";
 
 import { STAGE_META, type OrderStage } from "@/lib/crm/computeOrderStage";
 import { useOrderWorkflow } from "@/hooks/useOrderWorkflow";
@@ -261,6 +262,62 @@ export function CustomerJourneyMap(p: Props) {
   const isReopenedHot = !closed && !completed && (p.stage === "order_reopened" || p.fulfillmentStatus === "order_reopened" || (p.workflowStatus as string) === "reopened");
   const role = useRole();
   const isAdmin = role.hasAny(["super_admin", "admin"]);
+
+  const reopenedDetails = useMemo(() => {
+    // 1. From active callback
+    if (activeCallback?.parsedRemarks) {
+      return {
+        reason: activeCallback.parsedRemarks.reasonLabel || activeCallback.parsedRemarks.reason || "Order Reopened & Hot Priority",
+        note: activeCallback.parsedRemarks.note || null,
+        ticketNumber: activeCallback.parsedRemarks.ticketNumber || null,
+        ticketId: activeCallback.parsedRemarks.ticketId || null,
+      };
+    }
+    // 2. From recent workflow events
+    const reopenEvent = (events ?? []).find(
+      (e: any) =>
+        e?.event_type === "order_reopened" ||
+        e?.event_type === "hot_priority_escalated" ||
+        e?.type === "OrderReopened" ||
+        e?.metadata?.event === "ORDER_REOPENED_HOT"
+    );
+    if (reopenEvent) {
+      const meta = reopenEvent.metadata || {};
+      return {
+        reason: reopenEvent.title || "Order Reopened from Support Ticket",
+        note: meta.note || reopenEvent.description || null,
+        ticketNumber: meta.ticketNumber || null,
+        ticketId: meta.ticketId || null,
+      };
+    }
+    // 3. From callback history
+    const historyItem = (callbackHistory ?? []).find(
+      (h: any) => h.reason === "ticket_hot_priority" || h.reason === "order_reopened" || h.reason_label
+    );
+    if (historyItem) {
+      return {
+        reason: historyItem.reason_label || "Order Reopened",
+        note: historyItem.note || null,
+        ticketNumber: (historyItem as any).ticketNumber || null,
+        ticketId: (historyItem as any).ticketId || null,
+      };
+    }
+    // 4. From open ticket
+    if (openTicket) {
+      return {
+        reason: `Order Reopened · Support Ticket #${openTicket.ticket_number ?? String(openTicket.id).slice(0, 8)}`,
+        note: openTicket.subject || "Customer support escalation",
+        ticketNumber: openTicket.ticket_number ?? null,
+        ticketId: openTicket.id ?? null,
+      };
+    }
+    return {
+      reason: p.closureReasonLabel ? `Order Reopened · Prior: ${p.closureReasonLabel}` : "Order Reopened — Urgent Action Required",
+      note: null,
+      ticketNumber: null,
+      ticketId: null,
+    };
+  }, [activeCallback, events, callbackHistory, openTicket, p.closureReasonLabel]);
 
   const [dialog, setDialog] = useState<
     | null
@@ -757,6 +814,9 @@ export function CustomerJourneyMap(p: Props) {
             (activeCallback.parsedRemarks?.note && activeCallback.parsedRemarks.note.toLowerCase().includes("ticket"))
           );
 
+          const ticketNum = activeCallback.parsedRemarks?.ticketNumber || reopenedDetails.ticketNumber;
+          const ticketId = activeCallback.parsedRemarks?.ticketId || reopenedDetails.ticketId;
+
           return (
             <div className={cn(
               "mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-2.5 shadow-xs",
@@ -774,11 +834,21 @@ export function CustomerJourneyMap(p: Props) {
                     <Clock className="size-3" /> {activeCallback.parsedRemarks?.channel === "technical_delay" ? "Tech Delay Reminder" : isTicketSourceHot ? "Email Action Reminder" : "Scheduled Callback"}
                   </span>
                 )}
+                {ticketNum && (
+                  <a
+                    href={`/admin/support/tickets/${ticketId || ticketNum}`}
+                    className="inline-flex items-center gap-1 rounded-md bg-rose-100 border border-rose-200 px-2 py-0.5 text-xs font-bold text-rose-900 hover:bg-rose-200 transition"
+                    title="Open Linked Support Ticket"
+                  >
+                    <Mail className="size-3 text-rose-700" />
+                    Ticket #{ticketNum}
+                  </a>
+                )}
                 <span className="text-sm font-bold text-slate-900">
                   Due: {formatIST(activeCallback.fires_at)}
                 </span>
                 <span className="text-sm text-slate-800">
-                  · <strong className="font-bold text-slate-900">Reason:</strong> {activeCallback.parsedRemarks?.reasonLabel || "Follow-up"}
+                  · <strong className="font-bold text-slate-900">Reason:</strong> {activeCallback.parsedRemarks?.reasonLabel || reopenedDetails.reason || "Follow-up"}
                   {activeCallback.parsedRemarks?.note ? (
                     <span className="text-slate-600"> ({activeCallback.parsedRemarks.note})</span>
                   ) : null}
@@ -846,9 +916,24 @@ export function CustomerJourneyMap(p: Props) {
               <span className="inline-flex items-center gap-1 rounded-md bg-rose-600 px-2 py-0.5 text-[10px] font-black uppercase text-white shadow-xs tracking-wider">
                 <Flame className="size-3" /> HOT ORDER NOW
               </span>
+              {reopenedDetails.ticketNumber && (
+                <a
+                  href={`/admin/support/tickets/${reopenedDetails.ticketId || reopenedDetails.ticketNumber}`}
+                  className="inline-flex items-center gap-1 rounded-md bg-rose-100 border border-rose-200 px-2 py-0.5 text-xs font-bold text-rose-900 hover:bg-rose-200 transition"
+                  title="Open Linked Support Ticket"
+                >
+                  <Mail className="size-3 text-rose-700" />
+                  Ticket #{reopenedDetails.ticketNumber}
+                </a>
+              )}
               <span className="text-sm font-bold text-slate-900">
-                Reopened Hot Order · Employee workflow action or customer call required
+                {reopenedDetails.reason}
               </span>
+              {reopenedDetails.note && (
+                <span className="text-sm text-slate-700 font-medium">
+                  · <strong className="font-bold text-slate-900">Instructions:</strong> {reopenedDetails.note}
+                </span>
+              )}
             </div>
 
             <div className="flex items-center gap-2 ml-auto flex-wrap">
@@ -867,7 +952,7 @@ export function CustomerJourneyMap(p: Props) {
                 onClick={() => mutCompleteCallback.mutate()}
                 disabled={mutCompleteCallback.isPending}
                 className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3.5 py-1.5 text-xs font-bold text-white hover:bg-emerald-700 transition cursor-pointer shadow-xs disabled:opacity-50"
-                title="Mark customer contact completed & remove Hot Order"
+                title="Mark customer contact / action completed & remove Hot Order"
               >
                 {mutCompleteCallback.isPending ? <Loader2 className="size-3.5 animate-spin" /> : <CheckCircle2 className="size-3.5" />}
                 Call Completed
@@ -877,6 +962,7 @@ export function CustomerJourneyMap(p: Props) {
                 type="button"
                 onClick={() => setDialog({ kind: "callback_reminder" })}
                 className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-800 hover:bg-slate-50 transition cursor-pointer shadow-2xs"
+                title="Schedule customer callback"
               >
                 <Clock className="size-3.5 text-slate-600" />
                 Schedule Callback

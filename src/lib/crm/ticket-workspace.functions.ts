@@ -77,34 +77,7 @@ export const getTicketWorkspace = createServerFn({ method: "POST" })
         }
 
         if (app) {
-          // Check whether the linked application has a paid payment or paid lead status
-          let isPaid = false;
-          try {
-            const { data: pay } = await admin
-              .from("payments")
-              .select("id")
-              .or(`application_id.eq.${app.id}${app.lead_id ? `,lead_id.eq.${app.lead_id}` : ""}`)
-              .eq("status", "paid")
-              .limit(1)
-              .maybeSingle();
-
-            const isPaidLead =
-              (leadData as any)?.lead_status_v2 === "payment_successful" ||
-              (leadData as any)?.status === "payment_successful";
-
-            isPaid = Boolean(pay || isPaidLead);
-          } catch (payCheckErr) {
-            console.warn("[getTicketWorkspace] payment check warning:", payCheckErr);
-            isPaid = true;
-          }
-
-          if (isPaid) {
-            applicationData = app;
-          } else {
-            // Unpaid draft application — do not display as active order
-            applicationData = null;
-            leadData = null;
-          }
+          applicationData = app;
         }
       } catch (e) {
         console.warn("[getTicketWorkspace] application fetch warning:", e);
