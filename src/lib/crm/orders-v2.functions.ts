@@ -1563,10 +1563,34 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         const t = new Date(s.created_at).getTime();
         if (!hasDateFilter || (t >= fromTime && t <= toTime)) {
           const st = String(s.scheduler_type || "").toLowerCase();
+          let parsedRemarks: any = null;
+          if (typeof s.remarks === "object" && s.remarks) {
+            parsedRemarks = s.remarks;
+          } else if (typeof s.remarks === "string" && s.remarks) {
+            try {
+              parsedRemarks = JSON.parse(s.remarks);
+            } catch {
+              parsedRemarks = { reasonLabel: s.remarks };
+            }
+          }
+
           let title = "Workflow Scheduler";
-          if (st.includes("customer")) title = "Customer Delay Added";
-          else if (st.includes("technical") || st.includes("our_side")) title = "Technical Delay Added";
-          else if (st.includes("callback")) title = "Callback Scheduled";
+          if (st.includes("customer_delay") || st.includes("customer_side")) {
+            title = "Customer Delay Added";
+          } else if (st.includes("technical_delay") || st.includes("our_side_delay")) {
+            title = "Technical Delay Added";
+          } else if (
+            st.includes("our_side_reminder") ||
+            st.includes("callback") ||
+            st.includes("reminder") ||
+            st.includes("consultation")
+          ) {
+            title = "Callback Scheduled";
+          }
+
+          const note = parsedRemarks?.reasonLabel
+            ? (parsedRemarks.note ? `${parsedRemarks.reasonLabel} (${parsedRemarks.note})` : parsedRemarks.reasonLabel)
+            : (s.reason || parsedRemarks?.note || null);
 
           const exists = actionHistoryList.some((x) => Math.abs(new Date(x.created_at).getTime() - t) < 60000);
           if (!exists) {
@@ -1576,7 +1600,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
               title,
               staff_name: staffName!,
               created_at: s.created_at,
-              note: s.reason || null,
+              note,
             });
           }
         }
