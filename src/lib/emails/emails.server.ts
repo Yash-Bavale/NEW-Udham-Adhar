@@ -377,7 +377,9 @@ export async function enqueueEmailInternal(input: {
   // forever; everything else is blocked inside a short window so that a retry,
   // a double webhook, or a double click can't deliver the same mail twice.
   if (!input.allowDuplicate && templateCode) {
-    const ONCE_PER_ORDER = new Set(["E001", "E007"]);
+    // Only E001 (initial order confirmation) is strictly once-per-order forever.
+    // E007 (certificate delivery / completion) can be legitimately re-issued on reopened orders or manual sends.
+    const ONCE_PER_ORDER = new Set(["E001"]);
     const forever = ONCE_PER_ORDER.has(templateCode);
     let q = supabaseAdmin
       .from("email_queue")

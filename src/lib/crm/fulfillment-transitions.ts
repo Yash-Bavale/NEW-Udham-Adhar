@@ -20,6 +20,7 @@ export type FulfillmentStatus =
   | "application_rejected"              // S10
   | "order_completed"                   // S11
   | "order_closed"                      // S12
+  | "order_reopened"
   // legacy terminal aliases still written by older code paths
   | "completed"
   | "cancelled";
@@ -52,6 +53,7 @@ export const FULFILLMENT_CODE: Record<FulfillmentStatus, string> = {
   application_rejected:            "S10",
   order_completed:                 "S11",
   order_closed:                    "S12",
+  order_reopened:                  "S04",
   completed:                       "S11",
   cancelled:                       "S12",
 };
@@ -69,6 +71,7 @@ export const FULFILLMENT_LABEL: Record<FulfillmentStatus, string> = {
   application_rejected:            "Application Rejected",
   order_completed:                 "Order Completed",
   order_closed:                    "Order Closed",
+  order_reopened:                  "Order Reopened",
   completed:                       "Order Completed",
   cancelled:                       "Order Closed",
 };
@@ -86,6 +89,7 @@ export const FULFILLMENT_BADGE: Record<FulfillmentStatus, string> = {
   application_rejected:            "bg-rose-50 text-rose-700 border-rose-200",
   order_completed:                 "bg-emerald-50 text-emerald-700 border-emerald-200",
   order_closed:                    "bg-rose-50 text-rose-700 border-rose-200",
+  order_reopened:                  "bg-rose-50 text-rose-700 border-rose-200",
   completed:                       "bg-emerald-50 text-emerald-700 border-emerald-200",
   cancelled:                       "bg-rose-50 text-rose-700 border-rose-200",
 };
@@ -110,6 +114,17 @@ export const FULFILLMENT_TRANSITIONS: Record<FulfillmentStatus, FulfillmentStatu
   awaiting_customer_form:          ["waiting_for_customer_submission", "order_closed"],
   waiting_for_customer_submission: ["form_submitted", "order_closed"],
   form_submitted: [
+    "technical_delay",
+    "customer_delay",
+    "government_processing",
+    "consultation_completed",
+    "application_approved",
+    "application_rejected",
+    "order_completed",
+    "order_closed",
+  ],
+  order_reopened: [
+    "form_submitted",
     "technical_delay",
     "customer_delay",
     "government_processing",

@@ -104,17 +104,7 @@ export function computeOrderStage(
   const ws = application.workflow_status ?? "";
   const os = application.order_status ?? "";
 
-  // Reopened state takes precedence over prior closed status
-  if (
-    fs === "order_reopened" ||
-    ws === "order_reopened" ||
-    application.application_status === "order_reopened" ||
-    os === "REOPENED"
-  ) {
-    return "order_reopened";
-  }
-
-  // Terminals
+  // Terminals take precedence over active/reopened states
   if (
     fs === "completed" ||
     fs === "order_completed" ||
@@ -134,6 +124,16 @@ export function computeOrderStage(
     application?.closure_stage === "final_ticket_closed" ||
     os === "CLOSED"
   ) return "closed";
+
+  // Reopened state takes precedence over prior active stages
+  if (
+    fs === "order_reopened" ||
+    ws === "order_reopened" ||
+    application.application_status === "order_reopened" ||
+    os === "REOPENED"
+  ) {
+    return "order_reopened";
+  }
 
   // S09/S10 near-terminals
   if (fs === "application_approved") return "certificate_ready";

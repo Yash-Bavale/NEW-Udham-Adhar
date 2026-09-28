@@ -265,6 +265,8 @@ export const deliverCertificate = createServerFn({ method: "POST" })
           applicationId: app?.id ?? undefined,
           attachments: attachment ? [attachment] : undefined,
           requireImmediateSuccess: true,
+          allowDuplicate: true,
+          trigger: "manual",
         },
       );
     }

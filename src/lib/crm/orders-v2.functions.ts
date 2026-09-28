@@ -2515,6 +2515,8 @@ export const updateFulfillmentStatus = createServerFn({ method: "POST" })
               ? [{ filename: certAttachment.filename, content_type: certAttachment.content_type, content_base64: certAttachment.content_base64 }]
               : undefined,
             requireImmediateSuccess: true,
+            allowDuplicate: true,
+            trigger: "manual",
           });
       }
 
@@ -2525,11 +2527,13 @@ export const updateFulfillmentStatus = createServerFn({ method: "POST" })
         .update({
           fulfillment_status: "order_completed",
           application_status: "completed",
+          order_status: "COMPLETED",
           fulfilled_at: now,
           certificate_uploaded_at: now,
           certificate_number: certNumber,
           documents_deleted_at: now,
           documents_deleted_reason: "completed",
+          reopened_at: null,
         } as never)
         .eq("id", data.orderId);
 
@@ -2748,6 +2752,8 @@ export const resendOrderCertificate = createServerFn({ method: "POST" })
             ? [{ filename: resendAttachment.filename, content_type: resendAttachment.content_type, content_base64: resendAttachment.content_base64 }]
             : undefined,
           requireImmediateSuccess: true,
+          allowDuplicate: true,
+          trigger: "manual",
         });
     }
 
