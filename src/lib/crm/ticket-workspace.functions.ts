@@ -1,6 +1,14 @@
 /**
  * getTicketWorkspace — one-shot loader for the full-page ticket workspace.
  * Returns everything the 3-column detail page needs so first paint is instant.
+ *
+ * ARCHITECTURE RULE (post-audit repair):
+ * This function is READ-ONLY regarding ticket order relationships.
+ * It does NOT silently mutate support_tickets.application_id / customer_id / order_link_status.
+ * Order resolution authority lives in inbox-matcher.server.ts (ingestion time).
+ * When a ticket has order_link_status = "needs_review", this function returns
+ * candidateOrders so the UI can surface an explicit employee linking action.
+ * Use linkTicketToApplication() for the explicit employee-driven linking.
  */
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
@@ -11,17 +19,21 @@ async function getAdmin() {
   return m.supabaseAdmin;
 }
 
+// Terminal order statuses — orders with these statuses are not active/eligible
+// for new ticket linking. order_status is an enum and cannot be NULL.
+const INACTIVE_ORDER_STATUSES = ["COMPLETED", "CLOSED", "REFUND_PROCESSED", "REFUND_APPROVED"];
+
 export const getTicketWorkspace = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => z.object({ ticketId: z.string().uuid() }).parse(i))
   .handler(async ({ data }) => {
     const admin = await getAdmin();
 
-    // 1. Fetch primary ticket record
+    // 1. Fetch primary ticket record — includes order_link_status and is_unlinked
     const { data: ticket, error: ticketErr } = await admin
       .from("support_tickets")
       .select(
-        "id, ticket_number, subject, description, status, priority, assigned_to, resolved_at, resolved_by, closed_at, first_response_at, last_customer_message_at, last_staff_message_at, ticket_email, source, created_at, updated_at, customer_id, application_id, service_id, parent_ticket_id"
+        "id, ticket_number, subject, description, status, priority, assigned_to, resolved_at, resolved_by, closed_at, first_response_at, last_customer_message_at, last_staff_message_at, ticket_email, source, created_at, updated_at, customer_id, application_id, service_id, parent_ticket_id, order_link_status, is_unlinked, alternate_sender_email"
       )
       .eq("id", data.ticketId)
       .maybeSingle();
@@ -35,149 +47,12 @@ export const getTicketWorkspace = createServerFn({ method: "POST" })
     }
 
     const t = ticket as any;
-    let customerId = t.customer_id as string | null;
-    let applicationId = t.application_id as string | null;
+    // READ the persisted relationships. Do NOT resolve or mutate them here.
+    const customerId = t.customer_id as string | null;
+    const applicationId = t.application_id as string | null;
+    const orderLinkStatus = (t.order_link_status as string | null) ?? (applicationId ? "linked" : "unlinked");
 
-    // 2. Order Resolution & Self-Healing (If unlinked, extract AP code from subject/body/sender)
-    if (!applicationId) {
-      try {
-        const { extractOrderCodes } = await import("@/lib/mail/email-normalizer");
-        const { applicationCode, leadCode } = extractOrderCodes(t.subject, t.description);
-        if (applicationCode) {
-          const { data: foundApp } = await admin
-            .from("applications")
-            .select("id, application_code, order_status, fulfillment_status, assigned_to, created_at, service_id, customer_id, lead_id, is_hot")
-            .eq("application_code", applicationCode)
-            .maybeSingle();
-          if (foundApp) {
-            applicationId = (foundApp as any).id;
-            if (!customerId && (foundApp as any).customer_id) {
-              customerId = (foundApp as any).customer_id;
-            }
-            // Auto-heal support_tickets in database so subsequent loads are instant
-            await admin
-              .from("support_tickets")
-              .update({
-                application_id: applicationId,
-                customer_id: customerId || (foundApp as any).customer_id || null,
-                is_unlinked: false,
-                order_link_status: "linked",
-              } as never)
-              .eq("id", data.ticketId);
-          }
-        } else if (leadCode) {
-          const { data: foundLead } = await admin
-            .from("leads")
-            .select("id, customer_id")
-            .eq("lead_code", leadCode)
-            .maybeSingle();
-          if (foundLead) {
-            const { data: foundApp } = await admin
-              .from("applications")
-              .select("id, application_code, order_status, fulfillment_status, assigned_to, created_at, service_id, customer_id, lead_id, is_hot")
-              .eq("lead_id", (foundLead as any).id)
-              .order("created_at", { ascending: false })
-              .limit(1)
-              .maybeSingle();
-            if (foundApp) {
-              applicationId = (foundApp as any).id;
-              if (!customerId) customerId = (foundApp as any).customer_id || (foundLead as any).customer_id;
-              await admin
-                .from("support_tickets")
-                .update({
-                  application_id: applicationId,
-                  customer_id: customerId,
-                  is_unlinked: false,
-                  order_link_status: "linked",
-                } as never)
-                .eq("id", data.ticketId);
-            }
-          }
-        } else if (t.ticket_email) {
-          const email = t.ticket_email.trim().toLowerCase();
-          // First check customer record
-          const { data: custRecord } = await admin
-            .from("customers")
-            .select("id")
-            .ilike("primary_email", email)
-            .maybeSingle();
-
-          const resolvedCustId = (custRecord as any)?.id ?? null;
-          if (resolvedCustId) {
-            if (!customerId) customerId = resolvedCustId;
-            const { data: activeApps } = await admin
-              .from("applications")
-              .select("id, application_code, order_status, fulfillment_status, assigned_to, created_at, service_id, customer_id, lead_id, is_hot")
-              .eq("customer_id", resolvedCustId)
-              .not("order_status", "in", "(COMPLETED,CLOSED,REFUND_PROCESSED)")
-              .order("created_at", { ascending: false });
-
-            const apps = (activeApps ?? []) as any[];
-            // If customer has exactly 1 active order, safely auto-link it
-            if (apps.length === 1) {
-              applicationId = apps[0].id;
-              await admin
-                .from("support_tickets")
-                .update({
-                  application_id: applicationId,
-                  customer_id: customerId,
-                  is_unlinked: false,
-                  order_link_status: "linked",
-                } as never)
-                .eq("id", data.ticketId);
-            } else {
-              // If customer has multiple active orders or 0 active orders:
-              // Link customer_id only so all orders are visible in workspace
-              await admin
-                .from("support_tickets")
-                .update({
-                  customer_id: customerId,
-                  order_link_status: apps.length > 1 ? "needs_review" : "unlinked",
-                } as never)
-                .eq("id", data.ticketId);
-            }
-          } else {
-            // Fallback to leads table
-            const { data: matchedLeads } = await admin
-              .from("leads")
-              .select("id, customer_id")
-              .eq("email", email)
-              .order("created_at", { ascending: false })
-              .limit(5);
-
-            if (matchedLeads && matchedLeads.length === 1) {
-              const leadId = matchedLeads[0].id;
-              const custId = matchedLeads[0].customer_id;
-              const { data: foundApp } = await admin
-                .from("applications")
-                .select("id, application_code, order_status, fulfillment_status, assigned_to, created_at, service_id, customer_id, lead_id, is_hot")
-                .eq("lead_id", leadId)
-                .order("created_at", { ascending: false })
-                .limit(1)
-                .maybeSingle();
-
-              if (foundApp) {
-                applicationId = (foundApp as any).id;
-                if (!customerId) customerId = (foundApp as any).customer_id || custId;
-                await admin
-                  .from("support_tickets")
-                  .update({
-                    application_id: applicationId,
-                    customer_id: customerId,
-                    is_unlinked: false,
-                    order_link_status: "linked",
-                  } as never)
-                  .eq("id", data.ticketId);
-              }
-            }
-          }
-        }
-      } catch (e) {
-        console.warn("[getTicketWorkspace] auto-heal order linking warning:", e);
-      }
-    }
-
-    // 3. Fetch linked application and associated lead
+    // 2. Fetch linked application and associated lead (READ-ONLY)
     let applicationData: any = null;
     let leadData: any = null;
     if (applicationId) {
@@ -197,17 +72,14 @@ export const getTicketWorkspace = createServerFn({ method: "POST" })
             .maybeSingle();
           leadData = lead;
         }
-        if (!customerId && app?.customer_id) {
-          customerId = app.customer_id;
-        }
       } catch (e) {
         console.warn("[getTicketWorkspace] application fetch warning:", e);
       }
     }
 
-    // 4. Fetch customer details
+    // 3. Fetch customer details (READ-ONLY)
     let customerData: any = null;
-    const effectiveCustomerId = customerId || applicationData?.customer_id;
+    const effectiveCustomerId = customerId || applicationData?.customer_id || null;
     if (effectiveCustomerId) {
       try {
         const { data: cust } = await admin
@@ -221,36 +93,39 @@ export const getTicketWorkspace = createServerFn({ method: "POST" })
       }
     }
 
-    // Customer name resolution: if customer record has placeholder/test name (like 'Tesr'/'Test') or is missing,
-    // sync with authoritative applicant name from leadData
-    if (leadData) {
-      const isPlaceholderName =
-        !customerData?.name ||
-        /^(tesr|test|customer|demo|null|undefined)$/i.test(customerData.name.trim());
-      if (isPlaceholderName && leadData.name) {
-        if (customerData) {
-          customerData.name = leadData.name;
-          if (customerData.id) {
-            admin.from("customers").update({ name: leadData.name } as never).eq("id", customerData.id).then(() => {}, () => {});
-          }
-        } else {
-          customerData = {
-            id: effectiveCustomerId || null,
-            name: leadData.name,
-            primary_email: leadData.email || t.ticket_email,
-            primary_mobile: leadData.mobile,
-            state: null,
-            language: null,
-            created_at: null,
-            lifetime_value: leadData.total_amount,
-            total_applications: 1,
-            completed_applications: 0,
-          };
-        }
+    // 4. Customer/applicant name — DISPLAY ONLY, no DB write.
+    // When the application is linked, use leads.name as the authoritative applicant name
+    // for display purposes. Do NOT overwrite customers.name from a read path.
+    let displayCustomerName: string | null = customerData?.name ?? null;
+    if (leadData?.name) {
+      const isPlaceholder =
+        !displayCustomerName ||
+        /^(tesr|test|customer|demo|null|undefined|n\/a|—|-|new customer)$/i.test(
+          displayCustomerName.trim()
+        );
+      if (isPlaceholder) {
+        displayCustomerName = leadData.name;
       }
     }
+    // Produce a display-only customer object. The DB is never touched.
+    const displayCustomer = customerData
+      ? { ...customerData, name: displayCustomerName }
+      : (effectiveCustomerId
+          ? {
+              id: effectiveCustomerId,
+              name: leadData?.name ?? null,
+              primary_email: leadData?.email ?? t.ticket_email ?? null,
+              primary_mobile: leadData?.mobile ?? null,
+              state: null,
+              language: null,
+              created_at: null,
+              lifetime_value: leadData?.total_amount ?? null,
+              total_applications: null,
+              completed_applications: null,
+            }
+          : null);
 
-    // 5. Fetch service details
+    // 5. Fetch service details (READ-ONLY)
     const effectiveServiceId = t.service_id || applicationData?.service_id || null;
     let serviceData: any = null;
     if (effectiveServiceId) {
@@ -266,7 +141,34 @@ export const getTicketWorkspace = createServerFn({ method: "POST" })
       }
     }
 
-    // 5. Fire auxiliary queries in parallel with safe error guards
+    // 6. When order_link_status = "needs_review" AND application_id is null,
+    // return candidate active applications for this customer so the UI can
+    // present an explicit "Link Order" action. Scoped to the customer only.
+    let candidateOrders: Array<{
+      id: string;
+      application_code: string | null;
+      order_status: string | null;
+      fulfillment_status: string | null;
+      created_at: string | null;
+      service_id: string | null;
+    }> = [];
+
+    if (orderLinkStatus === "needs_review" && effectiveCustomerId && !applicationId) {
+      try {
+        const { data: candidates } = await admin
+          .from("applications")
+          .select("id, application_code, order_status, fulfillment_status, created_at, service_id")
+          .eq("customer_id", effectiveCustomerId)
+          .not("order_status", "in", `(${INACTIVE_ORDER_STATUSES.join(",")})`)
+          .order("created_at", { ascending: false })
+          .limit(20);
+        candidateOrders = (candidates ?? []) as typeof candidateOrders;
+      } catch (e) {
+        console.warn("[getTicketWorkspace] candidateOrders fetch warning:", e);
+      }
+    }
+
+    // 7. Fire auxiliary queries in parallel with safe error guards
     const [
       repliesList,
       eventsList,
@@ -307,32 +209,32 @@ export const getTicketWorkspace = createServerFn({ method: "POST" })
             .then((r) => r.data ?? [], () => [])
         : Promise.resolve([]),
 
-      customerId
+      effectiveCustomerId
         ? admin
             .from("support_tickets")
             .select("id, ticket_number, subject, status, priority, created_at")
-            .eq("customer_id", customerId)
+            .eq("customer_id", effectiveCustomerId)
             .neq("id", data.ticketId)
             .order("created_at", { ascending: false })
             .limit(20)
             .then((r) => r.data ?? [], () => [])
         : Promise.resolve([]),
 
-      customerId
+      effectiveCustomerId
         ? admin
             .from("applications")
             .select("id, application_code, order_status, created_at, service_id")
-            .eq("customer_id", customerId)
+            .eq("customer_id", effectiveCustomerId)
             .order("created_at", { ascending: false })
             .limit(20)
             .then((r) => r.data ?? [], () => [])
         : Promise.resolve([]),
 
-      customerId
+      effectiveCustomerId
         ? admin
             .from("complaints")
             .select("id, complaint_number, description, status, severity, created_at")
-            .eq("customer_id", customerId)
+            .eq("customer_id", effectiveCustomerId)
             .order("created_at", { ascending: false })
             .limit(10)
             .then((r) => r.data ?? [], () => [])
@@ -400,7 +302,7 @@ export const getTicketWorkspace = createServerFn({ method: "POST" })
     const parentTicketData = parentTicket;
     const childTicketsData = childTickets;
 
-    // 6. Resolve profile names for authors/assignees
+    // 8. Resolve profile names for authors/assignees
     const ids = new Set<string>();
     if (t.assigned_to) ids.add(t.assigned_to);
     if (t.resolved_by) ids.add(t.resolved_by);
@@ -424,7 +326,7 @@ export const getTicketWorkspace = createServerFn({ method: "POST" })
       }
     }
 
-    // 7. Hydrate email details for replies linked to email_logs
+    // 9. Hydrate email details for replies linked to email_logs
     const sendLogIds = Array.from(new Set(repliesList.map((r: any) => r.email_send_log_id).filter(Boolean)));
     const messageIds = Array.from(new Set(repliesList.map((r: any) => r.email_message_id).filter(Boolean)));
 
@@ -436,7 +338,7 @@ export const getTicketWorkspace = createServerFn({ method: "POST" })
     if (sendLogIds.length) mailOrs.push(`id.in.(${sendLogIds.join(",")})`);
     if (messageIds.length) mailOrs.push(`message_id.in.(${messageIds.join(",")})`);
     if (applicationId) mailOrs.push(`application_id.eq.${applicationId}`);
-    else if (customerId) mailOrs.push(`customer_id.eq.${customerId}`);
+    else if (effectiveCustomerId) mailOrs.push(`customer_id.eq.${effectiveCustomerId}`);
 
     if (mailOrs.length) {
       try {
@@ -477,7 +379,7 @@ export const getTicketWorkspace = createServerFn({ method: "POST" })
         ...r,
         author_name: r.created_by
           ? nameMap.get(r.created_by) ?? "Staff"
-          : (r.direction === "inbound" ? (customerData?.name ?? "Customer") : "System"),
+          : (r.direction === "inbound" ? (displayCustomer?.name ?? "Customer") : "System"),
         subject: linkedEmail?.subject ?? null,
         body_html: linkedEmail?.body_html ?? null,
         from_email: linkedEmail?.from_email ?? null,
@@ -486,14 +388,14 @@ export const getTicketWorkspace = createServerFn({ method: "POST" })
       };
     });
 
-    // 8. Compute customer stats & lifetime value
+    // 10. Compute customer stats & lifetime value
     let lifetimeValue = Number(customerData?.lifetime_value ?? 0);
-    if (!lifetimeValue && customerId) {
+    if (!lifetimeValue && effectiveCustomerId) {
       try {
         const { data: pays } = await admin
           .from("payments")
           .select("amount, status")
-          .eq("customer_id", customerId)
+          .eq("customer_id", effectiveCustomerId)
           .in("status", ["paid"]);
         lifetimeValue = (pays ?? []).reduce((sum: number, p: any) => sum + Number(p.amount ?? 0), 0);
       } catch (e) {
@@ -506,7 +408,7 @@ export const getTicketWorkspace = createServerFn({ method: "POST" })
     ).length;
     const closedTicketsForCustomer = prevTicketsList.length - openTicketsForCustomer;
 
-    // 9. Determine if order is hot dynamically
+    // 11. Determine if order is hot dynamically
     const firesAt = activeScheduler?.fires_at ? new Date(activeScheduler.fires_at).getTime() : 0;
     const isDue = firesAt > 0 && firesAt <= Date.now();
     const isReopened =
@@ -526,8 +428,9 @@ export const getTicketWorkspace = createServerFn({ method: "POST" })
       ticket: {
         ...t,
         application_id: applicationId,
+        order_link_status: orderLinkStatus,
         applications: appPayload,
-        customers: customerData,
+        customers: displayCustomer,
         services: serviceData ? { service_name: serviceData.service_name } : null,
         assigned_name: t.assigned_to ? nameMap.get(t.assigned_to) ?? null : null,
         resolved_name: t.resolved_by ? nameMap.get(t.resolved_by) ?? null : null,
@@ -553,6 +456,9 @@ export const getTicketWorkspace = createServerFn({ method: "POST" })
       emails: allMatchedEmails,
       parentTicket: parentTicketData,
       childTickets: childTicketsData,
+      // candidateOrders: non-empty only when order_link_status = "needs_review"
+      // and application_id is null. Contains active applications for the customer.
+      candidateOrders,
       customerStats: {
         lifetimeValue,
         totalOrders: Number(customerData?.total_applications ?? prevOrdersList.length),
@@ -560,5 +466,113 @@ export const getTicketWorkspace = createServerFn({ method: "POST" })
         openTickets: openTicketsForCustomer + (["open", "in_progress", "waiting_customer"].includes(t.status) ? 1 : 0),
         closedTickets: closedTicketsForCustomer,
       },
+    };
+  });
+
+// ──────────────────────────────────────────────────────────────────────────────
+// linkTicketToApplication
+//
+// Secure, validated, auditable server action for employees to manually resolve
+// a "needs_review" ticket by selecting one of the customer's candidate applications.
+//
+// Security rules enforced:
+//   1. Ticket must exist
+//   2. Application must exist
+//   3. Application MUST belong to the ticket's own customer_id (prevents cross-customer linking)
+//   4. Writes: support_tickets.application_id, order_link_status, is_unlinked
+//   5. Audit: application_events entry with actor, old value, new value, timestamp
+// ──────────────────────────────────────────────────────────────────────────────
+export const linkTicketToApplication = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        ticketId: z.string().uuid(),
+        applicationId: z.string().uuid(),
+      })
+      .parse(i)
+  )
+  .handler(async ({ data, context }) => {
+    const admin = await getAdmin();
+    const actorId = (context as any).userId as string;
+
+    // 1. Load ticket
+    const { data: ticketRow, error: tErr } = await admin
+      .from("support_tickets")
+      .select("id, ticket_number, customer_id, application_id, order_link_status, status")
+      .eq("id", data.ticketId)
+      .maybeSingle();
+
+    if (tErr) throw new Error(tErr.message);
+    if (!ticketRow) throw new Error("Ticket not found");
+
+    const t = ticketRow as any;
+
+    // 2. Guard: if already linked to a different order, reject
+    if (t.application_id && t.application_id !== data.applicationId) {
+      throw new Error(
+        "Ticket is already linked to a different order. Cannot overwrite an existing order link."
+      );
+    }
+
+    // 3. Load candidate application
+    const { data: appRow, error: aErr } = await admin
+      .from("applications")
+      .select("id, application_code, customer_id, order_status")
+      .eq("id", data.applicationId)
+      .maybeSingle();
+
+    if (aErr) throw new Error(aErr.message);
+    if (!appRow) throw new Error("Application not found");
+
+    const app = appRow as any;
+
+    // 4. Security: application must belong to the ticket's customer
+    if (!t.customer_id) {
+      throw new Error(
+        "Ticket has no customer_id — cannot safely link to an application without a verified customer association."
+      );
+    }
+    if (app.customer_id !== t.customer_id) {
+      throw new Error(
+        "Security violation: The selected application belongs to a different customer. Linking rejected."
+      );
+    }
+
+    // 5. Persist the link
+    const { error: updateErr } = await admin
+      .from("support_tickets")
+      .update({
+        application_id: data.applicationId,
+        order_link_status: "linked",
+        is_unlinked: false,
+        updated_at: new Date().toISOString(),
+      } as never)
+      .eq("id", data.ticketId);
+
+    if (updateErr) throw new Error(`Failed to link ticket: ${updateErr.message}`);
+
+    // 6. Audit trail on application_events (existing event system)
+    try {
+      await admin.from("application_events").insert({
+        application_id: data.applicationId,
+        customer_id: t.customer_id,
+        event_type: "ticket_order_linked",
+        old_value: t.application_id ?? null,
+        new_value: data.applicationId,
+        note: `Ticket ${t.ticket_number ?? data.ticketId} manually linked to order ${app.application_code ?? data.applicationId} by staff (was: ${t.order_link_status ?? "unknown"})`,
+        created_by: actorId,
+        staff_name: null,
+        staff_role: null,
+      } as never);
+    } catch (auditErr) {
+      console.warn("[linkTicketToApplication] audit event insert warning:", auditErr);
+    }
+
+    return {
+      ok: true,
+      ticketId: data.ticketId,
+      applicationId: data.applicationId,
+      applicationCode: app.application_code ?? null,
     };
   });

@@ -687,7 +687,7 @@ async function ingestOneMessage(
     matchedTicketId: newTicket.id,
     matchedApplicationId: matchedOrder?.applicationId ?? null,
     matchedCustomerId: matchedOrder?.customerId ?? null,
-    metadata: { isUnlinked, orderLinkStatus, isSystemSender: senderInfo.isSystemSender },
+    metadata: { isUnlinked, orderLinkStatus, isSystemSender: senderInfo.isSystemSender, resolutionMethod: matchedOrder?.resolutionMethod ?? null },
   });
 
   return {
@@ -1087,6 +1087,8 @@ type OrderMatchResult = {
   leadId: string | null;
   customerId: string | null;
   orderLinkStatus: "linked" | "needs_review" | "unlinked";
+  /** Identifies which matching strategy produced this result — for audit/observability only. */
+  resolutionMethod: "ap_code" | "ua_lead_code" | "thread_headers" | "x_bhs_order" | "customer_email" | "lead_email";
 };
 
 /** Match order and customer deterministically using exact priorities. */
@@ -1116,6 +1118,7 @@ async function matchOrderByContext(input: {
         leadId: r.lead_id,
         customerId: r.customer_id,
         orderLinkStatus: "linked",
+        resolutionMethod: "ap_code",
       };
     }
   }
@@ -1143,6 +1146,7 @@ async function matchOrderByContext(input: {
           leadId: l.id,
           customerId: (app as any).customer_id ?? l.customer_id,
           orderLinkStatus: "linked",
+          resolutionMethod: "ua_lead_code",
         };
       }
       return {
@@ -1150,6 +1154,7 @@ async function matchOrderByContext(input: {
         leadId: l.id,
         customerId: l.customer_id,
         orderLinkStatus: "unlinked",
+        resolutionMethod: "ua_lead_code",
       };
     }
   }
@@ -1173,6 +1178,7 @@ async function matchOrderByContext(input: {
           leadId: r.lead_id,
           customerId: r.customer_id,
           orderLinkStatus: "linked",
+          resolutionMethod: "thread_headers",
         };
       }
     }
@@ -1193,11 +1199,14 @@ async function matchOrderByContext(input: {
         leadId: r.lead_id,
         customerId: r.customer_id,
         orderLinkStatus: "linked",
+        resolutionMethod: "x_bhs_order",
       };
     }
   }
 
   // 4) Customer exact email fallback
+  // Email addresses are stored normalized (lowercase) but we use ilike as a safety net.
+  // IMPORTANT: both customer and lead lookups use ilike for consistent case-insensitive matching.
   if (input.fromEmail) {
     const email = input.fromEmail.trim().toLowerCase();
 
@@ -1214,7 +1223,8 @@ async function matchOrderByContext(input: {
         .from("applications")
         .select("id, lead_id, customer_id")
         .eq("customer_id", customerId)
-        .not("order_status", "in", "(COMPLETED,CLOSED,REFUND_PROCESSED)");
+        // REFUND_APPROVED is also terminal — include it alongside COMPLETED/CLOSED/REFUND_PROCESSED
+        .not("order_status", "in", "(COMPLETED,CLOSED,REFUND_PROCESSED,REFUND_APPROVED)");
 
       const apps = (activeApps ?? []) as Array<{ id: string; lead_id: string | null; customer_id: string | null }>;
 
@@ -1224,33 +1234,36 @@ async function matchOrderByContext(input: {
           leadId: apps[0].lead_id,
           customerId,
           orderLinkStatus: "linked",
+          resolutionMethod: "customer_email",
         };
       }
 
-      // If customer has multiple active orders, do not guess; flag for review
+      // Multiple active orders — do not guess; flag for review
       if (apps.length > 1) {
         return {
           applicationId: null,
           leadId: null,
           customerId,
           orderLinkStatus: "needs_review",
+          resolutionMethod: "customer_email",
         };
       }
 
-      // Customer has 0 active orders (previous orders completed or closed)
+      // Customer has 0 active orders (all completed or closed)
       return {
         applicationId: null,
         leadId: null,
         customerId,
         orderLinkStatus: "unlinked",
+        resolutionMethod: "customer_email",
       };
     }
 
-    // Lead exact email fallback
+    // 5) Lead email fallback — use ilike (consistent with customer lookup above)
     const { data: lead } = await supabaseAdmin
       .from("leads")
       .select("id, customer_id")
-      .ilike("email", email)
+      .ilike("email", email)  // was .eq() — fixed to ilike for case-insensitive consistency
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
@@ -1261,7 +1274,7 @@ async function matchOrderByContext(input: {
         .from("applications")
         .select("id, lead_id, customer_id")
         .eq("lead_id", leadRow.id)
-        .not("order_status", "in", "(COMPLETED,CLOSED,REFUND_PROCESSED)");
+        .not("order_status", "in", "(COMPLETED,CLOSED,REFUND_PROCESSED,REFUND_APPROVED)");
 
       const apps = (activeApps ?? []) as Array<{ id: string; lead_id: string | null; customer_id: string | null }>;
       if (apps.length === 1) {
@@ -1270,6 +1283,7 @@ async function matchOrderByContext(input: {
           leadId: apps[0].lead_id,
           customerId: apps[0].customer_id ?? leadRow.customer_id,
           orderLinkStatus: "linked",
+          resolutionMethod: "lead_email",
         };
       }
       return {
@@ -1277,6 +1291,7 @@ async function matchOrderByContext(input: {
         leadId: leadRow.id,
         customerId: leadRow.customer_id,
         orderLinkStatus: apps.length > 1 ? "needs_review" : "unlinked",
+        resolutionMethod: "lead_email",
       };
     }
   }

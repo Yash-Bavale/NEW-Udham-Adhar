@@ -14,7 +14,7 @@ import {
   AlignLeft, AlignCenter, AlignRight, Image as ImageIcon, Search, Tag,
   ChevronRight as ChevronRightIcon, RefreshCw, Flame, Reply, XCircle
 } from "lucide-react";
-import { getTicketWorkspace } from "@/lib/crm/ticket-workspace.functions";
+import { getTicketWorkspace, linkTicketToApplication } from "@/lib/crm/ticket-workspace.functions";
 import {
   replyToTicket, updateTicket, getAdjacentTickets,
   type TicketStatus, type TicketPriority
@@ -174,6 +174,7 @@ function TicketWorkspace() {
   const getDocUrlFn = useServerFn(getOrderDocumentSignedUrl);
   const reopenOrderFn = useServerFn(reopenOrder);
   const makeHotOrderFn = useServerFn(makeOrderHotFromTicket);
+  const linkOrderFn = useServerFn(linkTicketToApplication);
   const getAttachmentUploadUrlFn = useServerFn(getTicketAttachmentUploadUrl);
   const confirmAttachmentFn = useServerFn(confirmTicketAttachment);
 
@@ -684,6 +685,18 @@ function TicketWorkspace() {
       qc.invalidateQueries({ queryKey: ["sidebar-notification-counts"] });
     },
     onError: (e: Error) => toast.error(e.message),
+  });
+
+  const doLinkOrder = useMutation({
+    mutationFn: (targetApplicationId: string) =>
+      linkOrderFn({ data: { ticketId, applicationId: targetApplicationId } }),
+    onSuccess: () => {
+      toast.success("Order linked successfully to ticket");
+      invalidate();
+      qc.invalidateQueries({ queryKey: ["support-workspace", ticketId] });
+      qc.invalidateQueries({ queryKey: ["support-tickets-ops"] });
+    },
+    onError: (e: Error) => toast.error(e.message || "Failed to link order"),
   });
 
   // execCommand-based rich text formatting for contenteditable
@@ -1542,6 +1555,43 @@ function TicketWorkspace() {
                   <span>Escalate to Hot Order 🔥</span>
                 </button>
               )}
+            </div>
+          ) : ticket.order_link_status === "needs_review" && (data?.candidateOrders ?? []).length > 0 ? (
+            /* ── Multi-Order Review: employee picks which order to link ── */
+            <div className="space-y-2">
+              <div className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg bg-amber-50 border border-amber-200">
+                <AlertTriangle className="size-3.5 text-amber-600 shrink-0" />
+                <p className="text-[11px] text-amber-800 font-semibold">
+                  Multiple active orders found. Select which order this ticket belongs to:
+                </p>
+              </div>
+              <div className="space-y-1.5">
+                {(data.candidateOrders as any[]).map((candidate: any) => (
+                  <button
+                    key={candidate.id}
+                    onClick={() => doLinkOrder.mutate(candidate.id)}
+                    disabled={doLinkOrder.isPending}
+                    className="w-full flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg border border-slate-200 bg-slate-50 hover:bg-blue-50 hover:border-blue-300 text-left transition-all cursor-pointer disabled:opacity-50"
+                  >
+                    <div className="min-w-0">
+                      <div className="font-mono font-bold text-blue-700 text-[11px]">
+                        {candidate.application_code || "—"}
+                      </div>
+                      <div className="text-[10px] text-slate-500 mt-0.5 truncate">
+                        {candidate.fulfillment_status
+                          ? candidate.fulfillment_status.replace(/_/g, " ")
+                          : (candidate.order_status || "Processing")}
+                        {" · "}{ist(candidate.created_at)}
+                      </div>
+                    </div>
+                    {doLinkOrder.isPending ? (
+                      <Loader2 className="size-3.5 animate-spin text-blue-600 shrink-0" />
+                    ) : (
+                      <Link2 className="size-3.5 text-slate-400 shrink-0" />
+                    )}
+                  </button>
+                ))}
+              </div>
             </div>
           ) : (
             <div className="py-3 px-2 text-center space-y-1">

@@ -29,14 +29,6 @@ export const Route = createFileRoute("/admin")({
     }
   },
   component: AdminLayout,
-  pendingComponent: () => (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-600">
-      <div className="flex flex-col items-center gap-3">
-        <div className="size-8 rounded-full border-2 border-blue-600 border-t-transparent animate-spin" />
-        <span className="text-xs font-semibold text-slate-500 tracking-wide">Opening Admin Portal…</span>
-      </div>
-    </div>
-  ),
   errorComponent: ({ error }: any) => (
     <div className="p-8 text-sm text-red-700">Admin error: {error.message}</div>
   ),
