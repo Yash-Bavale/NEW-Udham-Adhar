@@ -110,6 +110,9 @@ function WorkforcePage() {
   const qc = useQueryClient();
   const listFn = useServerFn(listStaffUsers);
   const metricsFn = useServerFn(getWorkforceDashboardMetrics);
+  const archiveFn = useServerFn(archiveEmployee);
+  const deleteFn = useServerFn(deleteEmployee);
+  const setStatusFn = useServerFn(setEmploymentStatus);
 
   const { data, isLoading } = useQuery({ queryKey: ["admin.workforce.users"], queryFn: () => listFn() });
   const { data: metricsData } = useQuery({ queryKey: ["admin.workforce.metrics"], queryFn: () => metricsFn() });
@@ -493,7 +496,7 @@ function WorkforcePage() {
                               className="h-7 text-xs gap-1 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
                               onClick={async () => {
                                 try {
-                                  await setEmploymentStatus({
+                                  await setStatusFn({
                                     data: { user_id: u.id, status: "ACTIVE", reason: "Restored from archive by Admin" },
                                   });
                                   toast.success(`Restored ${u.full_name || u.email} to Active Workforce`);
@@ -568,7 +571,7 @@ function WorkforcePage() {
                 className="bg-amber-600 hover:bg-amber-700 text-white font-semibold"
                 onClick={async () => {
                   try {
-                    await archiveEmployee({ data: { user_id: archiveRow.id, reason: "Archived by Admin" } });
+                    await archiveFn({ data: { user_id: archiveRow.id, reason: "Archived by Admin" } });
                     toast.success(`Archived ${archiveRow.full_name || archiveRow.email}`);
                     setArchiveRow(null);
                     refreshAll();
@@ -600,7 +603,7 @@ function WorkforcePage() {
                 className="bg-rose-600 hover:bg-rose-700 text-white font-semibold"
                 onClick={async () => {
                   try {
-                    const res = await deleteEmployee({ data: { user_id: deleteRow.id } });
+                    const res = await deleteFn({ data: { user_id: deleteRow.id } });
                     if (res.mode === "archived") {
                       toast.info(res.message);
                     } else {

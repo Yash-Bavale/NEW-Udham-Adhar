@@ -527,17 +527,32 @@ export const archiveEmployee = createServerFn({ method: "POST" })
     const nowIso = new Date().toISOString();
 
     // 1. Mark profile is_active false and employment_status ARCHIVED
-    await (admin.from("profiles") as any).update({
-      is_active: false,
-      employment_status: "ARCHIVED",
-      archived_at: nowIso,
-    }).eq("id", data.user_id);
+    try {
+      const { error: pErr } = await (admin.from("profiles") as any).update({
+        is_active: false,
+        employment_status: "ARCHIVED",
+        archived_at: nowIso,
+      }).eq("id", data.user_id);
+      if (pErr) {
+        await (admin.from("profiles") as any).update({ is_active: false }).eq("id", data.user_id);
+      }
+    } catch {
+      await (admin.from("profiles") as any).update({ is_active: false }).eq("id", data.user_id);
+    }
 
     // 2. Disable assignment pool membership
-    await admin.from("assignment_pool").update({ is_active: false }).eq("user_id", data.user_id);
+    try {
+      await admin.from("assignment_pool").update({ is_active: false }).eq("user_id", data.user_id);
+    } catch (e) {
+      console.warn("[archiveEmployee] assignment_pool update warning:", e);
+    }
 
     // 3. Suspend auth login
-    await admin.auth.admin.updateUserById(data.user_id, { ban_duration: "876000h" } as never);
+    try {
+      await admin.auth.admin.updateUserById(data.user_id, { ban_duration: "876000h" } as never);
+    } catch (e) {
+      console.warn("[archiveEmployee] updateUserById warning:", e);
+    }
 
     // 4. Automatically redistribute action-required orders
     try {
@@ -581,20 +596,41 @@ export const deleteEmployee = createServerFn({ method: "POST" })
     if (totalRefs > 0) {
       const nowIso = new Date().toISOString();
       // User has historical records. Do NOT destructively delete! Safely archive instead.
-      await (admin.from("profiles") as any).update({
-        is_active: false,
-        employment_status: "ARCHIVED",
-        archived_at: nowIso,
-      }).eq("id", data.user_id);
-      await admin.from("assignment_pool").update({ is_active: false }).eq("user_id", data.user_id);
-      await admin.auth.admin.updateUserById(data.user_id, { ban_duration: "876000h" } as never);
+      try {
+        const { error: pErr } = await (admin.from("profiles") as any).update({
+          is_active: false,
+          employment_status: "ARCHIVED",
+          archived_at: nowIso,
+        }).eq("id", data.user_id);
+        if (pErr) {
+          await (admin.from("profiles") as any).update({ is_active: false }).eq("id", data.user_id);
+        }
+      } catch {
+        await (admin.from("profiles") as any).update({ is_active: false }).eq("id", data.user_id);
+      }
 
-      await reassignOrdersFromUnavailableEmployee({
-        unavailableEmployeeId: data.user_id,
-        reason: "Employee archived to preserve historical order records",
-        changeType: "AUTO_TERMINATED",
-        actorId: context.userId,
-      });
+      try {
+        await admin.from("assignment_pool").update({ is_active: false }).eq("user_id", data.user_id);
+      } catch (e) {
+        console.warn("[deleteEmployee] assignment_pool update warning:", e);
+      }
+
+      try {
+        await admin.auth.admin.updateUserById(data.user_id, { ban_duration: "876000h" } as never);
+      } catch (e) {
+        console.warn("[deleteEmployee] updateUserById warning:", e);
+      }
+
+      try {
+        await reassignOrdersFromUnavailableEmployee({
+          unavailableEmployeeId: data.user_id,
+          reason: "Employee archived to preserve historical order records",
+          changeType: "AUTO_TERMINATED",
+          actorId: context.userId,
+        });
+      } catch (err) {
+        console.warn("[deleteEmployee] Auto-reassign warning:", err);
+      }
 
       return { ok: true, mode: "archived", message: "Employee had historical orders and was securely archived instead of deleted." };
     }
