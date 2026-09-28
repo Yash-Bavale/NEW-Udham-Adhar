@@ -671,10 +671,6 @@ export function getOrderActionStatus(order: {
   const fs = order.fulfillment_status ?? "order_received";
   const stage = order.stage;
 
-  if (fs === "order_closed" || fs === "cancelled" || stage === "closed") {
-    return { label: "Order Closed", tone: "green" };
-  }
-
   const greenStatuses = new Set([
     "application_approved",
     "consultation_completed",
@@ -682,7 +678,11 @@ export function getOrderActionStatus(order: {
     "completed",
   ]);
   if (greenStatuses.has(fs) || stage === "completed") {
-    return { label: "Completed", tone: "green" };
+    return { label: "Order Completed", tone: "green" };
+  }
+
+  if (fs === "order_closed" || fs === "cancelled" || stage === "closed") {
+    return { label: "Order Closed", tone: "red" };
   }
 
   const blueStatuses = new Set([

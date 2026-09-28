@@ -1774,12 +1774,7 @@ export function getOrderActionStatus(order: any): { label: string; tone: "red" |
   const fs = order.fulfillment_status ?? "order_received";
   const stage = order.stage;
 
-  // Closed states -> Subtle Green "Order Closed"
-  if (fs === "order_closed" || fs === "cancelled" || stage === "closed" || order.is_terminal) {
-    return { label: "Order Closed", tone: "green" };
-  }
-
-  // Terminal / completed states -> Subtle Green "Completed"
+  // 1. Completed / Fulfilled states -> Green "Order Completed"
   const greenStatuses = new Set([
     "application_approved",
     "consultation_completed",
@@ -1787,8 +1782,19 @@ export function getOrderActionStatus(order: any): { label: string; tone: "red" |
     "completed",
   ]);
 
-  if (greenStatuses.has(fs) || stage === "completed") {
-    return { label: "Completed", tone: "green" };
+  if (greenStatuses.has(fs) || stage === "completed" || Boolean(order.in_range_completed)) {
+    return { label: "Order Completed", tone: "green" };
+  }
+
+  // 2. Closed / Cancelled states -> Red "Order Closed"
+  const closedStatuses = new Set([
+    "order_closed",
+    "cancelled",
+    "closed",
+  ]);
+
+  if (closedStatuses.has(fs) || stage === "closed" || Boolean(order.in_range_closed)) {
+    return { label: "Order Closed", tone: "red" };
   }
 
   const isTechDelay = order.fulfillment_status === "technical_delay" || order.callback_reminder?.remarks?.channel === "technical_delay";
