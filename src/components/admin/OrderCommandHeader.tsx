@@ -34,6 +34,7 @@ export function OrderCommandHeader({
   stage, paymentStatus, total, createdAt, assignedTo, staff, onAssign,
   leadId, hideAmount,
 }: Props) {
+  const { formatINR } = useFinancialVisibility();
   const meta = STAGE_META[stage];
   const isException = meta.side === "exception";
   const priority = paymentStatus === "Paid" && (stage === "form_submitted" || stage === "under_review")

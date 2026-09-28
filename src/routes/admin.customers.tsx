@@ -121,7 +121,7 @@ function CustomersPage() {
                         ({r.completed_applications} done · {r.pending_applications} open)
                       </span>
                     </td>
-                    <td className="py-2.5 pr-3 font-medium">{fmtINR(Number(r.lifetime_value ?? 0))}</td>
+                    <td className="py-2.5 pr-3 font-medium">{formatINR(Number(r.lifetime_value ?? 0))}</td>
                     <td className="py-2.5 pr-3 text-xs">{r.state ?? "—"}</td>
                     <td className="py-2.5 pr-3 text-xs" style={{ color: "var(--admin-fg-muted)" }}>{new Date(r.last_seen_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</td>
                   </tr>

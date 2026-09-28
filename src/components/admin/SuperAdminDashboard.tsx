@@ -8,7 +8,7 @@ import {
   ResponsiveContainer, ComposedChart, Bar, Area, XAxis, YAxis, Tooltip, CartesianGrid,
 } from "recharts";
 import {
-  Activity, AlertTriangle, Bell, Briefcase, Database, Mail,
+  Activity, AlertTriangle, Bell, Briefcase, Database, Eye, EyeOff, Mail,
   RefreshCw, Send, ShieldCheck, ShoppingBag, Target, TrendingDown, TrendingUp,
   UserCheck, Users, Wallet, Globe,
 } from "lucide-react";
@@ -35,7 +35,6 @@ import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { formatIST } from "@/lib/datetime";
 import { DateRangePicker } from "./DateRangePicker";
-import { FinancialPrivacySwitch } from "@/components/admin/FinancialPrivacySwitch";
 import { useFinancialVisibility } from "@/hooks/useFinancialVisibility";
 import { cn } from "@/lib/utils";
 
@@ -187,7 +186,6 @@ export function SuperAdminDashboard({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <FinancialPrivacySwitch />
           <Tabs
             value={range.preset}
             onValueChange={(v) =>
@@ -312,7 +310,7 @@ function StatChip({
 }
 
 function ModernKpi({
-  icon, label, value, tone, delta, subs, footer, href,
+  icon, label, value, tone, delta, subs, footer, href, action,
 }: {
   icon: React.ReactNode;
   label: string;
@@ -322,6 +320,7 @@ function ModernKpi({
   subs?: React.ReactNode;
   footer?: React.ReactNode;
   href?: string;
+  action?: React.ReactNode;
 }) {
   const navigate = useNavigate();
   const t = TONE_STYLES[tone];
@@ -340,9 +339,12 @@ function ModernKpi({
         <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{label}</div>
         {delta !== undefined && <DeltaPill d={delta ?? null} />}
       </div>
-      <div className="mt-1.5 flex items-center gap-2">
-        <div className={`grid size-8 shrink-0 place-items-center rounded-lg ${t.chip}`}>{icon}</div>
-        <div className={`text-2xl font-bold leading-tight tabular-nums ${t.value}`}>{value}</div>
+      <div className="mt-1.5 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <div className={`grid size-8 shrink-0 place-items-center rounded-lg ${t.chip}`}>{icon}</div>
+          <div className={`text-2xl font-bold leading-tight tabular-nums truncate ${t.value}`}>{value}</div>
+        </div>
+        {action}
       </div>
       {subs && <div className="mt-2 flex flex-wrap gap-1">{subs}</div>}
       {footer && <div className="mt-auto pt-2 text-[10px] text-slate-500">{footer}</div>}
@@ -352,7 +354,7 @@ function ModernKpi({
 }
 
 const KpiGrid = memo(function KpiGrid({ data, loading, range }: { data?: DashboardKpisResult; loading: boolean; range: DashboardRange }) {
-  const { formatShortINR } = useFinancialVisibility();
+  const { formatShortINR, isFinancialPrivacyEnabled, toggleFinancialPrivacy } = useFinancialVisibility();
   if (loading || !data) {
     return (
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 auto-rows-fr">
@@ -461,6 +463,25 @@ const KpiGrid = memo(function KpiGrid({ data, loading, range }: { data?: Dashboa
       <ModernKpi
         icon={<Wallet className="size-4" />} label="Revenue (excl. Tax)" value={formatShortINR(m.revenueExclTax)} tone="emerald" delta={revDelta}
         href="/admin/finance"
+        action={
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              toggleFinancialPrivacy();
+            }}
+            className="inline-flex size-7 shrink-0 items-center justify-center rounded-lg border border-slate-200/80 bg-slate-50/80 text-slate-500 hover:text-emerald-700 hover:bg-emerald-50 hover:border-emerald-200 transition-all cursor-pointer shadow-2xs"
+            title={isFinancialPrivacyEnabled ? "Show financial amounts" : "Hide financial amounts"}
+            aria-label="Toggle financial privacy"
+          >
+            {isFinancialPrivacyEnabled ? (
+              <EyeOff className="size-3.5 text-slate-400" />
+            ) : (
+              <Eye className="size-3.5 text-emerald-600" />
+            )}
+          </button>
+        }
         subs={<>
           <StatChip label="Incl. Tax" value={formatShortINR(m.revenueInclTax)} tone="emerald" href="/admin/finance" />
           <StatChip label="Tax" value={formatShortINR(m.taxCollected)} tone="slate" href="/admin/finance/gst" />

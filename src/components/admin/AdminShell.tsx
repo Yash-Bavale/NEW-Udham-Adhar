@@ -33,7 +33,6 @@ import { usePermissions } from "@/hooks/usePermissions";
 import { useNewLeadsWatcher } from "@/hooks/useNewLeadsWatcher";
 import { NotificationsOptIn } from "@/components/admin/NotificationsOptIn";
 import { ReminderNotificationManager } from "@/components/admin/ReminderNotificationManager";
-import { FinancialPrivacySwitch } from "@/components/admin/FinancialPrivacySwitch";
 import { clearModuleFilterState } from "@/hooks/usePreserveScroll";
 import type { Module } from "@/lib/roles";
 
@@ -476,7 +475,6 @@ function Shell({ children, email }: { children: ReactNode; email?: string }) {
             <GlobalSearchInput onOpenPalette={() => setPaletteOpen(true)} />
           </div>
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-            <FinancialPrivacySwitch size="sm" className="hidden sm:inline-flex" />
             <NotificationsBell />
             <UserMenu email={email} onSignOut={async () => {
               await supabase.auth.signOut();

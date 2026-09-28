@@ -88,9 +88,9 @@ function PaymentAuditPage() {
               {result.code} — {VERDICT_LABEL[result.verdict] ?? result.verdict}
             </div>
             <div className="mt-1">
-              {result.errors} error(s) · {result.warnings} warning(s) · Paid {fmtMoney(result.totals.paid)} · Invoiced{" "}
-              {fmtMoney(result.totals.invoiced)}
-              {Math.abs(result.totals.delta) > 0.5 ? ` · Δ ${fmtMoney(result.totals.delta)}` : ""}
+              {result.errors} error(s) · {result.warnings} warning(s) · Paid {formatINR(result.totals.paid)} · Invoiced{" "}
+              {formatINR(result.totals.invoiced)}
+              {Math.abs(result.totals.delta) > 0.5 ? ` · Δ ${formatINR(result.totals.delta)}` : ""}
             </div>
             {result.lead && (
               <div className="mt-1 text-xs opacity-80">
