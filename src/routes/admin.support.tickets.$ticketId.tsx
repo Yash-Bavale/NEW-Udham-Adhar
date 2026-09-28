@@ -15,6 +15,7 @@ import {
   ChevronRight as ChevronRightIcon, RefreshCw, Flame, Reply, XCircle
 } from "lucide-react";
 import { getTicketWorkspace, linkTicketToApplication, unlinkTicketFromApplication } from "@/lib/crm/ticket-workspace.functions";
+import { computeOrderStage, STAGE_META, STAGE_BADGE_CLASS, type OrderStage } from "@/lib/crm/computeOrderStage";
 import {
   replyToTicket, updateTicket, getAdjacentTickets,
   type TicketStatus, type TicketPriority
@@ -725,7 +726,10 @@ function TicketWorkspace() {
     const t = data?.ticket as any;
     const app = t?.applications ?? {};
     const serviceName = t?.services?.service_name ?? app?.services?.service_name ?? "Service";
-    const details = `<p><strong>Order No:</strong> ${app.application_code || "—"}</p><p><strong>Service:</strong> ${serviceName}</p><p><strong>Order Date:</strong> ${ist(app.created_at || t.created_at)}</p><p><strong>Order Stage:</strong> ${app.fulfillment_status ? app.fulfillment_status.replace(/_/g, " ") : "Processing"}</p>`;
+    const lead = app?.leads ?? (t?.customers ? { name: t.customers.name, email: t.customers.primary_email, mobile: t.customers.primary_mobile } : null);
+    const orderStage = app?.id ? computeOrderStage(lead, app) : null;
+    const stageLabel = orderStage ? STAGE_META[orderStage].label : (app.fulfillment_status ? app.fulfillment_status.replace(/_/g, " ") : "Processing");
+    const details = `<p><strong>Order No:</strong> ${app.application_code || "—"}</p><p><strong>Service:</strong> ${serviceName}</p><p><strong>Order Date:</strong> ${ist(app.created_at || t.created_at)}</p><p><strong>Order Stage:</strong> ${stageLabel}</p>`;
 
     if (composerRef.current) {
       composerRef.current.focus();
@@ -1545,9 +1549,17 @@ function TicketWorkspace() {
 
               <div className="flex items-center justify-between gap-2 py-0.5">
                 <span className="text-slate-500 text-[11px]">Order Stage</span>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-50 text-amber-800 border border-amber-200 capitalize">
-                  {app.fulfillment_status ? app.fulfillment_status.replace(/_/g, " ") : (app.order_status || "Processing")}
-                </span>
+                {(() => {
+                  const lead = app.leads ?? (ticket.customers ? { name: ticket.customers.name, email: ticket.customers.primary_email, mobile: ticket.customers.primary_mobile } : null);
+                  const orderStage = computeOrderStage(lead, app);
+                  const stageMeta = STAGE_META[orderStage];
+                  const stageBadgeClass = STAGE_BADGE_CLASS[orderStage] || "bg-slate-100 text-slate-700 border-slate-200";
+                  return (
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border capitalize ${stageBadgeClass}`}>
+                      {stageMeta?.label || (app.order_status || "Processing")}
+                    </span>
+                  );
+                })()}
               </div>
 
               <div className="flex items-center justify-between gap-2 py-0.5">
@@ -1589,31 +1601,33 @@ function TicketWorkspace() {
                 </p>
               </div>
               <div className="space-y-1.5">
-                {(data.candidateOrders as any[]).map((candidate: any) => (
-                  <button
-                    key={candidate.id}
-                    onClick={() => doLinkOrder.mutate(candidate.id)}
-                    disabled={doLinkOrder.isPending}
-                    className="w-full flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg border border-slate-200 bg-slate-50 hover:bg-blue-50 hover:border-blue-300 text-left transition-all cursor-pointer disabled:opacity-50"
-                  >
-                    <div className="min-w-0">
-                      <div className="font-mono font-bold text-blue-700 text-[11px]">
-                        {candidate.application_code || "—"}
+                {(data.candidateOrders as any[]).map((candidate: any) => {
+                  const candStage = computeOrderStage(candidate.lead, candidate);
+                  const candMeta = STAGE_META[candStage];
+                  return (
+                    <button
+                      key={candidate.id}
+                      onClick={() => doLinkOrder.mutate(candidate.id)}
+                      disabled={doLinkOrder.isPending}
+                      className="w-full flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg border border-slate-200 bg-slate-50 hover:bg-blue-50 hover:border-blue-300 text-left transition-all cursor-pointer disabled:opacity-50"
+                    >
+                      <div className="min-w-0">
+                        <div className="font-mono font-bold text-blue-700 text-[11px]">
+                          {candidate.application_code || "—"}
+                        </div>
+                        <div className="text-[10px] text-slate-500 mt-0.5 truncate">
+                          {candMeta?.label || (candidate.order_status || "Processing")}
+                          {" · "}{ist(candidate.created_at)}
+                        </div>
                       </div>
-                      <div className="text-[10px] text-slate-500 mt-0.5 truncate">
-                        {candidate.fulfillment_status
-                          ? candidate.fulfillment_status.replace(/_/g, " ")
-                          : (candidate.order_status || "Processing")}
-                        {" · "}{ist(candidate.created_at)}
-                      </div>
-                    </div>
-                    {doLinkOrder.isPending ? (
-                      <Loader2 className="size-3.5 animate-spin text-blue-600 shrink-0" />
-                    ) : (
-                      <Link2 className="size-3.5 text-slate-400 shrink-0" />
-                    )}
-                  </button>
-                ))}
+                      {doLinkOrder.isPending ? (
+                        <Loader2 className="size-3.5 animate-spin text-blue-600 shrink-0" />
+                      ) : (
+                        <Link2 className="size-3.5 text-slate-400 shrink-0" />
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           ) : (

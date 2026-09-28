@@ -59,14 +59,18 @@ export const getTicketWorkspace = createServerFn({ method: "POST" })
       try {
         const { data: app } = await admin
           .from("applications")
-          .select("id, application_code, order_status, fulfillment_status, assigned_to, created_at, service_id, lead_id, customer_id, is_hot")
+          .select(
+            "id, application_code, order_status, fulfillment_status, assigned_to, created_at, service_id, lead_id, customer_id, is_hot, form_submitted_at, certificate_uploaded_at, application_status, workflow_status, refund_approved_at, refund_processed_at, closure_stage, refund_status, technical_hold_started_at, customer_hold_started_at"
+          )
           .eq("id", applicationId)
           .maybeSingle();
 
         if (app?.lead_id) {
           const { data: lead } = await admin
             .from("leads")
-            .select("id, name, email, mobile, service, total_amount, lead_code, lead_status_v2, status")
+            .select(
+              "id, name, email, mobile, service, total_amount, lead_code, lead_status_v2, status, payment_successful_at, lead_source, source"
+            )
             .eq("id", app.lead_id)
             .maybeSingle();
           leadData = lead;
@@ -187,7 +191,7 @@ export const getTicketWorkspace = createServerFn({ method: "POST" })
       try {
         const { data: candidates } = await admin
           .from("applications")
-          .select("id, application_code, order_status, fulfillment_status, created_at, service_id, lead_id")
+          .select("id, application_code, order_status, fulfillment_status, created_at, service_id, lead_id, form_submitted_at, certificate_uploaded_at, application_status, workflow_status, refund_approved_at, refund_processed_at, closure_stage, refund_status, technical_hold_started_at, customer_hold_started_at")
           .eq("customer_id", effectiveCustomerId)
           .eq("is_deleted", false)
           .not("order_status", "in", `(${INACTIVE_ORDER_STATUSES.join(",")})`)
@@ -218,13 +222,15 @@ export const getTicketWorkspace = createServerFn({ method: "POST" })
             }
           }
 
+          const leadMap = new Map<string, any>();
           if (leadIds.length) {
             const { data: leads } = await admin
               .from("leads")
-              .select("id, lead_status_v2, status")
+              .select("id, lead_status_v2, status, payment_successful_at, lead_source, source, service, total_amount, lead_code")
               .in("id", leadIds);
 
-            for (const l of (leads ?? []) as Array<{ id: string; lead_status_v2: string | null; status: string | null }>) {
+            for (const l of (leads ?? []) as Array<any>) {
+              leadMap.set(l.id, l);
               if (
                 l.lead_status_v2 === "payment_successful" ||
                 l.lead_status_v2 === "welcome_mail_sent" ||
@@ -237,7 +243,10 @@ export const getTicketWorkspace = createServerFn({ method: "POST" })
 
           candidateOrders = rawCandidates
             .filter((c) => paidAppIds.has(c.id) || (c.lead_id && paidLeadIds.has(c.lead_id)))
-            .map(({ lead_id, ...rest }) => rest);
+            .map((c) => ({
+              ...c,
+              lead: c.lead_id ? leadMap.get(c.lead_id) ?? null : null,
+            }));
         }
       } catch (e) {
         console.warn("[getTicketWorkspace] candidateOrders fetch warning:", e);
@@ -495,6 +504,7 @@ export const getTicketWorkspace = createServerFn({ method: "POST" })
     const appPayload = applicationData
       ? {
           ...applicationData,
+          leads: leadData,
           is_hot: isHotOrder,
           services: serviceData ? { service_name: serviceData.service_name } : null,
         }
