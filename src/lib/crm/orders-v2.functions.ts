@@ -1536,7 +1536,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         }
       }
 
-      // Certificates (issued / uploaded by human staff)
+      // Certificates (issued / uploaded by human staff — this is the completion action)
       for (const c of thisAppCerts) {
         const staffName = c.issued_by_name || staff?.display_name || staff?.full_name || "Staff";
         if (!isHumanStaff(staffName)) continue;
@@ -1544,14 +1544,21 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         const ts = c.delivered_at || c.issued_at || c.created_at;
         const t = new Date(ts).getTime();
         if (!hasDateFilter || (t >= fromTime && t <= toTime)) {
-          actionHistoryList.push({
-            id: `cert-${c.id}`,
-            action_type: "CERTIFICATE_UPLOADED",
-            title: "Certificate Uploaded / Delivered",
-            staff_name: staffName,
-            created_at: ts,
-            note: c.certificate_number ? `Cert #${c.certificate_number}` : null,
-          });
+          const exists = actionHistoryList.some(
+            (x) =>
+              (x.action_type.toLowerCase().includes("complet") || x.action_type.toLowerCase().includes("cert")) &&
+              Math.abs(new Date(x.created_at).getTime() - t) < 300000
+          );
+          if (!exists) {
+            actionHistoryList.push({
+              id: `cert-${c.id}`,
+              action_type: "ORDER_COMPLETED",
+              title: "Order Completed",
+              staff_name: staffName,
+              created_at: ts,
+              note: c.certificate_number ? `Certificate delivered (Cert #${c.certificate_number})` : "Order fulfilled and certificate delivered",
+            });
+          }
         }
       }
 
@@ -1629,6 +1636,10 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
           et === "form_submitted" ||
           et === "order_closed" ||
           et === "workflow_closed" ||
+          et === "certificate_uploaded" ||
+          et === "certificate_delivered" ||
+          et === "order_completed" ||
+          et === "application_completed" ||
           nv === "form_submitted" ||
           nv === "order_received" ||
           nv === "lead_received" ||
@@ -1666,7 +1677,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       }
 
       // If completed in range by staff and no history entry yet
-      if (inRangeCompleted && isHumanStaff(staff?.display_name || staff?.full_name) && !actionHistoryList.some((x) => x.action_type.toLowerCase().includes("complet"))) {
+      if (inRangeCompleted && isHumanStaff(staff?.display_name || staff?.full_name) && !actionHistoryList.some((x) => x.action_type.toLowerCase().includes("complet") || x.action_type.toLowerCase().includes("cert"))) {
         actionHistoryList.push({
           id: `comp-${a.id}`,
           action_type: "ORDER_COMPLETED",
@@ -1680,19 +1691,8 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       // Sort actionHistoryList newest to oldest
       actionHistoryList.sort((x, y) => new Date(y.created_at).getTime() - new Date(x.created_at).getTime());
 
-      const stageLower = String(stage ?? "").toLowerCase();
-      const isReopenedOrder =
-        stageLower === "order_reopened" ||
-        fsLower === "order_reopened" ||
-        String((a as any).workflow_status ?? "").toLowerCase() === "order_reopened" ||
-        String((a as any).order_status ?? "").toUpperCase() === "REOPENED" ||
-        String((a as any).application_status ?? "").toLowerCase() === "order_reopened" ||
-        Boolean(parsedRemarks?.reason === "ticket_hot_priority" || (cb as any)?.ticket_id) ||
-        Boolean(thisAppEvents.some((e) => (e.event_type === "hot_priority_escalated" || e.event_type === "order_reopened")));
-
-      // Reopened orders must NEVER show in Action Taken / pending
-      const inRangeActionTaken = !isReopenedOrder && actionHistoryList.length > 0;
-      const actionCount = isReopenedOrder ? 0 : actionHistoryList.length;
+      const inRangeActionTaken = actionHistoryList.length > 0;
+      const actionCount = actionHistoryList.length;
 
       return {
         id: a.id,
