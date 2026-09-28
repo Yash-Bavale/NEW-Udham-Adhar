@@ -4,7 +4,7 @@ import { useQueryClient, useMutation, useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
   ArrowLeft, Copy, Phone, Mail, User2,
-  FileText, Workflow, Activity, LifeBuoy, ExternalLink, BadgeDollarSign,
+  FileText, Activity, LifeBuoy, ExternalLink, BadgeDollarSign,
   ShieldAlert, ShieldOff, Clock, AlertTriangle, XCircle, CheckCircle2, RotateCcw,
   Link2, Send, Loader2, VolumeX, History, Flame,
 } from "lucide-react";
@@ -40,7 +40,6 @@ import {
 import { FormSubmissionPanel } from "@/components/admin/FormSubmissionPanel";
 import { OrderDocumentsPanel } from "@/components/admin/OrderDocumentsPanel";
 import { OrderPaymentsPanel } from "@/components/admin/OrderPaymentsPanel";
-import { OrderWorkflowPanel } from "./OrderWorkflowPanel";
 
 import { UnifiedTimeline } from "@/components/admin/UnifiedTimeline";
 import { ConvertConsultationPanel } from "@/components/admin/ConvertConsultationPanel";
@@ -665,6 +664,23 @@ export function WorkspaceShell(p: Props) {
 
           <div className="w-full mt-5 space-y-5">
 
+            <TabsContent value="form" className="space-y-4 mt-0 animate-fade-in">
+              {p.showConsultationPanel ? (
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-sm text-amber-900">
+                  This is a <b>Talk-to-Expert</b> order. The service form appears here after the customer's service is picked and the second payment is received.
+                </div>
+              ) : (
+                <FormSubmissionPanel applicationId={application.id} isLocked={current === "completed" || current === "cancelled"} orderId={p.orderId} />
+              )}
+              <OrderDocumentsPanel
+                orderId={p.orderId}
+                documents={documents}
+                deletedAt={application.documents_deleted_at}
+                deletedReason={application.documents_deleted_reason}
+                hideMoney={p.hideAmount}
+              />
+            </TabsContent>
+
             <TabsContent value="customer" className="space-y-4 mt-0 animate-fade-in">
               <section className="rounded-2xl border border-slate-200 bg-white p-5 md:p-6 shadow-sm">
                 {/* Meta grid */}
@@ -780,23 +796,6 @@ export function WorkspaceShell(p: Props) {
                   </div>
                 </div>
               </section>
-            </TabsContent>
-
-            <TabsContent value="form" className="space-y-4 mt-0 animate-fade-in">
-              {p.showConsultationPanel ? (
-                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-sm text-amber-900">
-                  This is a <b>Talk-to-Expert</b> order. The service form appears here after the customer's service is picked and the second payment is received.
-                </div>
-              ) : (
-                <FormSubmissionPanel applicationId={application.id} isLocked={current === "completed" || current === "cancelled"} orderId={p.orderId} />
-              )}
-              <OrderDocumentsPanel
-                orderId={p.orderId}
-                documents={documents}
-                deletedAt={application.documents_deleted_at}
-                deletedReason={application.documents_deleted_reason}
-                hideMoney={p.hideAmount}
-              />
             </TabsContent>
 
             <TabsContent value="assignment" className="space-y-4 mt-0 animate-fade-in">
