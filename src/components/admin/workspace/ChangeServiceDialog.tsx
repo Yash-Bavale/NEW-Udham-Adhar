@@ -74,7 +74,10 @@ function ChangeServiceDialog({
   // Result state after successful change
   const [result, setResult] = useState<any | null>(null);
 
-  const options = (data?.rows ?? []).filter((s: any) => s.id !== currentServiceId && s.is_active);
+  const GST_DOMAIN = "gstcertificate.in";
+  const options = (data?.rows ?? []).filter(
+    (s: any) => s.id !== currentServiceId && s.is_active && s.website?.domain !== GST_DOMAIN
+  );
   const currentSvc = (data?.rows ?? []).find((s: any) => s.id === currentServiceId);
   const selected = options.find((s: any) => s.id === newId);
 

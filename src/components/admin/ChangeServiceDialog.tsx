@@ -50,7 +50,11 @@ export function ChangeServiceDialog({
     enabled: open,
   });
 
-  const activeServices = (servicesData?.rows ?? []).filter((s: ServiceRow) => s.is_active !== false);
+  const GST_DOMAIN = "gstcertificate.in";
+  const activeServices = (servicesData?.rows ?? []).filter(
+    (s: ServiceRow & { website?: { domain?: string } }) =>
+      s.is_active !== false && s.website?.domain !== GST_DOMAIN
+  );
 
   const selectedService = activeServices.find((s: ServiceRow) => s.id === selectedServiceId);
 

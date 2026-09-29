@@ -56,10 +56,16 @@ function SelectServiceStep({ leadId, leadCode }: Props) {
     queryFn: () => listFn(),
   });
 
+  const GST_DOMAIN = "gstcertificate.in";
   const services = useMemo(
     () =>
       (data?.rows ?? [])
-        .filter((s: any) => s.is_active && s.service_name !== "Expert Consultation")
+        .filter(
+          (s: any) =>
+            s.is_active &&
+            s.service_name !== "Expert Consultation" &&
+            s.website?.domain !== GST_DOMAIN
+        )
         .sort((a: any, b: any) => (a.sort_order ?? 0) - (b.sort_order ?? 0)),
     [data],
   );

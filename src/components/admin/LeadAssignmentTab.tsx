@@ -163,7 +163,7 @@ export function LeadAssignmentTab() {
         open={addOpen}
         onClose={() => setAddOpen(false)}
         employees={eligible?.rows ?? []}
-        services={(services?.rows ?? []).map((s: any) => ({ id: s.id, name: s.service_name }))}
+        services={(services?.rows ?? []).filter((s: any) => s.website?.domain !== "gstcertificate.in").map((s: any) => ({ id: s.id, name: s.service_name }))}
         onAdded={() => { setAddOpen(false); refresh(); }}
       />
     </div>

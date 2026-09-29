@@ -397,7 +397,7 @@ function SupportTicketsOperationsPage() {
 
   const groupedServices = useMemo(() => {
     const raw = servicesList;
-    const activeOnly = raw.filter((s: any) => s.is_active !== false);
+    const activeOnly = raw.filter((s: any) => s.is_active !== false && s.website?.domain !== "gstcertificate.in");
     const map = new Map<string, { websiteName: string; domain: string; services: any[] }>();
 
     for (const s of activeOnly) {

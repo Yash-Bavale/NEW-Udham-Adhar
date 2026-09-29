@@ -166,7 +166,7 @@ function LeadsPage() {
 
   const groupedServices = useMemo(() => {
     const raw = (servicesData?.rows ?? []) as any[];
-    const activeOnly = raw.filter((s) => s.is_active !== false);
+    const activeOnly = raw.filter((s) => s.is_active !== false && s.website?.domain !== "gstcertificate.in");
     const map = new Map<string, { websiteName: string; domain: string; services: any[] }>();
 
     for (const s of activeOnly) {
@@ -866,7 +866,9 @@ function AddLeadDialog({
 
   // Filter services by selected website; show all if no website selected
   const filteredServices = useMemo(() => {
-    const rows = ((servicesData?.rows ?? []) as any[]).filter((s: any) => s.is_active !== false);
+    const rows = ((servicesData?.rows ?? []) as any[]).filter(
+      (s: any) => s.is_active !== false && s.website?.domain !== "gstcertificate.in"
+    );
     if (!form.website_id) return rows;
     return rows.filter((s: any) => s.website_id === form.website_id);
   }, [servicesData, form.website_id]);
