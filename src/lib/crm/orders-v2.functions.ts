@@ -2465,7 +2465,7 @@ export const updateFulfillmentStatus = createServerFn({ method: "POST" })
           : Promise.resolve({ data: null as null | { service_name: string | null; service_code: string | null } }),
       ]);
 
-      const recipientEmail = lead?.email || customer?.primary_email || null;
+      const recipientEmail = (customer?.primary_email ?? "").trim() || (lead?.email ?? "").trim() || null;
       const recipientName = lead?.name || customer?.name || "Customer";
       const serviceName = service?.service_name || lead?.service || "Service";
 
@@ -2735,7 +2735,7 @@ export const resendOrderCertificate = createServerFn({ method: "POST" })
       ? (await admin.from("services").select("service_name").eq("id", app.service_id).maybeSingle()).data
       : null;
 
-    const recipientEmail = lead?.email || customer?.primary_email || null;
+    const recipientEmail = (customer?.primary_email ?? "").trim() || (lead?.email ?? "").trim() || null;
     const recipientName = lead?.name || customer?.name || "Customer";
     const serviceName = serviceRow?.service_name || lead?.service || "Service";
 

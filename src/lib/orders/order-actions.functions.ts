@@ -220,7 +220,7 @@ async function loadOrderContext(supabase: any, orderId: string) {
       .maybeSingle();
     lead = l as any;
   }
-  const recipientEmail = customer?.primary_email || lead?.email || null;
+  const recipientEmail = (customer?.primary_email ?? "").trim() || (lead?.email ?? "").trim() || null;
   const recipientName = customer?.name || lead?.name || "Customer";
   return { order, customer, lead, recipientEmail, recipientName };
 }

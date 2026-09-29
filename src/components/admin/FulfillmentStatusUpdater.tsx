@@ -172,8 +172,8 @@ function CompletionGateDialog({
     staleTime: 30_000,
   });
   const recipientEmail =
-    (detail as any)?.customer?.primary_email ||
-    (detail as any)?.lead?.email ||
+    ((detail as any)?.customer?.primary_email ?? "").trim() ||
+    ((detail as any)?.lead?.email ?? "").trim() ||
     null;
   const serviceName =
     (detail as any)?.service?.service_name ||
