@@ -288,18 +288,18 @@ function OrderIdleTimerKpiCard({
   const isExtended = Boolean(latestActionAt && minutes >= 60);
 
   const toneCls = isHealthy
-    ? "bg-emerald-500 text-white font-bold"
+    ? "bg-emerald-600 text-white font-bold"
     : isAttention
-    ? "bg-amber-500 text-white font-bold"
-    : "bg-rose-500 text-white font-bold";
+    ? "bg-amber-600 text-white font-bold"
+    : "bg-rose-600 text-white font-bold";
 
   const statusText = !latestActionAt
-    ? "Active Pace"
+    ? "Ready"
     : isHealthy
-    ? "Active Pace"
+    ? "Active"
     : isAttention
     ? "Idle"
-    : "Extended";
+    : "Away";
 
   const containerBg = isActive
     ? isHealthy
@@ -315,7 +315,7 @@ function OrderIdleTimerKpiCard({
 
   const headerCls = isHealthy ? "text-emerald-700 font-bold" : isAttention ? "text-amber-800 font-bold" : "text-rose-700 font-bold";
   const iconCls = isHealthy ? "text-emerald-600" : isAttention ? "text-amber-700" : "text-rose-600";
-  const timerCls = isHealthy ? "text-emerald-900" : isAttention ? "text-amber-950" : "text-rose-900";
+  const timerCls = isHealthy ? "text-emerald-950 font-bold" : isAttention ? "text-amber-950 font-bold" : "text-rose-950 font-bold";
   const subtitleCls = isHealthy ? "text-emerald-700/80" : isAttention ? "text-amber-700/80" : "text-rose-700/80";
 
   const subtitleText = latestActionLabel
@@ -327,7 +327,7 @@ function OrderIdleTimerKpiCard({
       type="button"
       onClick={onClick}
       className={cn(
-        "flex flex-col justify-between p-2.5 sm:p-3 rounded-xl min-h-[82px] border transition-all duration-150 cursor-pointer select-none text-left group shadow-xs hover:shadow-sm",
+        "flex flex-col justify-between p-2.5 sm:p-3 rounded-xl min-h-[82px] max-h-[82px] h-[82px] border transition-all duration-150 cursor-pointer select-none text-left group shadow-xs hover:shadow-sm overflow-hidden",
         containerBg
       )}
     >
@@ -345,12 +345,12 @@ function OrderIdleTimerKpiCard({
         <Timer className={cn("w-3.5 h-3.5 shrink-0 transition-transform group-hover:scale-110", iconCls)} />
       </div>
 
-      {/* Middle row: Live Timer & Badge */}
-      <div className="flex items-baseline gap-1.5 mt-1">
-        <span className={cn("font-mono text-base sm:text-lg font-black tracking-tight", timerCls)}>
+      {/* Middle row: Live Timer on single line with badge */}
+      <div className="flex items-baseline justify-between gap-1 mt-0.5 w-full min-w-0">
+        <span className={cn("font-mono text-sm sm:text-base font-black tracking-tight whitespace-nowrap leading-none", timerCls)}>
           {displayTime}
         </span>
-        <span className={cn("text-[9px] font-bold px-1.5 py-0.5 rounded leading-none shrink-0", toneCls)}>
+        <span className={cn("text-[8.5px] font-bold px-1.5 py-0.5 rounded leading-none shrink-0 whitespace-nowrap shadow-2xs", toneCls)}>
           {statusText}
         </span>
       </div>
@@ -1257,7 +1257,7 @@ return (
               setPage(1);
             }}
             className={cn(
-              "flex flex-col justify-between p-2.5 sm:p-3 rounded-xl min-h-[82px] border transition-all duration-150 cursor-pointer select-none text-left group shadow-xs hover:shadow-sm",
+              "flex flex-col justify-between p-2.5 sm:p-3 rounded-xl min-h-[82px] max-h-[82px] h-[82px] border transition-all duration-150 cursor-pointer select-none text-left group shadow-xs hover:shadow-sm overflow-hidden",
               cardContainerCls
             )}
           >
