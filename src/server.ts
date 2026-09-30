@@ -3,6 +3,7 @@ import "./lib/error-capture";
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
 import { isAbortError } from "./lib/abort-error";
+import { decideHostRouting } from "./lib/hosts.server";
 
 type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
@@ -80,9 +81,32 @@ async function rewriteHostInHtml(request: Request, response: Response): Promise<
   });
 }
 
+const NOT_FOUND_BODY =
+  '<!doctype html><html><head><meta charset="utf-8"><title>404 Not Found</title>' +
+  '<meta name="robots" content="noindex,nofollow"></head>' +
+  '<body style="font-family:system-ui;padding:3rem;text-align:center">' +
+  "<h1>404</h1><p>Page not found.</p></body></html>";
+
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
+      // Hostname boundary: CRM, API and public websites each serve only their
+      // own surface. Dev/preview hosts are unaffected.
+      const reqUrl = new URL(request.url);
+      const decision = decideHostRouting(reqUrl.hostname, reqUrl.pathname);
+      if (decision.action === "redirect") {
+        return new Response(null, { status: 302, headers: { Location: decision.location } });
+      }
+      if (decision.action === "notFound") {
+        return new Response(NOT_FOUND_BODY, {
+          status: 404,
+          headers: {
+            "content-type": "text/html; charset=utf-8",
+            "x-robots-tag": "noindex, nofollow",
+          },
+        });
+      }
+
       const safeCtx =
         ctx && typeof ctx === "object" && typeof (ctx as { waitUntil?: unknown }).waitUntil === "function"
           ? ctx
