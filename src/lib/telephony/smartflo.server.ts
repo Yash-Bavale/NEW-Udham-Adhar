@@ -23,7 +23,7 @@ export type MatchResult = {
   applicationId: string | null;
   employeeId: string | null;
   employeeActive: boolean;
-  agentId: string | null; // Smartflo agent/extension id — no source field exists yet
+  agentId: string | null; // Smartflo agent/extension id from profiles.smartflo_agent_id
 };
 
 export type Lookup = (mobile10: string) => Promise<MatchResult>;
@@ -101,16 +101,19 @@ export const dbLookup: Lookup = async (m) => {
   const lead = (app && leads.find((l) => l.id === app!.lead_id)) || leads[0] || null;
   const employeeId = app?.assigned_to ?? lead?.assigned_to ?? null;
   let employeeActive = false;
+  let agentId: string | null = null;
   if (employeeId) {
     const { data, error } = await supabaseAdmin.from("profiles")
-      .select("is_active").eq("id", employeeId).maybeSingle();
+      .select("is_active, smartflo_agent_id").eq("id", employeeId).maybeSingle();
     if (error) throw error;
     employeeActive = data?.is_active === true;
+    const rawAgentId = (data as any)?.smartflo_agent_id;
+    agentId = typeof rawAgentId === "string" && rawAgentId.trim().length > 0 ? rawAgentId.trim() : null;
   }
   return {
     customerId, leadId: lead?.id ?? null, applicationId: app?.id ?? null,
     employeeId, employeeActive,
-    agentId: null, // MISSING: no Smartflo agent/extension field on profiles
+    agentId,
   };
 };
 

@@ -306,6 +306,7 @@ const InviteInput = z.object({
   full_name: z.string().trim().min(1).max(120),
   email: z.string().trim().email().max(255),
   mobile: z.string().trim().max(20).optional().nullable(),
+  smartflo_agent_id: z.string().trim().max(100).optional().nullable(),
   role: z.enum(ROLE_VALUES),
   department: z.string().trim().max(120).optional().nullable(),
   max_workload: z.number().int().min(5).max(200).default(50),
@@ -348,6 +349,7 @@ export const inviteEmployee = createServerFn({ method: "POST" })
       display_name: data.full_name,
       full_name: data.full_name,
       mobile: data.mobile ?? null,
+      smartflo_agent_id: data.smartflo_agent_id ? data.smartflo_agent_id.trim() : null,
       is_active: true,
     }, { onConflict: "id" });
     if (pErr) throw new Error(pErr.message);
@@ -372,6 +374,7 @@ const UpdateInput = z.object({
   user_id: z.string().uuid(),
   full_name: z.string().trim().min(1).max(120).optional(),
   mobile: z.string().trim().max(20).optional().nullable(),
+  smartflo_agent_id: z.string().trim().max(100).optional().nullable(),
   role: z.enum(ROLE_VALUES).optional(),
   department: z.string().trim().max(120).optional().nullable(),
   joining_date: z.string().trim().max(20).optional().nullable(),
@@ -391,6 +394,9 @@ export const updateEmployee = createServerFn({ method: "POST" })
       patch.display_name = data.full_name;
     }
     if (data.mobile !== undefined) patch.mobile = data.mobile;
+    if (data.smartflo_agent_id !== undefined) {
+      patch.smartflo_agent_id = data.smartflo_agent_id ? data.smartflo_agent_id.trim() : null;
+    }
 
     if (Object.keys(patch).length) {
       const { error } = await admin.from("profiles").update(patch).eq("id", data.user_id);

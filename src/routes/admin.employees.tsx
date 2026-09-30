@@ -313,7 +313,14 @@ function WorkforcePage() {
                           {u.employee_code || "—"}
                         </td>
                         <td className="px-4 py-2.5">
-                          <div className="font-semibold text-slate-900">{u.full_name || "—"}</div>
+                          <div className="font-semibold text-slate-900 flex items-center gap-1.5">
+                            <span>{u.full_name || "—"}</span>
+                            {u.smartflo_agent_id && (
+                              <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-sky-50 text-sky-700 border border-sky-200" title={`Smartflo Agent ID: ${u.smartflo_agent_id}`}>
+                                Ext {u.smartflo_agent_id}
+                              </span>
+                            )}
+                          </div>
                           <div className="text-xs text-slate-400 font-mono">{u.email}</div>
                         </td>
                         <td className="px-4 py-2.5">
@@ -635,6 +642,7 @@ function AddEmployeeModal({ open, onOpenChange, onCreated }: { open: boolean; on
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [mobile, setMobile] = useState("");
+  const [smartfloAgentId, setSmartfloAgentId] = useState("");
   const [role, setRole] = useState<Role>("executive");
   const [department, setDepartment] = useState("Operations");
   const [maxWorkload, setMaxWorkload] = useState(50);
@@ -650,6 +658,7 @@ function AddEmployeeModal({ open, onOpenChange, onCreated }: { open: boolean; on
           full_name: fullName,
           email,
           mobile: mobile || null,
+          smartflo_agent_id: smartfloAgentId || null,
           role,
           department,
           max_workload: maxWorkload,
@@ -681,9 +690,15 @@ function AddEmployeeModal({ open, onOpenChange, onCreated }: { open: boolean; on
             <Label className="text-xs">Email Address</Label>
             <Input required type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="rahul@company.com" className="mt-1" />
           </div>
-          <div>
-            <Label className="text-xs">Mobile Number</Label>
-            <Input value={mobile} onChange={(e) => setMobile(e.target.value)} placeholder="+91 9876543210" className="mt-1" />
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label className="text-xs">Mobile Number</Label>
+              <Input value={mobile} onChange={(e) => setMobile(e.target.value)} placeholder="+91 9876543210" className="mt-1" />
+            </div>
+            <div>
+              <Label className="text-xs">Smartflo Agent ID / Ext</Label>
+              <Input value={smartfloAgentId} onChange={(e) => setSmartfloAgentId(e.target.value)} placeholder="e.g. 104 or agent_id" className="mt-1" />
+            </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -728,6 +743,7 @@ function EditEmployeeModal({ row, open, onOpenChange, onSaved }: { row: any; ope
   const updateFn = useServerFn(updateEmployee);
   const [fullName, setFullName] = useState(row.full_name || "");
   const [mobile, setMobile] = useState(row.mobile || "");
+  const [smartfloAgentId, setSmartfloAgentId] = useState(row.smartflo_agent_id || "");
   const [role, setRole] = useState<Role>((row.roles[0] as Role) || "executive");
   const [department, setDepartment] = useState(row.department || "Operations");
   const [maxWorkload, setMaxWorkload] = useState(row.max_workload || 50);
@@ -743,6 +759,7 @@ function EditEmployeeModal({ row, open, onOpenChange, onSaved }: { row: any; ope
           user_id: row.id,
           full_name: fullName,
           mobile: mobile || null,
+          smartflo_agent_id: smartfloAgentId || null,
           role,
           department,
           max_workload: maxWorkload,
@@ -770,9 +787,15 @@ function EditEmployeeModal({ row, open, onOpenChange, onSaved }: { row: any; ope
             <Label className="text-xs">Full Name</Label>
             <Input required value={fullName} onChange={(e) => setFullName(e.target.value)} className="mt-1" />
           </div>
-          <div>
-            <Label className="text-xs">Mobile Number</Label>
-            <Input value={mobile} onChange={(e) => setMobile(e.target.value)} className="mt-1" />
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label className="text-xs">Mobile Number</Label>
+              <Input value={mobile} onChange={(e) => setMobile(e.target.value)} className="mt-1" />
+            </div>
+            <div>
+              <Label className="text-xs">Smartflo Agent ID / Ext</Label>
+              <Input value={smartfloAgentId} onChange={(e) => setSmartfloAgentId(e.target.value)} placeholder="e.g. 104 or agent_id" className="mt-1" />
+            </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
