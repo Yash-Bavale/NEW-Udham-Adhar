@@ -106,7 +106,7 @@ export const dbLookup: Lookup = async (m) => {
     const { data, error } = await supabaseAdmin.from("profiles")
       .select("is_active, smartflo_agent_id").eq("id", employeeId).maybeSingle();
     if (error) throw error;
-    employeeActive = data?.is_active === true;
+    employeeActive = (data as { is_active?: boolean } | null)?.is_active === true;
     const rawAgentId = (data as any)?.smartflo_agent_id;
     agentId = typeof rawAgentId === "string" && rawAgentId.trim().length > 0 ? rawAgentId.trim() : null;
   }
