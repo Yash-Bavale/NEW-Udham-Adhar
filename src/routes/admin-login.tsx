@@ -155,7 +155,7 @@ function AdminLoginPage() {
   };
 
   return (
-    <main className="relative isolate flex min-h-screen items-center justify-center overflow-hidden bg-background px-4 py-10 text-foreground md:px-8">
+    <main className="relative isolate flex min-h-screen items-start justify-center overflow-hidden bg-background px-4 pb-10 pt-[7vh] text-foreground md:px-8">
       <img src={officeBg.url} alt="" aria-hidden="true" width={1672} height={941} className="absolute inset-0 -z-20 h-full w-full object-cover object-[44%_center]" />
       <div className="absolute inset-0 -z-10 bg-foreground/10 max-md:bg-foreground/35" />
 
@@ -207,7 +207,7 @@ function AdminLoginPage() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="staff@udyamadhar.in"
+                placeholder="grow@businesshelpservices.com"
                 className="h-9 w-full rounded-md border border-input bg-card px-3 text-xs text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
                 autoComplete="email"
               />
