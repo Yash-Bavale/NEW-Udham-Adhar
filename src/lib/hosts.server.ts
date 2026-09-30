@@ -112,6 +112,7 @@ function isCrmPath(pathname: string): boolean {
     pathname === "/admin" ||
     pathname.startsWith("/admin/") ||
     pathname === "/unauthorized" ||
+    pathname.startsWith("/auth/callback") ||
     pathname.startsWith("/seo-admin")
   );
 }
