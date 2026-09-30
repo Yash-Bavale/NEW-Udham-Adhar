@@ -4887,6 +4887,9 @@ export type Database = {
         }
         Returns: number
       }
+      prune_analytics_events: { Args: never; Returns: undefined }
+      prune_notifications: { Args: never; Returns: undefined }
+      prune_sent_email_bodies: { Args: never; Returns: undefined }
       read_email_batch: {
         Args: { batch_size: number; queue_name: string; vt: number }
         Returns: {
