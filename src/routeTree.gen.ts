@@ -153,12 +153,17 @@ import { Route as ApiPublicFormAssetSplatRouteImport } from './routes/api/public
 import { Route as ApiPublicGstLeadRouteImport } from './routes/api/public/gst/lead'
 import { Route as ApiPublicGstServicesRouteImport } from './routes/api/public/gst/services'
 import { Route as ApiPublicInvoiceLeadCodeRouteImport } from './routes/api/public/invoice.$leadCode'
+import { Route as ApiPublicV1LeadsRouteImport } from './routes/api/public/v1/leads'
+import { Route as ApiPublicV1ServicesRouteImport } from './routes/api/public/v1/services'
 import { Route as ApiPublicWebhooksCashfreeRouteImport } from './routes/api/public/webhooks/cashfree'
 import { Route as ApiPublicWebhooksCcavenueRouteImport } from './routes/api/public/webhooks/ccavenue'
 import { Route as ApiPublicWebhooksPayuRouteImport } from './routes/api/public/webhooks/payu'
 import { Route as LovableEmailQueueProcessRouteImport } from './routes/lovable/email/queue/process'
 import { Route as LovableEmailTransactionalPreviewRouteImport } from './routes/lovable/email/transactional/preview'
 import { Route as LovableEmailTransactionalSendRouteImport } from './routes/lovable/email/transactional/send'
+import { Route as ApiPublicV1ApplicationsSummaryRouteImport } from './routes/api/public/v1/applications/summary'
+import { Route as ApiPublicV1PaymentsInitiateRouteImport } from './routes/api/public/v1/payments/initiate'
+import { Route as ApiPublicV1PaymentsLeadCodeStatusRouteImport } from './routes/api/public/v1/payments/$leadCode.status'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -912,6 +917,16 @@ const ApiPublicInvoiceLeadCodeRoute =
     path: '/api/public/invoice/$leadCode',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicV1LeadsRoute = ApiPublicV1LeadsRouteImport.update({
+  id: '/api/public/v1/leads',
+  path: '/api/public/v1/leads',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicV1ServicesRoute = ApiPublicV1ServicesRouteImport.update({
+  id: '/api/public/v1/services',
+  path: '/api/public/v1/services',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicWebhooksCashfreeRoute =
   ApiPublicWebhooksCashfreeRouteImport.update({
     id: '/api/public/webhooks/cashfree',
@@ -945,6 +960,24 @@ const LovableEmailTransactionalSendRoute =
   LovableEmailTransactionalSendRouteImport.update({
     id: '/lovable/email/transactional/send',
     path: '/lovable/email/transactional/send',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicV1ApplicationsSummaryRoute =
+  ApiPublicV1ApplicationsSummaryRouteImport.update({
+    id: '/api/public/v1/applications/summary',
+    path: '/api/public/v1/applications/summary',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicV1PaymentsInitiateRoute =
+  ApiPublicV1PaymentsInitiateRouteImport.update({
+    id: '/api/public/v1/payments/initiate',
+    path: '/api/public/v1/payments/initiate',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicV1PaymentsLeadCodeStatusRoute =
+  ApiPublicV1PaymentsLeadCodeStatusRouteImport.update({
+    id: '/api/public/v1/payments/$leadCode/status',
+    path: '/api/public/v1/payments/$leadCode/status',
     getParentRoute: () => rootRouteImport,
   } as any)
 
@@ -1092,6 +1125,8 @@ export interface FileRoutesByFullPath {
   '/api/public/gst/lead': typeof ApiPublicGstLeadRoute
   '/api/public/gst/services': typeof ApiPublicGstServicesRoute
   '/api/public/invoice/$leadCode': typeof ApiPublicInvoiceLeadCodeRoute
+  '/api/public/v1/leads': typeof ApiPublicV1LeadsRoute
+  '/api/public/v1/services': typeof ApiPublicV1ServicesRoute
   '/api/public/webhooks/cashfree': typeof ApiPublicWebhooksCashfreeRoute
   '/api/public/webhooks/ccavenue': typeof ApiPublicWebhooksCcavenueRoute
   '/api/public/webhooks/payu': typeof ApiPublicWebhooksPayuRoute
@@ -1099,6 +1134,9 @@ export interface FileRoutesByFullPath {
   '/lovable/email/transactional/preview': typeof LovableEmailTransactionalPreviewRoute
   '/lovable/email/transactional/send': typeof LovableEmailTransactionalSendRoute
   '/admin/support/tickets/': typeof AdminSupportTicketsIndexRoute
+  '/api/public/v1/applications/summary': typeof ApiPublicV1ApplicationsSummaryRoute
+  '/api/public/v1/payments/initiate': typeof ApiPublicV1PaymentsInitiateRoute
+  '/api/public/v1/payments/$leadCode/status': typeof ApiPublicV1PaymentsLeadCodeStatusRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -1239,6 +1277,8 @@ export interface FileRoutesByTo {
   '/api/public/gst/lead': typeof ApiPublicGstLeadRoute
   '/api/public/gst/services': typeof ApiPublicGstServicesRoute
   '/api/public/invoice/$leadCode': typeof ApiPublicInvoiceLeadCodeRoute
+  '/api/public/v1/leads': typeof ApiPublicV1LeadsRoute
+  '/api/public/v1/services': typeof ApiPublicV1ServicesRoute
   '/api/public/webhooks/cashfree': typeof ApiPublicWebhooksCashfreeRoute
   '/api/public/webhooks/ccavenue': typeof ApiPublicWebhooksCcavenueRoute
   '/api/public/webhooks/payu': typeof ApiPublicWebhooksPayuRoute
@@ -1246,6 +1286,9 @@ export interface FileRoutesByTo {
   '/lovable/email/transactional/preview': typeof LovableEmailTransactionalPreviewRoute
   '/lovable/email/transactional/send': typeof LovableEmailTransactionalSendRoute
   '/admin/support/tickets': typeof AdminSupportTicketsIndexRoute
+  '/api/public/v1/applications/summary': typeof ApiPublicV1ApplicationsSummaryRoute
+  '/api/public/v1/payments/initiate': typeof ApiPublicV1PaymentsInitiateRoute
+  '/api/public/v1/payments/$leadCode/status': typeof ApiPublicV1PaymentsLeadCodeStatusRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -1392,6 +1435,8 @@ export interface FileRoutesById {
   '/api/public/gst/lead': typeof ApiPublicGstLeadRoute
   '/api/public/gst/services': typeof ApiPublicGstServicesRoute
   '/api/public/invoice/$leadCode': typeof ApiPublicInvoiceLeadCodeRoute
+  '/api/public/v1/leads': typeof ApiPublicV1LeadsRoute
+  '/api/public/v1/services': typeof ApiPublicV1ServicesRoute
   '/api/public/webhooks/cashfree': typeof ApiPublicWebhooksCashfreeRoute
   '/api/public/webhooks/ccavenue': typeof ApiPublicWebhooksCcavenueRoute
   '/api/public/webhooks/payu': typeof ApiPublicWebhooksPayuRoute
@@ -1399,6 +1444,9 @@ export interface FileRoutesById {
   '/lovable/email/transactional/preview': typeof LovableEmailTransactionalPreviewRoute
   '/lovable/email/transactional/send': typeof LovableEmailTransactionalSendRoute
   '/admin/support/tickets/': typeof AdminSupportTicketsIndexRoute
+  '/api/public/v1/applications/summary': typeof ApiPublicV1ApplicationsSummaryRoute
+  '/api/public/v1/payments/initiate': typeof ApiPublicV1PaymentsInitiateRoute
+  '/api/public/v1/payments/$leadCode/status': typeof ApiPublicV1PaymentsLeadCodeStatusRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -1546,6 +1594,8 @@ export interface FileRouteTypes {
     | '/api/public/gst/lead'
     | '/api/public/gst/services'
     | '/api/public/invoice/$leadCode'
+    | '/api/public/v1/leads'
+    | '/api/public/v1/services'
     | '/api/public/webhooks/cashfree'
     | '/api/public/webhooks/ccavenue'
     | '/api/public/webhooks/payu'
@@ -1553,6 +1603,9 @@ export interface FileRouteTypes {
     | '/lovable/email/transactional/preview'
     | '/lovable/email/transactional/send'
     | '/admin/support/tickets/'
+    | '/api/public/v1/applications/summary'
+    | '/api/public/v1/payments/initiate'
+    | '/api/public/v1/payments/$leadCode/status'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -1693,6 +1746,8 @@ export interface FileRouteTypes {
     | '/api/public/gst/lead'
     | '/api/public/gst/services'
     | '/api/public/invoice/$leadCode'
+    | '/api/public/v1/leads'
+    | '/api/public/v1/services'
     | '/api/public/webhooks/cashfree'
     | '/api/public/webhooks/ccavenue'
     | '/api/public/webhooks/payu'
@@ -1700,6 +1755,9 @@ export interface FileRouteTypes {
     | '/lovable/email/transactional/preview'
     | '/lovable/email/transactional/send'
     | '/admin/support/tickets'
+    | '/api/public/v1/applications/summary'
+    | '/api/public/v1/payments/initiate'
+    | '/api/public/v1/payments/$leadCode/status'
   id:
     | '__root__'
     | '/'
@@ -1845,6 +1903,8 @@ export interface FileRouteTypes {
     | '/api/public/gst/lead'
     | '/api/public/gst/services'
     | '/api/public/invoice/$leadCode'
+    | '/api/public/v1/leads'
+    | '/api/public/v1/services'
     | '/api/public/webhooks/cashfree'
     | '/api/public/webhooks/ccavenue'
     | '/api/public/webhooks/payu'
@@ -1852,6 +1912,9 @@ export interface FileRouteTypes {
     | '/lovable/email/transactional/preview'
     | '/lovable/email/transactional/send'
     | '/admin/support/tickets/'
+    | '/api/public/v1/applications/summary'
+    | '/api/public/v1/payments/initiate'
+    | '/api/public/v1/payments/$leadCode/status'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -1935,12 +1998,17 @@ export interface RootRouteChildren {
   ApiPublicGstLeadRoute: typeof ApiPublicGstLeadRoute
   ApiPublicGstServicesRoute: typeof ApiPublicGstServicesRoute
   ApiPublicInvoiceLeadCodeRoute: typeof ApiPublicInvoiceLeadCodeRoute
+  ApiPublicV1LeadsRoute: typeof ApiPublicV1LeadsRoute
+  ApiPublicV1ServicesRoute: typeof ApiPublicV1ServicesRoute
   ApiPublicWebhooksCashfreeRoute: typeof ApiPublicWebhooksCashfreeRoute
   ApiPublicWebhooksCcavenueRoute: typeof ApiPublicWebhooksCcavenueRoute
   ApiPublicWebhooksPayuRoute: typeof ApiPublicWebhooksPayuRoute
   LovableEmailQueueProcessRoute: typeof LovableEmailQueueProcessRoute
   LovableEmailTransactionalPreviewRoute: typeof LovableEmailTransactionalPreviewRoute
   LovableEmailTransactionalSendRoute: typeof LovableEmailTransactionalSendRoute
+  ApiPublicV1ApplicationsSummaryRoute: typeof ApiPublicV1ApplicationsSummaryRoute
+  ApiPublicV1PaymentsInitiateRoute: typeof ApiPublicV1PaymentsInitiateRoute
+  ApiPublicV1PaymentsLeadCodeStatusRoute: typeof ApiPublicV1PaymentsLeadCodeStatusRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -2953,6 +3021,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicInvoiceLeadCodeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/v1/leads': {
+      id: '/api/public/v1/leads'
+      path: '/api/public/v1/leads'
+      fullPath: '/api/public/v1/leads'
+      preLoaderRoute: typeof ApiPublicV1LeadsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/v1/services': {
+      id: '/api/public/v1/services'
+      path: '/api/public/v1/services'
+      fullPath: '/api/public/v1/services'
+      preLoaderRoute: typeof ApiPublicV1ServicesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/webhooks/cashfree': {
       id: '/api/public/webhooks/cashfree'
       path: '/api/public/webhooks/cashfree'
@@ -2993,6 +3075,27 @@ declare module '@tanstack/react-router' {
       path: '/lovable/email/transactional/send'
       fullPath: '/lovable/email/transactional/send'
       preLoaderRoute: typeof LovableEmailTransactionalSendRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/v1/applications/summary': {
+      id: '/api/public/v1/applications/summary'
+      path: '/api/public/v1/applications/summary'
+      fullPath: '/api/public/v1/applications/summary'
+      preLoaderRoute: typeof ApiPublicV1ApplicationsSummaryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/v1/payments/initiate': {
+      id: '/api/public/v1/payments/initiate'
+      path: '/api/public/v1/payments/initiate'
+      fullPath: '/api/public/v1/payments/initiate'
+      preLoaderRoute: typeof ApiPublicV1PaymentsInitiateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/v1/payments/$leadCode/status': {
+      id: '/api/public/v1/payments/$leadCode/status'
+      path: '/api/public/v1/payments/$leadCode/status'
+      fullPath: '/api/public/v1/payments/$leadCode/status'
+      preLoaderRoute: typeof ApiPublicV1PaymentsLeadCodeStatusRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -3305,12 +3408,18 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicGstLeadRoute: ApiPublicGstLeadRoute,
   ApiPublicGstServicesRoute: ApiPublicGstServicesRoute,
   ApiPublicInvoiceLeadCodeRoute: ApiPublicInvoiceLeadCodeRoute,
+  ApiPublicV1LeadsRoute: ApiPublicV1LeadsRoute,
+  ApiPublicV1ServicesRoute: ApiPublicV1ServicesRoute,
   ApiPublicWebhooksCashfreeRoute: ApiPublicWebhooksCashfreeRoute,
   ApiPublicWebhooksCcavenueRoute: ApiPublicWebhooksCcavenueRoute,
   ApiPublicWebhooksPayuRoute: ApiPublicWebhooksPayuRoute,
   LovableEmailQueueProcessRoute: LovableEmailQueueProcessRoute,
   LovableEmailTransactionalPreviewRoute: LovableEmailTransactionalPreviewRoute,
   LovableEmailTransactionalSendRoute: LovableEmailTransactionalSendRoute,
+  ApiPublicV1ApplicationsSummaryRoute: ApiPublicV1ApplicationsSummaryRoute,
+  ApiPublicV1PaymentsInitiateRoute: ApiPublicV1PaymentsInitiateRoute,
+  ApiPublicV1PaymentsLeadCodeStatusRoute:
+    ApiPublicV1PaymentsLeadCodeStatusRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
