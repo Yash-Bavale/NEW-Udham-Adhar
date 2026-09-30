@@ -92,6 +92,13 @@
       "when": 1790324800000,
       "tag": "0012_repair_completed_closed_event_dates",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1790744861349,
+      "tag": "0013_perf_fk_indexes_and_cron_retention",
+      "breakpoints": true
     }
   ]
 }
