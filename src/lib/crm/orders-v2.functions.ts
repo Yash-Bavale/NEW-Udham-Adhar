@@ -67,6 +67,10 @@ function rollupPaymentStatus(payments: Array<{ status: string; amount: number }>
  * Finds any paid payments where application_id is null or where lead status is payment_successful,
  * creates missing applications, links the payments, and triggers finalizePaidPayment.
  */
+const RECONCILE_INTERVAL_MS = 10 * 60_000;
+let lastReconcileAt = 0;
+let reconcileRunning = false;
+
 async function ensurePaidOrdersIntegrated(admin: any) {
   try {
     // 0. Live gateway check for recent payment attempts (created/attempted/failed) to heal any missed webhooks
@@ -797,10 +801,21 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       };
     }
 
-    // Fire self-healing check in background non-blocking so read response is instant
-    ensurePaidOrdersIntegrated(admin).catch((err) => {
-      console.error("[listOrdersV2] background reconciliation error:", err);
-    });
+    // Self-healing gateway check, throttled: runs at most once every 10 minutes
+    // per server instance instead of on every Orders refresh. Webhooks and the
+    // payu-reconcile cron remain the primary paths.
+    const nowMs = Date.now();
+    if (!reconcileRunning && nowMs - lastReconcileAt > RECONCILE_INTERVAL_MS) {
+      lastReconcileAt = nowMs;
+      reconcileRunning = true;
+      ensurePaidOrdersIntegrated(admin)
+        .catch((err) => {
+          console.error("[listOrdersV2] background reconciliation error:", err);
+        })
+        .finally(() => {
+          reconcileRunning = false;
+        });
+    }
 
     const normalized = normalizeOrdersFilter(data);
 
