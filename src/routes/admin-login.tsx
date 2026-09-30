@@ -155,7 +155,7 @@ function AdminLoginPage() {
   };
 
   return (
-    <main className="relative isolate flex min-h-screen items-start justify-center overflow-hidden bg-background px-4 pb-10 pt-[7vh] text-foreground md:px-8">
+    <main className="relative isolate flex min-h-screen items-start justify-center overflow-hidden bg-background px-4 pb-10 pt-[16vh] text-foreground md:px-8">
       <img src={officeBg.url} alt="" aria-hidden="true" width={1672} height={941} className="absolute inset-0 -z-20 h-full w-full object-cover object-[44%_center]" />
       <div className="absolute inset-0 -z-10 bg-foreground/10 max-md:bg-foreground/35" />
 
