@@ -1909,7 +1909,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       filtered = filtered.filter((r) => isTechnicalDelayOrder(r));
     } else if (bucket === "customer_delay") {
       filtered = filtered.filter((r) => isCustomerDelayOrder(r));
-    } else if (bucket === "pending") {
+    } else if (bucket === "pending" || bucket === "idle_time") {
       filtered = filtered.filter((r) => r.in_range_action_taken);
     } else if (bucket === "completed") {
       filtered = filtered.filter((r) => r.in_range_completed);

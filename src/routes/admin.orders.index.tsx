@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, keepPreviousData, useQueryClient } from "@tanstack/react-query";
 import { Fragment, useEffect, useMemo, useRef, useState, useCallback } from "react";
-import { ChevronLeft, ChevronRight, RotateCcw, X, Filter, Loader2, ArrowUpDown, ArrowUp, ArrowDown, ShieldAlert, Flame, PhoneCall, PhoneForwarded, Clock, Server, LayoutGrid, Inbox, Bell, Hourglass, CheckCircle2, CheckCheck, AlertTriangle, UserX, UserCheck, Scale, Sparkles, RefreshCw, LifeBuoy } from "lucide-react";
+import { ChevronLeft, ChevronRight, RotateCcw, X, Filter, Loader2, ArrowUpDown, ArrowUp, ArrowDown, ShieldAlert, Flame, PhoneCall, PhoneForwarded, Clock, Server, LayoutGrid, Inbox, Bell, Hourglass, CheckCircle2, CheckCheck, AlertTriangle, UserX, UserCheck, Scale, Sparkles, RefreshCw, LifeBuoy, Timer } from "lucide-react";
 import { formatIST, istDateKey } from "@/lib/datetime";
 import { toast } from "sonner";
 
@@ -21,6 +21,7 @@ import { listServices } from "@/lib/crm/services-admin.functions";
 import { bulkAssignOrders } from "@/lib/crm/orders.functions";
 import { autoDistributeSelectedOrders } from "@/lib/crm/assignment-history.functions";
 import { STAGE_META, type OrderStage } from "@/lib/crm/computeOrderStage";
+import { getMyPerformanceDashboard } from "@/lib/crm/employee-performance.functions";
 
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -63,6 +64,7 @@ export const Route = createFileRoute("/admin/orders/")({
 type Bucket =
   | "all"
   | "needs_action"
+  | "idle_time"
   | "hot_orders"
   | "reminders" // Call Back Scheduled
   | "technical_delay"
@@ -118,6 +120,17 @@ const BUCKET_CARDS: BucketCardItem[] = [
     subtitle: "Touch SLA Pending",
     icon: Inbox,
     tone: "rose",
+  },
+  {
+    id: "idle_time",
+    label: "IDLE TIME",
+    subtitle: "Action Pace Timer",
+    icon: Timer,
+    badge: {
+      text: "Live",
+      pillClass: "bg-emerald-500 text-white font-bold",
+    },
+    tone: "amber",
   },
   {
     id: "hot_orders",
@@ -230,11 +243,132 @@ function daysSince(iso: string | null | undefined): number {
   return Math.max(0, Math.floor((Date.now() - t) / 86_400_000));
 }
 
+function OrderIdleTimerKpiCard({
+  latestActionAt,
+  latestActionLabel,
+  latestActionOrderCode,
+  isActive,
+  onClick,
+}: {
+  latestActionAt?: string | null;
+  latestActionLabel?: string | null;
+  latestActionOrderCode?: string | null;
+  isActive?: boolean;
+  onClick: () => void;
+}) {
+  const [elapsedMs, setElapsedMs] = useState(() =>
+    latestActionAt ? Math.max(0, Date.now() - new Date(latestActionAt).getTime()) : 0
+  );
+
+  useEffect(() => {
+    if (!latestActionAt) {
+      setElapsedMs(0);
+      return;
+    }
+    const tick = () => {
+      setElapsedMs(Math.max(0, Date.now() - new Date(latestActionAt).getTime()));
+    };
+    tick();
+    const interval = setInterval(tick, 1000);
+    return () => clearInterval(interval);
+  }, [latestActionAt]);
+
+  const seconds = Math.floor(elapsedMs / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+
+  const displayTime = !latestActionAt
+    ? "0m 00s"
+    : hours > 0
+    ? `${hours}h ${String(minutes % 60).padStart(2, "0")}m ${String(seconds % 60).padStart(2, "0")}s`
+    : `${minutes}m ${String(seconds % 60).padStart(2, "0")}s`;
+
+  const isHealthy = !latestActionAt || minutes < 15;
+  const isAttention = Boolean(latestActionAt && minutes >= 15 && minutes < 60);
+  const isExtended = Boolean(latestActionAt && minutes >= 60);
+
+  const toneCls = isHealthy
+    ? "bg-emerald-500 text-white font-bold"
+    : isAttention
+    ? "bg-amber-500 text-white font-bold"
+    : "bg-rose-500 text-white font-bold";
+
+  const statusText = !latestActionAt
+    ? "Active Pace"
+    : isHealthy
+    ? "Active Pace"
+    : isAttention
+    ? "Idle"
+    : "Extended";
+
+  const containerBg = isActive
+    ? isHealthy
+      ? "bg-emerald-50 border-emerald-500 text-emerald-950 shadow-sm ring-2 ring-emerald-300"
+      : isAttention
+      ? "bg-amber-50 border-amber-500 text-amber-950 shadow-sm ring-2 ring-amber-300"
+      : "bg-rose-50 border-rose-500 text-rose-950 shadow-sm ring-2 ring-rose-300"
+    : isHealthy
+    ? "bg-emerald-50/50 border-emerald-200/90 text-emerald-950 hover:bg-emerald-50 hover:border-emerald-300"
+    : isAttention
+    ? "bg-amber-50/50 border-amber-200/90 text-amber-950 hover:bg-amber-50 hover:border-amber-300"
+    : "bg-rose-50/50 border-rose-200/90 text-rose-950 hover:bg-rose-50 hover:border-rose-300";
+
+  const headerCls = isHealthy ? "text-emerald-700 font-bold" : isAttention ? "text-amber-800 font-bold" : "text-rose-700 font-bold";
+  const iconCls = isHealthy ? "text-emerald-600" : isAttention ? "text-amber-700" : "text-rose-600";
+  const timerCls = isHealthy ? "text-emerald-900" : isAttention ? "text-amber-950" : "text-rose-900";
+  const subtitleCls = isHealthy ? "text-emerald-700/80" : isAttention ? "text-amber-700/80" : "text-rose-700/80";
+
+  const subtitleText = latestActionLabel
+    ? `Since ${latestActionLabel}${latestActionOrderCode ? ` (#${latestActionOrderCode})` : ""}`
+    : "Live employee timer";
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "flex flex-col justify-between p-2.5 sm:p-3 rounded-xl min-h-[82px] border transition-all duration-150 cursor-pointer select-none text-left group shadow-xs hover:shadow-sm",
+        containerBg
+      )}
+    >
+      {/* Top row: Label & Icon */}
+      <div className="flex items-center justify-between gap-1 w-full">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className="relative flex h-2 w-2 shrink-0">
+            <span className={cn("animate-ping absolute inline-flex h-full w-full rounded-full opacity-75", isHealthy ? "bg-emerald-400" : isAttention ? "bg-amber-400" : "bg-rose-400")}></span>
+            <span className={cn("relative inline-flex rounded-full h-2 w-2", isHealthy ? "bg-emerald-500" : isAttention ? "bg-amber-500" : "bg-rose-500")}></span>
+          </span>
+          <span className={cn("text-[10px] font-bold tracking-wider uppercase truncate", headerCls)} title="Idle Time">
+            IDLE TIME
+          </span>
+        </div>
+        <Timer className={cn("w-3.5 h-3.5 shrink-0 transition-transform group-hover:scale-110", iconCls)} />
+      </div>
+
+      {/* Middle row: Live Timer & Badge */}
+      <div className="flex items-baseline gap-1.5 mt-1">
+        <span className={cn("font-mono text-base sm:text-lg font-black tracking-tight", timerCls)}>
+          {displayTime}
+        </span>
+        <span className={cn("text-[9px] font-bold px-1.5 py-0.5 rounded leading-none shrink-0", toneCls)}>
+          {statusText}
+        </span>
+      </div>
+
+      {/* Bottom row: Subtitle */}
+      <div className={cn("text-[9.5px] font-medium truncate mt-0.5", subtitleCls)} title={subtitleText}>
+        {subtitleText}
+      </div>
+    </button>
+  );
+}
+
 function OrdersListPage() {
   const listFn = useServerFn(listOrdersV2);
   const assignStaffFn = useServerFn(listAssignmentStaff);
   const historicalStaffFn = useServerFn(listAllHistoricalStaff);
   const svcFn = useServerFn(listServices);
+  const getMyPerfFn = useServerFn(getMyPerformanceDashboard);
   const role = useRole();
   const userPerms = usePermissions();
   const isAdmin = role.hasAny(["admin", "super_admin"]) || Boolean(userPerms.perms?.isAdmin);
@@ -242,6 +376,18 @@ function OrdersListPage() {
   const hideMoney = role.hideMoney();
   const navigate = useNavigate();
   const qc = useQueryClient();
+
+  const { data: myPerfData } = useQuery({
+    queryKey: ["employee.my-performance", "today"],
+    queryFn: () => getMyPerfFn({ data: { dateFilter: "today" } }),
+    refetchInterval: 15_000,
+    staleTime: 10_000,
+  });
+
+  const actionMetrics = (myPerfData as any)?.actionResponseMetrics;
+  const latestActionAt = actionMetrics?.latestActionAt;
+  const latestActionLabel = actionMetrics?.latestActionLabel;
+  const latestActionOrderCode = actionMetrics?.latestActionOrderCode;
 
   const savedState = useMemo(() => getModuleFilterState("admin.orders"), []);
 
@@ -951,7 +1097,7 @@ return (
                 ? "Latest Completed (Newest)"
                 : bucket === "closed"
                   ? "Latest Closed (Newest)"
-                  : bucket === "pending"
+                  : bucket === "pending" || bucket === "idle_time"
                     ? "Latest Action First (Newest)"
                     : bucket === "customer_delay" || bucket === "technical_delay"
                       ? "Latest Delay First (Newest)"
@@ -962,7 +1108,7 @@ return (
                 ? "Older Completed (Oldest)"
                 : bucket === "closed"
                   ? "Older Closed (Oldest)"
-                  : bucket === "pending"
+                  : bucket === "pending" || bucket === "idle_time"
                     ? "Older Action First (Oldest)"
                     : bucket === "customer_delay" || bucket === "technical_delay"
                       ? "Older Delay First (Oldest)"
@@ -992,13 +1138,29 @@ return (
     <div className={cn(
       "grid gap-2 w-full",
       isAdmin
-        ? "grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-10"
-        : "grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-9"
+        ? "grid-cols-2 sm:grid-cols-3 md:grid-cols-6 lg:grid-cols-11"
+        : "grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-10"
     )}>
       {(isAdmin ? BUCKET_CARDS : BUCKET_CARDS.filter((b) => !b.adminOnly)).map((b) => {
         const active = bucket === b.id;
         const countVal = Number((counts as any)[b.id] ?? 0);
         const IconComponent = b.icon;
+
+        if (b.id === "idle_time") {
+          return (
+            <OrderIdleTimerKpiCard
+              key="idle_time"
+              latestActionAt={latestActionAt}
+              latestActionLabel={latestActionLabel}
+              latestActionOrderCode={latestActionOrderCode}
+              isActive={active}
+              onClick={() => {
+                setBucket("idle_time");
+                setPage(1);
+              }}
+            />
+          );
+        }
 
         let cardContainerCls = "bg-white border-slate-200 text-slate-800 hover:border-slate-300 hover:bg-slate-50/70";
         let headerCls = "text-slate-500";
