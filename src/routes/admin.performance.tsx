@@ -241,11 +241,16 @@ function EmployeeActivityCommandCenterPage() {
   };
 
   const employeeRows = data?.employeeRows ?? [];
-  const totalMonitored = data?.kpiCards?.totalActiveEmployees?.value ?? employeeRows.length;
-  const activeCount = employeeRows.filter((e) => e.status === "active").length;
-  const idleCount = employeeRows.filter((e) => e.status === "idle").length;
-  const awayCount = employeeRows.filter((e) => e.status === "away").length;
-  const offlineCount = employeeRows.filter((e) => e.status === "offline").length;
+  const telemetry = (data as any)?.telemetry;
+  const totalMonitored = telemetry?.totalMonitored ?? data?.kpiCards?.totalActiveEmployees?.value ?? employeeRows.length;
+  const activeCount = telemetry?.activeCount ?? employeeRows.filter((e) => e.status === "active").length;
+  const idleCount = telemetry?.idleCount ?? employeeRows.filter((e) => e.status === "idle").length;
+  const awayCount = telemetry?.awayCount ?? employeeRows.filter((e) => e.status === "away").length;
+  const offlineCount = telemetry?.offlineCount ?? employeeRows.filter((e) => e.status === "offline").length;
+
+  const totalIdleFormatted = telemetry?.totalIdleFormatted || "0m";
+  const totalAwayFormatted = telemetry?.totalAwayFormatted || "0m";
+  const totalActiveFormatted = telemetry?.totalActiveFormatted || "0m";
 
   const activePct = totalMonitored > 0 ? Math.round((activeCount / totalMonitored) * 100) : 0;
   const idlePct = totalMonitored > 0 ? Math.round((idleCount / totalMonitored) * 100) : 0;
@@ -326,6 +331,8 @@ function EmployeeActivityCommandCenterPage() {
       "Tech Delays",
       "Hot Orders",
       "SLA Compliance",
+      "Idle Time",
+      "Away Time",
       "Last Action",
       "Last Active",
     ];
@@ -342,6 +349,8 @@ function EmployeeActivityCommandCenterPage() {
       e.technicalDelays || 0,
       e.hotOrders,
       `"${e.slaPercent}%"`,
+      `"${e.idleDurationFormatted || "0m"}"`,
+      `"${e.awayDurationFormatted || "0m"}"`,
       `"${e.lastActionText || ""}"`,
       `"${e.lastActiveAgo || ""}"`,
     ]);
@@ -517,10 +526,10 @@ function EmployeeActivityCommandCenterPage() {
               <span className="text-3xl font-bold text-amber-600 tracking-tight leading-none">
                 {idleCount}
               </span>
-              <span className="text-xs text-slate-500">&gt;5m inactive</span>
+              <span className="text-xs text-amber-700 font-semibold">{totalIdleFormatted}</span>
             </div>
             <div className="mt-2 text-slate-500 text-[11px] truncate">
-              Terminal locked / paused
+              {idleCount} idle ({totalIdleFormatted} total idle)
             </div>
           </div>
 
@@ -539,10 +548,10 @@ function EmployeeActivityCommandCenterPage() {
               <span className="text-3xl font-bold text-orange-600 tracking-tight leading-none">
                 {awayCount}
               </span>
-              <span className="text-xs text-slate-500">&gt;15m away</span>
+              <span className="text-xs text-orange-700 font-semibold">{totalAwayFormatted}</span>
             </div>
             <div className="mt-2 text-slate-500 text-[11px] truncate">
-              Tab unfocused or meal
+              {awayCount} away ({totalAwayFormatted} total away)
             </div>
           </div>
 
@@ -699,16 +708,16 @@ function EmployeeActivityCommandCenterPage() {
                         <span className="block text-[10px] text-slate-400 font-medium uppercase">
                           Active Time
                         </span>
-                        <span className="text-xs font-semibold text-emerald-600">
-                          {emp.sessionLabel && emp.sessionLabel !== "—" ? emp.sessionLabel : (emp.actions > 0 ? `${Math.max(15, emp.actions * 2)}m` : "—")}
+                        <span className="text-xs font-semibold text-emerald-600 font-mono">
+                          {emp.activeDurationFormatted || emp.sessionLabel || (emp.actions > 0 ? `${Math.max(15, emp.actions * 2)}m` : "—")}
                         </span>
                       </div>
                       <div>
                         <span className="block text-[10px] text-slate-400 font-medium uppercase">
                           Idle Time
                         </span>
-                        <span className="text-xs font-semibold text-slate-700">
-                          {emp.customerDelays > 0 ? `${emp.customerDelays * 6}m` : (emp.actions > 0 ? "15m" : "—")}
+                        <span className="text-xs font-semibold text-amber-700 font-mono">
+                          {emp.idleDurationFormatted || (emp.liveOpenIdleFormatted && emp.liveOpenIdleFormatted !== "—" ? emp.liveOpenIdleFormatted : "0m")}
                         </span>
                       </div>
                     </div>
@@ -843,6 +852,7 @@ function EmployeeActivityCommandCenterPage() {
                 <th className="py-3 px-2 text-center" title="Govt / NIC Technical Delays">T.Delay</th>
                 <th className="py-3 px-2 text-center">Hot</th>
                 <th className="py-3 px-2.5 text-right">SLA %</th>
+                <th className="py-3 px-2.5 text-center text-amber-800 bg-amber-50/60 min-w-[95px]" title="Total Idle Time / Live Open Idle">Idle Time</th>
                 <th className="py-3 px-3 min-w-[200px]">Last Action</th>
                 <th className="py-3 px-3 text-right min-w-[90px]">Last Active</th>
                 <th className="py-3 px-3 text-right">Controls</th>
@@ -851,7 +861,7 @@ function EmployeeActivityCommandCenterPage() {
             <tbody className="divide-y divide-slate-100">
               {filteredEmployees.length === 0 ? (
                 <tr>
-                  <td colSpan={13} className="py-8 text-center text-slate-400">
+                  <td colSpan={14} className="py-8 text-center text-slate-400">
                     No matching employee records found.
                   </td>
                 </tr>
@@ -1088,6 +1098,44 @@ function EmployeeActivityCommandCenterPage() {
                               style={{ width: `${Math.min(100, emp.slaPercent)}%` }}
                             />
                           </div>
+                        </div>
+                      </td>
+
+                      {/* Idle Time */}
+                      <td className="py-2.5 px-2.5 text-center">
+                        <div className="inline-flex flex-col items-center">
+                          <span
+                            className={cn(
+                              "inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-mono text-[11px] font-bold border",
+                              emp.idleStatusTag === "healthy"
+                                ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                : emp.idleStatusTag === "attention"
+                                ? "bg-amber-50 text-amber-800 border-amber-200"
+                                : emp.idleStatusTag === "extended"
+                                ? "bg-rose-50 text-rose-700 border-rose-200"
+                                : "bg-slate-50 text-slate-500 border-slate-200"
+                            )}
+                            title={`Idle: ${emp.idleDurationFormatted || "0m"} • Away: ${emp.awayDurationFormatted || "0m"} • Open Idle: ${emp.liveOpenIdleFormatted || "—"}`}
+                          >
+                            <span
+                              className={cn(
+                                "w-1.5 h-1.5 rounded-full",
+                                emp.idleStatusTag === "healthy"
+                                  ? "bg-emerald-500 animate-pulse"
+                                  : emp.idleStatusTag === "attention"
+                                  ? "bg-amber-500"
+                                  : emp.idleStatusTag === "extended"
+                                  ? "bg-rose-500 animate-ping"
+                                  : "bg-slate-400"
+                              )}
+                            />
+                            {emp.idleDurationFormatted || "0m"}
+                          </span>
+                          {emp.status === "active" && emp.liveOpenIdleFormatted && emp.liveOpenIdleFormatted !== "—" && (
+                            <span className="text-[9px] text-slate-400 mt-0.5">
+                              {emp.liveOpenIdleFormatted} open
+                            </span>
+                          )}
                         </div>
                       </td>
 

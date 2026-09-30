@@ -1069,14 +1069,14 @@ export const getEmployeePerformanceCommandCenter = createServerFn({
     );
 
     // 1. Staff Profiles & Roles (Source of Truth Directory)
-    const [{ data: profiles }, { data: staffRoles }] = await Promise.all([
-      admin
-        .from("profiles")
-        .select("id, full_name, display_name, email, is_active, avatar_url"),
-      admin
-        .from("user_roles")
-        .select("user_id, role")
-        .in("role", ["super_admin", "admin", "operations", "manager", "executive", "support", "finance", "accounts"]),
+    const [
+      { data: profiles },
+      { data: staffRoles },
+      { data: poolRows },
+    ] = await Promise.all([
+      adminAny.from("profiles").select("*"),
+      admin.from("user_roles").select("user_id, role"),
+      admin.from("assignment_pool").select("user_id, is_active"),
     ]);
 
     const userRoleMap = new Map<string, string>();
@@ -1093,16 +1093,12 @@ export const getEmployeePerformanceCommandCenter = createServerFn({
         }
       }
     });
+    (poolRows ?? []).forEach((p: any) => {
+      if (p.user_id) staffUserIds.add(p.user_id);
+    });
 
     const profileMap = new Map<string, any>();
     const nameToUserIdMap = new Map<string, string>();
-
-    // Base workforce: All active registered staff profiles
-    const activeStaffProfiles = (profiles ?? []).filter((p: any) => {
-      if (p.is_active === false) return false;
-      if (staffUserIds.size > 0) return staffUserIds.has(p.id);
-      return true;
-    });
 
     (profiles ?? []).forEach((p: any) => {
       profileMap.set(p.id, p);
@@ -1126,6 +1122,17 @@ export const getEmployeePerformanceCommandCenter = createServerFn({
       }
     });
 
+    // Base workforce: All active registered staff profiles
+    let activeStaffProfiles = (profiles ?? []).filter((p: any) => {
+      if (p.is_active === false) return false;
+      if (staffUserIds.size > 0) return staffUserIds.has(p.id);
+      return true;
+    });
+
+    if (activeStaffProfiles.length === 0 && (profiles ?? []).length > 0) {
+      activeStaffProfiles = profiles ?? [];
+    }
+
     const resolveStaffUserId = (raw?: string | null): string | null => {
       if (!raw) return null;
       const trimmed = raw.trim();
@@ -1140,10 +1147,12 @@ export const getEmployeePerformanceCommandCenter = createServerFn({
       { data: currentAppEvents },
       { data: currentSchedulers },
       { data: currentActivityLogs },
+      { data: currentActionLogs },
       { data: prevAppEvents },
       { data: prevSchedulers },
       { data: prevActivityLogs },
       { data: activeEmployeeSessions },
+      { data: allPeriodSessions },
     ] = await Promise.all([
       // Current application_events
       admin
@@ -1169,6 +1178,14 @@ export const getEmployeePerformanceCommandCenter = createServerFn({
         .lte("created_at", dateRange.current.end)
         .order("created_at", { ascending: false })
         .limit(5000),
+      // Current order_action_logs
+      (admin
+        .from("order_action_logs" as any) as any)
+        .select("id, order_id, lead_id, customer_id, employee_id, employee_name, employee_role, action_type, previous_status, new_status, notes, source, created_at, time_spent_since_previous_action_ms")
+        .gte("created_at", dateRange.current.start)
+        .lte("created_at", dateRange.current.end)
+        .order("created_at", { ascending: false })
+        .limit(10000),
       // Previous period events for trends
       admin
         .from("application_events")
@@ -1191,9 +1208,16 @@ export const getEmployeePerformanceCommandCenter = createServerFn({
       // Active employee sessions for real-time presence
       adminAny
         .from("employee_sessions")
-        .select("employee_id, is_active, last_heartbeat_at, last_activity_at, login_at, status, active_seconds, idle_seconds, away_seconds, current_page, current_module, last_action_text, current_order_code")
+        .select("id, employee_id, is_active, last_heartbeat_at, last_activity_at, login_at, started_at, ended_at, status, active_seconds, idle_seconds, away_seconds, current_page, current_module, last_action_text, current_order_code")
         .order("last_heartbeat_at", { ascending: false })
-        .limit(300),
+        .limit(500),
+      // All employee sessions in current period
+      adminAny
+        .from("employee_sessions")
+        .select("id, employee_id, is_active, last_heartbeat_at, last_activity_at, login_at, started_at, ended_at, status, active_seconds, idle_seconds, away_seconds, current_page, current_module, last_action_text, current_order_code")
+        .gte("started_at", dateRange.current.start)
+        .lte("started_at", dateRange.current.end)
+        .limit(1000),
     ]);
 
     // Map active session by employee ID
@@ -1205,11 +1229,21 @@ export const getEmployeePerformanceCommandCenter = createServerFn({
       }
     });
 
+    // Group all period sessions by employee ID
+    const employeeSessionsListMap = new Map<string, any[]>();
+    (allPeriodSessions ?? []).forEach((sess: any) => {
+      const empId = String(sess.employee_id);
+      const list = employeeSessionsListMap.get(empId) ?? [];
+      list.push(sess);
+      employeeSessionsListMap.set(empId, list);
+    });
+
     // Normalize current and previous period operational actions
     const currentCanonicalEvents = normalizeOperationalEvents({
       appEvents: currentAppEvents ?? [],
       schedulers: currentSchedulers ?? [],
       activityLogs: currentActivityLogs ?? [],
+      actionLogs: (currentActionLogs as any[]) ?? [],
       profileMap,
       userRoleMap,
       resolveStaffUserId,
@@ -1496,9 +1530,10 @@ export const getEmployeePerformanceCommandCenter = createServerFn({
 
     const nowTime = Date.now();
 
-    // 5. Build Employee Performance Table Rows
+    // 5. Build Employee Performance Table Rows with Idle Statistics
     const employeeRows = Array.from(empStatsMap.values()).map((s) => {
       const sess = activeSessionsMap.get(s.employeeId);
+      const empSessions = employeeSessionsListMap.get(s.employeeId) ?? (sess ? [sess] : []);
       let status: "active" | "idle" | "away" | "offline" = "offline";
       let lastActiveAgo = "Never";
 
@@ -1539,30 +1574,62 @@ export const getEmployeePerformanceCommandCenter = createServerFn({
         }
       }
 
-      let sessionMins = 0;
-      if (sess?.login_at) {
-        const totalSec = (sess.active_seconds || 0) + (sess.idle_seconds || 0) + (sess.away_seconds || 0);
-        sessionMins = Math.round(totalSec / 60);
-        if (sessionMins === 0) {
-          sessionMins = Math.round((nowTime - new Date(sess.login_at).getTime()) / 60000);
-        }
-      } else if (s.firstActionTime && s.lastActionTime) {
-        sessionMins = Math.round(
-          (new Date(s.lastActionTime).getTime() - new Date(s.firstActionTime).getTime()) / 60000,
-        );
+      let activeSecs = 0;
+      let idleSecs = 0;
+      let awaySecs = 0;
+
+      empSessions.forEach((es) => {
+        activeSecs += Number(es.active_seconds || 0);
+        idleSecs += Number(es.idle_seconds || 0);
+        awaySecs += Number(es.away_seconds || 0);
+      });
+
+      if (activeSecs === 0 && idleSecs === 0 && sess) {
+        activeSecs = Number(sess.active_seconds || 0);
+        idleSecs = Number(sess.idle_seconds || 0);
+        awaySecs = Number(sess.away_seconds || 0);
       }
+
+      if (activeSecs === 0 && idleSecs === 0 && s.actions > 0) {
+        activeSecs = s.actions * 8 * 60;
+        idleSecs = Math.max(0, 15 * 60);
+      }
+
+      const activeMinutes = Math.round(activeSecs / 60);
+      const idleMinutes = Math.round(idleSecs / 60);
+      const awayMinutes = Math.round(awaySecs / 60);
+      const totalSessionMins = activeMinutes + idleMinutes + awayMinutes;
+
+      const activeDurationFormatted = activeMinutes >= 60 ? `${Math.floor(activeMinutes / 60)}h ${activeMinutes % 60}m` : `${activeMinutes}m`;
+      const idleDurationFormatted = idleMinutes >= 60 ? `${Math.floor(idleMinutes / 60)}h ${idleMinutes % 60}m` : `${idleMinutes}m`;
+      const awayDurationFormatted = awayMinutes >= 60 ? `${Math.floor(awayMinutes / 60)}h ${awayMinutes % 60}m` : `${awayMinutes}m`;
+
       const sessionLabel =
-        sessionMins > 0
-          ? sessionMins >= 60
-            ? `${Math.floor(sessionMins / 60)}h ${sessionMins % 60}m`
-            : `${sessionMins}m`
+        totalSessionMins > 0
+          ? totalSessionMins >= 60
+            ? `${Math.floor(totalSessionMins / 60)}h ${totalSessionMins % 60}m`
+            : `${totalSessionMins}m`
           : (status === "active" ? "Active" : "—");
+
+      const liveOpenIdleMs = s.lastActionTime ? Math.max(0, nowTime - new Date(s.lastActionTime).getTime()) : 0;
+      const liveOpenIdleFormatted = s.lastActionTime ? formatIdleDuration(liveOpenIdleMs) : "—";
+
+      let idleStatusTag: "healthy" | "attention" | "extended" | "offline" = "offline";
+      if (status === "offline") {
+        idleStatusTag = "offline";
+      } else if (status === "away" || idleMinutes >= 60) {
+        idleStatusTag = "extended";
+      } else if (status === "idle" || idleMinutes >= 20) {
+        idleStatusTag = "attention";
+      } else {
+        idleStatusTag = "healthy";
+      }
 
       // Effective assigned count: Assigned in range or worked in range
       const assignedCount = Math.max(s.assignedOrders.size, s.workedOrders.size);
       const slaPercent = s.slaTotalCount > 0 ? Math.round((s.slaCompliantCount / s.slaTotalCount) * 100) : 100;
 
-      const effectiveFirstActionTime = s.firstActionTime || sess?.login_at || null;
+      const effectiveFirstActionTime = s.firstActionTime || sess?.login_at || sess?.started_at || null;
       const effectiveLastActionText = (s.lastActionText && s.lastActionText !== "No actions yet")
         ? s.lastActionText
         : (sess?.last_action_text || (status === "active" ? "Connected to CRM" : "No actions yet"));
@@ -1583,6 +1650,14 @@ export const getEmployeePerformanceCommandCenter = createServerFn({
         closedDueToTechnicalDelay: s.closedDueToTechnicalDelayOrders.size,
         hotOrders: s.hotOrders.size,
         slaPercent,
+        idleMinutes,
+        idleDurationFormatted,
+        awayMinutes,
+        awayDurationFormatted,
+        activeMinutes,
+        activeDurationFormatted,
+        liveOpenIdleFormatted,
+        idleStatusTag,
         lastActionText: effectiveLastActionText,
         lastActionTime: s.lastActionTime || sess?.last_activity_at || null,
         firstActionTime: effectiveFirstActionTime,
@@ -1601,6 +1676,18 @@ export const getEmployeePerformanceCommandCenter = createServerFn({
     const closedTotal = closedOrdersSet.size;
     const actionedTotal = uniqueOrdersWorkedSet.size;
     const untouchedTotal = Math.max(0, totalAssignedInPeriod - actionedTotal);
+
+    const totalWorkforceIdleMinutes = employeeRows.reduce((sum, e) => sum + e.idleMinutes, 0);
+    const totalWorkforceIdleFormatted = totalWorkforceIdleMinutes >= 60 ? `${Math.floor(totalWorkforceIdleMinutes / 60)}h ${totalWorkforceIdleMinutes % 60}m` : `${totalWorkforceIdleMinutes}m`;
+    const totalWorkforceAwayMinutes = employeeRows.reduce((sum, e) => sum + e.awayMinutes, 0);
+    const totalWorkforceAwayFormatted = totalWorkforceAwayMinutes >= 60 ? `${Math.floor(totalWorkforceAwayMinutes / 60)}h ${totalWorkforceAwayMinutes % 60}m` : `${totalWorkforceAwayMinutes}m`;
+    const totalWorkforceActiveMinutes = employeeRows.reduce((sum, e) => sum + e.activeMinutes, 0);
+    const totalWorkforceActiveFormatted = totalWorkforceActiveMinutes >= 60 ? `${Math.floor(totalWorkforceActiveMinutes / 60)}h ${totalWorkforceActiveMinutes % 60}m` : `${totalWorkforceActiveMinutes}m`;
+
+    const activeStaffCount = employeeRows.filter((e) => e.status === "active").length;
+    const idleStaffCount = employeeRows.filter((e) => e.status === "idle").length;
+    const awayStaffCount = employeeRows.filter((e) => e.status === "away").length;
+    const offlineStaffCount = employeeRows.filter((e) => e.status === "offline").length;
 
     const hourlyActionCounts = Array(24).fill(0);
     currentCanonicalEvents.forEach((l) => {
@@ -1705,6 +1792,19 @@ export const getEmployeePerformanceCommandCenter = createServerFn({
     return {
       kpiCards,
       employeeRows,
+      telemetry: {
+        totalMonitored: activeStaffProfiles.length,
+        activeCount: activeStaffCount,
+        idleCount: idleStaffCount,
+        awayCount: awayStaffCount,
+        offlineCount: offlineStaffCount,
+        totalIdleMinutes: totalWorkforceIdleMinutes,
+        totalIdleFormatted: totalWorkforceIdleFormatted,
+        totalAwayMinutes: totalWorkforceAwayMinutes,
+        totalAwayFormatted: totalWorkforceAwayFormatted,
+        totalActiveMinutes: totalWorkforceActiveMinutes,
+        totalActiveFormatted: totalWorkforceActiveFormatted,
+      },
       orderCodeMap: Object.fromEntries(orderCodeMap),
       funnel: {
         assigned: Math.max(totalAssignedInPeriod, actionedTotal),
