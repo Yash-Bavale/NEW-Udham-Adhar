@@ -5,6 +5,8 @@ import { useState, useEffect, useMemo } from "react";
 import {
   getMyPerformanceDashboard,
   type DatePeriodFilter,
+  type ActionResponseMetrics,
+  type ActionIntervalItem,
 } from "@/lib/crm/employee-performance.functions";
 import {
   ShoppingBag,
@@ -30,6 +32,11 @@ import {
   CheckCircle,
   HelpCircle,
   AlertTriangle,
+  Zap,
+  TrendingUp,
+  Scale,
+  History,
+  Timer,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -55,6 +62,124 @@ function getGreeting(name?: string) {
   return `${timeStr}, ${firstName} 👋`;
 }
 
+function formatISTTimeOnly(iso?: string | null): string {
+  if (!iso) return "—";
+  try {
+    return new Intl.DateTimeFormat("en-IN", {
+      timeZone: "Asia/Kolkata",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: true,
+    }).format(new Date(iso));
+  } catch {
+    return "—";
+  }
+}
+
+function formatISTDateOnly(iso?: string | null): string {
+  if (!iso) return "";
+  try {
+    return new Intl.DateTimeFormat("en-IN", {
+      timeZone: "Asia/Kolkata",
+      day: "2-digit",
+      month: "short",
+    }).format(new Date(iso));
+  } catch {
+    return "";
+  }
+}
+
+function LiveActionIdleTicker({
+  latestActionAt,
+  latestActionLabel,
+  latestActionOrderCode,
+}: {
+  latestActionAt: string | null;
+  latestActionLabel: string | null;
+  latestActionOrderCode: string | null;
+}) {
+  const [elapsedMs, setElapsedMs] = useState<number>(() =>
+    latestActionAt ? Math.max(0, Date.now() - new Date(latestActionAt).getTime()) : 0
+  );
+
+  useEffect(() => {
+    if (!latestActionAt) return;
+    const tick = () => {
+      setElapsedMs(Math.max(0, Date.now() - new Date(latestActionAt).getTime()));
+    };
+    tick();
+    const interval = setInterval(tick, 1000);
+    return () => clearInterval(interval);
+  }, [latestActionAt]);
+
+  if (!latestActionAt) {
+    return (
+      <div className="flex flex-col justify-between h-full">
+        <div className="flex items-center justify-between text-slate-500 text-[11px] uppercase font-bold tracking-wider">
+          <span>Live Open Idle</span>
+          <Clock className="h-4 w-4 text-slate-400" />
+        </div>
+        <div className="my-2.5">
+          <div className="text-2xl font-bold tracking-tight text-slate-400">—</div>
+        </div>
+        <div className="text-[11px] text-slate-400">No action in selected period</div>
+      </div>
+    );
+  }
+
+  const seconds = Math.floor(elapsedMs / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+
+  const displayTime =
+    hours > 0
+      ? `${hours}h ${String(minutes % 60).padStart(2, "0")}m ${String(seconds % 60).padStart(2, "0")}s`
+      : `${minutes}m ${String(seconds % 60).padStart(2, "0")}s`;
+
+  const isHealthy = minutes < 30;
+  const isAttention = minutes >= 30 && minutes < 120;
+  const isExtended = minutes >= 120;
+
+  const toneCls = isHealthy
+    ? "text-emerald-700 bg-emerald-50 border-emerald-200"
+    : isAttention
+    ? "text-amber-800 bg-amber-50 border-amber-200"
+    : "text-rose-700 bg-rose-50 border-rose-200";
+
+  const dotCls = isHealthy
+    ? "bg-emerald-500 animate-pulse"
+    : isAttention
+    ? "bg-amber-500 animate-pulse"
+    : "bg-rose-500 animate-ping";
+
+  const statusText = isHealthy
+    ? "Active Pace"
+    : isAttention
+    ? "Idle Attention"
+    : "Extended Idle";
+
+  return (
+    <div className="flex flex-col justify-between h-full">
+      <div className="flex items-center justify-between text-slate-500 text-[11px] uppercase font-bold tracking-wider">
+        <span>Live Open Idle</span>
+        <span className={cn("inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border", toneCls)}>
+          <span className={cn("w-1.5 h-1.5 rounded-full", dotCls)} />
+          {statusText}
+        </span>
+      </div>
+      <div className="my-2.5">
+        <div className="font-mono text-3xl font-black tracking-tight text-slate-900">
+          {displayTime}
+        </div>
+      </div>
+      <div className="text-[11px] text-slate-500 truncate" title={`Since: ${latestActionLabel || "Action"} on #${latestActionOrderCode || "Order"}`}>
+        Since {latestActionLabel || "Action"} {latestActionOrderCode ? `(#${latestActionOrderCode})` : ""}
+      </div>
+    </div>
+  );
+}
+
 type OrderTableFilter =
   | "all"
   | "needs_action"
@@ -69,6 +194,7 @@ function MyPerformanceDashboardPage() {
   const [dateFilter, setDateFilter] = useState<DatePeriodFilter>("today");
   const [orderFilter, setOrderFilter] = useState<OrderTableFilter>("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [intervalSearch, setIntervalSearch] = useState("");
   const [isRotating, setIsRotating] = useState(false);
 
   const queryClient = useQueryClient();
@@ -111,6 +237,15 @@ function MyPerformanceDashboardPage() {
           });
         },
       )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "order_action_logs" },
+        () => {
+          queryClient.invalidateQueries({
+            queryKey: ["employee.my-performance"],
+          });
+        },
+      )
       .subscribe();
 
     return () => {
@@ -125,6 +260,8 @@ function MyPerformanceDashboardPage() {
   const topPerformers = data?.topPerformers ?? [];
   const rawOrders = data?.orders ?? [];
   const timeline = data?.timeline ?? [];
+  const actionMetrics = (data as any)?.actionResponseMetrics as ActionResponseMetrics | undefined;
+  const rawIntervals = ((data as any)?.actionIntervals ?? []) as ActionIntervalItem[];
 
   const empName = emp?.name || "Employee";
   const initials =
@@ -148,6 +285,18 @@ function MyPerformanceDashboardPage() {
   });
 
   const isEmpActive = emp?.presenceStatus === "active";
+
+  // Filtered action intervals
+  const filteredIntervals = useMemo(() => {
+    if (!intervalSearch.trim()) return rawIntervals;
+    const q = intervalSearch.toLowerCase().trim();
+    return rawIntervals.filter((item) =>
+      item.orderCode?.toLowerCase().includes(q) ||
+      item.previousAction?.toLowerCase().includes(q) ||
+      item.nextAction?.toLowerCase().includes(q) ||
+      item.employeeName?.toLowerCase().includes(q)
+    );
+  }, [rawIntervals, intervalSearch]);
 
   // Filtered orders for My Orders table
   const filteredOrders = useMemo(() => {
@@ -229,17 +378,40 @@ function MyPerformanceDashboardPage() {
           </div>
         </div>
 
-        {/* Global Controls */}
+        {/* Global Controls & Date Period Filter */}
         <div className="flex flex-wrap items-center gap-2 self-stretch md:self-auto justify-between md:justify-end">
-          <div className="flex items-center bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200 text-xs text-slate-700 font-medium">
-            <Calendar className="h-4 w-4 text-slate-400 mr-2" />
-            <span>Today, {currentDateFormatted} IST</span>
+          {/* Date Filter Tabs */}
+          <div className="flex flex-wrap items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200">
+            {(
+              [
+                { id: "today", label: "Today" },
+                { id: "yesterday", label: "Yesterday" },
+                { id: "7d", label: "7 Days" },
+                { id: "15d", label: "15 Days" },
+                { id: "30d", label: "30 Days" },
+                { id: "this_month", label: "This Month" },
+              ] as const
+            ).map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => setDateFilter(t.id)}
+                className={cn(
+                  "px-2.5 py-1 rounded-lg text-xs font-semibold transition cursor-pointer",
+                  dateFilter === t.id
+                    ? "bg-white text-blue-700 shadow-xs border border-slate-200"
+                    : "text-slate-600 hover:text-slate-900"
+                )}
+              >
+                {t.label}
+              </button>
+            ))}
           </div>
 
           <button
             onClick={handleSyncNow}
             type="button"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold transition shadow-xs"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold transition shadow-xs cursor-pointer"
           >
             <RefreshCw
               className={cn(
@@ -253,12 +425,120 @@ function MyPerformanceDashboardPage() {
       </section>
 
       {/* ───────────────────────────────────────────────────────────── */}
-      {/* 2. REAL EMPLOYEE ORDER KPIs (PHASE 2)                         */}
+      {/* 2. ACTION RESPONSE METRICS (ACTION-TO-ACTION SPEED & IDLE)    */}
+      {/* ───────────────────────────────────────────────────────────── */}
+      <section className="space-y-3">
+        <div className="flex items-center justify-between px-1">
+          <div className="flex items-center gap-2">
+            <Zap className="h-4 w-4 text-purple-600" />
+            <h2 className="text-sm font-bold uppercase tracking-wider text-slate-800">
+              Action Response &amp; Idle Metrics ({dateFilter.replace("_", " ")})
+            </h2>
+          </div>
+          <span className="text-xs text-slate-500 font-medium">
+            Calculated from verified employee action history
+          </span>
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+          {/* 1. TOTAL ACTIONS */}
+          <div className="bg-white rounded-xl p-4 border border-purple-100 shadow-xs flex flex-col justify-between transition hover:border-purple-200">
+            <div className="flex items-center justify-between text-slate-500 text-[11px] uppercase font-bold tracking-wider">
+              <span>Total Actions</span>
+              <Activity className="h-4 w-4 text-purple-600" />
+            </div>
+            <div className="my-2.5">
+              <div className="text-3xl font-bold tracking-tight text-purple-700">
+                {isLoading ? "--" : (actionMetrics?.totalActions ?? 0)}
+              </div>
+            </div>
+            <div className="text-[11px] text-slate-400">
+              Human staff actions
+            </div>
+          </div>
+
+          {/* 2. TRACKED INTERVALS */}
+          <div className="bg-white rounded-xl p-4 border border-indigo-100 shadow-xs flex flex-col justify-between transition hover:border-indigo-200">
+            <div className="flex items-center justify-between text-slate-500 text-[11px] uppercase font-bold tracking-wider">
+              <span>Tracked Intervals</span>
+              <TrendingUp className="h-4 w-4 text-indigo-600" />
+            </div>
+            <div className="my-2.5">
+              <div className="text-3xl font-bold tracking-tight text-indigo-700">
+                {isLoading ? "--" : (actionMetrics?.trackedIntervals ?? 0)}
+              </div>
+            </div>
+            <div className="text-[11px] text-slate-400">
+              Action-to-action steps
+            </div>
+          </div>
+
+          {/* 3. AVERAGE ACTION IDLE */}
+          <div className="bg-white rounded-xl p-4 border border-blue-100 shadow-xs flex flex-col justify-between transition hover:border-blue-200">
+            <div className="flex items-center justify-between text-slate-500 text-[11px] uppercase font-bold tracking-wider">
+              <span>Average Idle</span>
+              <Clock className="h-4 w-4 text-blue-600" />
+            </div>
+            <div className="my-2.5">
+              <div className="font-mono text-2xl font-bold tracking-tight text-blue-700">
+                {isLoading ? "--" : (actionMetrics?.avgIdleFormatted ?? "0s")}
+              </div>
+            </div>
+            <div className="text-[11px] text-slate-400">
+              Mean response cadence
+            </div>
+          </div>
+
+          {/* 4. MEDIAN ACTION IDLE */}
+          <div className="bg-white rounded-xl p-4 border border-cyan-100 shadow-xs flex flex-col justify-between transition hover:border-cyan-200">
+            <div className="flex items-center justify-between text-slate-500 text-[11px] uppercase font-bold tracking-wider">
+              <span>Median Idle</span>
+              <Scale className="h-4 w-4 text-cyan-600" />
+            </div>
+            <div className="my-2.5">
+              <div className="font-mono text-2xl font-bold tracking-tight text-cyan-700">
+                {isLoading ? "--" : (actionMetrics?.medianIdleFormatted ?? "0s")}
+              </div>
+            </div>
+            <div className="text-[11px] text-slate-400">
+              Middle response pace
+            </div>
+          </div>
+
+          {/* 5. LONGEST ACTION IDLE */}
+          <div className="bg-white rounded-xl p-4 border border-amber-100 shadow-xs flex flex-col justify-between transition hover:border-amber-200">
+            <div className="flex items-center justify-between text-slate-500 text-[11px] uppercase font-bold tracking-wider">
+              <span>Longest Idle</span>
+              <Hourglass className="h-4 w-4 text-amber-600" />
+            </div>
+            <div className="my-2.5">
+              <div className="font-mono text-2xl font-bold tracking-tight text-amber-800">
+                {isLoading ? "--" : (actionMetrics?.longestIdleFormatted ?? "0s")}
+              </div>
+            </div>
+            <div className="text-[11px] text-slate-400">
+              Max single interval
+            </div>
+          </div>
+
+          {/* 6. LIVE OPEN IDLE TICKER */}
+          <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-xs flex flex-col justify-between transition hover:border-slate-300">
+            <LiveActionIdleTicker
+              latestActionAt={actionMetrics?.latestActionAt ?? null}
+              latestActionLabel={actionMetrics?.latestActionLabel ?? null}
+              latestActionOrderCode={actionMetrics?.latestActionOrderCode ?? null}
+            />
+          </div>
+        </div>
+      </section>
+
+      {/* ───────────────────────────────────────────────────────────── */}
+      {/* 3. REAL EMPLOYEE ORDER KPIs (PHASE 2)                         */}
       {/* ───────────────────────────────────────────────────────────── */}
       <section className="space-y-3">
         <div className="flex items-center justify-between px-1">
           <h2 className="text-sm font-bold uppercase tracking-wider text-slate-500">
-            Today's Order Performance
+            Order Performance Pipeline
           </h2>
           <span className="text-xs text-slate-400">
             Realtime verified from CRM orders &amp; events
@@ -790,16 +1070,139 @@ function MyPerformanceDashboardPage() {
       </section>
 
       {/* ───────────────────────────────────────────────────────────── */}
-      {/* 6. TODAY'S REAL ACTIVITY TIMELINE (PHASE 8)                   */}
+      {/* 6. HISTORICAL ACTION INTERVALS (ACTION CADENCE INSPECTION)    */}
+      {/* ───────────────────────────────────────────────────────────── */}
+      <section className="bg-white rounded-xl border border-slate-200/90 shadow-xs overflow-hidden space-y-3 p-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2">
+              <History className="h-4 w-4 text-indigo-600" />
+              <h3 className="font-bold text-slate-900 text-base">
+                Historical Action Intervals (Action Cadence)
+              </h3>
+            </div>
+            <p className="text-xs text-slate-500">
+              Inter-action idle duration measured from Previous Employee Action &rarr; Next Employee Action
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <div className="relative">
+              <Search className="h-3.5 w-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={intervalSearch}
+                onChange={(e) => setIntervalSearch(e.target.value)}
+                placeholder="Filter order #, action title..."
+                className="pl-8 pr-3 py-1.5 text-xs rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 w-56"
+              />
+            </div>
+            <span className="text-xs text-slate-500 font-semibold px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200">
+              {filteredIntervals.length} Tracked
+            </span>
+          </div>
+        </div>
+
+        {/* Action Intervals Table */}
+        <div className="overflow-x-auto rounded-lg border border-slate-100">
+          <table className="w-full text-left text-xs text-slate-600">
+            <thead className="bg-slate-50 text-[11px] uppercase font-bold text-slate-500 tracking-wider border-b border-slate-100">
+              <tr>
+                <th className="py-2.5 px-3">Order #</th>
+                <th className="py-2.5 px-3">Previous Employee Action</th>
+                <th className="py-2.5 px-2 text-center">Flow</th>
+                <th className="py-2.5 px-3">Next Employee Action</th>
+                <th className="py-2.5 px-3">Action Idle Duration</th>
+                <th className="py-2.5 px-3">Employee</th>
+                <th className="py-2.5 px-3 text-right">Action</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {filteredIntervals.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="py-8 text-center text-slate-400">
+                    <History className="h-8 w-8 text-slate-300 mx-auto mb-2 opacity-50" />
+                    <span>No multi-action intervals recorded for this timeframe yet.</span>
+                  </td>
+                </tr>
+              ) : (
+                filteredIntervals.slice(0, 30).map((interval) => {
+                  const idleMinutes = Math.floor(interval.idleDurationMs / 60000);
+                  const isQuick = idleMinutes < 30;
+                  const isModerate = idleMinutes >= 30 && idleMinutes < 120;
+
+                  const badgeCls = isQuick
+                    ? "bg-emerald-50 text-emerald-700 border-emerald-200 font-semibold"
+                    : isModerate
+                    ? "bg-amber-50 text-amber-800 border-amber-200 font-semibold"
+                    : "bg-rose-50 text-rose-700 border-rose-200 font-bold";
+
+                  return (
+                    <tr key={interval.id} className="hover:bg-slate-50/60 transition">
+                      <td className="py-3 px-3 font-bold text-slate-900 font-mono">
+                        #{interval.orderCode}
+                      </td>
+                      <td className="py-3 px-3">
+                        <div className="font-semibold text-slate-800">{interval.previousAction}</div>
+                        <div className="text-[11px] text-slate-400">
+                          {formatISTDateOnly(interval.previousActionTime)} {formatISTTimeOnly(interval.previousActionTime)} IST
+                        </div>
+                      </td>
+                      <td className="py-3 px-2 text-center text-slate-400 font-bold">
+                        <ArrowRight className="h-3.5 w-3.5 mx-auto text-indigo-500" />
+                      </td>
+                      <td className="py-3 px-3">
+                        <div className="font-semibold text-slate-800">{interval.nextAction}</div>
+                        <div className="text-[11px] text-slate-400">
+                          {formatISTDateOnly(interval.nextActionTime)} {formatISTTimeOnly(interval.nextActionTime)} IST
+                        </div>
+                      </td>
+                      <td className="py-3 px-3">
+                        <span className={cn("inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs border shadow-2xs font-mono", badgeCls)}>
+                          <Clock className="h-3 w-3" />
+                          <span>{interval.idleDurationFormatted}</span>
+                        </span>
+                      </td>
+                      <td className="py-3 px-3 text-slate-600 font-medium">
+                        {interval.employeeName}
+                      </td>
+                      <td className="py-3 px-3 text-right">
+                        {interval.orderId && (
+                          <Link
+                            to={`/admin/orders/${interval.orderId}` as any}
+                            className="px-2.5 py-1 rounded-md bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 font-semibold shadow-2xs transition inline-flex items-center gap-1"
+                          >
+                            <span>Open</span>
+                            <ExternalLink className="h-3 w-3 text-slate-400" />
+                          </Link>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {filteredIntervals.length > 30 && (
+          <div className="text-center pt-2 text-xs text-slate-400">
+            Showing latest 30 of {filteredIntervals.length} recorded action intervals in selected period.
+          </div>
+        )}
+      </section>
+
+      {/* ───────────────────────────────────────────────────────────── */}
+      {/* 7. TODAY'S REAL ACTIVITY TIMELINE (PHASE 8)                   */}
       {/* ───────────────────────────────────────────────────────────── */}
       <section className="bg-white rounded-xl p-5 border border-slate-200/90 shadow-xs space-y-4">
         <div className="flex items-center justify-between">
           <div>
             <h3 className="font-bold text-slate-900 text-base">
-              Today's Real Activity Timeline
+              Real Activity Timeline ({dateFilter.replace("_", " ")})
             </h3>
             <p className="text-xs text-slate-500">
-              Chronological operational CRM events performed by you today
+              Chronological operational CRM events performed by you in this period
             </p>
           </div>
           <span className="text-xs text-slate-400 font-medium">

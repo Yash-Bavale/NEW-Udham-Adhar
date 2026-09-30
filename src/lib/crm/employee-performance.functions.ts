@@ -197,6 +197,56 @@ const STAGE_DISPLAY_NAMES: Record<string, string> = {
   technical_hold_internal: "Internal Tech Delay",
 };
 
+export function formatIdleDuration(ms: number): string {
+  if (ms <= 0 || isNaN(ms)) return "0s";
+  const seconds = Math.floor(ms / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+
+  if (days > 0) {
+    const remHours = hours % 24;
+    return `${days}d ${remHours}h`;
+  }
+  if (hours > 0) {
+    const remMins = minutes % 60;
+    return `${hours}h ${remMins}m`;
+  }
+  if (minutes > 0) {
+    const remSecs = seconds % 60;
+    return remSecs > 0 ? `${minutes}m ${remSecs}s` : `${minutes}m`;
+  }
+  return `${seconds}s`;
+}
+
+export interface ActionIntervalItem {
+  id: string;
+  orderId: string | null;
+  orderCode: string;
+  employeeId: string;
+  employeeName: string;
+  previousAction: string;
+  previousActionTime: string;
+  nextAction: string;
+  nextActionTime: string;
+  idleDurationMs: number;
+  idleDurationFormatted: string;
+}
+
+export interface ActionResponseMetrics {
+  totalActions: number;
+  trackedIntervals: number;
+  avgIdleMs: number;
+  avgIdleFormatted: string;
+  medianIdleMs: number;
+  medianIdleFormatted: string;
+  longestIdleMs: number;
+  longestIdleFormatted: string;
+  latestActionAt: string | null;
+  latestActionLabel: string | null;
+  latestActionOrderCode: string | null;
+}
+
 export function cleanStageOrStatus(raw?: string | null): string {
   if (!raw) return "";
   const trimmed = raw.trim();
@@ -582,11 +632,12 @@ function normalizeOperationalEvents(params: {
   appEvents: any[];
   schedulers: any[];
   activityLogs: any[];
+  actionLogs?: any[];
   profileMap: Map<string, any>;
   userRoleMap: Map<string, string>;
   resolveStaffUserId: (raw?: string | null) => string | null;
 }): NormalizedOperationalEvent[] {
-  const { appEvents, schedulers, activityLogs, profileMap, userRoleMap, resolveStaffUserId } = params;
+  const { appEvents, schedulers, activityLogs, actionLogs, profileMap, userRoleMap, resolveStaffUserId } = params;
   const results: NormalizedOperationalEvent[] = [];
   const seenDelayKeys = new Set<string>(); // `${orderId}_${category}_${rounded10MinBucket}`
 
@@ -647,7 +698,55 @@ function normalizeOperationalEvents(params: {
     });
   });
 
-  // 2. Process application_events (Audit trail for state changes, assignments, completions, closures)
+  // 2. Process order_action_logs (Direct immutable operational action audit logs)
+  if (Array.isArray(actionLogs)) {
+    actionLogs.forEach((l: any) => {
+      const rawCreator = l.employee_id || l.employee_name;
+      const resolvedEmpId = resolveStaffUserId(rawCreator);
+      const p = resolvedEmpId ? profileMap.get(resolvedEmpId) : null;
+      const empName = resolveEmployeeName(p, l.employee_name);
+      const role = l.employee_role || (resolvedEmpId && userRoleMap.get(resolvedEmpId)) || "operations";
+      const eventTime = l.created_at || l.timestamp;
+      if (!eventTime) return;
+
+      const at = String(l.action_type || "").toUpperCase();
+      if (at === "ORDER_ASSIGNED" || at === "ORDER_REASSIGNED") return;
+
+      let actionCategory: NormalizedOperationalEvent["actionCategory"] = "status_change";
+      if (at.includes("CUSTOMER_DELAY")) actionCategory = "customer_delay";
+      else if (at.includes("TECHNICAL_DELAY") || at.includes("OUR_SIDE_DELAY")) actionCategory = "technical_delay";
+      else if (at.includes("CALLBACK") || at.includes("CALL_")) actionCategory = "callback";
+      else if (at.includes("COMPLET") || at.includes("CERTIFICATE")) actionCategory = "completion";
+      else if (at.includes("CLOSE")) actionCategory = "closure";
+      else if (at.includes("FORM")) actionCategory = "form";
+      else if (at.includes("DOCUMENT")) actionCategory = "document";
+
+      const timeBucket = Math.floor(new Date(eventTime).getTime() / (2 * 60 * 1000));
+      const dedupKey = `${l.order_id}_${at}_${timeBucket}`;
+      if (seenDelayKeys.has(dedupKey)) return;
+      seenDelayKeys.add(dedupKey);
+
+      const isSystemAction = l.source === "system" || l.source === "customer" || !empName || empName.toLowerCase() === "system";
+
+      results.push({
+        id: `oal_${l.id}`,
+        orderId: l.order_id,
+        leadId: l.lead_id,
+        employeeId: resolvedEmpId,
+        employeeName: empName,
+        employeeRole: role,
+        actionType: at,
+        actionCategory,
+        previousStatus: l.previous_status,
+        newStatus: l.new_status,
+        notes: l.notes,
+        createdAt: eventTime,
+        isSystemAction,
+      });
+    });
+  }
+
+  // 3. Process application_events (Audit trail for state changes, assignments, completions, closures)
   appEvents.forEach((evt: any) => {
     const rawCreator = evt.created_by || evt.staff_name;
     const resolvedEmpId = resolveStaffUserId(rawCreator);
@@ -744,7 +843,7 @@ function normalizeOperationalEvents(params: {
     });
   });
 
-  // 3. Process activity_logs (Only notes / genuine manual actions not already logged)
+  // 4. Process activity_logs (Only notes / genuine manual actions not already logged)
   activityLogs.forEach((act: any) => {
     const rawCreator = act.user_id;
     const resolvedEmpId = resolveStaffUserId(rawCreator);
@@ -1852,6 +1951,7 @@ export const getMyPerformanceDashboard = createServerFn({ method: "POST" })
       { data: appEvents },
       { data: schedulers },
       { data: activityLogs },
+      { data: actionLogs },
     ] = await Promise.all([
       admin
         .from("application_events")
@@ -1860,7 +1960,7 @@ export const getMyPerformanceDashboard = createServerFn({ method: "POST" })
         .gte("created_at", dateRange.current.start)
         .lte("created_at", dateRange.current.end)
         .order("created_at", { ascending: false })
-        .limit(500),
+        .limit(1000),
       adminAny
         .from("order_schedulers")
         .select("id, application_id, status, scheduler_type, started_at, fires_at, remarks, created_at, created_by")
@@ -1868,7 +1968,7 @@ export const getMyPerformanceDashboard = createServerFn({ method: "POST" })
         .gte("created_at", dateRange.current.start)
         .lte("created_at", dateRange.current.end)
         .order("created_at", { ascending: false })
-        .limit(500),
+        .limit(1000),
       admin
         .from("activity_logs")
         .select("id, activity_type, activity_description, application_id, lead_id, created_at, user_id")
@@ -1876,13 +1976,22 @@ export const getMyPerformanceDashboard = createServerFn({ method: "POST" })
         .gte("created_at", dateRange.current.start)
         .lte("created_at", dateRange.current.end)
         .order("created_at", { ascending: false })
-        .limit(500),
+        .limit(1000),
+      (admin
+        .from("order_action_logs" as any) as any)
+        .select("id, order_id, lead_id, customer_id, employee_id, employee_name, employee_role, action_type, previous_status, new_status, notes, source, created_at, time_spent_since_previous_action_ms")
+        .or(`employee_id.eq.${employeeId},employee_name.ilike.%${empName}%`)
+        .gte("created_at", dateRange.current.start)
+        .lte("created_at", dateRange.current.end)
+        .order("created_at", { ascending: false })
+        .limit(1000),
     ]);
 
     const canonicalEvents = normalizeOperationalEvents({
       appEvents: appEvents ?? [],
       schedulers: schedulers ?? [],
       activityLogs: activityLogs ?? [],
+      actionLogs: (actionLogs as any[]) ?? [],
       profileMap,
       userRoleMap,
       resolveStaffUserId,
@@ -1930,6 +2039,88 @@ export const getMyPerformanceDashboard = createServerFn({ method: "POST" })
     allAssigned.forEach((a: any) => {
       if (a.application_code) orderCodeMap.set(a.id, a.application_code);
     });
+
+    // ── Calculate Action Idle Times & Action Response Intervals ──
+    const humanActions = canonicalEvents
+      .filter((e) => !e.isSystemAction && e.orderId)
+      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+
+    const actionsByOrder = new Map<string, NormalizedOperationalEvent[]>();
+    humanActions.forEach((act) => {
+      if (act.orderId) {
+        const list = actionsByOrder.get(act.orderId) ?? [];
+        list.push(act);
+        actionsByOrder.set(act.orderId, list);
+      }
+    });
+
+    const actionIntervals: ActionIntervalItem[] = [];
+    const allIntervalMs: number[] = [];
+
+    actionsByOrder.forEach((orderActions, ordId) => {
+      orderActions.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+      for (let i = 1; i < orderActions.length; i++) {
+        const prev = orderActions[i - 1];
+        const curr = orderActions[i];
+        const tPrev = new Date(prev.createdAt).getTime();
+        const tCurr = new Date(curr.createdAt).getTime();
+        const diffMs = Math.max(0, tCurr - tPrev);
+
+        const { actionLabel: prevLabel } = formatLogAction({ action_type: prev.actionType, notes: prev.notes });
+        const { actionLabel: currLabel } = formatLogAction({ action_type: curr.actionType, notes: curr.notes });
+        const code = orderCodeMap.get(ordId) || ordId.slice(0, 8);
+
+        actionIntervals.push({
+          id: `${prev.id}_to_${curr.id}`,
+          orderId: ordId,
+          orderCode: code,
+          employeeId: curr.employeeId || employeeId,
+          employeeName: curr.employeeName || empName,
+          previousAction: prevLabel,
+          previousActionTime: prev.createdAt,
+          nextAction: currLabel,
+          nextActionTime: curr.createdAt,
+          idleDurationMs: diffMs,
+          idleDurationFormatted: formatIdleDuration(diffMs),
+        });
+
+        allIntervalMs.push(diffMs);
+      }
+    });
+
+    actionIntervals.sort((a, b) => new Date(b.nextActionTime).getTime() - new Date(a.nextActionTime).getTime());
+
+    const totalActionsCount = humanActions.length;
+    const trackedIntervalsCount = allIntervalMs.length;
+    const avgIdleMs = trackedIntervalsCount > 0 ? Math.round(allIntervalMs.reduce((sum, v) => sum + v, 0) / trackedIntervalsCount) : 0;
+
+    let medianIdleMs = 0;
+    if (trackedIntervalsCount > 0) {
+      const sortedMs = [...allIntervalMs].sort((a, b) => a - b);
+      const mid = Math.floor(sortedMs.length / 2);
+      medianIdleMs = sortedMs.length % 2 !== 0 ? sortedMs[mid] : Math.round((sortedMs[mid - 1] + sortedMs[mid]) / 2);
+    }
+
+    const longestIdleMs = trackedIntervalsCount > 0 ? Math.max(...allIntervalMs) : 0;
+
+    const latestOverallAction = humanActions.length > 0 ? humanActions[humanActions.length - 1] : null;
+    const { actionLabel: latestActionLabel } = latestOverallAction
+      ? formatLogAction({ action_type: latestOverallAction.actionType, notes: latestOverallAction.notes })
+      : { actionLabel: null };
+
+    const actionResponseMetrics: ActionResponseMetrics = {
+      totalActions: totalActionsCount,
+      trackedIntervals: trackedIntervalsCount,
+      avgIdleMs,
+      avgIdleFormatted: formatIdleDuration(avgIdleMs),
+      medianIdleMs,
+      medianIdleFormatted: formatIdleDuration(medianIdleMs),
+      longestIdleMs,
+      longestIdleFormatted: formatIdleDuration(longestIdleMs),
+      latestActionAt: latestOverallAction?.createdAt || null,
+      latestActionLabel,
+      latestActionOrderCode: latestOverallAction?.orderId ? (orderCodeMap.get(latestOverallAction.orderId) || latestOverallAction.orderId.slice(0, 8)) : null,
+    };
 
     const workedOrdersSet = new Set(canonicalEvents.filter((e) => !e.isSystemAction && e.orderId).map((e) => e.orderId));
     const completedOrdersSet = new Set(canonicalEvents.filter((e) => e.actionCategory === "completion" && e.orderId).map((e) => e.orderId));
@@ -2197,6 +2388,8 @@ export const getMyPerformanceDashboard = createServerFn({ method: "POST" })
       orders: myOrdersList,
       timeline: activityTimeline,
       recentActions,
+      actionResponseMetrics,
+      actionIntervals,
     };
   });
 
