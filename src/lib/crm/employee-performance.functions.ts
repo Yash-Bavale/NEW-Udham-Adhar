@@ -400,11 +400,12 @@ export function resolveEmployeeName(p?: any, rawFallback?: string | null): strin
 
 /**
  * Builds authentic session telemetry segments from public.employee_sessions records.
- * If database sessions are empty, dynamically constructs segment bursts from verified canonical events.
+ * Starts strictly from the employee's authentic login / session initialization timestamp.
+ * Preserves multi-session gaps (logged off) and extends live active sessions to current time.
  */
 export function buildDynamicTelemetrySegments(
-  sessions: any[],
-  events: any[] = [],
+  sessions: any[] = [],
+  actions: any[] = [],
 ) {
   const segments: Array<{
     id: string;
@@ -417,116 +418,206 @@ export function buildDynamicTelemetrySegments(
     color: string;
   }> = [];
 
-  const sortedSessions = [...(sessions ?? [])].sort(
-    (a, b) => new Date(a.started_at).getTime() - new Date(b.started_at).getTime(),
-  );
+  const sortedSessions = [...(sessions ?? [])]
+    .filter((s) => s.started_at)
+    .sort((a, b) => new Date(a.started_at).getTime() - new Date(b.started_at).getTime());
 
-  sortedSessions.forEach((sess, idx) => {
-    const start = new Date(sess.started_at);
-    const end = sess.ended_at
-      ? new Date(sess.ended_at)
-      : sess.last_heartbeat_at
-        ? new Date(sess.last_heartbeat_at)
-        : new Date(sess.started_at);
+  if (sortedSessions.length > 0) {
+    let lastSessionEnd: Date | null = null;
 
-    const activeSecs = Number(sess.active_seconds || 0);
-    const idleSecs = Number(sess.idle_seconds || 0);
-    const awaySecs = Number(sess.away_seconds || 0);
+    sortedSessions.forEach((sess, sIdx) => {
+      const sessStart = new Date(sess.started_at);
+      const isLiveActive = sess.is_active || sess.status === "active";
+      const sessEnd = sess.ended_at
+        ? new Date(sess.ended_at)
+        : (isLiveActive ? new Date() : (sess.last_heartbeat_at ? new Date(sess.last_heartbeat_at) : sessStart));
 
-    const activeMins = Math.round(activeSecs / 60);
-    const idleMins = Math.round(idleSecs / 60);
-    const awayMins = Math.round(awaySecs / 60);
+      // 1. If gap between sessions >= 5 mins, add logged-off gap
+      if (lastSessionEnd && sessStart.getTime() - lastSessionEnd.getTime() >= 5 * 60 * 1000) {
+        const gapMins = Math.round((sessStart.getTime() - lastSessionEnd.getTime()) / 60000);
+        segments.push({
+          id: `seg_gap_${sIdx}`,
+          label: `${gapMins}m LOGGED OFF`,
+          durationMins: gapMins,
+          startTime: formatTimeISTShort(lastSessionEnd),
+          endTime: formatTimeISTShort(sessStart),
+          type: "offline",
+          percent: 0,
+          color: "#94a3b8",
+        });
+      }
 
-    if (activeMins > 0) {
-      segments.push({
-        id: `seg_act_${idx}`,
-        label: `${activeMins}m ACTIVE`,
-        durationMins: activeMins,
-        startTime: formatTimeISTShort(start),
-        endTime: formatTimeISTShort(end),
-        type: "active",
-        percent: 0,
-        color: "#059669",
-      });
-    }
+      // 2. Build segments within this session
+      const actSecs = Number(sess.active_seconds || 0);
+      const idleSecs = Number(sess.idle_seconds || 0);
+      const awaySecs = Number(sess.away_seconds || 0);
 
-    if (idleMins > 0) {
-      segments.push({
-        id: `seg_idle_${idx}`,
-        label: `${idleMins}m IDLE`,
-        durationMins: idleMins,
-        startTime: formatTimeISTShort(start),
-        endTime: formatTimeISTShort(end),
-        type: "idle",
-        percent: 0,
-        color: "#f59e0b",
-      });
-    }
+      const actMins = Math.round(actSecs / 60);
+      const idleMins = Math.round(idleSecs / 60);
+      const awayMins = Math.round(awaySecs / 60);
 
-    if (awayMins > 0) {
-      segments.push({
-        id: `seg_away_${idx}`,
-        label: `${awayMins}m AWAY`,
-        durationMins: awayMins,
-        startTime: formatTimeISTShort(start),
-        endTime: formatTimeISTShort(end),
-        type: "away",
-        percent: 0,
-        color: "#d97706",
-      });
-    }
+      // Find actions that occurred within this session window
+      const sessionActions = (actions ?? [])
+        .filter((a) => {
+          const t = new Date(a.createdAt || a.created_at).getTime();
+          return t >= sessStart.getTime() - 60000 && t <= sessEnd.getTime() + 60000;
+        })
+        .sort((a, b) => new Date(a.createdAt || a.created_at).getTime() - new Date(b.createdAt || b.created_at).getTime());
 
-    if (activeMins === 0 && idleMins === 0 && awayMins === 0) {
-      const diffMins = Math.max(1, Math.round((end.getTime() - start.getTime()) / 60000));
-      const sType = sess.status === "active" ? "active" : sess.status === "idle" ? "idle" : sess.status === "away" ? "away" : "offline";
-      segments.push({
-        id: `seg_sess_${idx}`,
-        label: `${diffMins}m ${sType.toUpperCase()}`,
-        durationMins: diffMins,
-        startTime: formatTimeISTShort(start),
-        endTime: formatTimeISTShort(end),
-        type: sType,
-        percent: 0,
-        color: sType === "active" ? "#059669" : sType === "idle" ? "#f59e0b" : sType === "away" ? "#d97706" : "#94a3b8",
-      });
-    }
-  });
+      if (sessionActions.length > 0) {
+        let cursorTime = sessStart;
+        for (let i = 0; i < sessionActions.length; i++) {
+          const actTime = new Date(sessionActions[i].createdAt || sessionActions[i].created_at);
 
-  // If no session rows in database, build continuous telemetry sequence from verified events
-  if (segments.length === 0 && Array.isArray(events) && events.length > 0) {
-    const sortedEvents = [...events].sort(
+          // Gap before action
+          if (actTime.getTime() - cursorTime.getTime() >= 4 * 60 * 1000) {
+            const gapMins = Math.round((actTime.getTime() - cursorTime.getTime()) / 60000);
+            const isAway = gapMins >= 45;
+            segments.push({
+              id: `seg_${sIdx}_gap_${i}`,
+              label: isAway ? `${gapMins}m AWAY` : `${gapMins}m IDLE`,
+              durationMins: gapMins,
+              startTime: formatTimeISTShort(cursorTime),
+              endTime: formatTimeISTShort(actTime),
+              type: isAway ? "away" : "idle",
+              percent: 0,
+              color: isAway ? "#d97706" : "#f59e0b",
+            });
+            cursorTime = actTime;
+          }
+
+          // Active burst around the action
+          const nextActTime = i < sessionActions.length - 1 ? new Date(sessionActions[i + 1].createdAt || sessionActions[i + 1].created_at).getTime() : sessEnd.getTime();
+          const burstEnd = new Date(Math.min(sessEnd.getTime(), nextActTime, actTime.getTime() + 10 * 60000));
+          const burstMins = Math.max(1, Math.round((burstEnd.getTime() - actTime.getTime()) / 60000));
+          const isNow = isLiveActive && i === sessionActions.length - 1 && burstEnd.getTime() >= sessEnd.getTime() - 60000;
+
+          segments.push({
+            id: `seg_${sIdx}_act_${i}`,
+            label: isNow ? `${burstMins}m ACTIVE (NOW)` : `${burstMins}m ACTIVE`,
+            durationMins: burstMins,
+            startTime: formatTimeISTShort(actTime),
+            endTime: isNow ? "Now" : formatTimeISTShort(burstEnd),
+            type: "active",
+            percent: 0,
+            color: "#059669",
+          });
+
+          cursorTime = burstEnd;
+        }
+
+        // Remaining time until sessEnd
+        if (sessEnd.getTime() - cursorTime.getTime() >= 3 * 60 * 1000) {
+          const remMins = Math.round((sessEnd.getTime() - cursorTime.getTime()) / 60000);
+          const isCurrentActive = isLiveActive;
+          segments.push({
+            id: `seg_${sIdx}_rem`,
+            label: isCurrentActive ? `${remMins}m ACTIVE (NOW)` : `${remMins}m IDLE`,
+            durationMins: remMins,
+            startTime: formatTimeISTShort(cursorTime),
+            endTime: isCurrentActive ? "Now" : formatTimeISTShort(sessEnd),
+            type: isCurrentActive ? "active" : "idle",
+            percent: 0,
+            color: isCurrentActive ? "#059669" : "#f59e0b",
+          });
+        }
+      } else {
+        // No discrete actions in this session: break down by recorded active / idle / away
+        let cursorTime = sessStart;
+        if (actMins > 0) {
+          const segEnd = new Date(cursorTime.getTime() + actMins * 60000);
+          segments.push({
+            id: `seg_${sIdx}_act`,
+            label: `${actMins}m ACTIVE`,
+            durationMins: actMins,
+            startTime: formatTimeISTShort(cursorTime),
+            endTime: formatTimeISTShort(segEnd),
+            type: "active",
+            percent: 0,
+            color: "#059669",
+          });
+          cursorTime = segEnd;
+        }
+        if (idleMins > 0) {
+          const segEnd = new Date(cursorTime.getTime() + idleMins * 60000);
+          segments.push({
+            id: `seg_${sIdx}_idle`,
+            label: `${idleMins}m IDLE`,
+            durationMins: idleMins,
+            startTime: formatTimeISTShort(cursorTime),
+            endTime: formatTimeISTShort(segEnd),
+            type: "idle",
+            percent: 0,
+            color: "#f59e0b",
+          });
+          cursorTime = segEnd;
+        }
+        if (awayMins > 0) {
+          const segEnd = new Date(cursorTime.getTime() + awayMins * 60000);
+          segments.push({
+            id: `seg_${sIdx}_away`,
+            label: `${awayMins}m AWAY`,
+            durationMins: awayMins,
+            startTime: formatTimeISTShort(cursorTime),
+            endTime: formatTimeISTShort(segEnd),
+            type: "away",
+            percent: 0,
+            color: "#d97706",
+          });
+          cursorTime = segEnd;
+        }
+
+        if (actMins === 0 && idleMins === 0 && awayMins === 0) {
+          const durMins = Math.max(1, Math.round((sessEnd.getTime() - sessStart.getTime()) / 60000));
+          const sType = isLiveActive ? "active" : sess.status === "away" ? "away" : sess.status === "idle" ? "idle" : "active";
+          segments.push({
+            id: `seg_${sIdx}_simple`,
+            label: isLiveActive ? `${durMins}m ACTIVE (NOW)` : `${durMins}m ${sType.toUpperCase()}`,
+            durationMins: durMins,
+            startTime: formatTimeISTShort(sessStart),
+            endTime: isLiveActive ? "Now" : formatTimeISTShort(sessEnd),
+            type: sType as any,
+            percent: 0,
+            color: sType === "active" ? "#059669" : sType === "away" ? "#d97706" : "#f59e0b",
+          });
+        }
+      }
+
+      lastSessionEnd = sessEnd;
+    });
+  } else if (Array.isArray(actions) && actions.length > 0) {
+    // If no dbSessions, start from the FIRST action's timestamp
+    const sortedActions = [...actions].sort(
       (a, b) => new Date(a.createdAt || a.created_at).getTime() - new Date(b.createdAt || b.created_at).getTime(),
     );
 
-    for (let i = 0; i < sortedEvents.length; i++) {
-      const ev = sortedEvents[i];
-      const evTime = new Date(ev.createdAt || ev.created_at);
+    for (let i = 0; i < sortedActions.length; i++) {
+      const act = sortedActions[i];
+      const actTime = new Date(act.createdAt || act.created_at);
 
-      // Active operational burst around each action
       segments.push({
-        id: `seg_ev_act_${i}`,
+        id: `seg_act_${i}`,
         label: `ACTIVE`,
         durationMins: 8,
-        startTime: formatTimeISTShort(evTime),
-        endTime: formatTimeISTShort(new Date(evTime.getTime() + 8 * 60000)),
+        startTime: formatTimeISTShort(actTime),
+        endTime: formatTimeISTShort(new Date(actTime.getTime() + 8 * 60000)),
         type: "active",
         percent: 0,
         color: "#059669",
       });
 
-      // If next event exists, calculate idle or away gap between actions
-      if (i < sortedEvents.length - 1) {
-        const nextEv = sortedEvents[i + 1];
-        const nextTime = new Date(nextEv.createdAt || nextEv.created_at);
-        const gapMins = Math.max(1, Math.round((nextTime.getTime() - (evTime.getTime() + 8 * 60000)) / 60000));
+      if (i < sortedActions.length - 1) {
+        const nextAct = sortedActions[i + 1];
+        const nextTime = new Date(nextAct.createdAt || nextAct.created_at);
+        const gapMins = Math.max(1, Math.round((nextTime.getTime() - (actTime.getTime() + 8 * 60000)) / 60000));
 
         if (gapMins > 0) {
           const isAway = gapMins >= 60;
           segments.push({
-            id: `seg_ev_gap_${i}`,
+            id: `seg_gap_${i}`,
             label: isAway ? `${gapMins}m AWAY` : `${gapMins}m IDLE`,
             durationMins: gapMins,
-            startTime: formatTimeISTShort(new Date(evTime.getTime() + 8 * 60000)),
+            startTime: formatTimeISTShort(new Date(actTime.getTime() + 8 * 60000)),
             endTime: formatTimeISTShort(nextTime),
             type: isAway ? "away" : "idle",
             percent: 0,
@@ -538,41 +629,57 @@ export function buildDynamicTelemetrySegments(
   }
 
   if (segments.length === 0) {
-    return [
-      {
-        id: "seg_unavailable",
-        label: "Standby / Offline",
-        durationMins: 0,
-        startTime: "09:00",
-        endTime: "18:00",
-        type: "offline" as const,
-        percent: 100,
-        color: "#94a3b8",
-      },
-    ];
+    return [];
   }
 
   const totalMins = segments.reduce((acc, s) => acc + s.durationMins, 0) || 1;
   segments.forEach((s) => {
-    s.percent = Math.max(3, Math.round((s.durationMins / totalMins) * 100));
+    s.percent = Math.max(4, Math.round((s.durationMins / totalMins) * 100));
   });
 
   return segments;
 }
 
+export function buildOrderActionChronology(
+  qualifyingActions: any[],
+  orderCodeMap: Map<string, string>,
+) {
+  if (!qualifyingActions || qualifyingActions.length === 0) {
+    return [];
+  }
+
+  const chronological = [...qualifyingActions].sort(
+    (a, b) => new Date(a.createdAt || a.created_at).getTime() - new Date(b.createdAt || b.created_at).getTime(),
+  );
+
+  return chronological.map((act) => {
+    const { actionLabel, details } = formatLogAction({
+      action_type: act.actionType,
+      previous_status: act.previousStatus,
+      new_status: act.newStatus,
+      notes: act.notes,
+    });
+    const orderCode = act.orderId ? (orderCodeMap.get(act.orderId) || act.orderId.slice(0, 8)) : "—";
+
+    return {
+      id: act.id,
+      timestamp: formatTimeIST(act.createdAt || act.created_at),
+      timeIST: formatTimeIST(act.createdAt || act.created_at),
+      timeShort: formatTimeISTShort(act.createdAt || act.created_at),
+      actionType: act.actionType,
+      actionTitle: actionLabel,
+      orderId: act.orderId || null,
+      orderCode,
+      employeeName: act.employeeName,
+      employeeRole: act.employeeRole,
+      notes: details || act.notes || null,
+    };
+  });
+}
+
 export function buildDynamicStepperEvents(logs: any[], firstActionIso: string | null, empName: string) {
   if (!logs || logs.length === 0) {
-    return [
-      {
-        time: "09:00 IST",
-        title: "No Session Recorded",
-        desc: "No CRM operations recorded for selected period",
-        type: "offline" as const,
-        orderCode: null,
-        orderId: null,
-        actionType: null,
-      },
-    ];
+    return [];
   }
 
   const chronological = [...logs].sort((a, b) => new Date(a.created_at || a.createdAt).getTime() - new Date(b.created_at || b.createdAt).getTime());
@@ -586,20 +693,8 @@ export function buildDynamicStepperEvents(logs: any[], firstActionIso: string | 
     actionType?: string | null;
   }> = [];
 
-  const firstTime = new Date(chronological[0].created_at || chronological[0].createdAt);
-  steps.push({
-    time: formatTimeIST(firstTime),
-    title: "Session Initialized",
-    desc: `Auth Session Active (Desk #01)`,
-    type: "login",
-    orderCode: null,
-    orderId: null,
-    actionType: "LOGIN",
-  });
-
-  const recentOrKeyEvents = chronological.slice(-10);
-  for (let i = 0; i < recentOrKeyEvents.length; i++) {
-    const l = recentOrKeyEvents[i];
+  for (let i = 0; i < chronological.length; i++) {
+    const l = chronological[i];
     const { actionLabel, details } = formatLogAction(l);
     const code = l.order_code || l.orderCode || (l.order_id || l.orderId ? (l.order_id || l.orderId).slice(0, 8) : null);
     const aType = l.action_type || l.actionType || "ACTION";
@@ -613,18 +708,6 @@ export function buildDynamicStepperEvents(logs: any[], firstActionIso: string | 
       actionType: aType,
     });
   }
-
-  const lastTime = new Date(chronological[chronological.length - 1].created_at || chronological[chronological.length - 1].createdAt);
-  const minsAgo = Math.round((Date.now() - lastTime.getTime()) / 60000);
-  steps.push({
-    time: `${formatTimeIST(lastTime)} – Present`,
-    title: minsAgo < 15 ? "Active CRM Stream" : "Telemetry Standby",
-    desc: minsAgo < 15 ? "Live Stream Connected" : `Last action ${minsAgo}m ago`,
-    type: minsAgo < 15 ? "active" : "idle",
-    orderCode: null,
-    orderId: null,
-    actionType: minsAgo < 15 ? "ACTIVE" : "STANDBY",
-  });
 
   return steps;
 }
@@ -2099,13 +2182,36 @@ export const getMyPerformanceDashboard = createServerFn({ method: "POST" })
       if (a.application_code) orderCodeMap.set(a.id, a.application_code);
     });
 
-    // ── Calculate Action Idle Times & Action Response Intervals ──
-    const humanActions = canonicalEvents
-      .filter((e) => !e.isSystemAction && e.orderId)
+    // ── Calculate Action Idle Times & Action Response Intervals (STRICTLY Order Actions) ──
+    const isQualifyingOrderAction = (e: NormalizedOperationalEvent): boolean => {
+      if (e.isSystemAction || !e.orderId) return false;
+      if (e.actionCategory === "assignment" || e.actionCategory === "system_closure") return false;
+      const at = (e.actionType || "").toUpperCase();
+      const excludedTypes = [
+        "ORDER_ASSIGNED",
+        "ORDER_REASSIGNED",
+        "PAGE_VIEWED",
+        "TAB_OPENED",
+        "LOGIN",
+        "LOGOUT",
+        "SESSION_INITIALIZED",
+        "SESSION_STARTED",
+        "SESSION_HEARTBEAT",
+        "TELEMETRY",
+        "ACTIVE_STREAM",
+        "PRESENCE_CHANGED",
+        "SYSTEM_CLOSE",
+      ];
+      if (excludedTypes.includes(at)) return false;
+      return true;
+    };
+
+    const qualifyingOrderActions = canonicalEvents
+      .filter(isQualifyingOrderAction)
       .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
 
     const actionsByOrder = new Map<string, NormalizedOperationalEvent[]>();
-    humanActions.forEach((act) => {
+    qualifyingOrderActions.forEach((act) => {
       if (act.orderId) {
         const list = actionsByOrder.get(act.orderId) ?? [];
         list.push(act);
@@ -2149,20 +2255,12 @@ export const getMyPerformanceDashboard = createServerFn({ method: "POST" })
 
     actionIntervals.sort((a, b) => new Date(b.nextActionTime).getTime() - new Date(a.nextActionTime).getTime());
 
-    const totalActionsCount = humanActions.length;
+    const totalActionsCount = qualifyingOrderActions.length;
     const trackedIntervalsCount = allIntervalMs.length;
     const avgIdleMs = trackedIntervalsCount > 0 ? Math.round(allIntervalMs.reduce((sum, v) => sum + v, 0) / trackedIntervalsCount) : 0;
-
-    let medianIdleMs = 0;
-    if (trackedIntervalsCount > 0) {
-      const sortedMs = [...allIntervalMs].sort((a, b) => a - b);
-      const mid = Math.floor(sortedMs.length / 2);
-      medianIdleMs = sortedMs.length % 2 !== 0 ? sortedMs[mid] : Math.round((sortedMs[mid - 1] + sortedMs[mid]) / 2);
-    }
-
     const longestIdleMs = trackedIntervalsCount > 0 ? Math.max(...allIntervalMs) : 0;
 
-    const latestOverallAction = humanActions.length > 0 ? humanActions[humanActions.length - 1] : null;
+    const latestOverallAction = qualifyingOrderActions.length > 0 ? qualifyingOrderActions[qualifyingOrderActions.length - 1] : null;
     const { actionLabel: latestActionLabel } = latestOverallAction
       ? formatLogAction({ action_type: latestOverallAction.actionType, notes: latestOverallAction.notes })
       : { actionLabel: null };
@@ -2172,8 +2270,8 @@ export const getMyPerformanceDashboard = createServerFn({ method: "POST" })
       trackedIntervals: trackedIntervalsCount,
       avgIdleMs,
       avgIdleFormatted: formatIdleDuration(avgIdleMs),
-      medianIdleMs,
-      medianIdleFormatted: formatIdleDuration(medianIdleMs),
+      medianIdleMs: 0,
+      medianIdleFormatted: "0s",
       longestIdleMs,
       longestIdleFormatted: formatIdleDuration(longestIdleMs),
       latestActionAt: latestOverallAction?.createdAt || null,
@@ -2419,15 +2517,19 @@ export const getMyPerformanceDashboard = createServerFn({ method: "POST" })
     let totalActiveSecs = 0;
     let totalIdleSecs = 0;
     let totalAwaySecs = 0;
-    (dbSessions ?? []).forEach((s: any) => {
+    const sortedDbSessions = [...(dbSessions ?? [])].sort(
+      (a, b) => new Date(a.started_at).getTime() - new Date(b.started_at).getTime()
+    );
+
+    sortedDbSessions.forEach((s: any) => {
       totalActiveSecs += Number(s.active_seconds || 0);
       totalIdleSecs += Number(s.idle_seconds || 0);
       totalAwaySecs += Number(s.away_seconds || 0);
     });
 
-    // If dbSessions is empty, estimate seamlessly from verified operational events
-    if (totalActiveSecs === 0 && canonicalEvents.length > 0) {
-      totalActiveSecs = humanActions.length * 8 * 60; // 8 mins per verified action burst
+    // If dbSessions is empty, estimate seamlessly from qualifying actions
+    if (totalActiveSecs === 0 && qualifyingOrderActions.length > 0) {
+      totalActiveSecs = qualifyingOrderActions.length * 8 * 60;
       const idleSumSecs = Math.round(allIntervalMs.reduce((acc, v) => acc + v, 0) / 1000);
       totalIdleSecs = Math.min(idleSumSecs, 8 * 3600);
     }
@@ -2440,19 +2542,11 @@ export const getMyPerformanceDashboard = createServerFn({ method: "POST" })
     const idleFormatted = idleMins >= 60 ? `${Math.floor(idleMins / 60)}h ${idleMins % 60}m` : `${idleMins}m`;
     const awayFormatted = awayMins >= 60 ? `${Math.floor(awayMins / 60)}h ${awayMins % 60}m` : `${awayMins}m`;
 
-    const firstActionIso = canonicalEvents.length > 0 ? canonicalEvents[canonicalEvents.length - 1].createdAt : null;
-    const sessionSegments = buildDynamicTelemetrySegments(dbSessions ?? [], canonicalEvents);
-    const stepperEvents = buildDynamicStepperEvents(
-      canonicalEvents.map((c) => ({
-        created_at: c.createdAt,
-        notes: c.notes,
-        action_type: c.actionType,
-        order_id: c.orderId,
-        order_code: c.orderId ? (orderCodeMap.get(c.orderId) || c.orderId.slice(0, 8)) : null,
-      })),
-      firstActionIso,
-      empName,
-    );
+    const firstSessionStartIso = sortedDbSessions[0]?.started_at || (qualifyingOrderActions[0]?.createdAt ?? null);
+    const firstLoginFormatted = firstSessionStartIso ? formatTimeIST(firstSessionStartIso) : null;
+
+    const sessionSegments = buildDynamicTelemetrySegments(sortedDbSessions, qualifyingOrderActions);
+    const orderActionChronology = buildOrderActionChronology(qualifyingOrderActions, orderCodeMap);
 
     return {
       employee: {
@@ -2463,6 +2557,8 @@ export const getMyPerformanceDashboard = createServerFn({ method: "POST" })
         presenceStatus,
       },
       session: {
+        firstLogin: firstLoginFormatted,
+        firstLoginIso: firstSessionStartIso,
         activeDuration: activeFormatted,
         activeMinutes: activeMins,
         idleDuration: idleFormatted,
@@ -2473,7 +2569,8 @@ export const getMyPerformanceDashboard = createServerFn({ method: "POST" })
         ordersWorked: workedOrdersSet.size,
         slaCompliance,
         sessionSegments,
-        stepperEvents,
+        actionChronology: orderActionChronology,
+        stepperEvents: orderActionChronology,
       },
       kpiCards: {
         assigned: assignedCount,

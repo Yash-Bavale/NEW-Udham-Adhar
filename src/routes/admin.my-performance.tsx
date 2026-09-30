@@ -442,7 +442,7 @@ function MyPerformanceDashboardPage() {
           </span>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
           {/* 1. TOTAL ACTIONS */}
           <div className="bg-white rounded-xl p-4 border border-purple-100 shadow-xs flex flex-col justify-between transition hover:border-purple-200">
             <div className="flex items-center justify-between text-slate-500 text-[11px] uppercase font-bold tracking-wider">
@@ -491,23 +491,7 @@ function MyPerformanceDashboardPage() {
             </div>
           </div>
 
-          {/* 4. MEDIAN ACTION IDLE */}
-          <div className="bg-white rounded-xl p-4 border border-cyan-100 shadow-xs flex flex-col justify-between transition hover:border-cyan-200">
-            <div className="flex items-center justify-between text-slate-500 text-[11px] uppercase font-bold tracking-wider">
-              <span>Median Idle</span>
-              <Scale className="h-4 w-4 text-cyan-600" />
-            </div>
-            <div className="my-2.5">
-              <div className="font-mono text-2xl font-bold tracking-tight text-cyan-700">
-                {isLoading ? "--" : (actionMetrics?.medianIdleFormatted ?? "0s")}
-              </div>
-            </div>
-            <div className="text-[11px] text-slate-400">
-              Middle response pace
-            </div>
-          </div>
-
-          {/* 5. LONGEST ACTION IDLE */}
+          {/* 4. LONGEST ACTION IDLE */}
           <div className="bg-white rounded-xl p-4 border border-amber-100 shadow-xs flex flex-col justify-between transition hover:border-amber-200">
             <div className="flex items-center justify-between text-slate-500 text-[11px] uppercase font-bold tracking-wider">
               <span>Longest Idle</span>
@@ -523,7 +507,7 @@ function MyPerformanceDashboardPage() {
             </div>
           </div>
 
-          {/* 6. LIVE OPEN IDLE TICKER */}
+          {/* 5. LIVE OPEN IDLE TICKER */}
           <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-xs flex flex-col justify-between transition hover:border-slate-300">
             <LiveActionIdleTicker
               latestActionAt={actionMetrics?.latestActionAt ?? null}
@@ -714,90 +698,103 @@ function MyPerformanceDashboardPage() {
               )}
             </div>
 
-            {/* Time axis scale */}
-            <div className="flex justify-between items-center text-slate-400 text-[11px] px-1 font-mono">
-              <span>09:00 IST</span>
-              <span>11:00</span>
-              <span>13:00 (Lunch)</span>
-              <span>15:00</span>
-              <span>17:00</span>
+            {/* Time axis scale: starts strictly from actual login/session initialization timestamp */}
+            <div className="flex justify-between items-center text-slate-500 text-[11px] px-1 font-mono">
+              <span className="font-semibold text-emerald-700">
+                {session?.firstLogin
+                  ? `${session.firstLogin} (Login)`
+                  : (session?.sessionSegments?.[0]?.startTime
+                    ? `${session.sessionSegments[0].startTime} (Login)`
+                    : "Login / Session Start")}
+              </span>
+              {(session?.sessionSegments?.length ?? 0) > 2 && (
+                <span className="hidden sm:inline-block text-slate-400">
+                  {session?.sessionSegments?.[Math.floor((session.sessionSegments.length - 1) / 2)]?.startTime || ""}
+                </span>
+              )}
+              {(session?.sessionSegments?.length ?? 0) > 4 && (
+                <span className="hidden md:inline-block text-slate-400">
+                  {session?.sessionSegments?.[Math.floor((session.sessionSegments.length - 1) * 0.75)]?.startTime || ""}
+                </span>
+              )}
               <span className="font-semibold text-blue-600">
-                Now ({new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: false })})
+                {isEmpActive || session?.presenceStatus === "ACTIVE"
+                  ? `Now (${new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: false })})`
+                  : (session?.sessionSegments?.[(session?.sessionSegments?.length ?? 1) - 1]?.endTime || "Session End")}
               </span>
             </div>
           </div>
 
-          {/* Dynamic Stepper event markers below bar */}
+          {/* Dynamic Action Event Chronology below bar (Strictly Order Actions Taken) */}
           <div className="space-y-2 pt-2 border-t border-slate-100">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-slate-800">
-                Action Event Markers &amp; Chronology
+                Order Action Event Chronology
               </span>
               <span className="text-[11px] text-slate-400">
-                Showing latest verified actions with timestamp, type &amp; order reference
+                Verified Order Action Taken events only (excludes telemetry, views &amp; logins)
               </span>
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2.5 overflow-x-auto pb-1">
-              {(session?.stepperEvents ?? []).map((step: any, idx: number) => {
-                const isAction = step.type === "action";
-                const isActive = step.type === "active";
-                const isIdle = step.type === "idle";
-                const isAway = step.type === "away";
-                const isLogin = step.type === "login";
+            {(session?.actionChronology ?? session?.stepperEvents ?? []).length > 0 ? (
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2.5 overflow-x-auto pb-1">
+                {(session?.actionChronology ?? session?.stepperEvents ?? []).map((step: any, idx: number) => {
+                  const timestampStr = step.timestamp || step.timeIST || step.time || "—";
+                  const titleStr = step.actionTitle || step.title || "Order Action Taken";
+                  const descStr = step.notes || step.desc || "";
+                  const codeStr = step.orderCode || (step.orderId ? step.orderId.slice(0, 8) : null);
+                  const empNameStr = step.employeeName || empName;
 
-                return (
-                  <div
-                    key={idx}
-                    className={cn(
-                      "p-2.5 rounded-lg border flex flex-col justify-between transition min-w-[140px]",
-                      isActive
-                        ? "bg-emerald-50/70 border-emerald-200 shadow-2xs"
-                        : isIdle
-                        ? "bg-amber-50/70 border-amber-200"
-                        : isAway
-                        ? "bg-orange-50/70 border-orange-200"
-                        : isLogin
-                        ? "bg-blue-50/70 border-blue-200"
-                        : isAction
-                        ? "bg-white border-slate-200 shadow-2xs hover:border-blue-300"
-                        : "bg-slate-50 border-slate-200"
-                    )}
-                  >
-                    <div className="flex items-center justify-between gap-1 mb-1">
-                      <span className="text-[10px] font-mono text-slate-500 font-semibold">{step.time}</span>
-                      {step.actionType && (
-                        <span className="px-1.5 py-0.2 rounded text-[9px] font-bold uppercase bg-slate-100 text-slate-700">
-                          {step.actionType.slice(0, 10)}
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="my-0.5">
-                      <span className="text-xs font-bold text-slate-900 line-clamp-1" title={step.title}>
-                        {step.title}
-                      </span>
-                      <p className="text-[10px] text-slate-500 line-clamp-1 mt-0.5" title={step.desc}>
-                        {step.desc}
-                      </p>
-                    </div>
-
-                    {step.orderCode && (
-                      <div className="mt-1 pt-1 border-t border-slate-100 flex items-center justify-between">
-                        <Link
-                          to={`/admin/orders/${step.orderId || ""}` as any}
-                          className="text-[10px] font-bold text-blue-600 hover:underline flex items-center gap-0.5"
-                        >
-                          <span>#{step.orderCode}</span>
-                          <ExternalLink className="h-2.5 w-2.5" />
-                        </Link>
-                        <span className="text-[9px] text-slate-400">Order</span>
+                  return (
+                    <div
+                      key={step.id || idx}
+                      className="p-2.5 rounded-lg border bg-white border-slate-200 shadow-2xs hover:border-blue-300 flex flex-col justify-between transition min-w-[150px]"
+                    >
+                      <div className="flex items-center justify-between gap-1 mb-1">
+                        <span className="text-[10px] font-mono text-slate-600 font-semibold">{timestampStr}</span>
+                        {step.actionType && (
+                          <span className="px-1.5 py-0.2 rounded text-[9px] font-bold uppercase bg-purple-50 text-purple-700 border border-purple-100">
+                            {step.actionType.replace(/_/g, " ").slice(0, 12)}
+                          </span>
+                        )}
                       </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+
+                      <div className="my-0.5">
+                        <span className="text-xs font-bold text-slate-900 line-clamp-1" title={titleStr}>
+                          {titleStr}
+                        </span>
+                        {descStr && (
+                          <p className="text-[10px] text-slate-500 line-clamp-1 mt-0.5" title={descStr}>
+                            {descStr}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="mt-1 pt-1 border-t border-slate-100 flex items-center justify-between gap-1">
+                        {codeStr ? (
+                          <Link
+                            to={`/admin/orders/${step.orderId || ""}` as any}
+                            className="text-[10px] font-bold text-blue-600 hover:underline flex items-center gap-0.5 truncate"
+                          >
+                            <span>#{codeStr}</span>
+                            <ExternalLink className="h-2.5 w-2.5 flex-shrink-0" />
+                          </Link>
+                        ) : (
+                          <span className="text-[9px] text-slate-400">Order</span>
+                        )}
+                        <span className="text-[9px] text-slate-400 truncate max-w-[65px]" title={empNameStr}>
+                          {empNameStr}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="p-4 rounded-lg bg-slate-50 border border-slate-200 text-center text-xs text-slate-500 font-medium">
+                No qualifying employee order actions recorded for the selected period.
+              </div>
+            )}
           </div>
         </div>
       </section>
