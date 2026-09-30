@@ -48,8 +48,8 @@ export function ReminderNotificationManager() {
   const { data: globalSound } = useQuery({
     queryKey: ["global-reminder-sound-settings"],
     queryFn: () => getSoundSettingsFn(),
-    staleTime: 10_000,
-    refetchInterval: 30_000,
+    staleTime: 5 * 60_000,
+    refetchInterval: 10 * 60_000,
   });
 
   useEffect(() => {
@@ -186,12 +186,14 @@ export function ReminderNotificationManager() {
     qc.invalidateQueries({ queryKey: ["active-order-callback"] });
   });
 
-  // Rapidly poll active reminders summary (every 4s)
+  // Realtime invalidates on changes; upcoming reminders fire via local timers.
+  // A slow safety poll only catches missed realtime events.
   const { data } = useQuery({
     queryKey: ["due-reminders-summary"],
     queryFn: () => getSummaryFn({ data: {} }),
-    refetchInterval: 4_000,
-    staleTime: 0,
+    refetchInterval: 60_000,
+    refetchIntervalInBackground: false,
+    staleTime: 30_000,
   });
 
   useEffect(() => {
