@@ -81,6 +81,7 @@ export async function emitToUsers(userIds: string[], base: Omit<EmitNotification
 
 /** Convenience: emit to every user holding a given app_role. */
 export async function emitToRole(role: string, base: Omit<EmitNotificationInput, "userId">): Promise<void> {
+  if (!isStoredNotificationKind(base.kind)) return;
   const { data, error } = await supabaseAdmin
     .from("user_roles")
     .select("user_id")
