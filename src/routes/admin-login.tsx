@@ -1,11 +1,10 @@
-import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { logLoginAttempt, verifyGoogleStaffAccess } from "@/lib/crm/employee-sessions.functions";
 import { getOrCreateSessionId } from "@/hooks/useEmployeePresence";
 import { Button } from "@/components/ui/button";
 import officeBg from "@/assets/login-office-bg.png.asset.json";
-import logoAsset from "@/assets/bhs-logo.png.asset.json";
 
 /** Only allow same-origin relative paths as a post-login redirect target. */
 function safeNext(value: unknown): string | null {
