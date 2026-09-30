@@ -161,6 +161,7 @@ import { Route as ApiPublicWebhooksPayuRouteImport } from './routes/api/public/w
 import { Route as LovableEmailQueueProcessRouteImport } from './routes/lovable/email/queue/process'
 import { Route as LovableEmailTransactionalPreviewRouteImport } from './routes/lovable/email/transactional/preview'
 import { Route as LovableEmailTransactionalSendRouteImport } from './routes/lovable/email/transactional/send'
+import { Route as ApiPublicTelephonySmartfloDialplanRouteImport } from './routes/api/public/telephony/smartflo/dialplan'
 import { Route as ApiPublicV1ApplicationsSummaryRouteImport } from './routes/api/public/v1/applications/summary'
 import { Route as ApiPublicV1PaymentsInitiateRouteImport } from './routes/api/public/v1/payments/initiate'
 import { Route as ApiPublicV1PaymentsLeadCodeStatusRouteImport } from './routes/api/public/v1/payments/$leadCode.status'
@@ -962,6 +963,12 @@ const LovableEmailTransactionalSendRoute =
     path: '/lovable/email/transactional/send',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicTelephonySmartfloDialplanRoute =
+  ApiPublicTelephonySmartfloDialplanRouteImport.update({
+    id: '/api/public/telephony/smartflo/dialplan',
+    path: '/api/public/telephony/smartflo/dialplan',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicV1ApplicationsSummaryRoute =
   ApiPublicV1ApplicationsSummaryRouteImport.update({
     id: '/api/public/v1/applications/summary',
@@ -1134,6 +1141,7 @@ export interface FileRoutesByFullPath {
   '/lovable/email/transactional/preview': typeof LovableEmailTransactionalPreviewRoute
   '/lovable/email/transactional/send': typeof LovableEmailTransactionalSendRoute
   '/admin/support/tickets/': typeof AdminSupportTicketsIndexRoute
+  '/api/public/telephony/smartflo/dialplan': typeof ApiPublicTelephonySmartfloDialplanRoute
   '/api/public/v1/applications/summary': typeof ApiPublicV1ApplicationsSummaryRoute
   '/api/public/v1/payments/initiate': typeof ApiPublicV1PaymentsInitiateRoute
   '/api/public/v1/payments/$leadCode/status': typeof ApiPublicV1PaymentsLeadCodeStatusRoute
@@ -1286,6 +1294,7 @@ export interface FileRoutesByTo {
   '/lovable/email/transactional/preview': typeof LovableEmailTransactionalPreviewRoute
   '/lovable/email/transactional/send': typeof LovableEmailTransactionalSendRoute
   '/admin/support/tickets': typeof AdminSupportTicketsIndexRoute
+  '/api/public/telephony/smartflo/dialplan': typeof ApiPublicTelephonySmartfloDialplanRoute
   '/api/public/v1/applications/summary': typeof ApiPublicV1ApplicationsSummaryRoute
   '/api/public/v1/payments/initiate': typeof ApiPublicV1PaymentsInitiateRoute
   '/api/public/v1/payments/$leadCode/status': typeof ApiPublicV1PaymentsLeadCodeStatusRoute
@@ -1444,6 +1453,7 @@ export interface FileRoutesById {
   '/lovable/email/transactional/preview': typeof LovableEmailTransactionalPreviewRoute
   '/lovable/email/transactional/send': typeof LovableEmailTransactionalSendRoute
   '/admin/support/tickets/': typeof AdminSupportTicketsIndexRoute
+  '/api/public/telephony/smartflo/dialplan': typeof ApiPublicTelephonySmartfloDialplanRoute
   '/api/public/v1/applications/summary': typeof ApiPublicV1ApplicationsSummaryRoute
   '/api/public/v1/payments/initiate': typeof ApiPublicV1PaymentsInitiateRoute
   '/api/public/v1/payments/$leadCode/status': typeof ApiPublicV1PaymentsLeadCodeStatusRoute
@@ -1603,6 +1613,7 @@ export interface FileRouteTypes {
     | '/lovable/email/transactional/preview'
     | '/lovable/email/transactional/send'
     | '/admin/support/tickets/'
+    | '/api/public/telephony/smartflo/dialplan'
     | '/api/public/v1/applications/summary'
     | '/api/public/v1/payments/initiate'
     | '/api/public/v1/payments/$leadCode/status'
@@ -1755,6 +1766,7 @@ export interface FileRouteTypes {
     | '/lovable/email/transactional/preview'
     | '/lovable/email/transactional/send'
     | '/admin/support/tickets'
+    | '/api/public/telephony/smartflo/dialplan'
     | '/api/public/v1/applications/summary'
     | '/api/public/v1/payments/initiate'
     | '/api/public/v1/payments/$leadCode/status'
@@ -1912,6 +1924,7 @@ export interface FileRouteTypes {
     | '/lovable/email/transactional/preview'
     | '/lovable/email/transactional/send'
     | '/admin/support/tickets/'
+    | '/api/public/telephony/smartflo/dialplan'
     | '/api/public/v1/applications/summary'
     | '/api/public/v1/payments/initiate'
     | '/api/public/v1/payments/$leadCode/status'
@@ -2006,6 +2019,7 @@ export interface RootRouteChildren {
   LovableEmailQueueProcessRoute: typeof LovableEmailQueueProcessRoute
   LovableEmailTransactionalPreviewRoute: typeof LovableEmailTransactionalPreviewRoute
   LovableEmailTransactionalSendRoute: typeof LovableEmailTransactionalSendRoute
+  ApiPublicTelephonySmartfloDialplanRoute: typeof ApiPublicTelephonySmartfloDialplanRoute
   ApiPublicV1ApplicationsSummaryRoute: typeof ApiPublicV1ApplicationsSummaryRoute
   ApiPublicV1PaymentsInitiateRoute: typeof ApiPublicV1PaymentsInitiateRoute
   ApiPublicV1PaymentsLeadCodeStatusRoute: typeof ApiPublicV1PaymentsLeadCodeStatusRoute
@@ -3077,6 +3091,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LovableEmailTransactionalSendRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/telephony/smartflo/dialplan': {
+      id: '/api/public/telephony/smartflo/dialplan'
+      path: '/api/public/telephony/smartflo/dialplan'
+      fullPath: '/api/public/telephony/smartflo/dialplan'
+      preLoaderRoute: typeof ApiPublicTelephonySmartfloDialplanRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/v1/applications/summary': {
       id: '/api/public/v1/applications/summary'
       path: '/api/public/v1/applications/summary'
@@ -3416,6 +3437,8 @@ const rootRouteChildren: RootRouteChildren = {
   LovableEmailQueueProcessRoute: LovableEmailQueueProcessRoute,
   LovableEmailTransactionalPreviewRoute: LovableEmailTransactionalPreviewRoute,
   LovableEmailTransactionalSendRoute: LovableEmailTransactionalSendRoute,
+  ApiPublicTelephonySmartfloDialplanRoute:
+    ApiPublicTelephonySmartfloDialplanRoute,
   ApiPublicV1ApplicationsSummaryRoute: ApiPublicV1ApplicationsSummaryRoute,
   ApiPublicV1PaymentsInitiateRoute: ApiPublicV1PaymentsInitiateRoute,
   ApiPublicV1PaymentsLeadCodeStatusRoute:
