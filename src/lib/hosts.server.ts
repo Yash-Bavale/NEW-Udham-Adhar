@@ -63,24 +63,6 @@ export function getPublicHosts(): string[] {
   return ["udyamadhar.in", "udyamregistrations.in", "gstcertificate.in"];
 }
 
-/**
- * Public website hostnames that may STILL serve the staff CRM panel during the
- * migration to crm.businesshelpservices.com. Override with LEGACY_CRM_HOSTS
- * (comma separated); set it to "none" to disable legacy CRM access entirely.
- */
-export function getLegacyCrmHosts(): string[] {
-  const raw = process.env["LEGACY_CRM_HOSTS"];
-  if (raw && raw.trim().toLowerCase() === "none") return [];
-  const configured = envList("LEGACY_CRM_HOSTS");
-  if (configured.length) return configured;
-  return ["udyamadhar.in"];
-}
-
-export function isLegacyCrmHost(hostHeader: string | null | undefined): boolean {
-  const host = normalizeHost(hostHeader).replace(/^www\./, "");
-  return getLegacyCrmHosts().includes(host);
-}
-
 /** Hosts that must never be gated: local dev and Lovable preview/published. */
 export function isDevHost(host: string): boolean {
   return (
