@@ -113,6 +113,13 @@
       "when": 1790747186822,
       "tag": "0015_prune_sent_email_bodies_empty_string",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1790748072486,
+      "tag": "0016_disable_sent_email_body_pruning",
+      "breakpoints": true
     }
   ]
 }

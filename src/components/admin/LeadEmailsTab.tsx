@@ -96,17 +96,25 @@ export function LeadEmailsTab({ leadId, leadService, orderId }: { leadId: string
 
   // Dedupe: every successful send creates a row in BOTH email_queue and email_logs.
   // Prefer the email_logs row (it has the final sent status); key by queue_id when present.
-  // If the log row is missing body_html/body_text (older rows), backfill from the queue row
-  // so the inline preview renders instead of showing "No body captured".
+  // Bodies are merged in BOTH directions: an empty body on either side is treated as
+  // missing, so whichever copy still holds the rendered email is the one displayed.
+  const pick = (...vals: any[]) => vals.find((v) => typeof v === "string" && v.trim() !== "") ?? null;
   const queueById = new Map<string, any>();
   for (const q of (data?.queue || [])) queueById.set(q.id, q);
+  const logByQueueId = new Map<string, any>();
+  for (const l of (data?.logs || [])) if (l.queue_id) logByQueueId.set(l.queue_id, l);
   const dedupMap = new Map<string, any>();
-  for (const q of (data?.queue || [])) dedupMap.set(`q:${q.id}`, q);
+  for (const q of (data?.queue || [])) {
+    const l = logByQueueId.get(q.id);
+    dedupMap.set(`q:${q.id}`, l
+      ? { ...q, body_html: pick(q.body_html, l.body_html), body_text: pick(q.body_text, l.body_text) }
+      : q);
+  }
   for (const l of (data?.logs || [])) {
     const key = l.queue_id ? `q:${l.queue_id}` : `l:${l.id}`;
     const q = l.queue_id ? queueById.get(l.queue_id) : null;
     const merged = q
-      ? { ...l, body_html: l.body_html ?? q.body_html, body_text: l.body_text ?? q.body_text }
+      ? { ...l, body_html: pick(l.body_html, q.body_html), body_text: pick(l.body_text, q.body_text) }
       : l;
     dedupMap.set(key, merged);
   }
