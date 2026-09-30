@@ -327,7 +327,7 @@ function OrderIdleTimerKpiCard({
       type="button"
       onClick={onClick}
       className={cn(
-        "flex flex-col justify-between p-2.5 sm:p-3 rounded-xl min-h-[82px] max-h-[82px] h-[82px] border transition-all duration-150 cursor-pointer select-none text-left group shadow-xs hover:shadow-sm overflow-hidden",
+        "flex flex-col justify-between p-2.5 rounded-xl min-h-[88px] border transition-all duration-150 cursor-pointer select-none text-left group shadow-xs hover:shadow-sm",
         containerBg
       )}
     >
@@ -346,8 +346,8 @@ function OrderIdleTimerKpiCard({
       </div>
 
       {/* Middle row: Live Timer on single line with badge */}
-      <div className="flex items-baseline justify-between gap-1 mt-0.5 w-full min-w-0">
-        <span className={cn("font-mono text-sm sm:text-base font-black tracking-tight whitespace-nowrap leading-none", timerCls)}>
+      <div className="flex items-baseline justify-between gap-1 mt-1 w-full min-w-0">
+        <span className={cn("font-mono text-base font-black tracking-tight whitespace-nowrap leading-none", timerCls)}>
           {displayTime}
         </span>
         <span className={cn("text-[8.5px] font-bold px-1.5 py-0.5 rounded leading-none shrink-0 whitespace-nowrap shadow-2xs", toneCls)}>
@@ -356,7 +356,7 @@ function OrderIdleTimerKpiCard({
       </div>
 
       {/* Bottom row: Subtitle */}
-      <div className={cn("text-[9.5px] font-medium truncate mt-0.5", subtitleCls)} title={subtitleText}>
+      <div className={cn("text-[9.5px] font-medium truncate mt-1 leading-tight", subtitleCls)} title={subtitleText}>
         {subtitleText}
       </div>
     </button>
@@ -1257,7 +1257,7 @@ return (
               setPage(1);
             }}
             className={cn(
-              "flex flex-col justify-between p-2.5 sm:p-3 rounded-xl min-h-[82px] max-h-[82px] h-[82px] border transition-all duration-150 cursor-pointer select-none text-left group shadow-xs hover:shadow-sm overflow-hidden",
+              "flex flex-col justify-between p-2.5 rounded-xl min-h-[88px] border transition-all duration-150 cursor-pointer select-none text-left group shadow-xs hover:shadow-sm",
               cardContainerCls
             )}
           >
@@ -1298,7 +1298,7 @@ return (
 
             {/* Bottom row: Subtitle */}
             <div
-              className={cn("text-[9.5px] font-medium truncate mt-0.5", subtitleCls)}
+              className={cn("text-[9.5px] font-medium truncate mt-1 leading-tight", subtitleCls)}
               title={b.id === "pending" && (counts as any).pending_actions_total > countVal ? `${countVal} unique orders · ${(counts as any).pending_actions_total} total actions performed` : b.subtitle}
             >
               {b.id === "pending" && (counts as any).pending_actions_total > countVal
