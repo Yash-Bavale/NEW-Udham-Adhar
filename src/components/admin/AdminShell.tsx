@@ -223,8 +223,9 @@ function Shell({ children, email }: { children: ReactNode; email?: string }) {
   const { data: sidebarCounts } = useQuery<SidebarNotificationCounts>({
     queryKey: ["sidebar-notification-counts"],
     queryFn: () => fetchSidebarCounts(),
-    refetchInterval: 30_000,
-    staleTime: 10_000,
+    refetchInterval: 120_000,
+    refetchIntervalInBackground: false,
+    staleTime: 60_000,
   });
 
   // Track which module paths have been visited this session —
