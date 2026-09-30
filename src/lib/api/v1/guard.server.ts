@@ -157,10 +157,10 @@ function b64url(bytes: Uint8Array): string {
   return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
-function b64urlDecode(value: string): Uint8Array {
+function b64urlDecode(value: string): Uint8Array<ArrayBuffer> {
   const padded = value.replace(/-/g, "+").replace(/_/g, "/");
   const binary = atob(padded + "=".repeat((4 - (padded.length % 4)) % 4));
-  const out = new Uint8Array(binary.length);
+  const out = new Uint8Array(new ArrayBuffer(binary.length));
   for (let i = 0; i < binary.length; i++) out[i] = binary.charCodeAt(i);
   return out;
 }
