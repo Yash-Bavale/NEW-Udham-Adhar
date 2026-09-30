@@ -630,6 +630,7 @@ function EmployeeActivityCommandCenterPage() {
                 .toUpperCase() || "OP";
 
               const isEmpActive = emp.status === "active";
+              const isEmpIdle = emp.status === "idle";
               const isEmpAway = emp.status === "away";
 
               return (
@@ -647,9 +648,11 @@ function EmployeeActivityCommandCenterPage() {
                               "w-10 h-10 rounded-full flex items-center justify-center font-bold text-xs shadow-xs",
                               isEmpActive
                                 ? "bg-blue-100 text-blue-900"
-                                : isEmpAway
+                                : isEmpIdle
                                   ? "bg-amber-100 text-amber-900"
-                                  : "bg-slate-100 text-slate-600",
+                                  : isEmpAway
+                                    ? "bg-orange-100 text-orange-900"
+                                    : "bg-slate-100 text-slate-600",
                             )}
                           >
                             {initials}
@@ -659,9 +662,11 @@ function EmployeeActivityCommandCenterPage() {
                               "absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white",
                               isEmpActive
                                 ? "bg-emerald-500"
-                                : isEmpAway
+                                : isEmpIdle
                                   ? "bg-amber-500"
-                                  : "bg-slate-400",
+                                  : isEmpAway
+                                    ? "bg-orange-500"
+                                    : "bg-slate-400",
                             )}
                           />
                         </div>
@@ -681,10 +686,15 @@ function EmployeeActivityCommandCenterPage() {
                           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
                           Active
                         </span>
-                      ) : isEmpAway ? (
+                      ) : isEmpIdle ? (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 text-[11px] font-semibold">
                           <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-                          Away {emp.lastActiveAgo || "15m"}
+                          Idle {emp.lastActiveAgo ? `(${emp.lastActiveAgo})` : ""}
+                        </span>
+                      ) : isEmpAway ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-orange-100 text-orange-900 text-[11px] font-semibold">
+                          <span className="w-1.5 h-1.5 rounded-full bg-orange-500" />
+                          Away {emp.lastActiveAgo ? `(${emp.lastActiveAgo})` : ""}
                         </span>
                       ) : (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[11px] font-medium">
@@ -875,6 +885,7 @@ function EmployeeActivityCommandCenterPage() {
                     .toUpperCase() || "OP";
 
                   const isEmpActive = emp.status === "active";
+                  const isEmpIdle = emp.status === "idle";
                   const isEmpAway = emp.status === "away";
 
                   return (
@@ -894,9 +905,11 @@ function EmployeeActivityCommandCenterPage() {
                                 "w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs",
                                 isEmpActive
                                   ? "bg-blue-100 text-blue-900"
-                                  : isEmpAway
+                                  : isEmpIdle
                                     ? "bg-amber-100 text-amber-900"
-                                    : "bg-slate-100 text-slate-600",
+                                    : isEmpAway
+                                      ? "bg-orange-100 text-orange-900"
+                                      : "bg-slate-100 text-slate-600",
                               )}
                             >
                               {initials}
@@ -906,9 +919,11 @@ function EmployeeActivityCommandCenterPage() {
                                 "absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full ring-2 ring-white",
                                 isEmpActive
                                   ? "bg-emerald-500"
-                                  : isEmpAway
+                                  : isEmpIdle
                                     ? "bg-amber-500"
-                                    : "bg-slate-400",
+                                    : isEmpAway
+                                      ? "bg-orange-500"
+                                      : "bg-slate-400",
                               )}
                             />
                           </div>
@@ -922,8 +937,12 @@ function EmployeeActivityCommandCenterPage() {
                                   <span className="w-1 h-1 rounded-full bg-emerald-500 animate-ping" />
                                   Active
                                 </span>
-                              ) : isEmpAway ? (
+                              ) : isEmpIdle ? (
                                 <span className="inline-flex items-center px-1.5 py-0.2 rounded-full bg-amber-100 text-amber-900 text-[9px] font-bold">
+                                  Idle
+                                </span>
+                              ) : isEmpAway ? (
+                                <span className="inline-flex items-center px-1.5 py-0.2 rounded-full bg-orange-100 text-orange-900 text-[9px] font-bold">
                                   Away
                                 </span>
                               ) : (

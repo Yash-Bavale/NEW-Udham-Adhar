@@ -1530,46 +1530,42 @@ export const getEmployeePerformanceCommandCenter = createServerFn({
 
     const nowTime = Date.now();
 
-    // 5. Build Employee Performance Table Rows with Idle Statistics
+    // 5. Build Employee Performance Table Rows with Realtime Ground Truth Presence & Idle Statistics
     const employeeRows = Array.from(empStatsMap.values()).map((s) => {
       const sess = activeSessionsMap.get(s.employeeId);
       const empSessions = employeeSessionsListMap.get(s.employeeId) ?? (sess ? [sess] : []);
+
+      // Determine the single most recent interaction timestamp across all sources
+      const candidateTimestamps: number[] = [];
+      if (s.lastActionTime) candidateTimestamps.push(new Date(s.lastActionTime).getTime());
+      if (sess?.last_heartbeat_at) candidateTimestamps.push(new Date(sess.last_heartbeat_at).getTime());
+      if (sess?.last_activity_at) candidateTimestamps.push(new Date(sess.last_activity_at).getTime());
+      if (sess?.login_at) candidateTimestamps.push(new Date(sess.login_at).getTime());
+      if (sess?.started_at) candidateTimestamps.push(new Date(sess.started_at).getTime());
+
       let status: "active" | "idle" | "away" | "offline" = "offline";
       let lastActiveAgo = "Never";
+      let liveElapsedMins = 0;
 
-      if (sess && sess.is_active && sess.status !== "force_logged_out" && sess.status !== "logged_out") {
-        const lastHb = sess.last_heartbeat_at || sess.last_activity_at || sess.login_at;
-        const diffMins = Math.floor((nowTime - new Date(lastHb).getTime()) / 60000);
-        if (diffMins <= 10) {
-          if (sess.status === "away" || diffMins > 8) {
-            status = "away";
-            lastActiveAgo = diffMins <= 1 ? "Away (just now)" : `Away (${diffMins}m ago)`;
-          } else if (sess.status === "idle" || diffMins > 5) {
-            status = "idle";
-            lastActiveAgo = diffMins <= 1 ? "Idle (just now)" : `Idle (${diffMins}m ago)`;
-          } else {
-            status = "active";
-            lastActiveAgo = diffMins <= 1 ? "Just now" : `${diffMins}m ago`;
-          }
-        } else {
-          const hours = Math.floor(diffMins / 60);
-          status = "offline";
-          lastActiveAgo = hours < 24 ? `${hours}h ago` : `${Math.floor(hours / 24)}d ago`;
-        }
-      } else if (s.lastActionTime) {
-        const diffMins = Math.floor((nowTime - new Date(s.lastActionTime).getTime()) / 60000);
+      if (candidateTimestamps.length > 0) {
+        const latestTs = Math.max(...candidateTimestamps);
+        const diffMins = Math.max(0, Math.floor((nowTime - latestTs) / 60000));
+        liveElapsedMins = diffMins;
+
         if (diffMins < 15) {
           status = "active";
           lastActiveAgo = diffMins <= 1 ? "Just now" : `${diffMins}m ago`;
         } else if (diffMins < 60) {
           status = "idle";
           lastActiveAgo = `${diffMins}m ago`;
-        } else if (diffMins < 180) {
+        } else if (diffMins < 240) {
           status = "away";
-          lastActiveAgo = `${diffMins}m ago`;
-        } else {
           const hours = Math.floor(diffMins / 60);
+          const mins = diffMins % 60;
+          lastActiveAgo = hours > 0 ? (mins > 0 ? `${hours}h ${mins}m ago` : `${hours}h ago`) : `${diffMins}m ago`;
+        } else {
           status = "offline";
+          const hours = Math.floor(diffMins / 60);
           lastActiveAgo = hours < 24 ? `${hours}h ago` : `${Math.floor(hours / 24)}d ago`;
         }
       }
@@ -1590,26 +1586,55 @@ export const getEmployeePerformanceCommandCenter = createServerFn({
         awaySecs = Number(sess.away_seconds || 0);
       }
 
-      if (activeSecs === 0 && idleSecs === 0 && s.actions > 0) {
-        activeSecs = s.actions * 8 * 60;
-        idleSecs = Math.max(0, 15 * 60);
+      // If no continuous per-second telemetry records exist, derive from live status & actions
+      if (idleSecs === 0) {
+        if (status === "idle") {
+          idleSecs = liveElapsedMins * 60;
+        } else if (status === "away") {
+          awaySecs = liveElapsedMins * 60;
+        }
+      }
+
+      if (activeSecs === 0 && s.actions > 0) {
+        activeSecs = s.actions * 5 * 60;
       }
 
       const activeMinutes = Math.round(activeSecs / 60);
-      const idleMinutes = Math.round(idleSecs / 60);
-      const awayMinutes = Math.round(awaySecs / 60);
+      const idleMinutes = status === "idle" ? liveElapsedMins : Math.round(idleSecs / 60);
+      const awayMinutes = status === "away" ? liveElapsedMins : Math.round(awaySecs / 60);
       const totalSessionMins = activeMinutes + idleMinutes + awayMinutes;
 
       const activeDurationFormatted = activeMinutes >= 60 ? `${Math.floor(activeMinutes / 60)}h ${activeMinutes % 60}m` : `${activeMinutes}m`;
-      const idleDurationFormatted = idleMinutes >= 60 ? `${Math.floor(idleMinutes / 60)}h ${idleMinutes % 60}m` : `${idleMinutes}m`;
-      const awayDurationFormatted = awayMinutes >= 60 ? `${Math.floor(awayMinutes / 60)}h ${awayMinutes % 60}m` : `${awayMinutes}m`;
+      const idleDurationFormatted =
+        status === "idle"
+          ? `${liveElapsedMins}m`
+          : idleMinutes > 0
+          ? idleMinutes >= 60
+            ? `${Math.floor(idleMinutes / 60)}h ${idleMinutes % 60}m`
+            : `${idleMinutes}m`
+          : status === "active"
+          ? "0m"
+          : "—";
+
+      const awayDurationFormatted =
+        status === "away"
+          ? liveElapsedMins >= 60
+            ? `${Math.floor(liveElapsedMins / 60)}h ${liveElapsedMins % 60}m`
+            : `${liveElapsedMins}m`
+          : awayMinutes > 0
+          ? awayMinutes >= 60
+            ? `${Math.floor(awayMinutes / 60)}h ${awayMinutes % 60}m`
+            : `${awayMinutes}m`
+          : "0m";
 
       const sessionLabel =
         totalSessionMins > 0
           ? totalSessionMins >= 60
             ? `${Math.floor(totalSessionMins / 60)}h ${totalSessionMins % 60}m`
             : `${totalSessionMins}m`
-          : (status === "active" ? "Active" : "—");
+          : status === "active"
+          ? "Active"
+          : "—";
 
       const liveOpenIdleMs = s.lastActionTime ? Math.max(0, nowTime - new Date(s.lastActionTime).getTime()) : 0;
       const liveOpenIdleFormatted = s.lastActionTime ? formatIdleDuration(liveOpenIdleMs) : "—";
@@ -1617,12 +1642,12 @@ export const getEmployeePerformanceCommandCenter = createServerFn({
       let idleStatusTag: "healthy" | "attention" | "extended" | "offline" = "offline";
       if (status === "offline") {
         idleStatusTag = "offline";
-      } else if (status === "away" || idleMinutes >= 60) {
-        idleStatusTag = "extended";
-      } else if (status === "idle" || idleMinutes >= 20) {
-        idleStatusTag = "attention";
-      } else {
+      } else if (status === "active") {
         idleStatusTag = "healthy";
+      } else if (status === "idle") {
+        idleStatusTag = "attention";
+      } else if (status === "away") {
+        idleStatusTag = "extended";
       }
 
       // Effective assigned count: Assigned in range or worked in range
