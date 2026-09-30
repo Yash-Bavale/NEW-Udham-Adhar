@@ -96,6 +96,7 @@ import { Route as AdminTrainingRouteImport } from './routes/admin.training'
 import { Route as AdminUsersRouteImport } from './routes/admin.users'
 import { Route as AdminWebsitesRouteImport } from './routes/admin.websites'
 import { Route as AdminWhatsappTemplatesRouteImport } from './routes/admin.whatsapp-templates'
+import { Route as ApiHealthRouteImport } from './routes/api/health'
 import { Route as AppTokenRouteImport } from './routes/app.$token'
 import { Route as EmailUnsubscribeRouteImport } from './routes/email/unsubscribe'
 import { Route as PaymentFailedLeadCodeRouteImport } from './routes/payment-failed.$leadCode'
@@ -601,6 +602,11 @@ const AdminWhatsappTemplatesRoute = AdminWhatsappTemplatesRouteImport.update({
   path: '/whatsapp-templates',
   getParentRoute: () => AdminRoute,
 } as any)
+const ApiHealthRoute = ApiHealthRouteImport.update({
+  id: '/api/health',
+  path: '/api/health',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AppTokenRoute = AppTokenRouteImport.update({
   id: '/app/$token',
   path: '/app/$token',
@@ -1023,6 +1029,7 @@ export interface FileRoutesByFullPath {
   '/admin/users': typeof AdminUsersRoute
   '/admin/websites': typeof AdminWebsitesRoute
   '/admin/whatsapp-templates': typeof AdminWhatsappTemplatesRoute
+  '/api/health': typeof ApiHealthRoute
   '/app/$token': typeof AppTokenRoute
   '/email/unsubscribe': typeof EmailUnsubscribeRoute
   '/payment-failed/$leadCode': typeof PaymentFailedLeadCodeRoute
@@ -1169,6 +1176,7 @@ export interface FileRoutesByTo {
   '/admin/users': typeof AdminUsersRoute
   '/admin/websites': typeof AdminWebsitesRoute
   '/admin/whatsapp-templates': typeof AdminWhatsappTemplatesRoute
+  '/api/health': typeof ApiHealthRoute
   '/app/$token': typeof AppTokenRoute
   '/email/unsubscribe': typeof EmailUnsubscribeRoute
   '/payment-failed/$leadCode': typeof PaymentFailedLeadCodeRoute
@@ -1319,6 +1327,7 @@ export interface FileRoutesById {
   '/admin/users': typeof AdminUsersRoute
   '/admin/websites': typeof AdminWebsitesRoute
   '/admin/whatsapp-templates': typeof AdminWhatsappTemplatesRoute
+  '/api/health': typeof ApiHealthRoute
   '/app/$token': typeof AppTokenRoute
   '/email/unsubscribe': typeof EmailUnsubscribeRoute
   '/payment-failed/$leadCode': typeof PaymentFailedLeadCodeRoute
@@ -1471,6 +1480,7 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/admin/websites'
     | '/admin/whatsapp-templates'
+    | '/api/health'
     | '/app/$token'
     | '/email/unsubscribe'
     | '/payment-failed/$leadCode'
@@ -1617,6 +1627,7 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/admin/websites'
     | '/admin/whatsapp-templates'
+    | '/api/health'
     | '/app/$token'
     | '/email/unsubscribe'
     | '/payment-failed/$leadCode'
@@ -1766,6 +1777,7 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/admin/websites'
     | '/admin/whatsapp-templates'
+    | '/api/health'
     | '/app/$token'
     | '/email/unsubscribe'
     | '/payment-failed/$leadCode'
@@ -1874,6 +1886,7 @@ export interface RootRouteChildren {
   VerifyUdyamCertificateRoute: typeof VerifyUdyamCertificateRoute
   Char91DotmcpChar93ListToolsRoute: typeof Char91DotmcpChar93ListToolsRoute
   Char91DotwellKnownChar93OauthProtectedResourceRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
+  ApiHealthRoute: typeof ApiHealthRoute
   AppTokenRoute: typeof AppTokenRoute
   EmailUnsubscribeRoute: typeof EmailUnsubscribeRoute
   PaymentFailedLeadCodeRoute: typeof PaymentFailedLeadCodeRoute
@@ -2527,6 +2540,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/admin/whatsapp-templates'
       preLoaderRoute: typeof AdminWhatsappTemplatesRouteImport
       parentRoute: typeof AdminRoute
+    }
+    '/api/health': {
+      id: '/api/health'
+      path: '/api/health'
+      fullPath: '/api/health'
+      preLoaderRoute: typeof ApiHealthRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/app/$token': {
       id: '/app/$token'
@@ -3227,6 +3247,7 @@ const rootRouteChildren: RootRouteChildren = {
   Char91DotmcpChar93ListToolsRoute: Char91DotmcpChar93ListToolsRoute,
   Char91DotwellKnownChar93OauthProtectedResourceRoute:
     Char91DotwellKnownChar93OauthProtectedResourceRoute,
+  ApiHealthRoute: ApiHealthRoute,
   AppTokenRoute: AppTokenRoute,
   EmailUnsubscribeRoute: EmailUnsubscribeRoute,
   PaymentFailedLeadCodeRoute: PaymentFailedLeadCodeRoute,

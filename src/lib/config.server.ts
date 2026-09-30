@@ -16,9 +16,16 @@ import process from "node:process";
 //     and server (analytics IDs, public URLs). Define in .env with the
 //     VITE_ prefix. Never put secrets here — they ship to the browser.
 
+import { getApiBaseUrl, getCrmBaseUrl, getPublicHosts } from "./hosts.server";
+
 export function getServerConfig() {
   return {
     nodeEnv: process.env.NODE_ENV,
+    // Domain separation (phase 1). Override via CRM_BASE_URL / API_BASE_URL /
+    // PUBLIC_HOSTS env vars — never hardcode these URLs in feature code.
+    crmBaseUrl: getCrmBaseUrl(),
+    apiBaseUrl: getApiBaseUrl(),
+    publicHosts: getPublicHosts(),
     // Add server-only values here, e.g.:
     //   databaseUrl: process.env.DATABASE_URL,
     //   stripeSecretKey: process.env.STRIPE_SECRET_KEY,
