@@ -62,6 +62,7 @@ export async function emitNotification(input: EmitNotificationInput): Promise<vo
 /** Fan-out to many users at once (Super Admin escalations etc). Silently swallows individual errors. */
 export async function emitToUsers(userIds: string[], base: Omit<EmitNotificationInput, "userId">): Promise<void> {
   if (userIds.length === 0) return;
+  if (!isStoredNotificationKind(base.kind)) return;
   const rows = userIds.map((userId) => ({
     user_id: userId,
     kind: base.kind,
