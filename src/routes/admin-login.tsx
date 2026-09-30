@@ -161,19 +161,9 @@ function AdminLoginPage() {
       <div className="absolute inset-0 -z-10 bg-foreground/10 max-md:bg-foreground/35" />
 
       <section className="w-full max-w-[370px] overflow-hidden rounded-lg bg-card shadow-2xl md:-translate-x-[4%]" aria-label="Staff sign in">
-        <div className="border-b border-border bg-card px-7 pb-5 pt-6 text-center">
-          <img src={logoAsset.url} alt="" width={72} height={72} className="mx-auto size-[68px] object-contain" />
-          <div className="mt-2 text-[17px] font-extrabold leading-tight text-foreground">BUSINESS HELP SERVICES</div>
-          <p className="mt-0.5 text-xs text-muted-foreground">Employee CRM &amp; Operations Portal</p>
-        </div>
-
         <div className="space-y-4 px-7 pb-5 pt-5">
-          <div>
-            <h1 className="text-base font-bold text-foreground">Staff Sign In</h1>
-            <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
-              Sign in with your approved Google corporate account or staff credentials.
-            </p>
-          </div>
+          <h1 className="text-base font-bold text-foreground">Staff Sign In</h1>
+
 
           <Button
             type="button"
@@ -255,14 +245,9 @@ function AdminLoginPage() {
             </Button>
           </form>
 
-          <div className="flex items-center justify-between gap-2 border-t border-border pt-3 text-[10px] text-muted-foreground">
-            <Link to="/" className="hover:text-foreground hover:underline">&larr; Back to public site</Link>
-            <span className="text-right font-medium">
-              Secure Staff Session &bull; ISO 27001
-            </span>
-          </div>
         </div>
       </section>
+
 
     </main>
   );
