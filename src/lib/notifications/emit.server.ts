@@ -29,7 +29,24 @@ export interface EmitNotificationInput {
   entityId?: string;
 }
 
+/**
+ * Only hot-order and new-order alerts are stored. Every other event is already
+ * visible in the Orders queues, so persisting it only bloated the notifications
+ * table (382k rows) and slowed the unread-count query.
+ */
+const STORED_KINDS = new Set<string>([
+  "hot_order_callback",
+  "hot_order_alert",
+  "order_reminder",
+  "order_assigned",
+]);
+
+export function isStoredNotificationKind(kind: string): boolean {
+  return STORED_KINDS.has(kind);
+}
+
 export async function emitNotification(input: EmitNotificationInput): Promise<void> {
+  if (!isStoredNotificationKind(input.kind)) return;
   const { error } = await supabaseAdmin.from("notifications").insert({
     user_id: input.userId,
     kind: input.kind,
@@ -45,6 +62,7 @@ export async function emitNotification(input: EmitNotificationInput): Promise<vo
 /** Fan-out to many users at once (Super Admin escalations etc). Silently swallows individual errors. */
 export async function emitToUsers(userIds: string[], base: Omit<EmitNotificationInput, "userId">): Promise<void> {
   if (userIds.length === 0) return;
+  if (!isStoredNotificationKind(base.kind)) return;
   const rows = userIds.map((userId) => ({
     user_id: userId,
     kind: base.kind,
@@ -63,6 +81,7 @@ export async function emitToUsers(userIds: string[], base: Omit<EmitNotification
 
 /** Convenience: emit to every user holding a given app_role. */
 export async function emitToRole(role: string, base: Omit<EmitNotificationInput, "userId">): Promise<void> {
+  if (!isStoredNotificationKind(base.kind)) return;
   const { data, error } = await supabaseAdmin
     .from("user_roles")
     .select("user_id")
