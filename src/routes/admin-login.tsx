@@ -3,6 +3,10 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { logLoginAttempt, verifyGoogleStaffAccess } from "@/lib/crm/employee-sessions.functions";
 import { getOrCreateSessionId } from "@/hooks/useEmployeePresence";
+import { Button } from "@/components/ui/button";
+import { Building2, FileText, Landmark, Store, UtensilsCrossed } from "lucide-react";
+import officeImage from "@/assets/staff-login-office.jpg";
+import logoAsset from "@/assets/bhs-logo.png.asset.json";
 
 /** Only allow same-origin relative paths as a post-login redirect target. */
 function safeNext(value: unknown): string | null {
@@ -19,6 +23,11 @@ export const Route = createFileRoute("/admin-login")({
   head: () => ({
     meta: [
       { title: "Admin Sign In — Business Help Services" },
+      { name: "description", content: "Sign in to the Business Help Services employee CRM and operations portal." },
+      { property: "og:title", content: "Admin Sign In — Business Help Services" },
+      { property: "og:description", content: "Sign in to the Business Help Services employee CRM and operations portal." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
       { name: "robots", content: "noindex,nofollow" },
     ],
   }),
@@ -148,33 +157,44 @@ function AdminLoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4 py-12">
-      <div className="w-full max-w-md">
-        {/* Brand Header */}
-        <div className="text-center mb-6">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-slate-900 text-white font-bold text-lg mb-2 shadow-sm">
-            BHS
-          </div>
-          <h2 className="text-xl font-bold text-slate-900">BUSINESS HELP SERVICES</h2>
-          <p className="text-xs text-slate-500 mt-0.5">Employee CRM &amp; Operations Portal</p>
+    <main className="relative isolate flex min-h-screen items-center justify-center overflow-hidden bg-background px-4 py-10 text-foreground md:px-8">
+      <img src={officeImage} alt="" aria-hidden="true" width={1672} height={941} className="absolute inset-0 -z-20 h-full w-full object-cover object-[44%_center]" />
+      <div className="absolute inset-0 -z-10 bg-foreground/10 max-md:bg-foreground/35" />
+
+      <div className="absolute left-[5%] top-[6%] hidden items-center gap-3 text-primary-foreground drop-shadow-md lg:flex">
+        <img src={logoAsset.url} alt="Business Help Services" width={104} height={104} className="size-20 shrink-0 object-contain xl:size-24" />
+        <div>
+          <div className="max-w-48 text-2xl font-extrabold leading-tight xl:text-3xl">BUSINESS<br />HELP SERVICES</div>
+          <div className="mt-2 border-t border-primary-foreground/70 pt-1 text-[10px] font-bold uppercase tracking-widest">Support · Guide · Grow</div>
+        </div>
+      </div>
+      <p className="absolute left-[8%] top-[29%] hidden max-w-64 rotate-[-5deg] font-serif text-3xl italic leading-tight text-primary-foreground drop-shadow-md xl:block">
+        Empowering<br />Indian Businesses
+      </p>
+
+      <section className="w-full max-w-[370px] overflow-hidden rounded-lg bg-card shadow-2xl md:translate-x-[2vw] lg:translate-x-[5vw]" aria-label="Staff sign in">
+        <div className="border-b border-border bg-card px-7 pb-5 pt-6 text-center">
+          <img src={logoAsset.url} alt="" width={72} height={72} className="mx-auto size-[68px] object-contain" />
+          <div className="mt-2 text-[17px] font-extrabold leading-tight text-foreground">BUSINESS HELP SERVICES</div>
+          <p className="mt-0.5 text-xs text-muted-foreground">Employee CRM &amp; Operations Portal</p>
         </div>
 
-        <div className="rounded-2xl border border-slate-200/80 bg-white p-7 shadow-sm space-y-5">
+        <div className="space-y-4 px-7 pb-5 pt-5">
           <div>
-            <h1 className="text-lg font-bold text-slate-900">Staff Sign In</h1>
-            <p className="text-xs text-slate-500 mt-1">
+            <h1 className="text-base font-bold text-foreground">Staff Sign In</h1>
+            <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
               Sign in with your approved Google corporate account or staff credentials.
             </p>
           </div>
 
-          {/* Google OAuth Button */}
-          <button
+          <Button
             type="button"
             onClick={handleGoogleSignIn}
             disabled={googleBusy || busy}
-            className="w-full flex items-center justify-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 hover:border-slate-300 disabled:opacity-50 transition"
+            variant="outline"
+            className="h-9 w-full rounded-md border-border bg-card text-xs font-semibold text-foreground shadow-none hover:bg-muted"
           >
-            <svg className="h-4 w-4" viewBox="0 0 24 24">
+            <svg className="h-4 w-4" viewBox="0 0 24 24" aria-hidden="true">
               <path
                 d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
                 fill="#4285F4"
@@ -193,73 +213,85 @@ function AdminLoginPage() {
               />
             </svg>
             <span>{googleBusy ? "Connecting to Google…" : "Continue with Google"}</span>
-          </button>
+          </Button>
 
-          <div className="relative flex items-center justify-center">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-slate-200" />
-            </div>
-            <span className="relative bg-white px-3 text-[11px] uppercase font-bold text-slate-400">
-              Or sign in with password
-            </span>
+          <div className="flex items-center gap-3 text-center text-[10px] font-medium uppercase text-muted-foreground">
+            <span className="h-px flex-1 bg-border" />Or sign in with password<span className="h-px flex-1 bg-border" />
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-3.5">
+          <form onSubmit={handleSubmit} className="space-y-3">
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
+              <label htmlFor="staff-email" className="mb-1 block text-[11px] font-semibold text-foreground">
                 Email / Employee ID
               </label>
               <input
+                id="staff-email"
                 type="email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="staff@udyamadhar.in"
-                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
+                className="h-9 w-full rounded-md border border-input bg-card px-3 text-xs text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
                 autoComplete="email"
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
+              <label htmlFor="staff-password" className="mb-1 block text-[11px] font-semibold text-foreground">
                 Password
               </label>
               <input
+                id="staff-password"
                 type="password"
                 required
                 minLength={8}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
+                className="h-9 w-full rounded-md border border-input bg-card px-3 text-xs text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
                 autoComplete="current-password"
               />
             </div>
 
             {error && (
-              <div className="rounded-lg bg-rose-50 border border-rose-200 p-2.5 text-xs text-rose-700 font-medium">
+              <div role="alert" className="rounded-md border border-destructive/25 bg-destructive/10 p-2.5 text-xs font-medium text-destructive">
                 {error}
               </div>
             )}
 
-            <button
+            <Button
               type="submit"
               disabled={busy || googleBusy}
-              className="w-full rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50 transition shadow-xs"
+              className="h-9 w-full rounded-md bg-foreground text-xs font-semibold text-background hover:bg-foreground/90"
             >
               {busy ? "Signing in…" : "Sign In with Password"}
-            </button>
+            </Button>
           </form>
 
-          <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-            <Link to="/" className="hover:underline">
-              &larr; Back to public site
-            </Link>
-            <span className="text-[11px] text-slate-400 font-medium">
+          <div className="flex items-center justify-between gap-2 border-t border-border pt-3 text-[10px] text-muted-foreground">
+            <Link to="/" className="hover:text-foreground hover:underline">&larr; Back to public site</Link>
+            <span className="text-right font-medium">
               Secure Staff Session &bull; ISO 27001
             </span>
           </div>
         </div>
+      </section>
+
+      <div className="absolute right-[5%] top-[14%] hidden w-[240px] rotate-[-6deg] grid-cols-2 gap-3 xl:grid 2xl:right-[9%] 2xl:w-[280px]" aria-hidden="true">
+        {[
+          { label: "Udyam Registration", icon: Landmark, color: "text-primary" },
+          { label: "GST Registration", icon: Building2, color: "text-brand-red" },
+          { label: "FSSAI Registration", icon: UtensilsCrossed, color: "text-primary" },
+          { label: "Company Registration", icon: Building2, color: "text-brand-navy" },
+          { label: "ITR Filing", icon: FileText, color: "text-status-done" },
+          { label: "Shop Act Registration", icon: Store, color: "text-brand-red" },
+        ].map(({ label, icon: Icon, color }, index) => (
+          <div key={label} className={`flex aspect-square flex-col items-center justify-center gap-2 rounded-lg bg-card/95 px-2 text-center shadow-xl ${index % 2 ? "translate-y-5 rotate-[-3deg]" : "rotate-[3deg]"}`}>
+            <Icon className={`size-9 ${color}`} strokeWidth={1.9} />
+            <span className="text-xs font-bold leading-tight text-foreground">{label}</span>
+            <span className={`h-0.5 w-14 ${index % 2 ? "bg-brand-red" : "bg-status-done"}`} />
+          </div>
+        ))}
       </div>
-    </div>
+    </main>
   );
 }
