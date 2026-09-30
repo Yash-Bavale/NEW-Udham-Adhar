@@ -166,14 +166,8 @@ export function decideHostRouting(host: string, pathname: string): HostDecision 
     return { action: "notFound" };
   }
 
-  // Public website hostnames.
-  //
-  // TRANSITION PERIOD: staff are still working from udyamadhar.in/admin while
-  // crm.businesshelpservices.com finishes rolling out, so the staff panel stays
-  // reachable on the legacy hosts listed in LEGACY_CRM_HOSTS. Remove a host from
-  // that list (or set the env var) once its users have moved to the CRM domain.
-  if (isCrmPath(pathname)) {
-    return isLegacyCrmHost(host) ? { action: "allow" } : { action: "notFound" };
-  }
+  // Public website hostnames never serve the staff CRM panel — staff sign in
+  // only at crm.businesshelpservices.com.
+  if (isCrmPath(pathname)) return { action: "notFound" };
   return { action: "allow" };
 }
