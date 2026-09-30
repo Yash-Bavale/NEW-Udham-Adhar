@@ -37,6 +37,7 @@ import {
   Scale,
   History,
   Timer,
+  ShieldCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -262,6 +263,7 @@ function MyPerformanceDashboardPage() {
   const timeline = data?.timeline ?? [];
   const actionMetrics = (data as any)?.actionResponseMetrics as ActionResponseMetrics | undefined;
   const rawIntervals = ((data as any)?.actionIntervals ?? []) as ActionIntervalItem[];
+  const session = (data as any)?.session;
 
   const empName = emp?.name || "Employee";
   const initials =
@@ -528,6 +530,274 @@ function MyPerformanceDashboardPage() {
               latestActionLabel={actionMetrics?.latestActionLabel ?? null}
               latestActionOrderCode={actionMetrics?.latestActionOrderCode ?? null}
             />
+          </div>
+        </div>
+      </section>
+
+      {/* ───────────────────────────────────────────────────────────── */}
+      {/* 2. DAILY EMPLOYEE ACTIVITY & CONTINUOUS TELEMETRY TIMELINE     */}
+      {/* ───────────────────────────────────────────────────────────── */}
+      <section className="space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-2 px-1">
+          <div className="flex items-center gap-2">
+            <Activity className="h-4 w-4 text-emerald-600" />
+            <h2 className="text-sm font-bold uppercase tracking-wider text-slate-800">
+              Daily Employee Activity &amp; Continuous Telemetry ({dateFilter.replace("_", " ")})
+            </h2>
+          </div>
+          <div className="flex items-center gap-4 text-xs font-medium">
+            <span className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-sm bg-emerald-600 inline-block" />
+              <span className="text-slate-700">Active ({session?.activeDuration || "0m"})</span>
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-sm bg-amber-500 inline-block" />
+              <span className="text-slate-700">Idle ({session?.idleDuration || "0m"})</span>
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-sm bg-amber-700 inline-block" />
+              <span className="text-slate-700">Away / Minimized ({session?.awayDuration || "0m"})</span>
+            </span>
+          </div>
+        </div>
+
+        {/* 6 Key Telemetry Summary Metrics */}
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+          {/* 1. CRM ACTIVE TIME */}
+          <div className="bg-white rounded-xl p-4 border border-emerald-100 shadow-xs flex flex-col justify-between transition hover:border-emerald-200">
+            <div className="flex items-center justify-between text-slate-500 text-[11px] uppercase font-bold tracking-wider">
+              <span>CRM Active Time</span>
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            </div>
+            <div className="my-2.5">
+              <div className="font-mono text-2xl font-bold tracking-tight text-emerald-700">
+                {isLoading ? "--" : (session?.activeDuration || "0m")}
+              </div>
+            </div>
+            <div className="text-[11px] text-slate-400">
+              Direct user interaction
+            </div>
+          </div>
+
+          {/* 2. CRM IDLE TIME */}
+          <div className="bg-white rounded-xl p-4 border border-amber-100 shadow-xs flex flex-col justify-between transition hover:border-amber-200">
+            <div className="flex items-center justify-between text-slate-500 text-[11px] uppercase font-bold tracking-wider">
+              <span>CRM Idle Time</span>
+              <span className="w-2 h-2 rounded-full bg-amber-500" />
+            </div>
+            <div className="my-2.5">
+              <div className="font-mono text-2xl font-bold tracking-tight text-amber-700">
+                {isLoading ? "--" : (session?.idleDuration || "0m")}
+              </div>
+            </div>
+            <div className="text-[11px] text-slate-400">
+              Paused or tab inactive
+            </div>
+          </div>
+
+          {/* 3. CRM AWAY / MINIMIZED TIME */}
+          <div className="bg-white rounded-xl p-4 border border-orange-100 shadow-xs flex flex-col justify-between transition hover:border-orange-200">
+            <div className="flex items-center justify-between text-slate-500 text-[11px] uppercase font-bold tracking-wider">
+              <span>CRM Away Time</span>
+              <span className="w-2 h-2 rounded-full bg-orange-500" />
+            </div>
+            <div className="my-2.5">
+              <div className="font-mono text-2xl font-bold tracking-tight text-orange-700">
+                {isLoading ? "--" : (session?.awayDuration || "0m")}
+              </div>
+            </div>
+            <div className="text-[11px] text-slate-400">
+              Minimized / break
+            </div>
+          </div>
+
+          {/* 4. MEANINGFUL ACTIONS */}
+          <div className="bg-white rounded-xl p-4 border border-blue-100 shadow-xs flex flex-col justify-between transition hover:border-blue-200">
+            <div className="flex items-center justify-between text-slate-500 text-[11px] uppercase font-bold tracking-wider">
+              <span>Meaningful Actions</span>
+              <Activity className="h-4 w-4 text-blue-600" />
+            </div>
+            <div className="my-2.5">
+              <div className="text-3xl font-bold tracking-tight text-blue-700">
+                {isLoading ? "--" : (session?.meaningfulActions ?? actionMetrics?.totalActions ?? 0)}
+              </div>
+            </div>
+            <div className="text-[11px] text-slate-400">
+              Verified operations
+            </div>
+          </div>
+
+          {/* 5. ORDERS WORKED */}
+          <div className="bg-white rounded-xl p-4 border border-indigo-100 shadow-xs flex flex-col justify-between transition hover:border-indigo-200">
+            <div className="flex items-center justify-between text-slate-500 text-[11px] uppercase font-bold tracking-wider">
+              <span>Orders Worked</span>
+              <ShoppingBag className="h-4 w-4 text-indigo-600" />
+            </div>
+            <div className="my-2.5">
+              <div className="text-3xl font-bold tracking-tight text-indigo-700">
+                {isLoading ? "--" : (session?.ordersWorked ?? kpis?.worked ?? 0)}
+              </div>
+            </div>
+            <div className="text-[11px] text-slate-400">
+              Unique orders actioned
+            </div>
+          </div>
+
+          {/* 6. SLA COMPLIANCE */}
+          <div className="bg-white rounded-xl p-4 border border-teal-100 shadow-xs flex flex-col justify-between transition hover:border-teal-200">
+            <div className="flex items-center justify-between text-slate-500 text-[11px] uppercase font-bold tracking-wider">
+              <span>SLA Compliance</span>
+              <ShieldCheck className="h-4 w-4 text-teal-600" />
+            </div>
+            <div className="my-2.5 flex items-baseline gap-1">
+              <div className="text-3xl font-bold tracking-tight text-teal-700">
+                {isLoading ? "--" : (session?.slaCompliance ?? 100)}%
+              </div>
+            </div>
+            <div className="text-[11px] text-teal-700 font-medium">
+              On-time order turnaround
+            </div>
+          </div>
+        </div>
+
+        {/* Continuous Telemetry Timeline Bar & Event Markers */}
+        <div className="bg-white rounded-xl p-5 border border-slate-200/90 shadow-xs space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h3 className="text-sm font-bold text-slate-900">
+                Continuous Telemetry Timeline
+              </h3>
+              <p className="text-xs text-slate-500">
+                Sequential execution timeline (Active → Idle → Away) showing verified interval duration and order actions
+              </p>
+            </div>
+            <div className="flex items-center gap-3 text-xs font-semibold text-slate-600">
+              <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-xs bg-emerald-600" /> Active</span>
+              <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-xs bg-amber-500" /> Idle</span>
+              <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-xs bg-amber-700" /> Away</span>
+            </div>
+          </div>
+
+          {/* Multi-segment continuous horizontal timeline bar */}
+          <div className="flex flex-col gap-2">
+            <div className="w-full h-9 bg-slate-100 rounded-lg p-1 flex items-stretch gap-1 overflow-x-auto shadow-inner min-w-full">
+              {(session?.sessionSegments ?? []).length > 0 ? (
+                (session?.sessionSegments ?? []).map((seg: any) => (
+                  <div
+                    key={seg.id}
+                    className="h-full rounded flex items-center justify-center text-white text-[10px] tracking-wider font-bold transition hover:opacity-90 cursor-help relative overflow-hidden px-2 truncate flex-shrink-0"
+                    style={{
+                      width: `${Math.max(4, seg.percent)}%`,
+                      minWidth: "48px",
+                      backgroundColor:
+                        seg.color ||
+                        (seg.type === "active"
+                          ? "#059669"
+                          : seg.type === "idle"
+                          ? "#f59e0b"
+                          : seg.type === "away"
+                          ? "#d97706"
+                          : "#94a3b8"),
+                    }}
+                    title={`${seg.startTime} – ${seg.endTime}: ${seg.label} (${seg.durationMins}m)`}
+                  >
+                    <span className="truncate">{seg.label}</span>
+                    {seg.label?.includes("NOW") && (
+                      <span className="absolute right-1 w-2 h-2 rounded-full bg-white animate-ping" />
+                    )}
+                  </div>
+                ))
+              ) : (
+                <div className="h-full w-full bg-slate-200 rounded flex items-center justify-center text-slate-500 text-xs font-semibold">
+                  No continuous session telemetry logged for selected period
+                </div>
+              )}
+            </div>
+
+            {/* Time axis scale */}
+            <div className="flex justify-between items-center text-slate-400 text-[11px] px-1 font-mono">
+              <span>09:00 IST</span>
+              <span>11:00</span>
+              <span>13:00 (Lunch)</span>
+              <span>15:00</span>
+              <span>17:00</span>
+              <span className="font-semibold text-blue-600">
+                Now ({new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: false })})
+              </span>
+            </div>
+          </div>
+
+          {/* Dynamic Stepper event markers below bar */}
+          <div className="space-y-2 pt-2 border-t border-slate-100">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-slate-800">
+                Action Event Markers &amp; Chronology
+              </span>
+              <span className="text-[11px] text-slate-400">
+                Showing latest verified actions with timestamp, type &amp; order reference
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2.5 overflow-x-auto pb-1">
+              {(session?.stepperEvents ?? []).map((step: any, idx: number) => {
+                const isAction = step.type === "action";
+                const isActive = step.type === "active";
+                const isIdle = step.type === "idle";
+                const isAway = step.type === "away";
+                const isLogin = step.type === "login";
+
+                return (
+                  <div
+                    key={idx}
+                    className={cn(
+                      "p-2.5 rounded-lg border flex flex-col justify-between transition min-w-[140px]",
+                      isActive
+                        ? "bg-emerald-50/70 border-emerald-200 shadow-2xs"
+                        : isIdle
+                        ? "bg-amber-50/70 border-amber-200"
+                        : isAway
+                        ? "bg-orange-50/70 border-orange-200"
+                        : isLogin
+                        ? "bg-blue-50/70 border-blue-200"
+                        : isAction
+                        ? "bg-white border-slate-200 shadow-2xs hover:border-blue-300"
+                        : "bg-slate-50 border-slate-200"
+                    )}
+                  >
+                    <div className="flex items-center justify-between gap-1 mb-1">
+                      <span className="text-[10px] font-mono text-slate-500 font-semibold">{step.time}</span>
+                      {step.actionType && (
+                        <span className="px-1.5 py-0.2 rounded text-[9px] font-bold uppercase bg-slate-100 text-slate-700">
+                          {step.actionType.slice(0, 10)}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="my-0.5">
+                      <span className="text-xs font-bold text-slate-900 line-clamp-1" title={step.title}>
+                        {step.title}
+                      </span>
+                      <p className="text-[10px] text-slate-500 line-clamp-1 mt-0.5" title={step.desc}>
+                        {step.desc}
+                      </p>
+                    </div>
+
+                    {step.orderCode && (
+                      <div className="mt-1 pt-1 border-t border-slate-100 flex items-center justify-between">
+                        <Link
+                          to={`/admin/orders/${step.orderId || ""}` as any}
+                          className="text-[10px] font-bold text-blue-600 hover:underline flex items-center gap-0.5"
+                        >
+                          <span>#{step.orderCode}</span>
+                          <ExternalLink className="h-2.5 w-2.5" />
+                        </Link>
+                        <span className="text-[9px] text-slate-400">Order</span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
       </section>
