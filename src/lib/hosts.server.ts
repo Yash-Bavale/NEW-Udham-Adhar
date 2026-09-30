@@ -63,6 +63,24 @@ export function getPublicHosts(): string[] {
   return ["udyamadhar.in", "udyamregistrations.in", "gstcertificate.in"];
 }
 
+/**
+ * Public website hostnames that may STILL serve the staff CRM panel during the
+ * migration to crm.businesshelpservices.com. Override with LEGACY_CRM_HOSTS
+ * (comma separated); set it to "none" to disable legacy CRM access entirely.
+ */
+export function getLegacyCrmHosts(): string[] {
+  const raw = process.env["LEGACY_CRM_HOSTS"];
+  if (raw && raw.trim().toLowerCase() === "none") return [];
+  const configured = envList("LEGACY_CRM_HOSTS");
+  if (configured.length) return configured;
+  return ["udyamadhar.in"];
+}
+
+export function isLegacyCrmHost(hostHeader: string | null | undefined): boolean {
+  const host = normalizeHost(hostHeader).replace(/^www\./, "");
+  return getLegacyCrmHosts().includes(host);
+}
+
 /** Hosts that must never be gated: local dev and Lovable preview/published. */
 export function isDevHost(host: string): boolean {
   return (
@@ -148,7 +166,14 @@ export function decideHostRouting(host: string, pathname: string): HostDecision 
     return { action: "notFound" };
   }
 
-  // Public website hostnames: everything stays as-is except the staff panel.
-  if (isCrmPath(pathname)) return { action: "notFound" };
+  // Public website hostnames.
+  //
+  // TRANSITION PERIOD: staff are still working from udyamadhar.in/admin while
+  // crm.businesshelpservices.com finishes rolling out, so the staff panel stays
+  // reachable on the legacy hosts listed in LEGACY_CRM_HOSTS. Remove a host from
+  // that list (or set the env var) once its users have moved to the CRM domain.
+  if (isCrmPath(pathname)) {
+    return isLegacyCrmHost(host) ? { action: "allow" } : { action: "notFound" };
+  }
   return { action: "allow" };
 }
