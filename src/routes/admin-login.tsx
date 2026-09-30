@@ -264,22 +264,6 @@ function AdminLoginPage() {
         </div>
       </section>
 
-      <div className="absolute right-[5%] top-[14%] hidden w-[240px] rotate-[-6deg] grid-cols-2 gap-3 xl:grid 2xl:right-[9%] 2xl:w-[280px]" aria-hidden="true">
-        {[
-          { label: "Udyam Registration", icon: Landmark, color: "text-primary" },
-          { label: "GST Registration", icon: Building2, color: "text-brand-red" },
-          { label: "FSSAI Registration", icon: UtensilsCrossed, color: "text-primary" },
-          { label: "Company Registration", icon: Building2, color: "text-brand-navy" },
-          { label: "ITR Filing", icon: FileText, color: "text-status-done" },
-          { label: "Shop Act Registration", icon: Store, color: "text-brand-red" },
-        ].map(({ label, icon: Icon, color }, index) => (
-          <div key={label} className={`flex aspect-square flex-col items-center justify-center gap-2 rounded-lg bg-card/95 px-2 text-center shadow-xl ${index % 2 ? "translate-y-5 rotate-[-3deg]" : "rotate-[3deg]"}`}>
-            <Icon className={`size-9 ${color}`} strokeWidth={1.9} />
-            <span className="text-xs font-bold leading-tight text-foreground">{label}</span>
-            <span className={`h-0.5 w-14 ${index % 2 ? "bg-brand-red" : "bg-status-done"}`} />
-          </div>
-        ))}
-      </div>
     </main>
   );
 }
