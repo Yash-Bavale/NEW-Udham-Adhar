@@ -44,16 +44,37 @@ async function admin() {
   return (await import("@/integrations/supabase/client.server")).supabaseAdmin as any;
 }
 
+const STALE_OUTBOUND_MS = 2 * 60_000;
+
+/** Fallback for missing Smartflo events: outbound calls stuck ringing >2 min become 'no_response'.
+ *  Guarded by status/answered_at/ended_at filters so it is idempotent and never overrides real events.
+ *  'no_response' is unranked in the webhook, so a late real answered/hangup event still applies. */
+async function expireStaleOutbound() {
+  try {
+    await (await admin()).from("telephony_calls")
+      .update({ status: "no_response", last_event: "timeout", updated_at: new Date().toISOString() })
+      .eq("direction", "outbound").eq("status", "ringing")
+      .is("answered_at", null).is("ended_at", null)
+      .lt("started_at", new Date(Date.now() - STALE_OUTBOUND_MS).toISOString());
+  } catch (e) { console.error("expireStaleOutbound failed", e); }
+}
+
+function isStaleOutbound(v: CallView) {
+  return v.direction === "outbound" && v.status === "ringing" && !v.answeredAt && !v.endedAt
+    && Date.now() - new Date(v.startedAt).getTime() > STALE_OUTBOUND_MS;
+}
+
 /** Current employee: live call (ringing/answered) + most recent ended call still needing a disposition. */
 export const getMyCallState = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
+    await expireStaleOutbound();
     const { data: rows } = await (context.supabase as any).from("telephony_calls").select("*")
       .eq("employee_id", context.userId).gte("started_at", new Date(Date.now() - 12 * 3600_000).toISOString())
       .order("started_at", { ascending: false }).limit(5);
     const views = await enrich(await admin(), rows ?? []);
     return {
-      active: views.find((v) => v.status === "ringing" || v.status === "answered") ?? null,
+      active: views.find((v) => (v.status === "ringing" || v.status === "answered") && !isStaleOutbound(v)) ?? null,
       pendingDisposition: views.find((v) => v.status === "ended" && !v.disposition) ?? null,
     };
   });
@@ -84,8 +105,9 @@ export const listLiveCalls = createServerFn({ method: "GET" })
       sb.rpc("has_role", { _user_id: context.userId, _role: "super_admin" }),
     ]);
     if (!a && !s) throw new Error("Unauthorized");
+    await expireStaleOutbound();
     const { data: rows } = await sb.from("telephony_calls").select("*")
       .in("status", ["ringing", "answered"]).gte("started_at", new Date(Date.now() - 6 * 3600_000).toISOString())
       .order("started_at", { ascending: false }).limit(100);
-    return enrich(await admin(), rows ?? []);
+    return (await enrich(await admin(), rows ?? [])).filter((v) => !isStaleOutbound(v));
   });
