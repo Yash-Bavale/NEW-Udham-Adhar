@@ -67,7 +67,16 @@ export function TelephonyPanel() {
     } catch (e: any) { toast.error(e?.message ?? "Could not save"); } finally { setSaving(false); }
   }
 
-  if (!active && !pending) return null;
+  if (!active && (!pending || !open)) {
+    const offline = typeof navigator !== "undefined" && !navigator.onLine;
+    return (
+      <div className="fixed bottom-4 right-4 z-40 flex items-center gap-2 rounded-full border bg-card px-3 py-1 text-xs shadow">
+        <span className={`h-2 w-2 rounded-full ${offline ? "bg-muted-foreground" : "bg-primary"}`} />
+        Phone: {offline ? "Offline" : "Available"}
+        {pending ? <button className="underline" onClick={() => setOpen(true)}>Log last call</button> : null}
+      </div>
+    );
+  }
 
   return (
     <div className="fixed bottom-4 right-4 z-50 w-[340px] rounded-xl border bg-card text-card-foreground shadow-2xl">
@@ -76,7 +85,7 @@ export function TelephonyPanel() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 font-semibold">
               <PhoneIncoming className={`h-4 w-4 ${active.status === "ringing" ? "animate-pulse text-primary" : "text-primary"}`} />
-              {active.status === "ringing" ? "Incoming call" : "Active call"}
+              {active.status === "ringing" ? "Incoming call" : "Active call"}<span className="rounded-full bg-primary/10 px-2 text-[11px] text-primary">On Call</span>
             </div>
             <span className="font-mono text-sm">{active.status === "answered" ? fmtDuration(secs) : "Ringing…"}</span>
           </div>
