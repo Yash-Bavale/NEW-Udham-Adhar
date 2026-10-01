@@ -327,6 +327,10 @@ function renderEmailEvidenceHtmlDocument(params: {
 </html>`;
 }
 
+async function renderHtmlToPdfBuffer(_html: string): Promise<Uint8Array> {
+  throw new Error("Exact email PDF rendering is unavailable on the hosted server");
+}
+
 export async function renderDisputeEvidencePackagePdf(data: DisputePackageData): Promise<Uint8Array> {
   const mergedPdf = await PDFDocument.create();
   const helv = await mergedPdf.embedFont(StandardFonts.Helvetica);
@@ -350,8 +354,7 @@ export async function renderDisputeEvidencePackagePdf(data: DisputePackageData):
     const email = sortedEmails[idx];
     try {
       const emailHtml = renderEmailEvidenceHtmlDocument({ email });
-      const { renderHtmlToPdf } = await import("@/lib/pdf/html-render.server");
-      const emailPdfBytes = await renderHtmlToPdf(emailHtml);
+      const emailPdfBytes = await renderHtmlToPdfBuffer(emailHtml);
       const emailDoc = await PDFDocument.load(emailPdfBytes);
       const copiedPages = await mergedPdf.copyPages(emailDoc, emailDoc.getPageIndices());
       for (const page of copiedPages) {
