@@ -1,12 +1,4 @@
-import fs from "node:fs";
-import path from "node:path";
-import os from "node:os";
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
 import { PDFDocument, PDFPage, PDFFont, StandardFonts, rgb, type RGB } from "pdf-lib";
-import { BHS_LOGO_BASE64 } from "../invoices/bhs-logo";
-
-const execFileAsync = promisify(execFile);
 
 // Brand Colors
 const NAVY = rgb(0.07, 0.13, 0.27);
@@ -187,88 +179,6 @@ export interface DisputePackageData {
     fileBuffer?: Uint8Array | null;
     mimeType?: string | null;
   } | null;
-}
-
-/**
- * Locate installed Chromium / Chrome / Edge binary on the host environment
- */
-function findChromiumExecutable(): string | null {
-  const envCandidates = [
-    process.env.CHROME_BIN,
-    process.env.CHROME_PATH,
-    process.env.PUPPETEER_EXECUTABLE_PATH,
-    process.env.CHROMIUM_PATH,
-  ].filter((p): p is string => Boolean(p));
-
-  const standardCandidates = [
-    "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
-    "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
-    "C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe",
-    "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
-    process.env.LOCALAPPDATA ? path.join(process.env.LOCALAPPDATA, "Google\\Chrome\\Application\\chrome.exe") : null,
-    process.env.PROGRAMFILES ? path.join(process.env.PROGRAMFILES, "Google\\Chrome\\Application\\chrome.exe") : null,
-    process.env["PROGRAMFILES(X86)"] ? path.join(process.env["PROGRAMFILES(X86)"], "Google\\Chrome\\Application\\chrome.exe") : null,
-    "/usr/bin/google-chrome",
-    "/usr/bin/google-chrome-stable",
-    "/usr/bin/chromium",
-    "/usr/bin/chromium-browser",
-    "/snap/bin/chromium",
-    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-    "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
-  ].filter((p): p is string => Boolean(p));
-
-  const all = [...envCandidates, ...standardCandidates];
-  for (const p of all) {
-    if (fs.existsSync(p)) return p;
-  }
-  return null;
-}
-
-/**
- * High-fidelity HTML to PDF rendering via headless Chromium CLI
- */
-async function renderHtmlToPdfBuffer(html: string): Promise<Uint8Array> {
-  const browserPath = findChromiumExecutable();
-  if (!browserPath) {
-    throw new Error(
-      "No Chromium/Chrome/Edge browser executable found on the server. Please ensure Chrome or Chromium is installed."
-    );
-  }
-
-  const tmpId = `dispute_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
-  const tmpDir = os.tmpdir();
-  const tmpHtmlPath = path.join(tmpDir, `${tmpId}.html`);
-  const tmpPdfPath = path.join(tmpDir, `${tmpId}.pdf`);
-
-  try {
-    fs.writeFileSync(tmpHtmlPath, html, "utf8");
-
-    const args = [
-      "--headless=new",
-      "--disable-gpu",
-      "--no-sandbox",
-      "--disable-software-rasterizer",
-      "--no-pdf-header-footer",
-      `--print-to-pdf=${tmpPdfPath}`,
-      `file://${tmpHtmlPath.replace(/\\/g, "/")}`,
-    ];
-
-    await execFileAsync(browserPath, args, { timeout: 35000 });
-
-    if (!fs.existsSync(tmpPdfPath)) {
-      throw new Error("Chromium completed without generating output PDF");
-    }
-
-    const pdfBuffer = fs.readFileSync(tmpPdfPath);
-    return new Uint8Array(pdfBuffer);
-  } finally {
-    try {
-      if (fs.existsSync(tmpHtmlPath)) fs.unlinkSync(tmpHtmlPath);
-      if (fs.existsSync(tmpPdfPath)) fs.unlinkSync(tmpPdfPath);
-    } catch {
-      // ignore temp file cleanup errors
-    }
-  }
 }
 
 /**
@@ -455,47 +365,69 @@ export async function renderDisputeEvidencePackagePdf(data: DisputePackageData):
   for (let idx = 0; idx < sortedEmails.length; idx++) {
     const email = sortedEmails[idx];
     try {
-      const emailHtml = renderEmailEvidenceHtmlDocument({
-        email,
-        emailIndex: idx,
-        totalEmails: sortedEmails.length,
-        orderCode: data.order.applicationCode,
-        hasInvoiceAttachment: Boolean(data.invoice),
-      });
-
-      const emailPdfBytes = await renderHtmlToPdfBuffer(emailHtml);
+      const emailHtml = renderEmailEvidenceHtmlDocument({ email });
+      const { renderHtmlToPdf } = await import("@/lib/pdf/html-render.server");
+      const emailPdfBytes = await renderHtmlToPdf(emailHtml);
       const emailDoc = await PDFDocument.load(emailPdfBytes);
       const copiedPages = await mergedPdf.copyPages(emailDoc, emailDoc.getPageIndices());
       for (const page of copiedPages) {
         mergedPdf.addPage(page);
       }
     } catch (renderErr) {
-      console.error(`[dispute-pdf] Failed to render email #${idx + 1} with Chromium:`, renderErr);
+      console.error(`[dispute-pdf] Failed to render email #${idx + 1}:`, renderErr);
       // Fallback page in case of severe rendering fault
       const fallbackPage = mergedPdf.addPage([PAGE_W, PAGE_H]);
-      drawText(fallbackPage, `EVIDENCE ITEM: SENT EMAIL #${idx + 1} OF ${sortedEmails.length}`, {
+      drawText(fallbackPage, `From: ${safePdfText(email.from_email || COMPANY_EMAIL)}`, {
         x: MARGIN_X,
         y: PAGE_H - 40,
         size: 11,
         font: helvBold,
         color: NAVY,
       });
-      drawText(fallbackPage, `Subject: ${safePdfText(email.subject)}`, {
+      drawText(fallbackPage, `To: ${safePdfText(email.to_email)}`, {
         x: MARGIN_X,
         y: PAGE_H - 60,
         size: 9,
         font: helv,
         color: TEXT_DARK,
       });
-      drawText(fallbackPage, `To: ${safePdfText(email.to_email)} | Sent: ${formatIST(email.sent_at)}`, {
+      drawText(fallbackPage, `Date: ${formatIST(email.sent_at)}`, {
         x: MARGIN_X,
         y: PAGE_H - 75,
         size: 8.5,
         font: helv,
         color: TEXT_MUTED,
       });
-      const lines = wrap(email.body_text || email.body_html || "Content unavailable", helv, 8, CONTENT_W);
-      let fy = PAGE_H - 100;
+      drawText(fallbackPage, `Subject: ${safePdfText(email.subject)}`, {
+        x: MARGIN_X,
+        y: PAGE_H - 90,
+        size: 8.5,
+        font: helv,
+        color: TEXT_DARK,
+      });
+      drawText(fallbackPage, `Attachments: ${(email.attachment_names ?? []).join(", ") || "None"}`, {
+        x: MARGIN_X,
+        y: PAGE_H - 105,
+        size: 8.5,
+        font: helv,
+        color: TEXT_DARK,
+      });
+      drawText(fallbackPage, `Message ID: ${safePdfText(email.message_id || `msg_${email.id.slice(0, 16)}@businesshelpservices.com`)}`, {
+        x: MARGIN_X,
+        y: PAGE_H - 120,
+        size: 8,
+        font: helv,
+        color: TEXT_MUTED,
+      });
+      drawText(fallbackPage, `Status: ${safePdfText(email.status || "sent")}`, {
+        x: MARGIN_X,
+        y: PAGE_H - 135,
+        size: 8.5,
+        font: helv,
+        color: TEXT_DARK,
+      });
+      const lines = wrap(email.body_text || "Email body could not be rendered.", helv, 8, CONTENT_W);
+      let fy = PAGE_H - 165;
       for (const l of lines.slice(0, 45)) {
         drawText(fallbackPage, l, { x: MARGIN_X, y: fy, size: 8, font: helv, color: TEXT_DARK });
         fy -= 12;
@@ -551,42 +483,6 @@ export async function renderDisputeEvidencePackagePdf(data: DisputePackageData):
     } catch (certErr) {
       console.error("[dispute-pdf] Error copying certificate pages:", certErr);
     }
-  }
-
-  // ══════════════════════════════════════════════════════════════════════════
-  // 5. STAMP RUNNING FOOTER ON ALL PAGES
-  // ══════════════════════════════════════════════════════════════════════════
-  const totalPages = mergedPdf.getPageCount();
-  const disputeTag = data.disputeId ? `Dispute ID: ${data.disputeId}` : `Dispute Evidence ID: ${data.packageId.slice(0, 8)}`;
-
-  for (let i = 0; i < totalPages; i++) {
-    const page = mergedPdf.getPage(i);
-    const footY = 20;
-
-    page.drawLine({
-      start: { x: MARGIN_X, y: footY + 8 },
-      end: { x: PAGE_W - MARGIN_X, y: footY + 8 },
-      thickness: 0.5,
-      color: BORDER_COLOR,
-    });
-
-    drawText(page, `Order: ${data.order.applicationCode}  |  ${disputeTag}`, {
-      x: MARGIN_X,
-      y: footY,
-      size: 7,
-      font: helv,
-      color: TEXT_MUTED,
-    });
-
-    const pageStr = `Page ${i + 1} of ${totalPages}`;
-    const pWidth = textWidth(helvBold, pageStr, 7);
-    drawText(page, pageStr, {
-      x: PAGE_W - MARGIN_X - pWidth,
-      y: footY,
-      size: 7,
-      font: helvBold,
-      color: TEXT_MUTED,
-    });
   }
 
   return await mergedPdf.save();
