@@ -4,7 +4,8 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, useMemo } from "react";
 import {
   searchDisputeOrder,
-  generateDisputeEvidencePackage,
+  prepareDisputeEvidencePackage,
+  saveBrowserDisputeEvidencePackage,
   getDisputeEvidenceSignedUrl,
   deleteDisputeEvidenceRecord,
   deleteAllDisputeEvidenceRecords,
@@ -29,7 +30,6 @@ import {
   Loader2,
   Mail,
   Receipt,
-  Award,
   Calendar,
   User,
   CreditCard,
@@ -51,6 +51,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { bytesToBase64, createDisputePdfInBrowser } from "@/lib/disputes/dispute-browser-pdf";
 
 export const Route = createFileRoute("/admin/dispute-manager")({
   beforeLoad: async () => {
@@ -90,7 +91,8 @@ function formatDateTime(iso: string | null | undefined): string {
 function DisputeManagerPage() {
   const qc = useQueryClient();
   const searchFn = useServerFn(searchDisputeOrder);
-  const generateFn = useServerFn(generateDisputeEvidencePackage);
+  const prepareFn = useServerFn(prepareDisputeEvidencePackage);
+  const saveFn = useServerFn(saveBrowserDisputeEvidencePackage);
   const getUrlFn = useServerFn(getDisputeEvidenceSignedUrl);
   const deleteRecordFn = useServerFn(deleteDisputeEvidenceRecord);
   const deleteAllRecordsFn = useServerFn(deleteAllDisputeEvidenceRecords);
@@ -103,7 +105,6 @@ function DisputeManagerPage() {
   // Evidence Selection State
   const [selectedEmailIds, setSelectedEmailIds] = useState<string[]>([]);
   const [includeInvoice, setIncludeInvoice] = useState<boolean>(true);
-  const [includeCertificate, setIncludeCertificate] = useState<boolean>(true);
 
   // Modals & Preview States
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
@@ -175,7 +176,6 @@ function DisputeManagerPage() {
         // Default selection: select all verified sent emails
         setSelectedEmailIds(res.sentEmails.map((em) => em.id));
         setIncludeInvoice(Boolean(res.invoice));
-        setIncludeCertificate(Boolean(res.certificate));
         toast.success(`Loaded order #${res.applicationCode}`);
       }
     } catch (err: any) {
@@ -189,13 +189,16 @@ function DisputeManagerPage() {
   const mutGenerate = useMutation({
     mutationFn: async () => {
       if (!currentOrder) throw new Error("No active order selected");
-      return await generateFn({
+      const selectedEmails = currentOrder.sentEmails.filter((email) => selectedEmailIds.includes(email.id));
+      const prepared = await prepareFn({ data: { orderId: currentOrder.applicationId, includeInvoice: includeInvoice && Boolean(currentOrder.invoice) } });
+      const pdfBytes = await createDisputePdfInBrowser({ emails: selectedEmails, invoiceUrl: prepared.invoiceUrl });
+      return await saveFn({
         data: {
           orderId: currentOrder.applicationId,
           disputeId: disputeId.trim() || undefined,
           selectedEmailIds,
-          includeInvoice: includeInvoice && Boolean(currentOrder.invoice),
-          includeCertificate: includeCertificate && Boolean(currentOrder.certificate),
+          invoiceIncluded: includeInvoice && Boolean(currentOrder.invoice),
+          pdfBase64: bytesToBase64(pdfBytes),
         },
       });
     },
@@ -233,9 +236,8 @@ function DisputeManagerPage() {
   const totalSelectedCount = useMemo(() => {
     let count = selectedEmailIds.length;
     if (includeInvoice && currentOrder?.invoice) count += 1;
-    if (includeCertificate && currentOrder?.certificate) count += 1;
     return count;
-  }, [selectedEmailIds, includeInvoice, includeCertificate, currentOrder]);
+  }, [selectedEmailIds, includeInvoice, currentOrder]);
 
   const allEmailsSelected = currentOrder && currentOrder.sentEmails.length > 0 && selectedEmailIds.length === currentOrder.sentEmails.length;
 
@@ -563,7 +565,7 @@ function DisputeManagerPage() {
               </CardContent>
             </Card>
 
-            {/* Right Col: Documents (Invoice & Certificate) */}
+            {/* Right Col: Saved invoice */}
             <div className="space-y-5">
               {/* Document 1: Invoice */}
               <Card className="border-slate-200 shadow-xs bg-white">
@@ -611,55 +613,6 @@ function DisputeManagerPage() {
                 </CardContent>
               </Card>
 
-              {/* Document 2: Certificate */}
-              <Card className="border-slate-200 shadow-xs bg-white">
-                <CardHeader className="pb-3 border-b border-slate-100 flex flex-row items-center justify-between">
-                  <CardTitle className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                    <Award className="size-4 text-amber-600" />
-                    Certificate
-                  </CardTitle>
-                  {currentOrder.certificate ? (
-                    <div className="flex items-center gap-2">
-                      <Checkbox
-                        id="check-cert"
-                        checked={includeCertificate}
-                        onCheckedChange={(c) => setIncludeCertificate(Boolean(c))}
-                      />
-                      <label htmlFor="check-cert" className="text-xs font-bold text-slate-700 cursor-pointer">
-                        Include
-                      </label>
-                    </div>
-                  ) : null}
-                </CardHeader>
-                <CardContent className="p-4 text-xs">
-                  {currentOrder.certificate ? (
-                    <div className="space-y-2">
-                      <div className="flex justify-between">
-                        <span className="text-slate-500">Certificate No.</span>
-                        <span className="font-bold text-slate-900 font-mono">
-                          {currentOrder.certificate.certificateNumber || "Verified Certificate"}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-500">File Name</span>
-                        <span className="font-semibold text-slate-700 truncate max-w-[150px]">
-                          {currentOrder.certificate.fileName || "certificate.pdf"}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-500">Issued Date</span>
-                        <span className="font-semibold text-slate-700">
-                          {formatDateTime(currentOrder.certificate.issuedAt)}
-                        </span>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="py-4 text-center text-slate-400">
-                      <p className="font-medium text-xs">Certificate not available for this order</p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
             </div>
           </div>
 
@@ -713,8 +666,7 @@ function DisputeManagerPage() {
                   <Badge className="bg-indigo-600 text-white font-mono text-xs">{totalSelectedCount} items</Badge>
                 </div>
                 <div className="text-xs text-slate-400 mt-0.5">
-                  {selectedEmailIds.length} Emails · {includeInvoice && currentOrder.invoice ? "1 Invoice" : "No Invoice"} ·{" "}
-                  {includeCertificate && currentOrder.certificate ? "1 Certificate" : "No Certificate"}
+                  {selectedEmailIds.length} Emails · {includeInvoice && currentOrder.invoice ? "1 Invoice" : "No Invoice"}
                 </div>
               </div>
             </div>
@@ -911,23 +863,16 @@ function DisputeManagerPage() {
           <DialogHeader className="p-5 bg-slate-900 text-white border-b border-slate-800 shrink-0">
             <DialogTitle className="text-base font-bold flex items-center gap-2">
               <FileText className="size-4 text-amber-400" />
-              Dispute Evidence Package Manifest
+              Final PDF Contents
             </DialogTitle>
             <DialogDescription className="text-xs text-slate-400">
-              Review package structure and chronological document order before PDF compilation
+              Selected emails are rendered exactly as sent, followed by the saved invoice
             </DialogDescription>
           </DialogHeader>
 
           {currentOrder && (
             <div className="p-5 overflow-y-auto flex-1 space-y-4 text-xs bg-slate-50">
-              {/* Cover Page Card */}
               <div className="bg-white p-4 rounded-xl border border-slate-200 space-y-3">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                  <span className="font-bold text-slate-900 text-sm">1. Cover Page Manifest</span>
-                  <Badge className="bg-indigo-50 text-indigo-700 border-indigo-200 font-mono text-[10px]">
-                    Page 1
-                  </Badge>
-                </div>
                 <div className="grid grid-cols-2 gap-2 text-slate-700">
                   <div>
                     <span className="text-slate-400 font-medium">Order Number:</span> {currentOrder.applicationCode}
@@ -953,7 +898,7 @@ function DisputeManagerPage() {
               {/* Included Items Order */}
               <div className="bg-white p-4 rounded-xl border border-slate-200 space-y-3">
                 <span className="font-bold text-slate-900 text-sm block border-b border-slate-100 pb-2">
-                  2. Document Assembly Order (Chronological)
+                  Document Order
                 </span>
                 <ol className="space-y-2 pl-4 list-decimal text-slate-800 font-medium">
                   {selectedEmailIds.map((id, i) => {
@@ -969,18 +914,13 @@ function DisputeManagerPage() {
                       Tax Invoice: <strong>#{currentOrder.invoice.invoiceNumber}</strong>
                     </li>
                   )}
-                  {includeCertificate && currentOrder.certificate && (
-                    <li>
-                      Certificate: <strong>{currentOrder.certificate.certificateNumber || currentOrder.certificate.fileName}</strong>
-                    </li>
-                  )}
                 </ol>
               </div>
 
               <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-[11px] text-amber-900 flex items-start gap-2">
                 <AlertTriangle className="size-4 text-amber-600 shrink-0 mt-0.5" />
                 <span>
-                  The final PDF is merged server-side with standard A4 margins, page numbering, running audit headers, and legal disclaimers.
+                  No summary page, evidence branding, legal statement, page footer, or certificate will be added.
                 </span>
               </div>
             </div>
@@ -1013,7 +953,7 @@ function DisputeManagerPage() {
               Dispute Package Ready!
             </DialogTitle>
             <DialogDescription className="text-xs text-slate-500">
-              The evidence PDF has been compiled, numbered, and saved to private storage.
+               The exact email printouts and saved invoice have been combined and stored securely.
             </DialogDescription>
           </DialogHeader>
 
