@@ -30,7 +30,6 @@ import {
   Loader2,
   Mail,
   Receipt,
-  Award,
   Calendar,
   User,
   CreditCard,
@@ -106,7 +105,6 @@ function DisputeManagerPage() {
   // Evidence Selection State
   const [selectedEmailIds, setSelectedEmailIds] = useState<string[]>([]);
   const [includeInvoice, setIncludeInvoice] = useState<boolean>(true);
-  const [includeCertificate, setIncludeCertificate] = useState<boolean>(false);
 
   // Modals & Preview States
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
@@ -178,7 +176,6 @@ function DisputeManagerPage() {
         // Default selection: select all verified sent emails
         setSelectedEmailIds(res.sentEmails.map((em) => em.id));
         setIncludeInvoice(Boolean(res.invoice));
-        setIncludeCertificate(false);
         toast.success(`Loaded order #${res.applicationCode}`);
       }
     } catch (err: any) {
@@ -239,9 +236,8 @@ function DisputeManagerPage() {
   const totalSelectedCount = useMemo(() => {
     let count = selectedEmailIds.length;
     if (includeInvoice && currentOrder?.invoice) count += 1;
-    if (includeCertificate && currentOrder?.certificate) count += 1;
     return count;
-  }, [selectedEmailIds, includeInvoice, includeCertificate, currentOrder]);
+  }, [selectedEmailIds, includeInvoice, currentOrder]);
 
   const allEmailsSelected = currentOrder && currentOrder.sentEmails.length > 0 && selectedEmailIds.length === currentOrder.sentEmails.length;
 
@@ -617,55 +613,6 @@ function DisputeManagerPage() {
                 </CardContent>
               </Card>
 
-              {/* Document 2: Certificate */}
-              <Card className="border-slate-200 shadow-xs bg-white">
-                <CardHeader className="pb-3 border-b border-slate-100 flex flex-row items-center justify-between">
-                  <CardTitle className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                    <Award className="size-4 text-amber-600" />
-                    Certificate
-                  </CardTitle>
-                  {currentOrder.certificate ? (
-                    <div className="flex items-center gap-2">
-                      <Checkbox
-                        id="check-cert"
-                        checked={includeCertificate}
-                        onCheckedChange={(c) => setIncludeCertificate(Boolean(c))}
-                      />
-                      <label htmlFor="check-cert" className="text-xs font-bold text-slate-700 cursor-pointer">
-                        Include
-                      </label>
-                    </div>
-                  ) : null}
-                </CardHeader>
-                <CardContent className="p-4 text-xs">
-                  {currentOrder.certificate ? (
-                    <div className="space-y-2">
-                      <div className="flex justify-between">
-                        <span className="text-slate-500">Certificate No.</span>
-                        <span className="font-bold text-slate-900 font-mono">
-                          {currentOrder.certificate.certificateNumber || "Verified Certificate"}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-500">File Name</span>
-                        <span className="font-semibold text-slate-700 truncate max-w-[150px]">
-                          {currentOrder.certificate.fileName || "certificate.pdf"}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-500">Issued Date</span>
-                        <span className="font-semibold text-slate-700">
-                          {formatDateTime(currentOrder.certificate.issuedAt)}
-                        </span>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="py-4 text-center text-slate-400">
-                      <p className="font-medium text-xs">Certificate not available for this order</p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
             </div>
           </div>
 
@@ -966,11 +913,6 @@ function DisputeManagerPage() {
                   {includeInvoice && currentOrder.invoice && (
                     <li>
                       Tax Invoice: <strong>#{currentOrder.invoice.invoiceNumber}</strong>
-                    </li>
-                  )}
-                  {includeCertificate && currentOrder.certificate && (
-                    <li>
-                      Certificate: <strong>{currentOrder.certificate.certificateNumber || currentOrder.certificate.fileName}</strong>
                     </li>
                   )}
                 </ol>
