@@ -173,6 +173,7 @@ export interface DisputePackageData {
     body_text?: string | null;
     message_id?: string | null;
     direction?: string | null;
+    attachment_names?: string[];
   }>;
   invoice?: {
     id: string;
@@ -273,14 +274,20 @@ async function renderHtmlToPdfBuffer(html: string): Promise<Uint8Array> {
 /**
  * Render standard CRM email preview HTML page with Evidence Header and exact stored sent email HTML
  */
+function decodeStoredHtml(value: string): string {
+  if (!/^\s*&lt;(?:!doctype|html|table|div|body)\b/i.test(value)) return value;
+  return value
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#0*39;|&apos;/gi, "'")
+    .replace(/&amp;/gi, "&");
+}
+
 function renderEmailEvidenceHtmlDocument(params: {
   email: DisputePackageData["selectedEmails"][0];
-  emailIndex: number;
-  totalEmails: number;
-  orderCode: string;
-  hasInvoiceAttachment: boolean;
 }): string {
-  const { email, emailIndex, totalEmails, orderCode, hasInvoiceAttachment } = params;
+  const { email } = params;
 
   const fromDisplay = email.from_email || COMPANY_EMAIL;
   const toDisplay = email.to_email || "customer@email.com";
@@ -290,10 +297,13 @@ function renderEmailEvidenceHtmlDocument(params: {
 
   const rawBodyHtml = email.body_html?.trim();
   const rawBodyText = email.body_text?.trim();
+  const attachmentsDisplay = email.attachment_names?.length
+    ? email.attachment_names.join(", ")
+    : "None";
 
   let bodyContentHtml = "";
   if (rawBodyHtml) {
-    bodyContentHtml = rawBodyHtml;
+    bodyContentHtml = decodeStoredHtml(rawBodyHtml);
   } else if (rawBodyText) {
     bodyContentHtml = `<div style="white-space: pre-wrap; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 13px; line-height: 1.6; color: #1e293b; padding: 12px 0;">${escapeHtml(
       rawBodyText
@@ -307,7 +317,7 @@ function renderEmailEvidenceHtmlDocument(params: {
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Evidence Sent Email ${emailIndex + 1}</title>
+  <title>${escapeHtml(subjectDisplay)}</title>
   <style>
     @page {
       size: A4 portrait;
@@ -327,72 +337,39 @@ function renderEmailEvidenceHtmlDocument(params: {
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
     }
-    .evidence-header-card {
-      margin-bottom: 16px;
-      border-radius: 6px;
-      overflow: hidden;
-      border: 1px solid #e2e8f0;
+    .mail-header {
+      margin-bottom: 10px;
       page-break-inside: avoid;
       break-inside: avoid;
-    }
-    .evidence-top-banner {
-      background: #072242;
-      color: #ffffff;
-      padding: 8px 12px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      border-bottom: 2px solid #f59e0b;
-    }
-    .evidence-title {
-      font-size: 10.5px;
-      font-weight: 800;
-      letter-spacing: 0.04em;
-      text-transform: uppercase;
-      color: #ffffff;
-    }
-    .evidence-badge {
-      background: #059669;
-      color: #ffffff;
-      font-size: 8.5px;
-      font-weight: 700;
-      padding: 2px 7px;
-      border-radius: 3px;
-      letter-spacing: 0.02em;
     }
     .email-meta-table {
       width: 100%;
       border-collapse: collapse;
-      background: #fefce8;
-      border: 1px solid #fef08a;
-      border-top: none;
-      font-size: 11px;
+      border: 1px solid #edc98e;
+      font: 11px Arial, Helvetica, sans-serif;
     }
     .email-meta-table td {
-      padding: 4px 12px;
+      padding: 2px 8px;
       vertical-align: top;
+      border-bottom: 1px solid #f3dfbc;
     }
     .email-meta-table .meta-label {
-      width: 85px;
-      font-weight: 700;
-      color: #475569;
+      width: 95px;
+      text-align: right;
+      font-weight: 400;
+      color: #111111;
       white-space: nowrap;
     }
     .email-meta-table .meta-value {
-      color: #0f172a;
+      color: #111111;
     }
     .email-meta-table .meta-value a {
-      color: #1e40af;
-      text-decoration: none;
-    }
-    .email-meta-table .meta-sub {
-      font-weight: 700;
-      color: #0f172a;
+      color: #0000ee;
+      text-decoration: underline;
     }
     .email-meta-table .meta-id {
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-      font-size: 9.5px;
-      color: #64748b;
+      font-size: 9px;
+      overflow-wrap: anywhere;
     }
     .email-body-wrapper {
       width: 100%;
@@ -415,11 +392,7 @@ function renderEmailEvidenceHtmlDocument(params: {
   </style>
 </head>
 <body>
-  <div class="evidence-header-card">
-    <div class="evidence-top-banner">
-      <span class="evidence-title">EVIDENCE ITEM: SENT EMAIL #${emailIndex + 1} OF ${totalEmails}</span>
-      <span class="evidence-badge">&#10003; AUTHENTICATED SENT RECORD</span>
-    </div>
+  <div class="mail-header">
     <table class="email-meta-table">
       <tr>
         <td class="meta-label">From:</td>
@@ -430,24 +403,24 @@ function renderEmailEvidenceHtmlDocument(params: {
         <td class="meta-value"><a href="mailto:${escapeHtml(toDisplay)}">${escapeHtml(toDisplay)}</a></td>
       </tr>
       <tr>
-        <td class="meta-label">Sent Date:</td>
+        <td class="meta-label">Date:</td>
         <td class="meta-value">${escapeHtml(dateDisplay)}</td>
       </tr>
       <tr>
         <td class="meta-label">Subject:</td>
-        <td class="meta-value meta-sub">${escapeHtml(subjectDisplay)}</td>
+        <td class="meta-value">${escapeHtml(subjectDisplay)}</td>
       </tr>
-      ${
-        hasInvoiceAttachment
-          ? `<tr>
-        <td class="meta-label">Attachment:</td>
-        <td class="meta-value" style="color:#1e40af;font-weight:600;">Tax-Invoice-${escapeHtml(orderCode)}.pdf (Verified)</td>
-      </tr>`
-          : ""
-      }
+      <tr>
+        <td class="meta-label">Attachments:</td>
+        <td class="meta-value">${escapeHtml(attachmentsDisplay)}</td>
+      </tr>
       <tr>
         <td class="meta-label">Message ID:</td>
         <td class="meta-value meta-id">${escapeHtml(messageIdDisplay)}</td>
+      </tr>
+      <tr>
+        <td class="meta-label">Status:</td>
+        <td class="meta-value">${escapeHtml(email.status || "sent")}</td>
       </tr>
     </table>
   </div>
@@ -464,218 +437,11 @@ export async function renderDisputeEvidencePackagePdf(data: DisputePackageData):
   const mergedPdf = await PDFDocument.create();
   const helv = await mergedPdf.embedFont(StandardFonts.Helvetica);
   const helvBold = await mergedPdf.embedFont(StandardFonts.HelveticaBold);
-  let logo: any = null;
-  try {
-    logo = await mergedPdf.embedPng(base64ToBytes(BHS_LOGO_BASE64));
-  } catch (err) {
-    console.warn("[dispute-pdf] Logo embedding failed, continuing without logo:", err);
-  }
 
   const PAGE_W = 595.28;
   const PAGE_H = 841.89;
   const MARGIN_X = 36;
   const CONTENT_W = PAGE_W - MARGIN_X * 2;
-
-  // ══════════════════════════════════════════════════════════════════════════
-  // 1. COVER PAGE
-  // ══════════════════════════════════════════════════════════════════════════
-  const coverPage = mergedPdf.addPage([PAGE_W, PAGE_H]);
-  let y = PAGE_H - 30;
-
-  // Header Banner
-  coverPage.drawRectangle({ x: 0, y: y - 50, width: PAGE_W, height: 60, color: NAVY });
-  coverPage.drawRectangle({ x: 0, y: y - 54, width: PAGE_W, height: 4, color: ACCENT });
-
-  if (logo) {
-    coverPage.drawImage(logo, { x: MARGIN_X, y: y - 44, width: 44, height: 44 });
-    drawText(coverPage, COMPANY_NAME.toUpperCase(), { x: MARGIN_X + 54, y: y - 20, size: 14, font: helvBold, color: WHITE });
-    drawText(coverPage, "OFFICIAL DISPUTE EVIDENCE & AUDIT PACKAGE", { x: MARGIN_X + 54, y: y - 36, size: 9, font: helv, color: rgb(0.85, 0.9, 1) });
-  } else {
-    drawText(coverPage, COMPANY_NAME.toUpperCase(), { x: MARGIN_X, y: y - 20, size: 14, font: helvBold, color: WHITE });
-    drawText(coverPage, "OFFICIAL DISPUTE EVIDENCE & AUDIT PACKAGE", { x: MARGIN_X, y: y - 36, size: 9, font: helv, color: rgb(0.85, 0.9, 1) });
-  }
-
-  y -= 80;
-
-  // Title Box
-  coverPage.drawRectangle({
-    x: MARGIN_X,
-    y: y - 50,
-    width: CONTENT_W,
-    height: 52,
-    color: LIGHT_BG,
-    borderColor: BORDER_COLOR,
-    borderWidth: 1,
-  });
-  drawText(coverPage, "DISPUTE EVIDENCE PACKAGE", { x: MARGIN_X + 16, y: y - 22, size: 14, font: helvBold, color: NAVY });
-  drawText(coverPage, `Generated on ${formatIST(new Date().toISOString())} · Prepared for Payment Gateway / Banking Dispute Resolution`, {
-    x: MARGIN_X + 16,
-    y: y - 38,
-    size: 8.5,
-    font: helv,
-    color: TEXT_MUTED,
-  });
-
-  y -= 70;
-
-  // Section 1: Order & Customer Information
-  drawText(coverPage, "1. ORDER & CUSTOMER INFORMATION", { x: MARGIN_X, y, size: 10.5, font: helvBold, color: NAVY });
-  y -= 8;
-
-  const cardH = data.disputeId ? 115 : 95;
-  coverPage.drawRectangle({
-    x: MARGIN_X,
-    y: y - cardH,
-    width: CONTENT_W,
-    height: cardH,
-    color: WHITE,
-    borderColor: BORDER_COLOR,
-    borderWidth: 1,
-  });
-
-  const rowH = 18;
-  let rowY = y - 14;
-  const col1L = MARGIN_X + 12;
-  const col1V = MARGIN_X + 110;
-  const col2L = MARGIN_X + 270;
-  const col2V = MARGIN_X + 370;
-
-  const drawMetaRow = (l1: string, v1: string, l2?: string, v2?: string) => {
-    drawText(coverPage, l1, { x: col1L, y: rowY, size: 8.5, font: helv, color: TEXT_MUTED });
-    drawText(coverPage, `: ${safePdfText(v1)}`, { x: col1V, y: rowY, size: 8.5, font: helvBold, color: TEXT_DARK });
-    if (l2 && v2 !== undefined) {
-      drawText(coverPage, l2, { x: col2L, y: rowY, size: 8.5, font: helv, color: TEXT_MUTED });
-      drawText(coverPage, `: ${safePdfText(v2)}`, { x: col2V, y: rowY, size: 8.5, font: helvBold, color: TEXT_DARK });
-    }
-    rowY -= rowH;
-  };
-
-  drawMetaRow("Order Number", data.order.applicationCode, "Customer Name", data.lead.name);
-  drawMetaRow("Mobile", data.lead.mobile, "Email Address", data.lead.email);
-  drawMetaRow("Service", data.lead.service, "Order Date", formatIST(data.order.createdAt));
-  drawMetaRow("Payment Status", (data.payment?.status ?? "PAID").toUpperCase(), "Payment Amount", `INR ${(data.payment?.amount ?? data.lead.totalAmount ?? 0).toLocaleString("en-IN")}`);
-
-  // Row 5: Gateway & Transaction ID
-  drawText(coverPage, "Gateway / Txn ID", { x: col1L, y: rowY, size: 8.5, font: helv, color: TEXT_MUTED });
-  drawText(coverPage, `: ${data.payment?.gatewayName ?? "Razorpay"} / ${data.payment?.transactionId ?? "—"}`, {
-    x: col1V,
-    y: rowY,
-    size: 8.5,
-    font: helvBold,
-    color: TEXT_DARK,
-  });
-  rowY -= rowH;
-
-  // Row 6: Dispute ID (Optional)
-  if (data.disputeId) {
-    drawText(coverPage, "Dispute ID", { x: col1L, y: rowY, size: 8.5, font: helv, color: TEXT_MUTED });
-    drawText(coverPage, `: ${safePdfText(data.disputeId)}`, { x: col1V, y: rowY, size: 8.5, font: helvBold, color: rgb(0.7, 0.15, 0.1) });
-    rowY -= rowH;
-  }
-
-  y -= (cardH + 20);
-
-  // Section 2: Included Evidence Manifest
-  drawText(coverPage, "2. EVIDENCE MANIFEST / INCLUDED RECORDS", { x: MARGIN_X, y, size: 10.5, font: helvBold, color: NAVY });
-  y -= 12;
-
-  // Manifest table header
-  coverPage.drawRectangle({
-    x: MARGIN_X,
-    y: y - 20,
-    width: CONTENT_W,
-    height: 20,
-    color: NAVY_SOFT,
-  });
-  drawText(coverPage, "#", { x: MARGIN_X + 8, y: y - 14, size: 8, font: helvBold, color: WHITE });
-  drawText(coverPage, "TYPE", { x: MARGIN_X + 26, y: y - 14, size: 8, font: helvBold, color: WHITE });
-  drawText(coverPage, "ITEM DESCRIPTION", { x: MARGIN_X + 80, y: y - 14, size: 8, font: helvBold, color: WHITE });
-  drawText(coverPage, "RECIPIENT / DETAILS", { x: MARGIN_X + 310, y: y - 14, size: 8, font: helvBold, color: WHITE });
-  drawText(coverPage, "SENT / ISSUED DATE", { x: MARGIN_X + 430, y: y - 14, size: 8, font: helvBold, color: WHITE });
-
-  y -= 20;
-
-  let itemIdx = 1;
-  const manifestItems: Array<{ type: string; desc: string; detail: string; date: string }> = [];
-
-  for (const email of data.selectedEmails) {
-    manifestItems.push({
-      type: "EMAIL",
-      desc: email.subject || "Customer Communication",
-      detail: email.to_email || data.lead.email,
-      date: formatIST(email.sent_at),
-    });
-  }
-
-  if (data.invoice) {
-    manifestItems.push({
-      type: "INVOICE",
-      desc: `Tax Invoice #${data.invoice.invoiceNumber}`,
-      detail: `Amount: INR ${(data.payment?.amount ?? data.lead.totalAmount ?? 0).toLocaleString("en-IN")}`,
-      date: formatIST(data.payment?.paymentDate ?? data.order.createdAt),
-    });
-  }
-
-  if (data.certificate) {
-    manifestItems.push({
-      type: "CERTIFICATE",
-      desc: `Registration Certificate${data.certificate.certificateNumber ? ` #${data.certificate.certificateNumber}` : ""}`,
-      detail: data.certificate.fileName || "Verified Issued Certificate",
-      date: formatIST(new Date().toISOString()),
-    });
-  }
-
-  for (const item of manifestItems) {
-    const isEven = itemIdx % 2 === 0;
-    coverPage.drawRectangle({
-      x: MARGIN_X,
-      y: y - 20,
-      width: CONTENT_W,
-      height: 20,
-      color: isEven ? LIGHT_BG : WHITE,
-      borderColor: BORDER_COLOR,
-      borderWidth: 0.5,
-    });
-    drawText(coverPage, String(itemIdx), { x: MARGIN_X + 8, y: y - 14, size: 8, font: helvBold, color: TEXT_DARK });
-    drawText(coverPage, item.type, { x: MARGIN_X + 26, y: y - 14, size: 7.5, font: helvBold, color: NAVY });
-    drawText(coverPage, wrap(item.desc, helv, 8, 220)[0] || item.desc, { x: MARGIN_X + 80, y: y - 14, size: 8, font: helv, color: TEXT_DARK });
-    drawText(coverPage, wrap(item.detail, helv, 7.5, 115)[0] || item.detail, { x: MARGIN_X + 310, y: y - 14, size: 7.5, font: helv, color: TEXT_MUTED });
-    drawText(coverPage, item.date, { x: MARGIN_X + 430, y: y - 14, size: 7.5, font: helv, color: TEXT_DARK });
-    y -= 20;
-    itemIdx++;
-  }
-
-  y -= 20;
-
-  // Section 3: Legal & Audit Statement
-  coverPage.drawRectangle({
-    x: MARGIN_X,
-    y: y - 80,
-    width: CONTENT_W,
-    height: 80,
-    color: rgb(0.98, 0.98, 0.99),
-    borderColor: rgb(0.8, 0.83, 0.88),
-    borderWidth: 1,
-  });
-
-  drawText(coverPage, "LEGAL & REGULATORY DISPUTE STATEMENT", { x: MARGIN_X + 12, y: y - 16, size: 8.5, font: helvBold, color: NAVY });
-  const disclaimerText =
-    "This evidence package has been compiled from authenticated and immutable CRM server logs for presentation before payment gateways, acquiring banks, dispute handling authorities, and regulatory bodies. All enclosed emails represent actual communications transmitted to the customer's registered email address.";
-
-  const disclaimerLines = wrap(disclaimerText, helv, 7.5, CONTENT_W - 24);
-  let discY = y - 30;
-  for (const dl of disclaimerLines) {
-    drawText(coverPage, dl, { x: MARGIN_X + 12, y: discY, size: 7.5, font: helv, color: rgb(0.3, 0.35, 0.42) });
-    discY -= 11;
-  }
-
-  drawText(coverPage, `Entity: ${COMPANY_NAME} | GSTIN: ${COMPANY_GSTIN} | ${COMPANY_ADDRESS}`, {
-    x: MARGIN_X + 12,
-    y: y - 70,
-    size: 7,
-    font: helvBold,
-    color: TEXT_MUTED,
-  });
 
   // ══════════════════════════════════════════════════════════════════════════
   // 2. SELECTED SENT EMAILS (Rendered 1:1 via Chromium Headless)
