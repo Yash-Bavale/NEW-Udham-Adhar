@@ -3933,6 +3933,92 @@ export type Database = {
           },
         ]
       }
+      telephony_calls: {
+        Row: {
+          agent_id: string | null
+          answered_at: string | null
+          application_id: string | null
+          call_id: string
+          called_number: string | null
+          caller_number: string | null
+          created_at: string
+          customer_id: string | null
+          direction: string
+          disposition: string | null
+          disposition_at: string | null
+          disposition_by: string | null
+          disposition_notes: string | null
+          duration_seconds: number | null
+          employee_id: string | null
+          ended_at: string | null
+          id: string
+          lead_id: string | null
+          provider: string
+          provider_uuid: string | null
+          started_at: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          agent_id?: string | null
+          answered_at?: string | null
+          application_id?: string | null
+          call_id: string
+          called_number?: string | null
+          caller_number?: string | null
+          created_at?: string
+          customer_id?: string | null
+          direction?: string
+          disposition?: string | null
+          disposition_at?: string | null
+          disposition_by?: string | null
+          disposition_notes?: string | null
+          duration_seconds?: number | null
+          employee_id?: string | null
+          ended_at?: string | null
+          id?: string
+          lead_id?: string | null
+          provider?: string
+          provider_uuid?: string | null
+          started_at?: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          agent_id?: string | null
+          answered_at?: string | null
+          application_id?: string | null
+          call_id?: string
+          called_number?: string | null
+          caller_number?: string | null
+          created_at?: string
+          customer_id?: string | null
+          direction?: string
+          disposition?: string | null
+          disposition_at?: string | null
+          disposition_by?: string | null
+          disposition_notes?: string | null
+          duration_seconds?: number | null
+          employee_id?: string | null
+          ended_at?: string | null
+          id?: string
+          lead_id?: string | null
+          provider?: string
+          provider_uuid?: string | null
+          started_at?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "telephony_calls_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ticket_replies: {
         Row: {
           created_at: string | null

@@ -127,6 +127,13 @@
       "when": 1790830055499,
       "tag": "0017_add_smartflo_agent_id_to_profiles",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1790839228708,
+      "tag": "0018_telephony_calls",
+      "breakpoints": true
     }
   ]
 }
