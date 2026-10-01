@@ -327,6 +327,10 @@ function renderEmailEvidenceHtmlDocument(params: {
 </html>`;
 }
 
+async function renderHtmlToPdfBuffer(_html: string): Promise<Uint8Array> {
+  throw new Error("Exact email PDF rendering is unavailable on the hosted server");
+}
+
 export async function renderDisputeEvidencePackagePdf(data: DisputePackageData): Promise<Uint8Array> {
   const mergedPdf = await PDFDocument.create();
   const helv = await mergedPdf.embedFont(StandardFonts.Helvetica);
