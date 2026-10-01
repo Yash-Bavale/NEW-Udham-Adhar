@@ -134,6 +134,13 @@
       "when": 1790839228708,
       "tag": "0018_telephony_calls",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1790840629559,
+      "tag": "0019_telephony_calls_event_fields",
+      "breakpoints": true
     }
   ]
 }
