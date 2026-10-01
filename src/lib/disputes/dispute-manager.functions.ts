@@ -2,7 +2,6 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { assertRole } from "@/lib/audit";
-import { renderDisputeEvidencePackagePdf, DisputePackageData } from "./dispute-pdf.server";
 
 async function getAdmin() {
   const m = await import("@/integrations/supabase/client.server");
@@ -75,6 +74,7 @@ export interface DisputeOrderSummary {
     attempt?: number;
     error_message?: string | null;
     smtp_response?: string | null;
+    attachment_names?: string[];
   }>;
   orderTimeline: Array<{
     id: string;
@@ -409,6 +409,79 @@ const GenerateDisputePackageSchema = z.object({
   includeInvoice: z.boolean(),
   includeCertificate: z.boolean(),
 });
+
+export const prepareDisputeEvidencePackage = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({
+    orderId: z.string().uuid(),
+    includeInvoice: z.boolean(),
+  }).parse(i))
+  .handler(async ({ data, context }) => {
+    await assertRole(context.supabase, AUTHORIZED_ROLES as any);
+    if (!data.includeInvoice) return { invoiceUrl: null };
+    const admin = await getAdmin();
+    const { data: invoice } = await admin
+      .from("invoices")
+      .select("pdf_path")
+      .eq("application_id", data.orderId)
+      .not("pdf_path", "is", null)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (!invoice?.pdf_path) throw new Error("The saved invoice PDF is not ready");
+    const { data: signed, error } = await admin.storage.from("invoices").createSignedUrl(invoice.pdf_path, 60 * 10);
+    if (error || !signed?.signedUrl) throw new Error("Could not open the saved invoice PDF");
+    return { invoiceUrl: signed.signedUrl };
+  });
+
+export const saveBrowserDisputeEvidencePackage = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({
+    orderId: z.string().uuid(),
+    disputeId: z.string().max(200).optional().nullable(),
+    selectedEmailIds: z.array(z.string().uuid()).max(50),
+    invoiceIncluded: z.boolean(),
+    pdfBase64: z.string().min(100).max(28_000_000),
+  }).parse(i))
+  .handler(async ({ data, context }) => {
+    const user = await assertRole(context.supabase, AUTHORIZED_ROLES as any);
+    const admin = await getAdmin();
+    const { data: app } = await admin.from("applications").select("id, application_code").eq("id", data.orderId).maybeSingle();
+    if (!app) throw new Error("Application record not found");
+    const pdfBytes = Uint8Array.from(atob(data.pdfBase64), (char) => char.charCodeAt(0));
+    if (pdfBytes.length < 5 || new TextDecoder().decode(pdfBytes.slice(0, 5)) !== "%PDF-") throw new Error("The generated file is not a valid PDF");
+    const { data: profile } = await admin.from("profiles").select("display_name, email").eq("id", user.id).maybeSingle();
+    const now = new Date();
+    const packageId = crypto.randomUUID();
+    const cleanOrderCode = String(app.application_code || app.id.slice(0, 8)).replace(/[^a-zA-Z0-9_-]/g, "_");
+    const dateStamp = now.toISOString().replace(/[-:T]/g, "").slice(0, 14);
+    const fileName = `dispute-evidence-${cleanOrderCode}-${dateStamp}.pdf`;
+    const storagePath = `dispute-evidence/${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, "0")}/${cleanOrderCode}/${fileName}`;
+    const { error: uploadError } = await admin.storage.from("documents").upload(storagePath, pdfBytes, { contentType: "application/pdf", upsert: true });
+    if (uploadError) throw new Error(`Failed to save dispute PDF: ${uploadError.message}`);
+    const itemCount = data.selectedEmailIds.length + (data.invoiceIncluded ? 1 : 0);
+    const { error: recordError } = await (admin.from("dispute_evidence_records" as any) as any).insert({
+      id: packageId,
+      order_id: app.id,
+      application_code: app.application_code,
+      generated_by: user.id,
+      generated_by_name: profile?.display_name || profile?.email || "Admin",
+      generated_at: now.toISOString(),
+      file_path: storagePath,
+      file_name: fileName,
+      selected_email_ids: data.selectedEmailIds,
+      invoice_included: data.invoiceIncluded,
+      certificate_included: false,
+      item_count: itemCount,
+      metadata: { disputeId: data.disputeId?.trim() || null, totalPdfBytes: pdfBytes.length, renderer: "crm-browser" },
+    });
+    if (recordError) {
+      await admin.storage.from("documents").remove([storagePath]);
+      throw new Error(`Failed to record dispute PDF: ${recordError.message}`);
+    }
+    const { data: signed } = await admin.storage.from("documents").createSignedUrl(storagePath, 60 * 60);
+    return { success: true, recordId: packageId, signedUrl: signed?.signedUrl || null, fileName, filePath: storagePath, itemCount };
+  });
 
 /**
  * 2. Generate and Merge Dispute Evidence Package PDF

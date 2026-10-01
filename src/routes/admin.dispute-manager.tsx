@@ -4,7 +4,8 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, useMemo } from "react";
 import {
   searchDisputeOrder,
-  generateDisputeEvidencePackage,
+  prepareDisputeEvidencePackage,
+  saveBrowserDisputeEvidencePackage,
   getDisputeEvidenceSignedUrl,
   deleteDisputeEvidenceRecord,
   deleteAllDisputeEvidenceRecords,
@@ -51,6 +52,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { bytesToBase64, createDisputePdfInBrowser } from "@/lib/disputes/dispute-browser-pdf";
 
 export const Route = createFileRoute("/admin/dispute-manager")({
   beforeLoad: async () => {
@@ -90,7 +92,8 @@ function formatDateTime(iso: string | null | undefined): string {
 function DisputeManagerPage() {
   const qc = useQueryClient();
   const searchFn = useServerFn(searchDisputeOrder);
-  const generateFn = useServerFn(generateDisputeEvidencePackage);
+  const prepareFn = useServerFn(prepareDisputeEvidencePackage);
+  const saveFn = useServerFn(saveBrowserDisputeEvidencePackage);
   const getUrlFn = useServerFn(getDisputeEvidenceSignedUrl);
   const deleteRecordFn = useServerFn(deleteDisputeEvidenceRecord);
   const deleteAllRecordsFn = useServerFn(deleteAllDisputeEvidenceRecords);
@@ -103,7 +106,7 @@ function DisputeManagerPage() {
   // Evidence Selection State
   const [selectedEmailIds, setSelectedEmailIds] = useState<string[]>([]);
   const [includeInvoice, setIncludeInvoice] = useState<boolean>(true);
-  const [includeCertificate, setIncludeCertificate] = useState<boolean>(true);
+  const [includeCertificate, setIncludeCertificate] = useState<boolean>(false);
 
   // Modals & Preview States
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
@@ -175,7 +178,7 @@ function DisputeManagerPage() {
         // Default selection: select all verified sent emails
         setSelectedEmailIds(res.sentEmails.map((em) => em.id));
         setIncludeInvoice(Boolean(res.invoice));
-        setIncludeCertificate(Boolean(res.certificate));
+        setIncludeCertificate(false);
         toast.success(`Loaded order #${res.applicationCode}`);
       }
     } catch (err: any) {
@@ -189,13 +192,16 @@ function DisputeManagerPage() {
   const mutGenerate = useMutation({
     mutationFn: async () => {
       if (!currentOrder) throw new Error("No active order selected");
-      return await generateFn({
+      const selectedEmails = currentOrder.sentEmails.filter((email) => selectedEmailIds.includes(email.id));
+      const prepared = await prepareFn({ data: { orderId: currentOrder.applicationId, includeInvoice: includeInvoice && Boolean(currentOrder.invoice) } });
+      const pdfBytes = await createDisputePdfInBrowser({ emails: selectedEmails, invoiceUrl: prepared.invoiceUrl });
+      return await saveFn({
         data: {
           orderId: currentOrder.applicationId,
           disputeId: disputeId.trim() || undefined,
           selectedEmailIds,
-          includeInvoice: includeInvoice && Boolean(currentOrder.invoice),
-          includeCertificate: includeCertificate && Boolean(currentOrder.certificate),
+          invoiceIncluded: includeInvoice && Boolean(currentOrder.invoice),
+          pdfBase64: bytesToBase64(pdfBytes),
         },
       });
     },
@@ -911,23 +917,16 @@ function DisputeManagerPage() {
           <DialogHeader className="p-5 bg-slate-900 text-white border-b border-slate-800 shrink-0">
             <DialogTitle className="text-base font-bold flex items-center gap-2">
               <FileText className="size-4 text-amber-400" />
-              Dispute Evidence Package Manifest
+              Final PDF Contents
             </DialogTitle>
             <DialogDescription className="text-xs text-slate-400">
-              Review package structure and chronological document order before PDF compilation
+              Selected emails are rendered exactly as sent, followed by the saved invoice
             </DialogDescription>
           </DialogHeader>
 
           {currentOrder && (
             <div className="p-5 overflow-y-auto flex-1 space-y-4 text-xs bg-slate-50">
-              {/* Cover Page Card */}
               <div className="bg-white p-4 rounded-xl border border-slate-200 space-y-3">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                  <span className="font-bold text-slate-900 text-sm">1. Cover Page Manifest</span>
-                  <Badge className="bg-indigo-50 text-indigo-700 border-indigo-200 font-mono text-[10px]">
-                    Page 1
-                  </Badge>
-                </div>
                 <div className="grid grid-cols-2 gap-2 text-slate-700">
                   <div>
                     <span className="text-slate-400 font-medium">Order Number:</span> {currentOrder.applicationCode}
@@ -953,7 +952,7 @@ function DisputeManagerPage() {
               {/* Included Items Order */}
               <div className="bg-white p-4 rounded-xl border border-slate-200 space-y-3">
                 <span className="font-bold text-slate-900 text-sm block border-b border-slate-100 pb-2">
-                  2. Document Assembly Order (Chronological)
+                  Document Order
                 </span>
                 <ol className="space-y-2 pl-4 list-decimal text-slate-800 font-medium">
                   {selectedEmailIds.map((id, i) => {
@@ -980,7 +979,7 @@ function DisputeManagerPage() {
               <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-[11px] text-amber-900 flex items-start gap-2">
                 <AlertTriangle className="size-4 text-amber-600 shrink-0 mt-0.5" />
                 <span>
-                  The final PDF is merged server-side with standard A4 margins, page numbering, running audit headers, and legal disclaimers.
+                  No summary page, evidence branding, legal statement, page footer, or certificate will be added.
                 </span>
               </div>
             </div>
@@ -1013,7 +1012,7 @@ function DisputeManagerPage() {
               Dispute Package Ready!
             </DialogTitle>
             <DialogDescription className="text-xs text-slate-500">
-              The evidence PDF has been compiled, numbered, and saved to private storage.
+               The exact email printouts and saved invoice have been combined and stored securely.
             </DialogDescription>
           </DialogHeader>
 
