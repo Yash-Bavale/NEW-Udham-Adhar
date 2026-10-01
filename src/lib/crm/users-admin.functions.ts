@@ -201,6 +201,7 @@ export const listStaffUsers = createServerFn({ method: "GET" })
         email: p?.email || uAuth?.email || "",
         full_name: resolvedName,
         mobile: p?.mobile ?? null,
+        smartflo_agent_id: p?.smartflo_agent_id ?? null,
         is_active: isActive,
         employment_status: employmentStatus,
         auto_assign_enabled: autoAssignEnabled,

@@ -120,6 +120,13 @@
       "when": 1790748072486,
       "tag": "0016_disable_sent_email_body_pruning",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1790830055499,
+      "tag": "0017_add_smartflo_agent_id_to_profiles",
+      "breakpoints": true
     }
   ]
 }
