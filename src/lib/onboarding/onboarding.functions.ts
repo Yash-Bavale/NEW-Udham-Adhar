@@ -279,14 +279,36 @@ export const submitOnboarding = createServerFn({ method: "POST" })
     }
 
 
-    // Find latest application (if any) to link
+    // Find latest application (if any) to link — fetch status fields so we can
+    // detect terminal orders and prevent a closed order from being re-opened.
     const { data: app } = await supabaseAdmin
       .from("applications")
-      .select("id")
+      .select("id, order_status, fulfillment_status, closure_stage, workflow_status")
       .eq("lead_id", lead.id)
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
+
+    // Determine whether the linked order is in a terminal state.
+    // A closed/completed/refunded order must NEVER be re-opened by a customer
+    // form submission — the form data is saved below, but status fields are left untouched.
+    const TERMINAL_ORDER_STATUSES = new Set(["CLOSED", "COMPLETED", "REFUNDED", "CANCELLED"]);
+    const CLOSED_FULFILLMENT = new Set([
+      "order_closed", "cancelled", "application_rejected", "certificate_rejected",
+      "order_completed", "completed", "certificate_delivered", "service_completed",
+      "application_approved", "approved", "refunded",
+    ]);
+    const isTerminalOrder = Boolean(
+      app &&
+      (
+        TERMINAL_ORDER_STATUSES.has((app.order_status ?? "").toUpperCase()) ||
+        CLOSED_FULFILLMENT.has(app.fulfillment_status ?? "") ||
+        app.closure_stage === "closed" ||
+        app.closure_stage === "final_ticket_closed" ||
+        app.workflow_status === "closed" ||
+        app.workflow_status === "refund_closed"
+      )
+    );
 
     const now = new Date().toISOString();
     const { error } = await supabaseAdmin
@@ -304,8 +326,9 @@ export const submitOnboarding = createServerFn({ method: "POST" })
       );
     if (error) throw new Error(error.message);
 
-    if (!data.draft && app?.id) {
-      // form_status is a free-text column managed alongside the audited status transition
+    if (!data.draft && app?.id && !isTerminalOrder) {
+      // form_status is a free-text column managed alongside the audited status transition.
+      // Only runs for active (non-terminal) orders — closed orders keep their status unchanged.
       await supabaseAdmin
         .from("applications")
         .update({
@@ -344,6 +367,13 @@ export const submitOnboarding = createServerFn({ method: "POST" })
       } catch (e) {
         console.error("[onboarding] cancelling form timers failed", e);
       }
+    } else if (!data.draft && app?.id && isTerminalOrder) {
+      // Order is closed/completed — log for visibility but do not touch any status fields.
+      console.warn(
+        `[onboarding] Skipped status update for terminal order ${app.id} ` +
+        `(order_status=${app.order_status}, fulfillment_status=${app.fulfillment_status}). ` +
+        `Form data has been saved to onboarding_submissions.`
+      );
     }
 
     // Fire completion emails on final submit (best-effort, never blocks)
