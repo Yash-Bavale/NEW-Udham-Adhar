@@ -3056,6 +3056,7 @@ export type Database = {
           is_active: boolean
           joining_date: string | null
           mobile: string | null
+          smartflo_agent_id: string | null
           updated_at: string
         }
         Insert: {
@@ -3069,6 +3070,7 @@ export type Database = {
           is_active?: boolean
           joining_date?: string | null
           mobile?: string | null
+          smartflo_agent_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -3082,6 +3084,7 @@ export type Database = {
           is_active?: boolean
           joining_date?: string | null
           mobile?: string | null
+          smartflo_agent_id?: string | null
           updated_at?: string
         }
         Relationships: []
