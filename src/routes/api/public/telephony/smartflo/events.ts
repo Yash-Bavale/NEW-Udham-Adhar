@@ -65,7 +65,21 @@ async function handle(request: Request): Promise<Response> {
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const db = supabaseAdmin as any;
-    const { data: existing } = await db.from("telephony_calls").select("*").eq("call_id", callId).maybeSingle();
+    let { data: existing } = await db.from("telephony_calls").select("*").eq("call_id", callId).maybeSingle();
+    // Outbound (Click-to-Call) rows are pre-created with the Smartflo ref_id before the PBX
+    // issues its own call_id — correlate on ref_id (then provider uuid) so the CRM links
+    // chosen by the agent are preserved instead of being re-derived from the caller number.
+    if (!existing) {
+      const refId = pick(input, "ref_id");
+      const providerUuid = pick(input, "uuid");
+      for (const probe of [refId ? { col: "ref_id", val: refId } : null, providerUuid ? { col: "provider_uuid", val: providerUuid } : null]) {
+        if (!probe || existing) continue;
+        const { data: m } = await db.from("telephony_calls").select("*")
+          .eq("direction", "outbound").eq(probe.col, probe.val)
+          .order("started_at", { ascending: false }).limit(1).maybeSingle();
+        if (m) existing = m;
+      }
+    }
     const now = new Date().toISOString();
     const status = ev === "hangup" ? hangupStatus(input, !!existing?.answered_at) : ev === "answered" ? "answered" : "ringing";
 
