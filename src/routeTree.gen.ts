@@ -153,6 +153,9 @@ import { Route as ApiPublicFormAssetSplatRouteImport } from './routes/api/public
 import { Route as ApiPublicGstLeadRouteImport } from './routes/api/public/gst/lead'
 import { Route as ApiPublicGstServicesRouteImport } from './routes/api/public/gst/services'
 import { Route as ApiPublicInvoiceLeadCodeRouteImport } from './routes/api/public/invoice.$leadCode'
+import { Route as ApiPublicSiteBrandRouteImport } from './routes/api/public/site/brand'
+import { Route as ApiPublicSiteLeadRouteImport } from './routes/api/public/site/lead'
+import { Route as ApiPublicSiteServicesRouteImport } from './routes/api/public/site/services'
 import { Route as ApiPublicV1LeadsRouteImport } from './routes/api/public/v1/leads'
 import { Route as ApiPublicV1ServicesRouteImport } from './routes/api/public/v1/services'
 import { Route as ApiPublicWebhooksCashfreeRouteImport } from './routes/api/public/webhooks/cashfree'
@@ -918,6 +921,21 @@ const ApiPublicInvoiceLeadCodeRoute =
     path: '/api/public/invoice/$leadCode',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicSiteBrandRoute = ApiPublicSiteBrandRouteImport.update({
+  id: '/api/public/site/brand',
+  path: '/api/public/site/brand',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicSiteLeadRoute = ApiPublicSiteLeadRouteImport.update({
+  id: '/api/public/site/lead',
+  path: '/api/public/site/lead',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicSiteServicesRoute = ApiPublicSiteServicesRouteImport.update({
+  id: '/api/public/site/services',
+  path: '/api/public/site/services',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicV1LeadsRoute = ApiPublicV1LeadsRouteImport.update({
   id: '/api/public/v1/leads',
   path: '/api/public/v1/leads',
@@ -1132,6 +1150,9 @@ export interface FileRoutesByFullPath {
   '/api/public/gst/lead': typeof ApiPublicGstLeadRoute
   '/api/public/gst/services': typeof ApiPublicGstServicesRoute
   '/api/public/invoice/$leadCode': typeof ApiPublicInvoiceLeadCodeRoute
+  '/api/public/site/brand': typeof ApiPublicSiteBrandRoute
+  '/api/public/site/lead': typeof ApiPublicSiteLeadRoute
+  '/api/public/site/services': typeof ApiPublicSiteServicesRoute
   '/api/public/v1/leads': typeof ApiPublicV1LeadsRoute
   '/api/public/v1/services': typeof ApiPublicV1ServicesRoute
   '/api/public/webhooks/cashfree': typeof ApiPublicWebhooksCashfreeRoute
@@ -1285,6 +1306,9 @@ export interface FileRoutesByTo {
   '/api/public/gst/lead': typeof ApiPublicGstLeadRoute
   '/api/public/gst/services': typeof ApiPublicGstServicesRoute
   '/api/public/invoice/$leadCode': typeof ApiPublicInvoiceLeadCodeRoute
+  '/api/public/site/brand': typeof ApiPublicSiteBrandRoute
+  '/api/public/site/lead': typeof ApiPublicSiteLeadRoute
+  '/api/public/site/services': typeof ApiPublicSiteServicesRoute
   '/api/public/v1/leads': typeof ApiPublicV1LeadsRoute
   '/api/public/v1/services': typeof ApiPublicV1ServicesRoute
   '/api/public/webhooks/cashfree': typeof ApiPublicWebhooksCashfreeRoute
@@ -1444,6 +1468,9 @@ export interface FileRoutesById {
   '/api/public/gst/lead': typeof ApiPublicGstLeadRoute
   '/api/public/gst/services': typeof ApiPublicGstServicesRoute
   '/api/public/invoice/$leadCode': typeof ApiPublicInvoiceLeadCodeRoute
+  '/api/public/site/brand': typeof ApiPublicSiteBrandRoute
+  '/api/public/site/lead': typeof ApiPublicSiteLeadRoute
+  '/api/public/site/services': typeof ApiPublicSiteServicesRoute
   '/api/public/v1/leads': typeof ApiPublicV1LeadsRoute
   '/api/public/v1/services': typeof ApiPublicV1ServicesRoute
   '/api/public/webhooks/cashfree': typeof ApiPublicWebhooksCashfreeRoute
@@ -1604,6 +1631,9 @@ export interface FileRouteTypes {
     | '/api/public/gst/lead'
     | '/api/public/gst/services'
     | '/api/public/invoice/$leadCode'
+    | '/api/public/site/brand'
+    | '/api/public/site/lead'
+    | '/api/public/site/services'
     | '/api/public/v1/leads'
     | '/api/public/v1/services'
     | '/api/public/webhooks/cashfree'
@@ -1757,6 +1787,9 @@ export interface FileRouteTypes {
     | '/api/public/gst/lead'
     | '/api/public/gst/services'
     | '/api/public/invoice/$leadCode'
+    | '/api/public/site/brand'
+    | '/api/public/site/lead'
+    | '/api/public/site/services'
     | '/api/public/v1/leads'
     | '/api/public/v1/services'
     | '/api/public/webhooks/cashfree'
@@ -1915,6 +1948,9 @@ export interface FileRouteTypes {
     | '/api/public/gst/lead'
     | '/api/public/gst/services'
     | '/api/public/invoice/$leadCode'
+    | '/api/public/site/brand'
+    | '/api/public/site/lead'
+    | '/api/public/site/services'
     | '/api/public/v1/leads'
     | '/api/public/v1/services'
     | '/api/public/webhooks/cashfree'
@@ -2011,6 +2047,9 @@ export interface RootRouteChildren {
   ApiPublicGstLeadRoute: typeof ApiPublicGstLeadRoute
   ApiPublicGstServicesRoute: typeof ApiPublicGstServicesRoute
   ApiPublicInvoiceLeadCodeRoute: typeof ApiPublicInvoiceLeadCodeRoute
+  ApiPublicSiteBrandRoute: typeof ApiPublicSiteBrandRoute
+  ApiPublicSiteLeadRoute: typeof ApiPublicSiteLeadRoute
+  ApiPublicSiteServicesRoute: typeof ApiPublicSiteServicesRoute
   ApiPublicV1LeadsRoute: typeof ApiPublicV1LeadsRoute
   ApiPublicV1ServicesRoute: typeof ApiPublicV1ServicesRoute
   ApiPublicWebhooksCashfreeRoute: typeof ApiPublicWebhooksCashfreeRoute
@@ -3035,6 +3074,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicInvoiceLeadCodeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/site/brand': {
+      id: '/api/public/site/brand'
+      path: '/api/public/site/brand'
+      fullPath: '/api/public/site/brand'
+      preLoaderRoute: typeof ApiPublicSiteBrandRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/site/lead': {
+      id: '/api/public/site/lead'
+      path: '/api/public/site/lead'
+      fullPath: '/api/public/site/lead'
+      preLoaderRoute: typeof ApiPublicSiteLeadRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/site/services': {
+      id: '/api/public/site/services'
+      path: '/api/public/site/services'
+      fullPath: '/api/public/site/services'
+      preLoaderRoute: typeof ApiPublicSiteServicesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/v1/leads': {
       id: '/api/public/v1/leads'
       path: '/api/public/v1/leads'
@@ -3429,6 +3489,9 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicGstLeadRoute: ApiPublicGstLeadRoute,
   ApiPublicGstServicesRoute: ApiPublicGstServicesRoute,
   ApiPublicInvoiceLeadCodeRoute: ApiPublicInvoiceLeadCodeRoute,
+  ApiPublicSiteBrandRoute: ApiPublicSiteBrandRoute,
+  ApiPublicSiteLeadRoute: ApiPublicSiteLeadRoute,
+  ApiPublicSiteServicesRoute: ApiPublicSiteServicesRoute,
   ApiPublicV1LeadsRoute: ApiPublicV1LeadsRoute,
   ApiPublicV1ServicesRoute: ApiPublicV1ServicesRoute,
   ApiPublicWebhooksCashfreeRoute: ApiPublicWebhooksCashfreeRoute,

@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 import { INDIAN_STATES, LANGUAGES } from "@/lib/constants";
-import { loadSite, resolveDomain, siteJson, siteOptions } from "@/lib/site-api.server";
+import { loadSite, resolveDomain, siteJson, siteOptions } from "@/lib/site-api";
 
 const Schema = z.object({
   name: z.string().trim().min(2, "Enter your name").max(120),

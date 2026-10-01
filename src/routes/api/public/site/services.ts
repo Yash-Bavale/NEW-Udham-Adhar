@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { loadSite, resolveDomain, siteJson, siteOptions } from "@/lib/site-api.server";
+import { loadSite, resolveDomain, siteJson, siteOptions } from "@/lib/site-api";
 
 /** Public: active services (code, name, price) for a customer website. */
 export const Route = createFileRoute("/api/public/site/services")({
