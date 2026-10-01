@@ -1062,6 +1062,65 @@ export type Database = {
         }
         Relationships: []
       }
+      dispute_evidence_records: {
+        Row: {
+          application_code: string | null
+          certificate_included: boolean
+          created_at: string
+          file_name: string
+          file_path: string
+          generated_at: string
+          generated_by: string | null
+          generated_by_name: string | null
+          id: string
+          invoice_included: boolean
+          item_count: number
+          metadata: Json | null
+          order_id: string
+          selected_email_ids: Json | null
+        }
+        Insert: {
+          application_code?: string | null
+          certificate_included?: boolean
+          created_at?: string
+          file_name: string
+          file_path: string
+          generated_at?: string
+          generated_by?: string | null
+          generated_by_name?: string | null
+          id?: string
+          invoice_included?: boolean
+          item_count?: number
+          metadata?: Json | null
+          order_id: string
+          selected_email_ids?: Json | null
+        }
+        Update: {
+          application_code?: string | null
+          certificate_included?: boolean
+          created_at?: string
+          file_name?: string
+          file_path?: string
+          generated_at?: string
+          generated_by?: string | null
+          generated_by_name?: string | null
+          id?: string
+          invoice_included?: boolean
+          item_count?: number
+          metadata?: Json | null
+          order_id?: string
+          selected_email_ids?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dispute_evidence_records_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "applications"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       documents: {
         Row: {
           application_id: string | null
