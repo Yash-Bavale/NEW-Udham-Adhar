@@ -107,6 +107,7 @@ function CustomerProfilePage() {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            <SmartfloCallButton mobile={c.primary_mobile} customerId={c.id} />
             {c.primary_mobile && (
               <a href={`tel:${c.primary_mobile}`} className="rounded-lg border px-3 py-1.5 text-xs inline-flex items-center gap-1.5 hover:bg-[var(--admin-surface-2)]" style={{ borderColor: "var(--admin-border)" }}>
                 <Phone className="size-3.5" /> Call
