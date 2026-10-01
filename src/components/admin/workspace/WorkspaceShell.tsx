@@ -13,6 +13,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { SmartfloCallButton } from "@/components/admin/telephony/SmartfloCallButton";
 
 import { CustomerJourneyMap } from "./CustomerJourneyMap";
 import { ChangeServiceButton } from "./ChangeServiceDialog";
@@ -721,7 +722,12 @@ export function WorkspaceShell(p: Props) {
                   {/* Customer fields */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-2.5 min-w-0">
                     <InfoRow icon={<User2 className="w-3.5 h-3.5" />} label="Customer Name" value={cName} />
-                    <InfoRow icon={<Phone className="w-3.5 h-3.5" />} label="Mobile Number" value={cMobile ? <a href={`tel:${cMobile}`} className="font-mono hover:text-indigo-700">{cMobile}</a> : "—"} />
+                    <InfoRow icon={<Phone className="w-3.5 h-3.5" />} label="Mobile Number" value={cMobile ? (
+                      <span className="flex flex-wrap items-center gap-2">
+                        <a href={`tel:${cMobile}`} className="font-mono hover:text-indigo-700">{cMobile}</a>
+                        <SmartfloCallButton mobile={cMobile} applicationId={p.orderId} leadId={application.lead_id ?? null} customerId={application.customer_id ?? null} compact />
+                      </span>
+                    ) : "—"} />
                     <InfoRow icon={<Mail className="w-3.5 h-3.5" />} label="Email ID" value={cEmail ? <span className="truncate block">{cEmail}</span> : "—"} />
                     <InfoRow label="State" value={cState} />
                     <InfoRow label="Language" value={cLanguage} />

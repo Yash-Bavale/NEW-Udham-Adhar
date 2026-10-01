@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { SmartfloCallButton } from "@/components/admin/telephony/SmartfloCallButton";
 import { format } from "date-fns";
 import {
   AlertTriangle,

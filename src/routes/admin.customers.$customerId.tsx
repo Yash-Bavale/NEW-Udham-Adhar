@@ -14,6 +14,7 @@ import { SectionCard, StatCard, StatusBadge, Timeline, TableSkeleton } from "@/c
 import { LeadFormSubmissionInline } from "@/components/admin/LeadFormSubmissionInline";
 import { computeOrderStage, STAGE_META, STAGE_BADGE_CLASS } from "@/lib/crm/computeOrderStage";
 import { useRole } from "@/hooks/useRole";
+import { SmartfloCallButton } from "@/components/admin/telephony/SmartfloCallButton";
 
 export const Route = createFileRoute("/admin/customers/$customerId")({
   head: () => ({ meta: [{ title: "Customer Profile — CRM" }, { name: "robots", content: "noindex,nofollow" }] }),
