@@ -1,27 +1,11 @@
 import { PDFDocument, PDFPage, PDFFont, StandardFonts, rgb, type RGB } from "pdf-lib";
 
-// Brand Colors
+// PDF colors used for the plain-text fallback only.
 const NAVY = rgb(0.07, 0.13, 0.27);
-const NAVY_SOFT = rgb(0.14, 0.22, 0.4);
-const ACCENT = rgb(0.95, 0.62, 0.07);
 const TEXT_DARK = rgb(0.12, 0.15, 0.22);
 const TEXT_MUTED = rgb(0.45, 0.48, 0.55);
-const BORDER_COLOR = rgb(0.84, 0.86, 0.9);
-const LIGHT_BG = rgb(0.96, 0.97, 0.99);
-const WHITE = rgb(1, 1, 1);
 
-const COMPANY_NAME = "Business Help Services";
 const COMPANY_EMAIL = "help@businesshelpservices.com";
-const COMPANY_PHONE = "+91-9767870331";
-const COMPANY_ADDRESS = "Koregaon Bk, Taluka-Khed, Pune, Maharashtra - 410505, India";
-const COMPANY_GSTIN = "27COFPD1743E2ZB";
-
-function base64ToBytes(b64: string): Uint8Array {
-  const bin = atob(b64);
-  const out = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
-  return out;
-}
 
 function safePdfText(value: string | null | undefined): string {
   return String(value ?? "")
@@ -182,7 +166,7 @@ export interface DisputePackageData {
 }
 
 /**
- * Render standard CRM email preview HTML page with Evidence Header and exact stored sent email HTML
+ * Render a plain mail-print header followed by the exact stored sent email HTML.
  */
 function decodeStoredHtml(value: string): string {
   if (!/^\s*&lt;(?:!doctype|html|table|div|body)\b/i.test(value)) return value;
