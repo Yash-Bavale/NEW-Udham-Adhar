@@ -937,18 +937,50 @@ function WorkAccessModal({ row, open, onOpenChange, onSaved }: { row: any; open:
   );
 }
 
+const LOGIN_URL = "https://crm.businesshelpservices.com/admin-login";
+
+/** Same charset as server-side generateTempPassword — safe, readable characters */
+function clientGeneratePassword() {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
+  let out = "";
+  for (let i = 0; i < 12; i++) out += chars[Math.floor(Math.random() * chars.length)];
+  return out + "!9";
+}
+
 function ResetPasswordModal({ row, open, onOpenChange }: { row: any; open: boolean; onOpenChange: (o: boolean) => void }) {
   const resetFn = useServerFn(resetEmployeePassword);
-  const [password, setPassword] = useState("");
+  const [password, setPassword] = useState(() => clientGeneratePassword());
+  const [showPw, setShowPw] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+
+  // Re-generate a fresh password whenever the dialog opens
+  const handleOpenChange = (o: boolean) => {
+    if (o) {
+      setPassword(clientGeneratePassword());
+      setSaved(false);
+      setCopied(false);
+      setCopiedField(null);
+      setShowPw(true);
+    }
+    onOpenChange(o);
+  };
+
+  const regenerate = () => {
+    setPassword(clientGeneratePassword());
+    setCopied(false);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (password.length < 8) return;
     setBusy(true);
     try {
       await resetFn({ data: { user_id: row.id, new_password: password } });
       toast.success(`Password reset for ${row.email}`);
-      onOpenChange(false);
+      setSaved(true);
     } catch (err) {
       toast.error((err as Error).message);
     } finally {
@@ -956,24 +988,187 @@ function ResetPasswordModal({ row, open, onOpenChange }: { row: any; open: boole
     }
   };
 
+  const copyField = async (value: string, field: string) => {
+    await navigator.clipboard.writeText(value);
+    setCopiedField(field);
+    setTimeout(() => setCopiedField(null), 2000);
+  };
+
+  const copyAll = async () => {
+    const text = [
+      `Login URL: ${LOGIN_URL}`,
+      `User ID: ${row.email}`,
+      `Password: ${password}`,
+    ].join("\n");
+    await navigator.clipboard.writeText(text);
+    setCopied(true);
+    toast.success("Credentials copied to clipboard!");
+    setTimeout(() => setCopied(false), 3000);
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[400px]">
-        <DialogHeader>
-          <DialogTitle className="text-base font-bold">Reset Password: {row.email}</DialogTitle>
-        </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-3 text-xs">
-          <div>
-            <Label className="text-xs">New Password</Label>
-            <Input required type="password" minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Minimum 8 characters" className="mt-1" />
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent className="sm:max-w-[440px] p-0 overflow-hidden">
+        {/* Header */}
+        <div className="px-5 pt-5 pb-3 border-b">
+          <div className="flex items-center gap-2">
+            <div className="size-8 rounded-lg bg-indigo-100 flex items-center justify-center flex-shrink-0">
+              <KeyRound className="size-4 text-indigo-600" />
+            </div>
+            <div>
+              <DialogTitle className="text-sm font-bold leading-tight">Reset Password</DialogTitle>
+              <p className="text-[11px] text-slate-500 mt-0.5 truncate max-w-[320px]">{row.email}</p>
+            </div>
           </div>
-          <DialogFooter className="mt-4">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-            <Button type="submit" disabled={busy} className="bg-indigo-600 hover:bg-indigo-700 text-white">
-              {busy ? "Resetting…" : "Set New Password"}
+        </div>
+
+        {!saved ? (
+          /* ── STEP 1: Set password ── */
+          <form onSubmit={handleSubmit} className="px-5 py-4 space-y-4">
+            <div>
+              <Label className="text-xs font-semibold text-slate-700">New Password</Label>
+              <p className="text-[10px] text-slate-400 mb-2">Auto-generated. You can regenerate or type your own.</p>
+              <div className="flex gap-1.5">
+                <div className="relative flex-1">
+                  <Input
+                    required
+                    type={showPw ? "text" : "password"}
+                    minLength={8}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Minimum 8 characters"
+                    className="pr-9 font-mono text-sm tracking-wider"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPw((v) => !v)}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                    tabIndex={-1}
+                    aria-label={showPw ? "Hide password" : "Show password"}
+                  >
+                    {showPw ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
+                  </button>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={regenerate}
+                  className="px-2.5 text-slate-600 shrink-0"
+                  title="Generate new password"
+                >
+                  <RotateCcw className="size-3.5" />
+                </Button>
+              </div>
+              {password.length > 0 && password.length < 8 && (
+                <p className="text-[10px] text-rose-500 mt-1">Minimum 8 characters required.</p>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-2 pt-1">
+              <Button type="button" variant="outline" size="sm" onClick={() => handleOpenChange(false)}>Cancel</Button>
+              <Button
+                type="submit"
+                size="sm"
+                disabled={busy || password.length < 8}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white min-w-[120px]"
+              >
+                {busy ? "Saving…" : "Save New Password"}
+              </Button>
+            </div>
+          </form>
+        ) : (
+          /* ── STEP 2: Credentials card shown after successful reset ── */
+          <div className="px-5 py-4 space-y-4">
+            <div className="flex items-center gap-2 text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
+              <Check className="size-4 flex-shrink-0" />
+              <p className="text-xs font-semibold">Password updated successfully!</p>
+            </div>
+
+            <div className="rounded-xl border border-slate-200 bg-slate-50 overflow-hidden divide-y divide-slate-200">
+              {/* Login Link */}
+              <div className="flex items-center gap-2 px-3 py-2.5">
+                <div className="flex-1 min-w-0">
+                  <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Login URL</p>
+                  <p className="text-xs text-slate-700 font-medium truncate mt-0.5">{LOGIN_URL}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => copyField(LOGIN_URL, "url")}
+                  className="shrink-0 p-1.5 rounded hover:bg-slate-200 text-slate-400 hover:text-slate-700 transition-colors"
+                  title="Copy URL"
+                >
+                  {copiedField === "url" ? <Check className="size-3.5 text-emerald-600" /> : <Copy className="size-3.5" />}
+                </button>
+              </div>
+
+              {/* User ID */}
+              <div className="flex items-center gap-2 px-3 py-2.5">
+                <div className="flex-1 min-w-0">
+                  <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">User ID (Email)</p>
+                  <p className="text-xs text-slate-700 font-medium truncate mt-0.5">{row.email}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => copyField(row.email, "email")}
+                  className="shrink-0 p-1.5 rounded hover:bg-slate-200 text-slate-400 hover:text-slate-700 transition-colors"
+                  title="Copy email"
+                >
+                  {copiedField === "email" ? <Check className="size-3.5 text-emerald-600" /> : <Copy className="size-3.5" />}
+                </button>
+              </div>
+
+              {/* Password */}
+              <div className="flex items-center gap-2 px-3 py-2.5">
+                <div className="flex-1 min-w-0">
+                  <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Password</p>
+                  <p className="text-xs text-slate-700 font-mono tracking-wider mt-0.5">
+                    {showPw ? password : "•".repeat(password.length)}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowPw((v) => !v)}
+                  className="shrink-0 p-1.5 rounded hover:bg-slate-200 text-slate-400 hover:text-slate-700 transition-colors"
+                  title={showPw ? "Hide" : "Show"}
+                >
+                  {showPw ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => copyField(password, "pw")}
+                  className="shrink-0 p-1.5 rounded hover:bg-slate-200 text-slate-400 hover:text-slate-700 transition-colors"
+                  title="Copy password"
+                >
+                  {copiedField === "pw" ? <Check className="size-3.5 text-emerald-600" /> : <Copy className="size-3.5" />}
+                </button>
+              </div>
+            </div>
+
+            {/* Copy all button */}
+            <Button
+              type="button"
+              onClick={copyAll}
+              className={`w-full text-xs font-semibold transition-colors ${
+                copied
+                  ? "bg-emerald-600 hover:bg-emerald-700 text-white"
+                  : "bg-indigo-600 hover:bg-indigo-700 text-white"
+              }`}
+            >
+              {copied ? (
+                <><Check className="size-3.5 mr-1.5" /> Credentials Copied!</>
+              ) : (
+                <><Copy className="size-3.5 mr-1.5" /> Copy All Credentials</>
+              )}
             </Button>
-          </DialogFooter>
-        </form>
+
+            <div className="flex justify-end">
+              <Button type="button" variant="ghost" size="sm" className="text-xs text-slate-500" onClick={() => handleOpenChange(false)}>
+                Done
+              </Button>
+            </div>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );
