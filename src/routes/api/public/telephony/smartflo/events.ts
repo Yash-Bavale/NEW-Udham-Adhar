@@ -65,7 +65,21 @@ async function handle(request: Request): Promise<Response> {
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const db = supabaseAdmin as any;
-    const { data: existing } = await db.from("telephony_calls").select("*").eq("call_id", callId).maybeSingle();
+    let { data: existing } = await db.from("telephony_calls").select("*").eq("call_id", callId).maybeSingle();
+    // Outbound (Click-to-Call) rows are pre-created with the Smartflo ref_id before the PBX
+    // issues its own call_id — correlate on ref_id (then provider uuid) so the CRM links
+    // chosen by the agent are preserved instead of being re-derived from the caller number.
+    if (!existing) {
+      const refId = pick(input, "ref_id");
+      const providerUuid = pick(input, "uuid");
+      for (const probe of [refId ? { col: "ref_id", val: refId } : null, providerUuid ? { col: "provider_uuid", val: providerUuid } : null]) {
+        if (!probe || existing) continue;
+        const { data: m } = await db.from("telephony_calls").select("*")
+          .eq("direction", "outbound").eq(probe.col, probe.val)
+          .order("started_at", { ascending: false }).limit(1).maybeSingle();
+        if (m) existing = m;
+      }
+    }
     const now = new Date().toISOString();
     const status = ev === "hangup" ? hangupStatus(input, !!existing?.answered_at) : ev === "answered" ? "answered" : "ringing";
 
@@ -79,6 +93,10 @@ async function handle(request: Request): Promise<Response> {
 
     const row: Record<string, unknown> = { call_id: callId, status, last_event: ev, updated_at: now };
     const ref = pick(input, "ref_id"); if (ref) row.ref_id = ref;
+    // Pre-linked outbound row: fill in the PBX identifiers, never the CRM relationships.
+    if (existing && existing.direction === "outbound" && !existing.provider_uuid) {
+      const u = pick(input, "uuid"); if (u) row.provider_uuid = u;
+    }
     if (!existing) {
       const rawNum = pick(input, "caller_id_number", "customer_no_with_prefix", "customer_number");
       const mobile = normalizeIndianMobile(rawNum);
@@ -105,7 +123,11 @@ async function handle(request: Request): Promise<Response> {
       const d = Number(pick(input, "billsec") ?? pick(input, "duration") ?? NaN);
       row.duration_seconds = Number.isFinite(d) ? Math.round(d) : start ? Math.max(0, Math.round((Date.now() - new Date(String(start)).getTime()) / 1000)) : 0;
     }
-    const { error } = await db.from("telephony_calls").upsert(row, { onConflict: "call_id" });
+    // Existing row (inbound or pre-linked outbound): update in place by primary key so a
+    // ref_id-matched outbound call is never duplicated when the PBX sends its own call_id.
+    const { error } = existing
+      ? await db.from("telephony_calls").update(row).eq("id", existing.id)
+      : await db.from("telephony_calls").upsert(row, { onConflict: "call_id" });
     if (error) throw error;
     return new Response(JSON.stringify({ ok: true }), { status: 200, headers });
   } catch (e) {

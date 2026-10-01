@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { SmartfloCallButton } from "@/components/admin/telephony/SmartfloCallButton";
 import { format } from "date-fns";
 import {
   AlertTriangle,
@@ -288,6 +289,12 @@ function CustomerQuickCard({ lead }: { lead: LeadShape }) {
           )}
         </div>
       </div>
+
+      {lead.mobile ? (
+        <div className="px-4 py-3 border-b border-slate-100 bg-white">
+          <SmartfloCallButton mobile={lead.mobile} leadId={lead.id} customerId={(lead as any).customer_id ?? null} className="w-full inline-flex items-center justify-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed transition" />
+        </div>
+      ) : null}
 
       {/* Communication buttons — right under the highlighted identity, so actions are inline on mobile */}
       <div className="grid grid-cols-3 border-b border-slate-100">
