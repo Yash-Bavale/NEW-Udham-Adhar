@@ -72,6 +72,7 @@ import { Route as AdminGatewaysRouteImport } from './routes/admin.gateways'
 import { Route as AdminInboxManagementRouteImport } from './routes/admin.inbox-management'
 import { Route as AdminInvoicesRouteImport } from './routes/admin.invoices'
 import { Route as AdminLeadsRouteImport } from './routes/admin.leads'
+import { Route as AdminLiveCallsRouteImport } from './routes/admin.live-calls'
 import { Route as AdminMyPerformanceRouteImport } from './routes/admin.my-performance'
 import { Route as AdminMyWorkRouteImport } from './routes/admin.my-work'
 import { Route as AdminNotificationsRouteImport } from './routes/admin.notifications'
@@ -165,6 +166,7 @@ import { Route as LovableEmailQueueProcessRouteImport } from './routes/lovable/e
 import { Route as LovableEmailTransactionalPreviewRouteImport } from './routes/lovable/email/transactional/preview'
 import { Route as LovableEmailTransactionalSendRouteImport } from './routes/lovable/email/transactional/send'
 import { Route as ApiPublicTelephonySmartfloDialplanRouteImport } from './routes/api/public/telephony/smartflo/dialplan'
+import { Route as ApiPublicTelephonySmartfloEventsRouteImport } from './routes/api/public/telephony/smartflo/events'
 import { Route as ApiPublicV1ApplicationsSummaryRouteImport } from './routes/api/public/v1/applications/summary'
 import { Route as ApiPublicV1PaymentsInitiateRouteImport } from './routes/api/public/v1/payments/initiate'
 import { Route as ApiPublicV1PaymentsLeadCodeStatusRouteImport } from './routes/api/public/v1/payments/$leadCode.status'
@@ -490,6 +492,11 @@ const AdminInvoicesRoute = AdminInvoicesRouteImport.update({
 const AdminLeadsRoute = AdminLeadsRouteImport.update({
   id: '/leads',
   path: '/leads',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminLiveCallsRoute = AdminLiveCallsRouteImport.update({
+  id: '/live-calls',
+  path: '/live-calls',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminMyPerformanceRoute = AdminMyPerformanceRouteImport.update({
@@ -987,6 +994,12 @@ const ApiPublicTelephonySmartfloDialplanRoute =
     path: '/api/public/telephony/smartflo/dialplan',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicTelephonySmartfloEventsRoute =
+  ApiPublicTelephonySmartfloEventsRouteImport.update({
+    id: '/api/public/telephony/smartflo/events',
+    path: '/api/public/telephony/smartflo/events',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicV1ApplicationsSummaryRoute =
   ApiPublicV1ApplicationsSummaryRouteImport.update({
     id: '/api/public/v1/applications/summary',
@@ -1069,6 +1082,7 @@ export interface FileRoutesByFullPath {
   '/admin/inbox-management': typeof AdminInboxManagementRoute
   '/admin/invoices': typeof AdminInvoicesRoute
   '/admin/leads': typeof AdminLeadsRouteWithChildren
+  '/admin/live-calls': typeof AdminLiveCallsRoute
   '/admin/my-performance': typeof AdminMyPerformanceRoute
   '/admin/my-work': typeof AdminMyWorkRoute
   '/admin/notifications': typeof AdminNotificationsRoute
@@ -1163,6 +1177,7 @@ export interface FileRoutesByFullPath {
   '/lovable/email/transactional/send': typeof LovableEmailTransactionalSendRoute
   '/admin/support/tickets/': typeof AdminSupportTicketsIndexRoute
   '/api/public/telephony/smartflo/dialplan': typeof ApiPublicTelephonySmartfloDialplanRoute
+  '/api/public/telephony/smartflo/events': typeof ApiPublicTelephonySmartfloEventsRoute
   '/api/public/v1/applications/summary': typeof ApiPublicV1ApplicationsSummaryRoute
   '/api/public/v1/payments/initiate': typeof ApiPublicV1PaymentsInitiateRoute
   '/api/public/v1/payments/$leadCode/status': typeof ApiPublicV1PaymentsLeadCodeStatusRoute
@@ -1228,6 +1243,7 @@ export interface FileRoutesByTo {
   '/admin/gateways': typeof AdminGatewaysRoute
   '/admin/inbox-management': typeof AdminInboxManagementRoute
   '/admin/invoices': typeof AdminInvoicesRoute
+  '/admin/live-calls': typeof AdminLiveCallsRoute
   '/admin/my-performance': typeof AdminMyPerformanceRoute
   '/admin/my-work': typeof AdminMyWorkRoute
   '/admin/notifications': typeof AdminNotificationsRoute
@@ -1319,6 +1335,7 @@ export interface FileRoutesByTo {
   '/lovable/email/transactional/send': typeof LovableEmailTransactionalSendRoute
   '/admin/support/tickets': typeof AdminSupportTicketsIndexRoute
   '/api/public/telephony/smartflo/dialplan': typeof ApiPublicTelephonySmartfloDialplanRoute
+  '/api/public/telephony/smartflo/events': typeof ApiPublicTelephonySmartfloEventsRoute
   '/api/public/v1/applications/summary': typeof ApiPublicV1ApplicationsSummaryRoute
   '/api/public/v1/payments/initiate': typeof ApiPublicV1PaymentsInitiateRoute
   '/api/public/v1/payments/$leadCode/status': typeof ApiPublicV1PaymentsLeadCodeStatusRoute
@@ -1387,6 +1404,7 @@ export interface FileRoutesById {
   '/admin/inbox-management': typeof AdminInboxManagementRoute
   '/admin/invoices': typeof AdminInvoicesRoute
   '/admin/leads': typeof AdminLeadsRouteWithChildren
+  '/admin/live-calls': typeof AdminLiveCallsRoute
   '/admin/my-performance': typeof AdminMyPerformanceRoute
   '/admin/my-work': typeof AdminMyWorkRoute
   '/admin/notifications': typeof AdminNotificationsRoute
@@ -1481,6 +1499,7 @@ export interface FileRoutesById {
   '/lovable/email/transactional/send': typeof LovableEmailTransactionalSendRoute
   '/admin/support/tickets/': typeof AdminSupportTicketsIndexRoute
   '/api/public/telephony/smartflo/dialplan': typeof ApiPublicTelephonySmartfloDialplanRoute
+  '/api/public/telephony/smartflo/events': typeof ApiPublicTelephonySmartfloEventsRoute
   '/api/public/v1/applications/summary': typeof ApiPublicV1ApplicationsSummaryRoute
   '/api/public/v1/payments/initiate': typeof ApiPublicV1PaymentsInitiateRoute
   '/api/public/v1/payments/$leadCode/status': typeof ApiPublicV1PaymentsLeadCodeStatusRoute
@@ -1550,6 +1569,7 @@ export interface FileRouteTypes {
     | '/admin/inbox-management'
     | '/admin/invoices'
     | '/admin/leads'
+    | '/admin/live-calls'
     | '/admin/my-performance'
     | '/admin/my-work'
     | '/admin/notifications'
@@ -1644,6 +1664,7 @@ export interface FileRouteTypes {
     | '/lovable/email/transactional/send'
     | '/admin/support/tickets/'
     | '/api/public/telephony/smartflo/dialplan'
+    | '/api/public/telephony/smartflo/events'
     | '/api/public/v1/applications/summary'
     | '/api/public/v1/payments/initiate'
     | '/api/public/v1/payments/$leadCode/status'
@@ -1709,6 +1730,7 @@ export interface FileRouteTypes {
     | '/admin/gateways'
     | '/admin/inbox-management'
     | '/admin/invoices'
+    | '/admin/live-calls'
     | '/admin/my-performance'
     | '/admin/my-work'
     | '/admin/notifications'
@@ -1800,6 +1822,7 @@ export interface FileRouteTypes {
     | '/lovable/email/transactional/send'
     | '/admin/support/tickets'
     | '/api/public/telephony/smartflo/dialplan'
+    | '/api/public/telephony/smartflo/events'
     | '/api/public/v1/applications/summary'
     | '/api/public/v1/payments/initiate'
     | '/api/public/v1/payments/$leadCode/status'
@@ -1867,6 +1890,7 @@ export interface FileRouteTypes {
     | '/admin/inbox-management'
     | '/admin/invoices'
     | '/admin/leads'
+    | '/admin/live-calls'
     | '/admin/my-performance'
     | '/admin/my-work'
     | '/admin/notifications'
@@ -1961,6 +1985,7 @@ export interface FileRouteTypes {
     | '/lovable/email/transactional/send'
     | '/admin/support/tickets/'
     | '/api/public/telephony/smartflo/dialplan'
+    | '/api/public/telephony/smartflo/events'
     | '/api/public/v1/applications/summary'
     | '/api/public/v1/payments/initiate'
     | '/api/public/v1/payments/$leadCode/status'
@@ -2059,6 +2084,7 @@ export interface RootRouteChildren {
   LovableEmailTransactionalPreviewRoute: typeof LovableEmailTransactionalPreviewRoute
   LovableEmailTransactionalSendRoute: typeof LovableEmailTransactionalSendRoute
   ApiPublicTelephonySmartfloDialplanRoute: typeof ApiPublicTelephonySmartfloDialplanRoute
+  ApiPublicTelephonySmartfloEventsRoute: typeof ApiPublicTelephonySmartfloEventsRoute
   ApiPublicV1ApplicationsSummaryRoute: typeof ApiPublicV1ApplicationsSummaryRoute
   ApiPublicV1PaymentsInitiateRoute: typeof ApiPublicV1PaymentsInitiateRoute
   ApiPublicV1PaymentsLeadCodeStatusRoute: typeof ApiPublicV1PaymentsLeadCodeStatusRoute
@@ -2505,6 +2531,13 @@ declare module '@tanstack/react-router' {
       path: '/leads'
       fullPath: '/admin/leads'
       preLoaderRoute: typeof AdminLeadsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/live-calls': {
+      id: '/admin/live-calls'
+      path: '/live-calls'
+      fullPath: '/admin/live-calls'
+      preLoaderRoute: typeof AdminLiveCallsRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/my-performance': {
@@ -3158,6 +3191,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicTelephonySmartfloDialplanRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/telephony/smartflo/events': {
+      id: '/api/public/telephony/smartflo/events'
+      path: '/api/public/telephony/smartflo/events'
+      fullPath: '/api/public/telephony/smartflo/events'
+      preLoaderRoute: typeof ApiPublicTelephonySmartfloEventsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/v1/applications/summary': {
       id: '/api/public/v1/applications/summary'
       path: '/api/public/v1/applications/summary'
@@ -3319,6 +3359,7 @@ interface AdminRouteChildren {
   AdminInboxManagementRoute: typeof AdminInboxManagementRoute
   AdminInvoicesRoute: typeof AdminInvoicesRoute
   AdminLeadsRoute: typeof AdminLeadsRouteWithChildren
+  AdminLiveCallsRoute: typeof AdminLiveCallsRoute
   AdminMyPerformanceRoute: typeof AdminMyPerformanceRoute
   AdminMyWorkRoute: typeof AdminMyWorkRoute
   AdminNotificationsRoute: typeof AdminNotificationsRoute
@@ -3371,6 +3412,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminInboxManagementRoute: AdminInboxManagementRoute,
   AdminInvoicesRoute: AdminInvoicesRoute,
   AdminLeadsRoute: AdminLeadsRouteWithChildren,
+  AdminLiveCallsRoute: AdminLiveCallsRoute,
   AdminMyPerformanceRoute: AdminMyPerformanceRoute,
   AdminMyWorkRoute: AdminMyWorkRoute,
   AdminNotificationsRoute: AdminNotificationsRoute,
@@ -3502,6 +3544,7 @@ const rootRouteChildren: RootRouteChildren = {
   LovableEmailTransactionalSendRoute: LovableEmailTransactionalSendRoute,
   ApiPublicTelephonySmartfloDialplanRoute:
     ApiPublicTelephonySmartfloDialplanRoute,
+  ApiPublicTelephonySmartfloEventsRoute: ApiPublicTelephonySmartfloEventsRoute,
   ApiPublicV1ApplicationsSummaryRoute: ApiPublicV1ApplicationsSummaryRoute,
   ApiPublicV1PaymentsInitiateRoute: ApiPublicV1PaymentsInitiateRoute,
   ApiPublicV1PaymentsLeadCodeStatusRoute:
