@@ -76,7 +76,7 @@ async function renderEmailCanvas(email: PrintableEmail) {
   const html2canvas = (await import("html2canvas")).default;
   const iframe = document.createElement("iframe");
   iframe.setAttribute("sandbox", "allow-same-origin");
-  iframe.style.cssText = "position:fixed;left:-10000px;top:0;width:794px;height:1123px;border:0;visibility:hidden";
+  iframe.style.cssText = "position:fixed;left:-10000px;top:0;width:794px;height:1123px;border:0;pointer-events:none";
   document.body.appendChild(iframe);
   try {
     const doc = iframe.contentDocument;

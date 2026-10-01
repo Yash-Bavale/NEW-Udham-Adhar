@@ -238,6 +238,14 @@ export const searchDisputeOrder = createServerFn({ method: "POST" })
       queueById.set(q.id, q);
     }
 
+    const attachmentNames = (row: any): string[] => {
+      const raw = row?.variables?.__attachments;
+      if (!Array.isArray(raw)) return [];
+      return raw
+        .map((attachment: any) => typeof attachment?.filename === "string" ? attachment.filename : "")
+        .filter(Boolean);
+    };
+
     const dedupMap = new Map<string, any>();
     for (const l of (emailLogsRes.data ?? [])) {
       const key = l.queue_id ? `q:${l.queue_id}` : l.message_id ? `m:${l.message_id}` : `l:${l.id}`;
@@ -256,6 +264,7 @@ export const searchDisputeOrder = createServerFn({ method: "POST" })
         attempt: l.attempt ?? 1,
         error_message: l.error_message || null,
         smtp_response: l.smtp_response || null,
+        attachment_names: attachmentNames(q),
       };
 
       // Filter: only include emails that were actually sent or attempted
@@ -286,6 +295,7 @@ export const searchDisputeOrder = createServerFn({ method: "POST" })
             attempt: q.attempts ?? 1,
             error_message: q.last_error || null,
             smtp_response: null,
+            attachment_names: attachmentNames(q),
           });
         }
       }
