@@ -3951,10 +3951,14 @@ export type Database = {
           duration_seconds: number | null
           employee_id: string | null
           ended_at: string | null
+          hangup_cause: string | null
           id: string
+          last_event: string | null
           lead_id: string | null
           provider: string
           provider_uuid: string | null
+          recording_url: string | null
+          ref_id: string | null
           started_at: string
           status: string
           updated_at: string
@@ -3976,10 +3980,14 @@ export type Database = {
           duration_seconds?: number | null
           employee_id?: string | null
           ended_at?: string | null
+          hangup_cause?: string | null
           id?: string
+          last_event?: string | null
           lead_id?: string | null
           provider?: string
           provider_uuid?: string | null
+          recording_url?: string | null
+          ref_id?: string | null
           started_at?: string
           status?: string
           updated_at?: string
@@ -4001,10 +4009,14 @@ export type Database = {
           duration_seconds?: number | null
           employee_id?: string | null
           ended_at?: string | null
+          hangup_cause?: string | null
           id?: string
+          last_event?: string | null
           lead_id?: string | null
           provider?: string
           provider_uuid?: string | null
+          recording_url?: string | null
+          ref_id?: string | null
           started_at?: string
           status?: string
           updated_at?: string
