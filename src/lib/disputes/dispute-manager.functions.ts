@@ -483,6 +483,14 @@ export const generateDisputeEvidencePackage = createServerFn({ method: "POST" })
         queueById.set(q.id, q);
       }
 
+      const attachmentNames = (row: any): string[] => {
+        const raw = row?.variables?.__attachments;
+        if (!Array.isArray(raw)) return [];
+        return raw
+          .map((attachment: any) => typeof attachment?.filename === "string" ? attachment.filename : "")
+          .filter(Boolean);
+      };
+
       const emailMap = new Map<string, any>();
       for (const q of (queue ?? [])) {
         emailMap.set(q.id, {
@@ -496,6 +504,7 @@ export const generateDisputeEvidencePackage = createServerFn({ method: "POST" })
           body_html: q.body_html || null,
           body_text: q.body_text || null,
           message_id: null,
+          attachment_names: attachmentNames(q),
         });
       }
 
@@ -512,6 +521,7 @@ export const generateDisputeEvidencePackage = createServerFn({ method: "POST" })
           body_html: l.body_html || q?.body_html || null,
           body_text: l.body_text || q?.body_text || null,
           message_id: l.message_id || null,
+          attachment_names: attachmentNames(q),
         });
       }
 

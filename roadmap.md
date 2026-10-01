@@ -5,4 +5,5 @@
 - [ ] Switch sending to ZeptoMail — blocked: need ZeptoMail send token + verified sender address
 - [ ] Release the 74 held emails in batches after the switch and verify delivery
 - [ ] Smartflo config: agent_id column (done), listStaffUsers mapping (done), secrets SMARTFLO_WEBHOOK_SECRET/FALLBACK_TYPE/FALLBACK_ID (pending user form), webhook portal config answer (done), verify + publish
-- [ ] Rebuild dispute PDF output as exact selected email printouts plus selected invoice, without the summary/evidence cover or evidence branding
+- [x] Rebuild dispute PDF output as exact selected email printouts plus selected invoice, without the summary/evidence cover or evidence branding
+- [ ] Configure the secure HTML-to-PDF renderer before generating the first production package
