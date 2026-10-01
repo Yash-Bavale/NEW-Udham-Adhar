@@ -35,6 +35,7 @@ export const Route = createFileRoute("/admin")({
 });
 
 import { useEmployeePresence } from "@/hooks/useEmployeePresence";
+import { TelephonyPanel } from "@/components/admin/telephony/TelephonyPanel";
 import { FinancialVisibilityProvider } from "@/hooks/useFinancialVisibility";
 
 function AdminLayout() {
@@ -70,6 +71,7 @@ function AdminLayout() {
     <FinancialVisibilityProvider>
       <AdminShell email={email}>
         <Outlet />
+        <TelephonyPanel />
       </AdminShell>
     </FinancialVisibilityProvider>
   );

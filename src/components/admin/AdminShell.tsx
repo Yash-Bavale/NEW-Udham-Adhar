@@ -121,6 +121,7 @@ const NAV: NavGroup[] = [
     items: [
       { to: "/admin/employees", label: "Employees", icon: UserCog, module: "employees", requireAnyRole: ADMIN_ROLES },
       { to: "/admin/assignment-history", label: "Assignment & Leaves", icon: History, requireAnyRole: ADMIN_ROLES },
+      { to: "/admin/live-calls", label: "Live Calls", icon: Activity, requireAnyRole: ADMIN_ROLES },
       { to: "/admin/sessions", label: "Sessions & Security", icon: ShieldAlert, requireAnyRole: ADMIN_ROLES },
       { to: "/admin/users", label: "Users & Roles", icon: ShieldCheck, module: "employees", requireAnyRole: ADMIN_ROLES },
       { to: "/admin/permissions", label: "Permissions", icon: ShieldCheck, requireAnyRole: ADMIN_ROLES },
