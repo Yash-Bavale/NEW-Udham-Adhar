@@ -350,8 +350,7 @@ export async function renderDisputeEvidencePackagePdf(data: DisputePackageData):
     const email = sortedEmails[idx];
     try {
       const emailHtml = renderEmailEvidenceHtmlDocument({ email });
-      const { renderHtmlToPdf } = await import("@/lib/pdf/html-render.server");
-      const emailPdfBytes = await renderHtmlToPdf(emailHtml);
+      const emailPdfBytes = await renderHtmlToPdfBuffer(emailHtml);
       const emailDoc = await PDFDocument.load(emailPdfBytes);
       const copiedPages = await mergedPdf.copyPages(emailDoc, emailDoc.getPageIndices());
       for (const page of copiedPages) {
