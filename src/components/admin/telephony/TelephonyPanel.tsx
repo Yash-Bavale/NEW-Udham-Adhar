@@ -85,9 +85,9 @@ export function TelephonyPanel() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 font-semibold">
               <PhoneIncoming className={`h-4 w-4 ${active.status === "ringing" ? "animate-pulse text-primary" : "text-primary"}`} />
-              {active.status === "ringing" ? "Incoming call" : "Active call"}<span className="rounded-full bg-primary/10 px-2 text-[11px] text-primary">On Call</span>
+              {active.status === "ringing" ? (active.direction === "outbound" ? "Outgoing call" : "Incoming call") : "Active call"}<span className="rounded-full bg-primary/10 px-2 text-[11px] text-primary">On Call</span>
             </div>
-            <span className="font-mono text-sm">{active.status === "answered" ? fmtDuration(secs) : "Ringing…"}</span>
+            <span className="font-mono text-sm">{active.status === "answered" ? fmtDuration(secs) : active.direction === "outbound" ? "Calling customer…" : "Ringing…"}</span>
           </div>
           <dl className="grid grid-cols-[90px_1fr] gap-y-1 text-sm">
             <dt className="text-muted-foreground">Caller</dt><dd className="font-mono">{active.callerNumber ?? "Unknown"}</dd>
