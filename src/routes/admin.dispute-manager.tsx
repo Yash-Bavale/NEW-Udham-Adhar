@@ -565,7 +565,7 @@ function DisputeManagerPage() {
               </CardContent>
             </Card>
 
-            {/* Right Col: Documents (Invoice & Certificate) */}
+            {/* Right Col: Saved invoice */}
             <div className="space-y-5">
               {/* Document 1: Invoice */}
               <Card className="border-slate-200 shadow-xs bg-white">
@@ -666,8 +666,7 @@ function DisputeManagerPage() {
                   <Badge className="bg-indigo-600 text-white font-mono text-xs">{totalSelectedCount} items</Badge>
                 </div>
                 <div className="text-xs text-slate-400 mt-0.5">
-                  {selectedEmailIds.length} Emails · {includeInvoice && currentOrder.invoice ? "1 Invoice" : "No Invoice"} ·{" "}
-                  {includeCertificate && currentOrder.certificate ? "1 Certificate" : "No Certificate"}
+                  {selectedEmailIds.length} Emails · {includeInvoice && currentOrder.invoice ? "1 Invoice" : "No Invoice"}
                 </div>
               </div>
             </div>
