@@ -13,9 +13,9 @@ import {
   FileText,
   AlertTriangle,
   StickyNote,
-  MessageCircle,
   ExternalLink,
 } from "lucide-react";
+import { SmartfloCallButton } from "@/components/admin/telephony/SmartfloCallButton";
 import {
   getFormSubmissionForApplication,
   resendFormLink,
@@ -245,16 +245,6 @@ export function FormSubmissionPanel({
     filter: `application_id=eq.${applicationId}`,
   });
 
-  const formLink = data?.lead?.lead_code
-    ? `${(typeof window !== "undefined" && window.location?.origin) || "https://udyamadhar.in"}/onboarding/${data.lead.lead_code}`
-    : "";
-
-  const handleCopy = async () => {
-    if (!formLink) return;
-    await navigator.clipboard.writeText(formLink);
-    toast.success("Form link copied");
-  };
-
   const handleResend = async () => {
     if (!data?.lead?.id) return;
     if (isLocked) { toast.error("Order is completed — form link is disabled."); return; }
@@ -359,7 +349,7 @@ export function FormSubmissionPanel({
   return (
     <>
       <div className="rounded-lg border bg-white overflow-hidden" style={{ borderColor: "var(--admin-border, #e5e7eb)" }}>
-        {/* Unified header: customer identity + form title in one card */}
+        {/* Unified header: customer identity + service/state chips + call */}
         <div className="px-5 py-3 border-b bg-gradient-to-r from-indigo-50/50 via-cyan-50/30 to-white flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-2 flex-wrap text-base md:text-lg">
             <span className="text-slate-500 font-medium">Customer:</span>
@@ -371,6 +361,26 @@ export function FormSubmissionPanel({
                 <span className="text-slate-900 font-bold font-mono">{formatMobile55(lead.mobile)}</span>
               </>
             )}
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            {serviceLabel && serviceLabel !== "Service" && (
+              <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 text-xs font-semibold">
+                {serviceLabel}
+              </span>
+            )}
+            {lead?.state && (
+              <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-amber-50 text-amber-800 border border-amber-200 text-xs font-semibold">
+                {lead.state}
+              </span>
+            )}
+            <SmartfloCallButton
+              mobile={lead?.mobile ?? null}
+              customerId={(data as any)?.application?.customer_id ?? null}
+              leadId={lead?.id ?? null}
+              applicationId={applicationId}
+              label="Call Customer"
+              compact
+            />
           </div>
         </div>
         {/* Header */}
@@ -398,35 +408,6 @@ export function FormSubmissionPanel({
         </div>
 
         <div className="flex items-center gap-2">
-          {formLink && (
-            <Button size="sm" variant="outline" onClick={handleCopy} disabled={isLocked} className="h-8 text-xs">
-              <Copy className="size-3.5 mr-1.5" /> Copy link
-            </Button>
-          )}
-          {formLink && lead?.mobile && (
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={isLocked}
-              className="h-8 text-xs border-emerald-300 text-emerald-700 hover:bg-emerald-50 font-medium"
-              title={isLocked ? "Order is completed — form link is disabled" : "Send form link on WhatsApp"}
-              onClick={() => {
-                if (isLocked) { toast.error("Order is completed — form link is disabled."); return; }
-                // Normalize mobile to digits and prepend country code if missing.
-                const digits = String(lead.mobile).replace(/\D/g, "");
-                const wa = digits.length === 10 ? `91${digits}` : digits;
-                const svc = (service?.service_name as string) || (lead?.service as string) || "your service";
-                const name = (lead?.name as string) || "there";
-                const text =
-                  `Hi ${name},\n\nPlease fill the details for *${svc}* using the secure link below to help us process your order.\n\n${formLink}\n\nIf you've already submitted, please ignore this message.\n— Team BHS`;
-                const url = `https://wa.me/${wa}?text=${encodeURIComponent(text)}`;
-                window.open(url, "_blank", "noopener");
-              }}
-            >
-              <MessageCircle className="size-3.5 mr-1.5 text-emerald-600" />
-              Send form link on whatsapp
-            </Button>
-          )}
           {lead?.id && (
             <Button
               size="sm"
