@@ -353,7 +353,7 @@ export function FormSubmissionPanel({
   return (
     <>
       <div className="rounded-lg border bg-white overflow-hidden" style={{ borderColor: "var(--admin-border, #e5e7eb)" }}>
-        {/* Unified header: customer identity + form title in one card */}
+        {/* Unified header: customer identity + service/state chips + call */}
         <div className="px-5 py-3 border-b bg-gradient-to-r from-indigo-50/50 via-cyan-50/30 to-white flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-2 flex-wrap text-base md:text-lg">
             <span className="text-slate-500 font-medium">Customer:</span>
@@ -365,6 +365,26 @@ export function FormSubmissionPanel({
                 <span className="text-slate-900 font-bold font-mono">{formatMobile55(lead.mobile)}</span>
               </>
             )}
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            {serviceLabel && serviceLabel !== "Service" && (
+              <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 text-xs font-semibold">
+                {serviceLabel}
+              </span>
+            )}
+            {lead?.state && (
+              <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-amber-50 text-amber-800 border border-amber-200 text-xs font-semibold">
+                {lead.state}
+              </span>
+            )}
+            <SmartfloCallButton
+              mobile={lead?.mobile ?? null}
+              customerId={(data as any)?.application?.customer_id ?? null}
+              leadId={lead?.id ?? null}
+              applicationId={applicationId}
+              label="Call Customer"
+              compact
+            />
           </div>
         </div>
         {/* Header */}
