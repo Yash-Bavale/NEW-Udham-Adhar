@@ -245,10 +245,6 @@ export function FormSubmissionPanel({
     filter: `application_id=eq.${applicationId}`,
   });
 
-  const formLink = data?.lead?.lead_code
-    ? `${(typeof window !== "undefined" && window.location?.origin) || "https://udyamadhar.in"}/onboarding/${data.lead.lead_code}`
-    : "";
-
   const handleResend = async () => {
     if (!data?.lead?.id) return;
     if (isLocked) { toast.error("Order is completed — form link is disabled."); return; }
