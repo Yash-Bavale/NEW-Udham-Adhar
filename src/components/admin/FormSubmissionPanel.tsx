@@ -361,18 +361,6 @@ export function FormSubmissionPanel({
                 <span className="text-slate-900 font-bold font-mono">{formatMobile55(lead.mobile)}</span>
               </>
             )}
-          </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            {serviceLabel && serviceLabel !== "Service" && (
-              <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 text-xs font-semibold">
-                {serviceLabel}
-              </span>
-            )}
-            {lead?.state && (
-              <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-amber-50 text-amber-800 border border-amber-200 text-xs font-semibold">
-                {lead.state}
-              </span>
-            )}
             <SmartfloCallButton
               mobile={lead?.mobile ?? null}
               customerId={(data as any)?.application?.customer_id ?? null}
@@ -381,6 +369,56 @@ export function FormSubmissionPanel({
               label="Call Customer"
               compact
             />
+            {serviceLabel && serviceLabel !== "Service" && (
+              <>
+                <span className="text-slate-300 font-light mx-1">•</span>
+                <span className="text-slate-500 font-medium">Service:</span>
+                <span className="text-slate-900 font-semibold text-sm">{serviceLabel}</span>
+              </>
+            )}
+            {lead?.state && (
+              <>
+                <span className="text-slate-300 font-light mx-1">•</span>
+                <span className="text-slate-500 font-medium">State:</span>
+                <span className="text-slate-900 font-semibold text-sm">{lead.state}</span>
+              </>
+            )}
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            {lead?.id && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleResend}
+                disabled={resending || isLocked}
+                className="h-8 text-xs font-medium"
+                title={isLocked ? "Order is completed — form link is disabled" : undefined}
+              >
+                {resending ? (
+                  <Loader2 className="size-3.5 mr-1.5 animate-spin" />
+                ) : (
+                  <Mail className="size-3.5 mr-1.5" />
+                )}
+                Send form link on Email
+              </Button>
+            )}
+
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={!service?.govt_portal_url}
+              className="h-8 text-xs border-indigo-100 text-indigo-700 hover:bg-indigo-50 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              title={service?.govt_portal_url ? "Open the government portal for this service" : "No government portal URL configured"}
+              onClick={() => {
+                if (service?.govt_portal_url) {
+                  window.open(service.govt_portal_url, "_blank", "noopener,noreferrer");
+                } else {
+                  toast.error("No government portal URL set for this service");
+                }
+              }}
+            >
+              <ExternalLink className="size-3.5 mr-1.5" /> Govt. Portal
+            </Button>
           </div>
         </div>
         {/* Header */}
@@ -407,42 +445,6 @@ export function FormSubmissionPanel({
           {statusPill}
         </div>
 
-        <div className="flex items-center gap-2">
-          {lead?.id && (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={handleResend}
-              disabled={resending || isLocked}
-              className="h-8 text-xs font-medium"
-              title={isLocked ? "Order is completed — form link is disabled" : undefined}
-            >
-              {resending ? (
-                <Loader2 className="size-3.5 mr-1.5 animate-spin" />
-              ) : (
-                <Mail className="size-3.5 mr-1.5" />
-              )}
-              Send form link on Email
-            </Button>
-          )}
-
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={!service?.govt_portal_url}
-            className="h-8 text-xs border-indigo-100 text-indigo-700 hover:bg-indigo-50 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-            title={service?.govt_portal_url ? "Open the government portal for this service" : "No government portal URL configured"}
-            onClick={() => {
-              if (service?.govt_portal_url) {
-                window.open(service.govt_portal_url, "_blank", "noopener,noreferrer");
-              } else {
-                toast.error("No government portal URL set for this service");
-              }
-            }}
-          >
-            <ExternalLink className="size-3.5 mr-1.5" /> Govt. Portal
-          </Button>
-        </div>
       </div>
 
       {isLocked && (
