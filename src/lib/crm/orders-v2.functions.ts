@@ -3033,11 +3033,24 @@ export const getOrderDocumentSignedUrl = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => z.object({ path: z.string().min(1) }).parse(i))
   .handler(async ({ data, context }) => {
-    await assertStaff(context.supabase);
+    await assertStaff(context.supabase, context.userId);
     const admin = await getAdmin();
-    const { data: signed, error } = await admin.storage.from("documents").createSignedUrl(data.path, 600);
-    if (error) throw new Error(error.message);
-    return { url: signed.signedUrl };
+    // Normalise legacy paths: full storage URLs or "documents/..." prefixes.
+    let path = data.path.trim();
+    const m = path.match(/\/object\/(?:public|sign|authenticated)\/documents\/([^?]+)/);
+    if (m) path = decodeURIComponent(m[1]);
+    path = path.replace(/^\/+/, "").replace(/^documents\//, "");
+    try {
+      const { data: signed, error } = await admin.storage.from("documents").createSignedUrl(path, 600);
+      if (error || !signed?.signedUrl) {
+        console.error("[getOrderDocumentSignedUrl] sign failed:", error?.message);
+        return { url: null as string | null, error: "File not found in storage" };
+      }
+      return { url: signed.signedUrl as string | null, error: null as string | null };
+    } catch (e) {
+      console.error("[getOrderDocumentSignedUrl] unexpected:", e);
+      return { url: null as string | null, error: "Could not open document" };
+    }
   });
 
 export const addOrderNoteV2 = createServerFn({ method: "POST" })
