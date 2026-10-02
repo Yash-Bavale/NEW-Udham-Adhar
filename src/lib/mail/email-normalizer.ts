@@ -195,11 +195,14 @@ export function extractOrderCodes(
   leadCode: string | null;
 } {
   const text = `${subject || ""} ${bodySnippet || ""}`;
-  const apMatch = text.match(/\b(AP-\d{4}-\d{6})\b/i);
-  const uaMatch = text.match(/\b(UA-\d{4}-\d{6})\b/i);
+  // Customers often type codes without hyphens ("AP2026011900") or with
+  // spaces/slashes ("AP 2026 011900"). Accept those and normalise to the
+  // canonical AP-YYYY-XXXXXX form.
+  const apMatch = text.match(/\bAP[-\s_/.]?(\d{4})[-\s_/.]?(\d{6})\b/i);
+  const uaMatch = text.match(/\bUA[-\s_/.]?(\d{4})[-\s_/.]?(\d{6})\b/i);
 
   return {
-    applicationCode: apMatch ? apMatch[1].toUpperCase() : null,
-    leadCode: uaMatch ? uaMatch[1].toUpperCase() : null,
+    applicationCode: apMatch ? `AP-${apMatch[1]}-${apMatch[2]}` : null,
+    leadCode: uaMatch ? `UA-${uaMatch[1]}-${uaMatch[2]}` : null,
   };
 }
