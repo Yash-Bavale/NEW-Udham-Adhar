@@ -745,6 +745,8 @@ function TicketWorkspace() {
       const res = await getDocUrlFn({ data: { path: doc.file_path } });
       if (res?.url) {
         window.open(res.url, "_blank", "noopener,noreferrer");
+      } else {
+        toast.error(res?.error ?? "Failed to download document");
       }
     } catch (e: any) {
       toast.error(e?.message ?? "Failed to download document");
