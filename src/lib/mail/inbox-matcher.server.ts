@@ -687,7 +687,7 @@ async function ingestOneMessage(
     matchedTicketId: newTicket.id,
     matchedApplicationId: matchedOrder?.applicationId ?? null,
     matchedCustomerId: matchedOrder?.customerId ?? null,
-    metadata: { isUnlinked, orderLinkStatus, isSystemSender: senderInfo.isSystemSender, resolutionMethod: matchedOrder?.resolutionMethod ?? null },
+    metadata: { isUnlinked, orderLinkStatus, isSystemSender: senderInfo.isSystemSender, resolutionMethod: matchedOrder?.resolutionMethod ?? null, ...(matchedOrder?.matchAudit ?? {}) },
   });
 
   return {
@@ -1088,10 +1088,37 @@ type OrderMatchResult = {
   customerId: string | null;
   orderLinkStatus: "linked" | "needs_review" | "unlinked";
   /** Identifies which matching strategy produced this result — for audit/observability only. */
-  resolutionMethod: "ap_code" | "ua_lead_code" | "thread_headers" | "x_bhs_order" | "customer_email" | "lead_email";
+  resolutionMethod:
+    | "EMAIL_CUSTOMER_ORDER"
+    | "ORDER_NUMBER"
+    | "EMAIL_ORDER_NUMBER_CONFLICT"
+    | "DUPLICATE_ORDER_NUMBER"
+    | "MULTIPLE_CUSTOMERS_SAME_EMAIL"
+    | "UNMATCHED"
+    // Legacy compat — kept for thread_headers and x_bhs_order paths
+    | "thread_headers"
+    | "x_bhs_order";
+  /** Structured audit bag persisted in the ingestion audit metadata. */
+  matchAudit?: Record<string, unknown>;
 };
 
-/** Match order and customer deterministically using exact priorities. */
+/**
+ * Deterministic ticket → order matching for inbound emails.
+ *
+ * Priority (per spec):
+ *  1. Sender Email → Customer → Customer's Order(s)
+ *  2. Explicit AP-/UA- order number in subject/body
+ *  3. Email-threading headers (In-Reply-To / References)
+ *  4. X-BHS-Order custom header
+ *  5. No match → UNMATCHED
+ *
+ * RULES:
+ * - Order status MUST NOT matter. No order is excluded because of status.
+ * - Leads are NEVER used for automatic order matching.
+ * - Duplicate customer emails → MATCH_REVIEW_REQUIRED (unless order number resolves it).
+ * - Duplicate order numbers → MATCH_REVIEW_REQUIRED.
+ * - Email/order-number conflict → MATCH_REVIEW_REQUIRED.
+ */
 async function matchOrderByContext(input: {
   subject: string;
   inReplyTo: string | null;
@@ -1101,65 +1128,293 @@ async function matchOrderByContext(input: {
   xBhsCustomer: string | null;
   bodySnippet?: string | null;
 }): Promise<OrderMatchResult | null> {
-  // 1) Explicit AP-YYYY-XXXXXX or UA-YYYY-XXXXXX code in subject or body
-  const { applicationCode, leadCode } = extractOrderCodes(input.subject, input.bodySnippet);
+  const { applicationCode } = extractOrderCodes(input.subject, input.bodySnippet);
+  const normalizedEmail = input.fromEmail?.trim().toLowerCase() || null;
 
-  if (applicationCode) {
-    const { data: app } = await supabaseAdmin
-      .from("applications")
-      .select("id, lead_id, customer_id")
-      .eq("application_code", applicationCode)
-      .maybeSingle();
+  // ═══════════════════════════════════════════════════════════════════════════
+  // PRIORITY 1: Sender Email → Customer → Customer's Order(s)
+  // ═══════════════════════════════════════════════════════════════════════════
+  if (normalizedEmail) {
+    // Find ALL customers matching this email (exact, case-insensitive).
+    const { data: rawCustomers } = await supabaseAdmin
+      .from("customers")
+      .select("id")
+      .ilike("primary_email", normalizedEmail);
 
-    if (app) {
-      const r = app as any;
-      return {
-        applicationId: r.id,
-        leadId: r.lead_id,
-        customerId: r.customer_id,
-        orderLinkStatus: "linked",
-        resolutionMethod: "ap_code",
-      };
-    }
-  }
+    const customers = (rawCustomers ?? []) as Array<{ id: string }>;
 
-  if (leadCode) {
-    const { data: lead } = await supabaseAdmin
-      .from("leads")
-      .select("id, customer_id")
-      .eq("lead_code", leadCode)
-      .maybeSingle();
+    if (customers.length === 1) {
+      const customerId = customers[0].id;
 
-    if (lead) {
-      const l = lead as any;
-      const { data: app } = await supabaseAdmin
+      // Fetch ALL orders for this customer — NO status filter, NO is_deleted filter
+      // (is_deleted is still respected because truly deleted rows shouldn't match)
+      const { data: rawApps } = await supabaseAdmin
         .from("applications")
-        .select("id, lead_id, customer_id")
-        .eq("lead_id", l.id)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+        .select("id, lead_id, customer_id, application_code, created_at")
+        .eq("customer_id", customerId)
+        .eq("is_deleted", false)
+        .order("created_at", { ascending: false });
 
-      if (app) {
+      const apps = (rawApps ?? []) as Array<{
+        id: string;
+        lead_id: string | null;
+        customer_id: string | null;
+        application_code: string | null;
+        created_at: string | null;
+      }>;
+
+      if (apps.length === 0) {
+        // Customer exists but has zero orders
         return {
-          applicationId: (app as any).id,
-          leadId: l.id,
-          customerId: (app as any).customer_id ?? l.customer_id,
-          orderLinkStatus: "linked",
-          resolutionMethod: "ua_lead_code",
+          applicationId: null,
+          leadId: null,
+          customerId,
+          orderLinkStatus: "unlinked",
+          resolutionMethod: "EMAIL_CUSTOMER_ORDER",
+          matchAudit: {
+            matchedCustomer: customerId,
+            ordersFound: 0,
+            selectedLatest: false,
+          },
         };
       }
+
+      if (apps.length === 1) {
+        // ── Exactly one order — link directly (regardless of status)
+        // If an order number is also present, verify it doesn't conflict
+        if (applicationCode && apps[0].application_code !== applicationCode) {
+          // Email says one customer, but the order number in the email doesn't belong to them → conflict
+          return {
+            applicationId: null,
+            leadId: null,
+            customerId,
+            orderLinkStatus: "needs_review",
+            resolutionMethod: "EMAIL_ORDER_NUMBER_CONFLICT",
+            matchAudit: {
+              matchedCustomer: customerId,
+              customerOrderCode: apps[0].application_code,
+              emailOrderCode: applicationCode,
+              reason: "Order number in email does not belong to matched customer's single order",
+            },
+          };
+        }
+
+        return {
+          applicationId: apps[0].id,
+          leadId: apps[0].lead_id,
+          customerId,
+          orderLinkStatus: "linked",
+          resolutionMethod: "EMAIL_CUSTOMER_ORDER",
+          matchAudit: {
+            matchedCustomer: customerId,
+            matchedOrder: apps[0].id,
+            ordersFound: 1,
+            selectedLatest: true,
+          },
+        };
+      }
+
+      // ── Multiple orders — try to disambiguate by order number in email
+      if (applicationCode) {
+        const matchingByCode = apps.filter((a) => a.application_code === applicationCode);
+
+        if (matchingByCode.length === 1) {
+          // Order number resolves to exactly one of this customer's orders
+          return {
+            applicationId: matchingByCode[0].id,
+            leadId: matchingByCode[0].lead_id,
+            customerId,
+            orderLinkStatus: "linked",
+            resolutionMethod: "ORDER_NUMBER",
+            matchAudit: {
+              matchedCustomer: customerId,
+              matchedOrder: matchingByCode[0].id,
+              ordersFound: apps.length,
+              orderCode: applicationCode,
+              selectedLatest: matchingByCode[0].id === apps[0].id,
+            },
+          };
+        }
+
+        if (matchingByCode.length > 1) {
+          // Duplicate order number records for the same customer → don't guess
+          return {
+            applicationId: null,
+            leadId: null,
+            customerId,
+            orderLinkStatus: "needs_review",
+            resolutionMethod: "DUPLICATE_ORDER_NUMBER",
+            matchAudit: {
+              matchedCustomer: customerId,
+              orderCode: applicationCode,
+              duplicateCount: matchingByCode.length,
+              reason: "Multiple database records contain the same order number for this customer",
+            },
+          };
+        }
+
+        // matchingByCode.length === 0 — order number not found among this customer's orders
+        // This is a conflict: email is from this customer, but the order number doesn't belong to them
+        return {
+          applicationId: null,
+          leadId: null,
+          customerId,
+          orderLinkStatus: "needs_review",
+          resolutionMethod: "EMAIL_ORDER_NUMBER_CONFLICT",
+          matchAudit: {
+            matchedCustomer: customerId,
+            emailOrderCode: applicationCode,
+            customerOrderCodes: apps.map((a) => a.application_code).filter(Boolean),
+            ordersFound: apps.length,
+            reason: "Order number in email does not belong to any of this customer's orders",
+          },
+        };
+      }
+
+      // No order number present — pick the most recently created order
       return {
-        applicationId: null,
-        leadId: l.id,
-        customerId: l.customer_id,
-        orderLinkStatus: "unlinked",
-        resolutionMethod: "ua_lead_code",
+        applicationId: apps[0].id,
+        leadId: apps[0].lead_id,
+        customerId,
+        orderLinkStatus: "linked",
+        resolutionMethod: "EMAIL_CUSTOMER_ORDER",
+        matchAudit: {
+          matchedCustomer: customerId,
+          matchedOrder: apps[0].id,
+          ordersFound: apps.length,
+          selectedLatest: true,
+          note: "Multiple orders; selected most recently created (no order number in email)",
+        },
       };
     }
+
+    if (customers.length > 1) {
+      // ── Multiple customer records share the same email
+      // Try order number to disambiguate
+      if (applicationCode) {
+        const { data: rawCodeApps } = await supabaseAdmin
+          .from("applications")
+          .select("id, lead_id, customer_id, application_code")
+          .eq("application_code", applicationCode)
+          .eq("is_deleted", false);
+
+        const codeApps = (rawCodeApps ?? []) as Array<{
+          id: string;
+          lead_id: string | null;
+          customer_id: string | null;
+          application_code: string | null;
+        }>;
+
+        if (codeApps.length === 1) {
+          // Order number uniquely identifies one order — use it
+          return {
+            applicationId: codeApps[0].id,
+            leadId: codeApps[0].lead_id,
+            customerId: codeApps[0].customer_id,
+            orderLinkStatus: "linked",
+            resolutionMethod: "ORDER_NUMBER",
+            matchAudit: {
+              multipleCustomersForEmail: true,
+              customerCount: customers.length,
+              orderCode: applicationCode,
+              matchedOrder: codeApps[0].id,
+              matchedCustomer: codeApps[0].customer_id,
+            },
+          };
+        }
+
+        if (codeApps.length > 1) {
+          return {
+            applicationId: null,
+            leadId: null,
+            customerId: null,
+            orderLinkStatus: "needs_review",
+            resolutionMethod: "DUPLICATE_ORDER_NUMBER",
+            matchAudit: {
+              multipleCustomersForEmail: true,
+              customerCount: customers.length,
+              orderCode: applicationCode,
+              duplicateCount: codeApps.length,
+              reason: "Multiple database records contain the same order number and multiple customers share the same email",
+            },
+          };
+        }
+      }
+
+      // No order number, or order number not found — cannot guess between customers
+      return {
+        applicationId: null,
+        leadId: null,
+        customerId: null,
+        orderLinkStatus: "needs_review",
+        resolutionMethod: "MULTIPLE_CUSTOMERS_SAME_EMAIL",
+        matchAudit: {
+          customerCount: customers.length,
+          customerIds: customers.map((c) => c.id),
+          emailOrderCode: applicationCode ?? null,
+          reason: "Multiple customer records share the same email address",
+        },
+      };
+    }
+
+    // customers.length === 0 — email doesn't match any customer
+    // Fall through to PRIORITY 2 (order number standalone)
   }
 
-  // 2) Threading headers against email_logs
+  // ═══════════════════════════════════════════════════════════════════════════
+  // PRIORITY 2: Explicit AP-/UA- order number (standalone — email didn't match a customer)
+  // ═══════════════════════════════════════════════════════════════════════════
+  if (applicationCode) {
+    const { data: rawCodeApps } = await supabaseAdmin
+      .from("applications")
+      .select("id, lead_id, customer_id, application_code")
+      .eq("application_code", applicationCode)
+      .eq("is_deleted", false);
+
+    const codeApps = (rawCodeApps ?? []) as Array<{
+      id: string;
+      lead_id: string | null;
+      customer_id: string | null;
+      application_code: string | null;
+    }>;
+
+    if (codeApps.length === 1) {
+      return {
+        applicationId: codeApps[0].id,
+        leadId: codeApps[0].lead_id,
+        customerId: codeApps[0].customer_id,
+        orderLinkStatus: "linked",
+        resolutionMethod: "ORDER_NUMBER",
+        matchAudit: {
+          orderCode: applicationCode,
+          matchedOrder: codeApps[0].id,
+          matchedCustomer: codeApps[0].customer_id,
+          emailMatchedCustomer: false,
+        },
+      };
+    }
+
+    if (codeApps.length > 1) {
+      return {
+        applicationId: null,
+        leadId: null,
+        customerId: null,
+        orderLinkStatus: "needs_review",
+        resolutionMethod: "DUPLICATE_ORDER_NUMBER",
+        matchAudit: {
+          orderCode: applicationCode,
+          duplicateCount: codeApps.length,
+          reason: "Multiple database records contain the same order number",
+        },
+      };
+    }
+
+    // Order number not found in DB — fall through
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // PRIORITY 3: Threading headers (In-Reply-To / References against email_logs)
+  // ═══════════════════════════════════════════════════════════════════════════
   const ids = [input.inReplyTo, ...input.references].filter(Boolean) as string[];
   if (ids.length > 0) {
     const { data: logs } = await supabaseAdmin
@@ -1179,12 +1434,19 @@ async function matchOrderByContext(input: {
           customerId: r.customer_id,
           orderLinkStatus: "linked",
           resolutionMethod: "thread_headers",
+          matchAudit: {
+            threadHeaderMatch: true,
+            matchedOrder: r.application_id,
+            matchedCustomer: r.customer_id,
+          },
         };
       }
     }
   }
 
-  // 3) X-BHS-Order header
+  // ═══════════════════════════════════════════════════════════════════════════
+  // PRIORITY 4: X-BHS-Order custom header
+  // ═══════════════════════════════════════════════════════════════════════════
   if (input.xBhsOrder) {
     const { data: app } = await supabaseAdmin
       .from("applications")
@@ -1200,170 +1462,19 @@ async function matchOrderByContext(input: {
         customerId: r.customer_id,
         orderLinkStatus: "linked",
         resolutionMethod: "x_bhs_order",
+        matchAudit: {
+          xBhsOrderHeader: input.xBhsOrder,
+          matchedOrder: r.id,
+          matchedCustomer: r.customer_id,
+        },
       };
     }
   }
 
-  // 4) Customer exact email fallback
-  // Email addresses are stored normalized (lowercase) but we use ilike as a safety net.
-  // IMPORTANT: both customer and lead lookups use ilike for consistent case-insensitive matching.
-  if (input.fromEmail) {
-    const email = input.fromEmail.trim().toLowerCase();
-
-    const { data: cust } = await supabaseAdmin
-      .from("customers")
-      .select("id")
-      .ilike("primary_email", email)
-      .maybeSingle();
-
-    const customerId = (cust as { id: string } | null)?.id ?? null;
-
-    if (customerId) {
-      const { data: rawApps } = await supabaseAdmin
-        .from("applications")
-        .select("id, lead_id, customer_id")
-        .eq("customer_id", customerId)
-        .eq("is_deleted", false)
-        // REFUND_APPROVED is also terminal — include it alongside COMPLETED/CLOSED/REFUND_PROCESSED
-        .not("order_status", "in", "(COMPLETED,CLOSED,REFUND_PROCESSED,REFUND_APPROVED)");
-
-      const apps = await filterPaidActiveApplications(
-        (rawApps ?? []) as Array<{ id: string; lead_id: string | null; customer_id: string | null }>
-      );
-
-      if (apps.length === 1) {
-        return {
-          applicationId: apps[0].id,
-          leadId: apps[0].lead_id,
-          customerId,
-          orderLinkStatus: "linked",
-          resolutionMethod: "customer_email",
-        };
-      }
-
-      // Multiple active orders — do not guess; flag for review
-      if (apps.length > 1) {
-        return {
-          applicationId: null,
-          leadId: null,
-          customerId,
-          orderLinkStatus: "needs_review",
-          resolutionMethod: "customer_email",
-        };
-      }
-
-      // Customer has 0 active orders (all completed or closed)
-      return {
-        applicationId: null,
-        leadId: null,
-        customerId,
-        orderLinkStatus: "unlinked",
-        resolutionMethod: "customer_email",
-      };
-    }
-
-    // 5) Lead email fallback — use ilike (consistent with customer lookup above)
-    const { data: lead } = await supabaseAdmin
-      .from("leads")
-      .select("id, customer_id")
-      .ilike("email", email)  // was .eq() — fixed to ilike for case-insensitive consistency
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    const leadRow = lead as { id: string; customer_id: string | null } | null;
-    if (leadRow?.id) {
-      const { data: rawApps } = await supabaseAdmin
-        .from("applications")
-        .select("id, lead_id, customer_id")
-        .eq("lead_id", leadRow.id)
-        .eq("is_deleted", false)
-        .not("order_status", "in", "(COMPLETED,CLOSED,REFUND_PROCESSED,REFUND_APPROVED)");
-
-      const apps = await filterPaidActiveApplications(
-        (rawApps ?? []) as Array<{ id: string; lead_id: string | null; customer_id: string | null }>
-      );
-
-      if (apps.length === 1) {
-        return {
-          applicationId: apps[0].id,
-          leadId: apps[0].lead_id,
-          customerId: apps[0].customer_id ?? leadRow.customer_id,
-          orderLinkStatus: "linked",
-          resolutionMethod: "lead_email",
-        };
-      }
-      return {
-        applicationId: null,
-        leadId: leadRow.id,
-        customerId: leadRow.customer_id,
-        orderLinkStatus: apps.length > 1 ? "needs_review" : "unlinked",
-        resolutionMethod: "lead_email",
-      };
-    }
-  }
-
+  // ═══════════════════════════════════════════════════════════════════════════
+  // No match — UNMATCHED
+  // ═══════════════════════════════════════════════════════════════════════════
   return null;
 }
 
-/**
- * Filters raw candidate applications to only include genuine PAID orders.
- * An application is paid if:
- *  1. It has a payment with status in ('paid', 'success', 'successful') by application_id or lead_id, OR
- *  2. Its associated lead has lead_status_v2 in ('payment_successful', 'welcome_mail_sent') or payment_successful_at != null
- */
-async function filterPaidActiveApplications(
-  apps: Array<{ id: string; lead_id: string | null; customer_id: string | null }>
-): Promise<Array<{ id: string; lead_id: string | null; customer_id: string | null }>> {
-  if (!apps.length) return [];
-  const appIds = apps.map((a) => a.id);
-  const leadIds = apps.map((a) => a.lead_id).filter(Boolean) as string[];
-
-  const orFilters: string[] = [];
-  if (appIds.length) orFilters.push(`application_id.in.(${appIds.join(",")})`);
-  if (leadIds.length) orFilters.push(`lead_id.in.(${leadIds.join(",")})`);
-
-  const paidAppIds = new Set<string>();
-  const paidLeadIds = new Set<string>();
-
-  if (orFilters.length) {
-    try {
-      const { data: pays } = await supabaseAdmin
-        .from("payments")
-        .select("application_id, lead_id, status")
-        .or(orFilters.join(","))
-        .eq("status", "paid");
-
-      for (const p of (pays ?? []) as Array<{ application_id: string | null; lead_id: string | null; status: string }>) {
-        if (p.application_id) paidAppIds.add(p.application_id);
-        if (p.lead_id) paidLeadIds.add(p.lead_id);
-      }
-    } catch (e) {
-      console.warn("[filterPaidActiveApplications] payment check warning:", e);
-    }
-  }
-
-  if (leadIds.length) {
-    try {
-      const { data: paidLeads } = await supabaseAdmin
-        .from("leads")
-        .select("id, lead_status_v2, status")
-        .in("id", leadIds);
-
-      for (const l of (paidLeads ?? []) as Array<{ id: string; lead_status_v2: string | null; status: string | null }>) {
-        if (
-          l.lead_status_v2 === "payment_successful" ||
-          l.lead_status_v2 === "welcome_mail_sent" ||
-          l.status === "payment_successful"
-        ) {
-          paidLeadIds.add(l.id);
-        }
-      }
-    } catch (e) {
-      console.warn("[filterPaidActiveApplications] lead check warning:", e);
-    }
-  }
-
-  return apps.filter((a) => paidAppIds.has(a.id) || (a.lead_id && paidLeadIds.has(a.lead_id)));
-}
 

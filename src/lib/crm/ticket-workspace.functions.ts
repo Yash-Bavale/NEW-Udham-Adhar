@@ -19,9 +19,6 @@ async function getAdmin() {
   return m.supabaseAdmin;
 }
 
-// Terminal order statuses — orders with these statuses are not active/eligible
-// for new ticket linking. order_status is an enum and cannot be NULL.
-const INACTIVE_ORDER_STATUSES = ["COMPLETED", "CLOSED", "REFUND_PROCESSED", "REFUND_APPROVED"];
 
 export const getTicketWorkspace = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -167,7 +164,6 @@ export const getTicketWorkspace = createServerFn({ method: "POST" })
           .select("id, application_code, order_status, fulfillment_status, created_at, service_id, lead_id, form_submitted_at, certificate_uploaded_at, application_status, workflow_status, refund_approved_at, refund_processed_at, closure_stage, technical_hold_started_at, customer_hold_started_at")
           .eq("customer_id", effectiveCustomerId)
           .eq("is_deleted", false)
-          .not("order_status", "in", `(${INACTIVE_ORDER_STATUSES.join(",")})`)
           .order("created_at", { ascending: false })
           .limit(20);
 
