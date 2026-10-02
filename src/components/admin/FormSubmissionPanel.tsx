@@ -13,9 +13,9 @@ import {
   FileText,
   AlertTriangle,
   StickyNote,
-  MessageCircle,
   ExternalLink,
 } from "lucide-react";
+import { SmartfloCallButton } from "@/components/admin/telephony/SmartfloCallButton";
 import {
   getFormSubmissionForApplication,
   resendFormLink,
@@ -248,12 +248,6 @@ export function FormSubmissionPanel({
   const formLink = data?.lead?.lead_code
     ? `${(typeof window !== "undefined" && window.location?.origin) || "https://udyamadhar.in"}/onboarding/${data.lead.lead_code}`
     : "";
-
-  const handleCopy = async () => {
-    if (!formLink) return;
-    await navigator.clipboard.writeText(formLink);
-    toast.success("Form link copied");
-  };
 
   const handleResend = async () => {
     if (!data?.lead?.id) return;

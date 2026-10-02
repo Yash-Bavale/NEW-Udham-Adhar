@@ -209,7 +209,7 @@ export const getFormSubmissionForApplication = createServerFn({ method: "GET" })
     const { data: app, error: appErr } = await supabase
       .from("applications")
       .select(
-        "id, application_code, lead_id, service_id, form_status, fulfillment_status, application_status, created_at",
+        "id, application_code, lead_id, customer_id, service_id, form_status, fulfillment_status, application_status, created_at",
       )
       .eq("id", data.applicationId)
       .maybeSingle();
@@ -220,7 +220,7 @@ export const getFormSubmissionForApplication = createServerFn({ method: "GET" })
       await Promise.all([
         supabase
           .from("leads")
-          .select("id, lead_code, name, email, mobile, service")
+          .select("id, lead_code, name, email, mobile, service, state")
           .eq("id", app.lead_id!)
           .maybeSingle(),
         supabase
