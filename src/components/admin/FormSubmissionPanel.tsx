@@ -369,23 +369,6 @@ export function FormSubmissionPanel({
               label="Call Customer"
               compact
             />
-            {serviceLabel && serviceLabel !== "Service" && (
-              <>
-                <span className="text-slate-300 font-light mx-1">•</span>
-                <span className="text-slate-500 font-medium">Service:</span>
-                <span className="text-slate-900 font-semibold text-sm">{serviceLabel}</span>
-              </>
-            )}
-            {lead?.state && (
-              <>
-                <span className="text-slate-300 font-light mx-1">•</span>
-                <span className="text-slate-500 font-medium">State:</span>
-                <span className="text-slate-900 font-semibold text-sm">{lead.state}</span>
-              </>
-            )}
-          </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            {lead?.id && (
               <Button
                 size="sm"
                 variant="outline"
