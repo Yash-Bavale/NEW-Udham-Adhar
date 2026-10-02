@@ -369,20 +369,6 @@ export function FormSubmissionPanel({
               label="Call Customer"
               compact
             />
-            {serviceLabel && serviceLabel !== "Service" && (
-              <>
-                <span className="text-slate-300 font-light mx-1">•</span>
-                <span className="text-slate-500 font-medium">Service:</span>
-                <span className="text-slate-900 font-semibold text-sm">{serviceLabel}</span>
-              </>
-            )}
-            {lead?.state && (
-              <>
-                <span className="text-slate-300 font-light mx-1">•</span>
-                <span className="text-slate-500 font-medium">State:</span>
-                <span className="text-slate-900 font-semibold text-sm">{lead.state}</span>
-              </>
-            )}
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             {lead?.id && (
@@ -426,9 +412,20 @@ export function FormSubmissionPanel({
           <div className="flex items-center gap-3 min-w-0">
             <FileText className="size-4 text-slate-600 shrink-0" />
             <div className="min-w-0">
-              <h3 className="text-sm font-semibold text-slate-800 break-words">
-                {serviceLabel}
-              </h3>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="text-sm font-semibold text-slate-800 break-words">
+                  Service: {serviceLabel}
+                </h3>
+                {lead?.state && (
+                  <>
+                    <span className="text-slate-300 font-light">•</span>
+                    <span className="text-sm text-slate-800 font-semibold">
+                      <span className="text-slate-500 font-medium">State:</span>{" "}
+                      {lead.state}
+                    </span>
+                  </>
+                )}
+              </div>
             <p className="text-xs text-slate-500 mt-0.5">
               {submission ? (
                 isDraft ? (
