@@ -349,37 +349,38 @@ export function FormSubmissionPanel({
   return (
     <>
       <div className="rounded-lg border bg-white overflow-hidden" style={{ borderColor: "var(--admin-border, #e5e7eb)" }}>
-        {/* Customer and order context, labelled rather than badge-shaped. */}
-        <div className="border-b border-border bg-card px-5 py-4">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div className="grid min-w-0 grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)] lg:flex lg:items-start lg:gap-0">
-              <div className="min-w-0 col-span-2 sm:col-span-1 lg:pr-6">
-                <p className="text-[11px] font-semibold uppercase text-muted-foreground">Customer</p>
-                <p className="mt-1 break-words text-sm font-semibold text-foreground">{lead?.name ?? "—"}</p>
-              </div>
-              <div className="min-w-0 lg:border-l lg:border-border lg:px-6">
-                <p className="text-[11px] font-semibold uppercase text-muted-foreground">Mobile</p>
-                <p className="mt-1 text-sm font-medium text-foreground">{lead?.mobile ? formatMobile55(lead.mobile) : "—"}</p>
-              </div>
-              <div className="min-w-0 lg:border-l lg:border-border lg:px-6">
-                <p className="text-[11px] font-semibold uppercase text-muted-foreground">State</p>
-                <p className="mt-1 break-words text-sm font-medium text-foreground">{lead?.state || "—"}</p>
-              </div>
-              <div className="min-w-0 col-span-2 sm:col-span-1 lg:border-l lg:border-border lg:px-6">
-                <p className="text-[11px] font-semibold uppercase text-muted-foreground">Service selected</p>
-                <p className="mt-1 break-words text-sm font-medium text-foreground">{serviceLabel}</p>
-              </div>
-            </div>
-            <div className="shrink-0">
-              <SmartfloCallButton
-                mobile={lead?.mobile ?? null}
-                customerId={(data as any)?.application?.customer_id ?? null}
-                leadId={lead?.id ?? null}
-                applicationId={applicationId}
-                label="Call Customer"
-                compact
-              />
-            </div>
+        {/* Unified header: customer identity + service/state chips + call */}
+        <div className="px-5 py-3 border-b bg-gradient-to-r from-indigo-50/50 via-cyan-50/30 to-white flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-2 flex-wrap text-base md:text-lg">
+            <span className="text-slate-500 font-medium">Customer:</span>
+            <span className="text-slate-900 font-bold">{lead?.name ?? "—"}</span>
+            {lead?.mobile && (
+              <>
+                <span className="text-slate-300 font-light mx-1">•</span>
+                <span className="text-slate-500 font-medium">Mobile:</span>
+                <span className="text-slate-900 font-bold font-mono">{formatMobile55(lead.mobile)}</span>
+              </>
+            )}
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            {serviceLabel && serviceLabel !== "Service" && (
+              <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 text-xs font-semibold">
+                {serviceLabel}
+              </span>
+            )}
+            {lead?.state && (
+              <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-amber-50 text-amber-800 border border-amber-200 text-xs font-semibold">
+                {lead.state}
+              </span>
+            )}
+            <SmartfloCallButton
+              mobile={lead?.mobile ?? null}
+              customerId={(data as any)?.application?.customer_id ?? null}
+              leadId={lead?.id ?? null}
+              applicationId={applicationId}
+              label="Call Customer"
+              compact
+            />
           </div>
         </div>
         {/* Header */}
