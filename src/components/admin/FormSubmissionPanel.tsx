@@ -358,6 +358,9 @@ export function FormSubmissionPanel({
               <>
                 <span className="text-slate-300 font-light mx-1">•</span>
                 <span className="text-slate-500 font-medium">Mobile:</span>
+                <span className="text-slate-900 font-bold font-mono">{formatMobile55(lead.mobile)}</span>
+              </>
+            )}
             <SmartfloCallButton
               mobile={lead?.mobile ?? null}
               customerId={(data as any)?.application?.customer_id ?? null}
