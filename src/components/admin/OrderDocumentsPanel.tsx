@@ -33,7 +33,11 @@ export function OrderDocumentsPanel({
 
   const open = async (path: string) => {
     try {
-      const { url } = await urlFn({ data: { path } });
+      const { url, error } = await urlFn({ data: { path } });
+      if (!url) {
+        toast.error(error ?? "Failed to open document");
+        return;
+      }
       window.open(url, "_blank", "noopener,noreferrer");
     } catch (e: any) {
       toast.error(e?.message ?? "Failed to open document");
