@@ -113,12 +113,18 @@ export function aggregateEmployee(rows: PerfStreamRow[], employeeId: string): Em
   const out = {} as EmployeeHistoricalKpis;
   for (const k of HISTORICAL_KPIS) out[k] = kpiRows(rows, employeeId, k).length;
   const work = rows.filter((r) => r.employee_id === employeeId && isWork(r));
-  out.last_action_in_range = work.reduce<string | null>((m, r) => (!m || r.occurred_at > m ? r.occurred_at : m), null);
+  const latest = work.reduce<PerfStreamRow | null>((m, r) => (!m || byTime(r, m) > 0 ? r : m), null);
+  out.last_action_in_range = latest ? new Date(latest.occurred_at).toISOString() : null;
   return out;
 }
 
+/** Total order: time, then stable identity, so output never depends on input row order. */
 function byTime(a: PerfStreamRow, b: PerfStreamRow) {
-  return a.occurred_at < b.occurred_at ? -1 : a.occurred_at > b.occurred_at ? 1 : 0;
+  const ta = Date.parse(a.occurred_at), tb = Date.parse(b.occurred_at);
+  if (ta !== tb) return ta < tb ? -1 : 1;
+  const ka = `${a.event_id ?? ""}|${a.kind}|${a.application_id}|${a.employee_id ?? ""}`;
+  const kb = `${b.event_id ?? ""}|${b.kind}|${b.application_id}|${b.employee_id ?? ""}`;
+  return ka < kb ? -1 : ka > kb ? 1 : 0;
 }
 
 function dedupeById(rows: PerfStreamRow[]) {
