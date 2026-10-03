@@ -384,27 +384,49 @@ export async function assignOrderCanonical(
 
   const nowIso = new Date().toISOString();
 
-  // 2. Update applications table atomically
-  let updateQ = (supabaseAdmin as any)
-    .from("applications")
-    .update({
-      assigned_to: newEmployeeId,
-      assigned_at: nowIso,
-      updated_at: nowIso,
-    })
-    .eq("id", orderId);
-
-  if (expectedPreviousEmployeeId !== undefined) {
-    if (expectedPreviousEmployeeId === null) {
-      updateQ = updateQ.is("assigned_to", null);
-    } else {
-      updateQ = updateQ.eq("assigned_to", expectedPreviousEmployeeId);
-    }
-  }
-
-  const { error: updateErr } = await updateQ;
+  // 2. Atomic, row-locked assignment. The ownership change and its history event
+  //    (application_events via trg_application_events) commit in one transaction.
+  const isHuman = (changeType === "MANUAL" || changeType === "MANUAL_BULK") && !!actorId;
+  const actorType = isHuman ? (source === "admin" || source === "super_admin" ? "admin" : "employee") : "system";
+  const assignmentType =
+    newEmployeeId === null
+      ? "UNASSIGNMENT"
+      : isHuman
+        ? currentAssignee
+          ? "REASSIGNMENT"
+          : "MANUAL_ASSIGNMENT"
+        : currentAssignee
+          ? "SYSTEM_REBALANCE"
+          : "AUTO_ASSIGNMENT";
+  const { data: rpcRes, error: updateErr } = await (supabaseAdmin as any).rpc("assign_application", {
+    p_application_id: orderId,
+    p_new_assignee: newEmployeeId,
+    p_assignment_type: assignmentType,
+    p_actor_type: actorType,
+    p_source: `${source}:${changeType}`,
+    p_actor: isHuman ? actorId : null,
+    p_reason: reason ?? null,
+    p_check_expected: expectedPreviousEmployeeId !== undefined,
+    p_expected_previous: expectedPreviousEmployeeId ?? null,
+    p_auto_assigned: isHuman ? false : null,
+  });
   if (updateErr) {
     return { success: false, orderId, error: updateErr.message };
+  }
+  const status = (rpcRes as any)?.status;
+  if (status === "conflict") {
+    return {
+      success: false,
+      orderId,
+      applicationCode: app.application_code,
+      previousEmployeeId: (rpcRes as any)?.previous ?? null,
+      newEmployeeId,
+      skippedDueToConflict: true,
+      error: "Order was already reassigned by another concurrent process",
+    };
+  }
+  if (status === "unchanged" || status === "not_found") {
+    return { success: status === "unchanged", orderId, applicationCode: app.application_code, previousEmployeeId: currentAssignee, newEmployeeId };
   }
 
   // 3. Synchronize leads table if lead_id exists
