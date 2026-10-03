@@ -32,11 +32,25 @@ export type HistoricalKpi =
   | "worked"
   | "actions"
   | "completed"
-  | "closed";
+  | "closed"
+  | "technical_delay_logged"
+  | "customer_delay_logged";
 
 export const HISTORICAL_KPIS: HistoricalKpi[] = [
   "assigned", "reassigned_in", "reassigned_out", "worked", "actions", "completed", "closed",
+  "technical_delay_logged", "customer_delay_logged",
 ];
+
+/** A deliberate staff delay marking. One event = one marking; the ongoing hold state never re-counts. */
+export function delayKind(r: PerfStreamRow): "technical" | "customer" | null {
+  if (r.kind !== "action") return null;
+  const v = String(r.new_value ?? "").toUpperCase();
+  if (r.event_type === "technical_delay_marked") return "technical";
+  if (r.event_type === "customer_delay_marked") return "customer";
+  if (r.event_type === "order_status_change" && v.startsWith("TECHNICAL_HOLD")) return "technical";
+  if (r.event_type === "order_status_change" && v === "CUSTOMER_HOLD") return "customer";
+  return null;
+}
 
 const isWork = (r: PerfStreamRow) => r.kind === "action" || r.kind === "completion" || r.kind === "closure";
 
@@ -66,6 +80,10 @@ export function kpiRows(rows: PerfStreamRow[], employeeId: string, kpi: Historic
     case "closed":
       picked = mine.filter((r) => r.kind === "closure");
       break;
+    case "technical_delay_logged":
+      return dedupeById(mine.filter((r) => delayKind(r) === "technical")).sort(byTime);
+    case "customer_delay_logged":
+      return dedupeById(mine.filter((r) => delayKind(r) === "customer")).sort(byTime);
   }
   return firstPerOrder(picked);
 }
@@ -78,6 +96,8 @@ export interface EmployeeHistoricalKpis {
   actions: number;
   completed: number;
   closed: number;
+  technical_delay_logged: number;
+  customer_delay_logged: number;
   last_action_in_range: string | null;
 }
 
