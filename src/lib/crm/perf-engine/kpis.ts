@@ -113,7 +113,8 @@ export function aggregateEmployee(rows: PerfStreamRow[], employeeId: string): Em
   const out = {} as EmployeeHistoricalKpis;
   for (const k of HISTORICAL_KPIS) out[k] = kpiRows(rows, employeeId, k).length;
   const work = rows.filter((r) => r.employee_id === employeeId && isWork(r));
-  out.last_action_in_range = work.reduce<string | null>((m, r) => (!m || Date.parse(r.occurred_at) > Date.parse(m) ? r.occurred_at : m), null);
+  const latest = work.reduce<PerfStreamRow | null>((m, r) => (!m || byTime(r, m) > 0 ? r : m), null);
+  out.last_action_in_range = latest ? new Date(latest.occurred_at).toISOString() : null;
   return out;
 }
 
