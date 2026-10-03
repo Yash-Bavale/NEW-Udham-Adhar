@@ -1,0 +1,128 @@
+// Canonical Employee Performance engine — pure aggregation.
+//
+// Every KPI is computed from ONE event stream (public.get_employee_perf_stream)
+// so a KPI count always equals its drilldown row count.
+//   - Assignment history != work attribution. Reassignment never removes past work.
+//   - Only order-level events (application_id IS NOT NULL) ever reach this stream.
+//   - Only validated human staff actions count as Worked/Actions/Completed/Closed.
+//   - No time-bucket de-duplication: each event id counts once.
+
+export type PerfStreamKind = "assignment" | "unassignment" | "action" | "completion" | "closure";
+
+export interface PerfStreamRow {
+  kind: PerfStreamKind;
+  employee_id: string | null;
+  application_id: string;
+  event_id: string | null;
+  event_type: string;
+  occurred_at: string;
+  old_assignee: string | null;
+  new_assignee: string | null;
+  initiator: string | null;
+  assignment_type: string | null;
+  attribution: string | null;
+  new_value: string | null;
+  note: string | null;
+}
+
+export type HistoricalKpi =
+  | "assigned"
+  | "reassigned_in"
+  | "reassigned_out"
+  | "worked"
+  | "actions"
+  | "completed"
+  | "closed";
+
+export const HISTORICAL_KPIS: HistoricalKpi[] = [
+  "assigned", "reassigned_in", "reassigned_out", "worked", "actions", "completed", "closed",
+];
+
+const isWork = (r: PerfStreamRow) => r.kind === "action" || r.kind === "completion" || r.kind === "closure";
+
+/** Rows that make up a KPI for one employee. Distinct-order KPIs keep the first event per order. */
+export function kpiRows(rows: PerfStreamRow[], employeeId: string, kpi: HistoricalKpi): PerfStreamRow[] {
+  const mine = rows.filter((r) => r.employee_id === employeeId);
+  let picked: PerfStreamRow[];
+  switch (kpi) {
+    case "assigned":
+      picked = mine.filter((r) => r.kind === "assignment");
+      break;
+    case "reassigned_in":
+      picked = mine.filter((r) => r.kind === "assignment" && !!r.old_assignee && r.old_assignee !== r.new_assignee);
+      break;
+    case "reassigned_out":
+      picked = mine.filter((r) => r.kind === "unassignment" && !!r.new_assignee && r.new_assignee !== employeeId);
+      break;
+    case "worked":
+      picked = mine.filter(isWork);
+      break;
+    case "actions":
+      // Every validated human event counts; never collapse by time window.
+      return dedupeById(mine.filter(isWork)).sort(byTime);
+    case "completed":
+      picked = mine.filter((r) => r.kind === "completion");
+      break;
+    case "closed":
+      picked = mine.filter((r) => r.kind === "closure");
+      break;
+  }
+  return firstPerOrder(picked);
+}
+
+export interface EmployeeHistoricalKpis {
+  assigned: number;
+  reassigned_in: number;
+  reassigned_out: number;
+  worked: number;
+  actions: number;
+  completed: number;
+  closed: number;
+  last_action_in_range: string | null;
+}
+
+export function aggregateEmployee(rows: PerfStreamRow[], employeeId: string): EmployeeHistoricalKpis {
+  const out = {} as EmployeeHistoricalKpis;
+  for (const k of HISTORICAL_KPIS) out[k] = kpiRows(rows, employeeId, k).length;
+  const work = rows.filter((r) => r.employee_id === employeeId && isWork(r));
+  out.last_action_in_range = work.reduce<string | null>((m, r) => (!m || r.occurred_at > m ? r.occurred_at : m), null);
+  return out;
+}
+
+function byTime(a: PerfStreamRow, b: PerfStreamRow) {
+  return a.occurred_at < b.occurred_at ? -1 : a.occurred_at > b.occurred_at ? 1 : 0;
+}
+
+function dedupeById(rows: PerfStreamRow[]) {
+  const seen = new Set<string>();
+  return rows.filter((r) => {
+    const key = r.event_id ?? `${r.kind}:${r.application_id}:${r.occurred_at}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function firstPerOrder(rows: PerfStreamRow[]) {
+  const m = new Map<string, PerfStreamRow>();
+  for (const r of [...rows].sort(byTime)) if (!m.has(r.application_id)) m.set(r.application_id, r);
+  return [...m.values()];
+}
+
+/** IST business-day boundaries as UTC instants. Pure arithmetic — never browser timezone parsing. */
+export function istRangeToUtc(fromDate: string, toDateInclusive: string): { fromIso: string; toIso: string } {
+  const re = /^(\d{4})-(\d{2})-(\d{2})$/;
+  const a = re.exec(fromDate);
+  const b = re.exec(toDateInclusive);
+  if (!a || !b) throw new Error("Dates must be YYYY-MM-DD");
+  const IST_OFFSET_MS = 330 * 60_000;
+  const start = Date.UTC(+a[1], +a[2] - 1, +a[3]) - IST_OFFSET_MS;
+  const end = Date.UTC(+b[1], +b[2] - 1, +b[3] + 1) - IST_OFFSET_MS;
+  if (end <= start) throw new Error("Invalid date range");
+  return { fromIso: new Date(start).toISOString(), toIso: new Date(end).toISOString() };
+}
+
+/** Today's IST date as YYYY-MM-DD. */
+export function istToday(now: Date = new Date()): string {
+  return new Date(now.getTime() + 330 * 60_000).toISOString().slice(0, 10);
+}

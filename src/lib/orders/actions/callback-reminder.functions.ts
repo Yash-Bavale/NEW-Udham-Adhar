@@ -233,6 +233,7 @@ export const scheduleOrderCallback = createServerFn({ method: "POST" })
 
     try {
       await admin.from("application_events").insert({
+        created_by: context.userId,
         application_id: data.orderId,
         event_type: isReschedule ? "callback_rescheduled" : "callback_scheduled",
         note: noteText,
@@ -386,6 +387,7 @@ export const cancelOrderCallback = createServerFn({ method: "POST" })
 
     try {
       await admin.from("application_events").insert({
+        created_by: context.userId,
         application_id: data.orderId,
         event_type: "callback_cancelled",
         note: `Callback cancelled by ${staff.staff_name}`,
@@ -518,6 +520,7 @@ export const completeOrderCallback = createServerFn({ method: "POST" })
     // 5. Log in application_events
     try {
       await admin.from("application_events").insert({
+        created_by: context.userId,
         application_id: data.orderId,
         event_type: "callback_completed",
         note: `Customer callback marked completed by ${staff.staff_name}.${formattedScheduled ? ` (Scheduled: ${formattedScheduled})` : ""}${data.callOutcomeNote ? ` Note: ${data.callOutcomeNote}` : ""}`,
@@ -700,6 +703,7 @@ export async function completeHotOrderOnQualifyingAction(params: {
   // 5. Insert into application_events
   try {
     await admin.from("application_events").insert({
+      created_by: params.actorId ?? null,
       application_id: params.orderId,
       event_type: "callback_completed",
       note: `Call completed: ${params.actionName} action performed by ${actorName}${params.actionReason ? ` (${params.actionReason})` : ""}`,

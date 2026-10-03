@@ -4989,6 +4989,33 @@ export type Database = {
         Returns: string
       }
       get_dashboard_metrics: { Args: never; Returns: Json }
+      get_employee_last_human_action: {
+        Args: { p_employees: string[] }
+        Returns: {
+          application_id: string
+          employee_id: string
+          event_type: string
+          last_action_at: string
+        }[]
+      }
+      get_employee_perf_stream: {
+        Args: { p_employee?: string; p_from: string; p_to: string }
+        Returns: {
+          application_id: string
+          assignment_type: string
+          attribution: string
+          employee_id: string
+          event_id: string
+          event_type: string
+          initiator: string
+          kind: string
+          new_assignee: string
+          new_value: string
+          note: string
+          occurred_at: string
+          old_assignee: string
+        }[]
+      }
       get_orders_v3_paged: {
         Args: {
           p_action_status?: string
