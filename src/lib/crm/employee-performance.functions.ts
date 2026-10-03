@@ -758,6 +758,19 @@ interface NormalizedOperationalEvent {
 }
 
 /**
+ * True only for verified human operational work. Assignment custody changes
+ * (manual, auto, pool, reassignment) and system/automation events are never
+ * shown in an employee's action lists.
+ */
+function isEmployeeActionEvent(e: NormalizedOperationalEvent): boolean {
+  if (e.isSystemAction) return false;
+  if (e.actionCategory === "assignment" || e.actionCategory === "system_closure") return false;
+  const at = String(e.actionType || "").toUpperCase();
+  return at !== "ORDER_ASSIGNED" && at !== "ORDER_REASSIGNED";
+}
+
+
+/**
  * Normalizes raw application_events, order_schedulers, and activity_logs
  * into a single deduplicated stream of authentic operational events.
  * Strictly separates HUMAN actions from SYSTEM automations (ORDER_ASSIGNED, crons, auto-reassignments).
@@ -2010,7 +2023,8 @@ export const getEmployeeDetailPerformance = createServerFn({
     const technicalDelays = canonicalEvents.filter((e) => e.actionCategory === "technical_delay").length;
 
     // Timeline format
-    const timeline = canonicalEvents.map((ev) => {
+    const employeeActionEvents = canonicalEvents.filter(isEmployeeActionEvent);
+    const timeline = employeeActionEvents.map((ev) => {
       const { actionLabel, details } = formatLogAction({
         action_type: ev.actionType,
         previous_status: ev.previousStatus,
@@ -2040,7 +2054,7 @@ export const getEmployeeDetailPerformance = createServerFn({
 
     // Order work list
     const orderWorkList = appsList.map((ord: any) => {
-      const orderEvents = canonicalEvents.filter((l) => l.orderId === ord.id);
+      const orderEvents = employeeActionEvents.filter((l) => l.orderId === ord.id);
       const firstAction = orderEvents.length ? orderEvents[orderEvents.length - 1] : null;
       const lastAction = orderEvents.length ? orderEvents[0] : null;
       const cust = customerMap.get(ord.customer_id);
@@ -2065,8 +2079,8 @@ export const getEmployeeDetailPerformance = createServerFn({
       };
     });
 
-    const firstActionIso = canonicalEvents.length > 0 ? canonicalEvents[canonicalEvents.length - 1].createdAt : null;
-    const lastActionIso = canonicalEvents.length > 0 ? canonicalEvents[0].createdAt : null;
+    const firstActionIso = employeeActionEvents.length > 0 ? employeeActionEvents[employeeActionEvents.length - 1].createdAt : null;
+    const lastActionIso = employeeActionEvents.length > 0 ? employeeActionEvents[0].createdAt : null;
     const firstLoginFormatted = firstActionIso ? formatTimeIST(firstActionIso) : "—";
     const lastActiveAgoText = lastActionIso
       ? `${Math.max(1, Math.round((Date.now() - new Date(lastActionIso).getTime()) / 60000))}m ago`
@@ -2582,7 +2596,7 @@ export const getMyPerformanceDashboard = createServerFn({ method: "POST" })
       };
     });
 
-    const activityTimeline = canonicalEvents.slice(0, 50).map((ev) => {
+    const activityTimeline = canonicalEvents.filter(isEmployeeActionEvent).slice(0, 50).map((ev) => {
       const { actionLabel, details } = formatLogAction({ action_type: ev.actionType, notes: ev.notes });
       const code = ev.orderId ? (orderCodeMap.get(ev.orderId) || ev.orderId.slice(0, 8)) : "—";
       const cust = ev.orderId && appsListMap.get(ev.orderId)?.customer_id ? customerMap.get(appsListMap.get(ev.orderId)!.customer_id) : null;
@@ -2603,7 +2617,7 @@ export const getMyPerformanceDashboard = createServerFn({ method: "POST" })
       };
     });
 
-    const recentActions = canonicalEvents.slice(0, 20).map((ev) => {
+    const recentActions = canonicalEvents.filter(isEmployeeActionEvent).slice(0, 20).map((ev) => {
       const { actionLabel, details } = formatLogAction({ action_type: ev.actionType, notes: ev.notes });
       const code = ev.orderId ? (orderCodeMap.get(ev.orderId) || ev.orderId.slice(0, 8)) : "—";
       return {
