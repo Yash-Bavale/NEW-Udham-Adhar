@@ -294,6 +294,7 @@ export function OnboardingForm({
               value={values[f.key] ?? ""}
               allValues={values}
               onChange={(v) => update(f.key, v)}
+              setMany={(patch) => setValues((s) => ({ ...s, ...patch }))}
             />
           );
         })}
