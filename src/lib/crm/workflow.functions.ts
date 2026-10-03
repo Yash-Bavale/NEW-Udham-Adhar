@@ -454,6 +454,7 @@ export const setExternalDelay = createServerFn({ method: "POST" })
 
       try {
         await admin.from("application_events").insert({
+          created_by: context.userId,
           application_id: app.id,
           event_type: "technical_delay_marked",
           note: `Technical delay marked: ${data.reasonLabel}${data.evidence ? ` · Evidence: ${data.evidence.fileName}` : ""}${data.internalNote ? ` (${data.internalNote})` : ""}`,
