@@ -28,14 +28,20 @@ async function callerIsManager(userId: string) {
   return { isManager: roles.has("admin") || roles.has("super_admin") || roles.has("manager"), isStaff: roles.size > 0 };
 }
 
+// The API caps each response at 1000 rows; the stream is stably ordered, so page through it.
 async function loadStream(supabase: any, fromIso: string, toIso: string, employeeId: string | null) {
-  const { data, error } = await supabase.rpc("get_employee_perf_stream", {
-    p_from: fromIso,
-    p_to: toIso,
-    p_employee: employeeId,
-  });
-  if (error) throw new Error(`Performance data unavailable: ${error.message}`);
-  return (data ?? []) as PerfStreamRow[];
+  const PAGE = 1000;
+  const all: PerfStreamRow[] = [];
+  for (let offset = 0; offset < 200_000; offset += PAGE) {
+    const { data, error } = await supabase
+      .rpc("get_employee_perf_stream", { p_from: fromIso, p_to: toIso, p_employee: employeeId })
+      .range(offset, offset + PAGE - 1);
+    if (error) throw new Error(`Performance data unavailable: ${error.message}`);
+    const rows = (data ?? []) as PerfStreamRow[];
+    all.push(...rows);
+    if (rows.length < PAGE) break;
+  }
+  return all;
 }
 
 export interface CurrentQueueKpis {
