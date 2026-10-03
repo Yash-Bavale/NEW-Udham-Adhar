@@ -420,6 +420,21 @@ export const setExternalDelay = createServerFn({ method: "POST" })
         }
       }
 
+      // Canonical employee action for performance credit (mirrors technical_delay_marked).
+      try {
+        await admin.from("application_events").insert({
+          created_by: context.userId,
+          application_id: app.id,
+          lead_id: app.lead_id,
+          event_type: "customer_delay_marked",
+          note: `Customer delay marked: ${data.reasonLabel}${data.internalNote ? ` (${data.internalNote})` : ""}`,
+          staff_name: name,
+          staff_role: "staff",
+        } as never);
+      } catch (evtErr) {
+        console.warn("[setExternalDelay] customer_delay_marked event warning:", evtErr);
+      }
+
       // Internal notifications for customer-side hold (assignee + Super Admin).
       {
         const { emitToUsers, emitToRole } = await import("@/lib/notifications/emit.server");

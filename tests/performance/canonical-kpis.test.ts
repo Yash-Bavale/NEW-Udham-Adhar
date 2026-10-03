@@ -69,3 +69,37 @@ describe("canonical employee performance", () => {
     expect(kpiRows(s, A, "worked").length).toBe(k.worked);
   });
 });
+
+describe("delay markings are employee actions", () => {
+  const td = (who: string, at: string, app = "T") => row({ employee_id: who, application_id: app, occurred_at: at, event_type: "technical_delay_marked" });
+  const cd = (who: string, at: string, app = "C") => row({ employee_id: who, application_id: app, occurred_at: at, event_type: "customer_delay_marked" });
+
+  it("1: employee marks Technical Delay → action +1, worked +1, logged +1", () => {
+    expect(aggregateEmployee([td(A, "2026-10-03T05:00:00Z")], A)).toMatchObject({ actions: 1, worked: 1, technical_delay_logged: 1, customer_delay_logged: 0 });
+  });
+  it("2: employee marks Customer Delay → action +1, worked +1, logged +1", () => {
+    expect(aggregateEmployee([cd(A, "2026-10-03T05:00:00Z")], A)).toMatchObject({ actions: 1, worked: 1, customer_delay_logged: 1, technical_delay_logged: 0 });
+  });
+  it("3: system Technical Delay never reaches the stream → employee action 0", () => {
+    // The database stream drops events without a verified staff actor.
+    expect(aggregateEmployee([], A)).toMatchObject({ actions: 0, worked: 0, technical_delay_logged: 0 });
+  });
+  it("4: an order still on hold the next day adds nothing without a new marking", () => {
+    const { fromIso, toIso } = istRangeToUtc("2026-10-04", "2026-10-04");
+    const stream = [td(A, "2026-10-03T05:00:00Z")].filter((r) => r.occurred_at >= fromIso && r.occurred_at < toIso);
+    expect(aggregateEmployee(stream, A)).toMatchObject({ actions: 0, worked: 0, technical_delay_logged: 0 });
+  });
+  it("5: Actions drilldown includes the delay action exactly once", () => {
+    const e = td(A, "2026-10-03T05:00:00Z");
+    const rows = kpiRows([e, e, act(A, "2026-10-03T06:00:00Z", "T")], A, "actions");
+    expect(rows.filter((r) => r.event_id === e.event_id)).toHaveLength(1);
+    expect(rows).toHaveLength(2);
+  });
+  it("6: Delay Logged drilldowns match the KPI (incl. status-change hold markings)", () => {
+    const s = [td(A, "2026-10-03T05:00:00Z"), row({ employee_id: A, application_id: "T2", event_type: "order_status_change", new_value: "TECHNICAL_HOLD_INTERNAL" }), cd(A, "2026-10-03T07:00:00Z")];
+    const k = aggregateEmployee(s, A);
+    expect(kpiRows(s, A, "technical_delay_logged")).toHaveLength(k.technical_delay_logged);
+    expect(kpiRows(s, A, "customer_delay_logged")).toHaveLength(k.customer_delay_logged);
+    expect(k).toMatchObject({ technical_delay_logged: 2, customer_delay_logged: 1, actions: 3 });
+  });
+});
