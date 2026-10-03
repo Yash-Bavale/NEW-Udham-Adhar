@@ -162,6 +162,13 @@
       "when": 1791019303832,
       "tag": "0022_perf_stream_stable_order",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1791021819951,
+      "tag": "0023_atomic_order_assignment",
+      "breakpoints": true
     }
   ]
 }
