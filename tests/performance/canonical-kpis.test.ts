@@ -103,3 +103,31 @@ describe("delay markings are employee actions", () => {
     expect(k).toMatchObject({ technical_delay_logged: 2, customer_delay_logged: 1, actions: 3 });
   });
 });
+
+describe("assignment is custody, never work", () => {
+  it("superadmin manual, auto, pool and reassignment never add Actions/Worked", () => {
+    const s = [
+      ...assign(A, null, "2026-10-03T04:00:00Z"),
+      ...assign(B, A, "2026-10-03T04:10:00Z"),
+      ...assign(A, B, "2026-10-03T04:20:00Z", "Y"),
+      row({ kind: "assignment", employee_id: A, application_id: "Z", event_type: "legacy_initial_assignment", assignment_type: "AUTO_ASSIGNMENT" }),
+    ];
+    for (const who of [A, B]) {
+      const k = aggregateEmployee(s, who);
+      expect(k.actions).toBe(0);
+      expect(k.worked).toBe(0);
+      expect(k.last_action_in_range).toBeNull();
+    }
+    expect(aggregateEmployee(s, A)).toMatchObject({ assigned: 3, reassigned_out: 1 });
+    expect(aggregateEmployee(s, B)).toMatchObject({ assigned: 1, reassigned_in: 1 });
+  });
+  it("a mislabelled assignment row (kind=action) is still rejected", () => {
+    const s = [row({ kind: "action", employee_id: A, event_type: "assignment_change" }), row({ kind: "action", employee_id: A, assignment_type: "MANUAL_ASSIGNMENT" })];
+    expect(aggregateEmployee(s, A)).toMatchObject({ actions: 0, worked: 0 });
+    expect(kpiRows(s, A, "actions")).toHaveLength(0);
+  });
+  it("only the real staff action counts after an assignment", () => {
+    const s = [...assign(A, null, "2026-10-03T04:00:00Z"), act(A, "2026-10-03T04:05:00Z")];
+    expect(aggregateEmployee(s, A)).toMatchObject({ assigned: 1, actions: 1, worked: 1 });
+  });
+});

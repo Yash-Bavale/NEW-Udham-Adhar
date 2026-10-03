@@ -52,7 +52,15 @@ export function delayKind(r: PerfStreamRow): "technical" | "customer" | null {
   return null;
 }
 
-const isWork = (r: PerfStreamRow) => r.kind === "action" || r.kind === "completion" || r.kind === "closure";
+/** Assignment = custody, never work. These event types can never count as Actions/Worked, whatever their kind. */
+export const ASSIGNMENT_EVENT_TYPES = new Set([
+  "assignment_change", "legacy_initial_assignment", "auto_assignment", "pool_assignment", "reassignment", "unassignment",
+]);
+const isAssignmentRow = (r: PerfStreamRow) =>
+  r.kind === "assignment" || r.kind === "unassignment" || ASSIGNMENT_EVENT_TYPES.has(r.event_type) || !!r.assignment_type;
+
+const isWork = (r: PerfStreamRow) =>
+  !isAssignmentRow(r) && (r.kind === "action" || r.kind === "completion" || r.kind === "closure");
 
 /** Rows that make up a KPI for one employee. Distinct-order KPIs keep the first event per order. */
 export function kpiRows(rows: PerfStreamRow[], employeeId: string, kpi: HistoricalKpi): PerfStreamRow[] {
