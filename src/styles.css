@@ -224,7 +224,7 @@
 .marquee-track {
   display: inline-flex;
   white-space: nowrap;
-  animation: marquee 180s linear infinite;
+  animation: marquee 60s linear infinite;
 }
 .marquee-track:hover {
   animation-play-state: paused;

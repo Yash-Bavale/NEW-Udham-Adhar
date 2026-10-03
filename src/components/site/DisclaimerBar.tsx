@@ -13,8 +13,8 @@ export function DisclaimerBar() {
         <strong>Disclaimer:</strong> {brand.legalFooterLine}
       </div>
       {/* Existing marquee strip retained */}
-      <div className="bg-disclaimer-bg text-white">
-        <div className="marquee-track py-2 text-xs md:text-sm font-medium bg-[#31547d]">
+      <div className="bg-[#31547d] text-white">
+        <div className="marquee-track py-2 text-xs md:text-sm font-medium">
           <span className="px-12">{text}</span>
           <span className="px-12">{text}</span>
         </div>
