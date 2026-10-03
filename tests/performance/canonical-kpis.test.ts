@@ -131,3 +131,34 @@ describe("assignment is custody, never work", () => {
     expect(aggregateEmployee(s, A)).toMatchObject({ assigned: 1, actions: 1, worked: 1 });
   });
 });
+
+describe("determinism: same input → same output, whatever the row order", () => {
+  const S = [
+    ...assign(A, null, "2026-10-03T04:00:00Z", "P"), act(A, "2026-10-03T04:05:00Z", "P"), act(A, "2026-10-03T04:05:00Z", "P"),
+    ...assign(B, A, "2026-10-03T04:10:00Z", "P"), act(B, "2026-10-03T04:10:00Z", "P"), complete(B, "2026-10-03T04:20:00Z", "P"),
+    row({ kind: "closure", employee_id: B, application_id: "P", event_type: "order_status_change", new_value: "CLOSED", occurred_at: "2026-10-03T04:20:00Z" }),
+    row({ employee_id: A, application_id: "Q", event_type: "technical_delay_marked", occurred_at: "2026-10-03T05:00:00.000+00:00" }),
+    row({ employee_id: A, application_id: "Q", occurred_at: "2026-10-03T05:00:00Z" }),
+  ];
+  // Seeded shuffle so every run is reproducible.
+  const shuffle = <T,>(xs: T[], seed: number) => {
+    const a = [...xs]; let s = seed;
+    for (let i = a.length - 1; i > 0; i--) { s = (s * 1103515245 + 12345) % 2147483648; const j = s % (i + 1); [a[i], a[j]] = [a[j], a[i]]; }
+    return a;
+  };
+  const snapshot = (rows: PerfStreamRow[]) => [A, B].map((e) => ({
+    k: aggregateEmployee(rows, e),
+    d: (["assigned", "reassigned_in", "reassigned_out", "worked", "actions", "completed", "closed", "technical_delay_logged"] as const)
+      .map((kpi) => kpiRows(rows, e, kpi).map((r) => r.event_id)),
+  }));
+  it("200 shuffled orderings give identical KPIs and drilldowns", () => {
+    const base = JSON.stringify(snapshot(S));
+    for (let seed = 1; seed <= 200; seed++) expect(JSON.stringify(snapshot(shuffle(S, seed)))).toBe(base);
+  });
+  it("aggregation is pure: repeated calls never change the result or the input", () => {
+    const before = JSON.stringify(S);
+    const first = JSON.stringify(snapshot(S));
+    for (let i = 0; i < 50; i++) expect(JSON.stringify(snapshot(S))).toBe(first);
+    expect(JSON.stringify(S)).toBe(before);
+  });
+});
