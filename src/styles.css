@@ -212,19 +212,19 @@
   }
 }
 
-/* Marquee for disclaimer bar */
+/* Marquee for disclaimer bar — enters from the right edge on page load, scrolls left */
 @keyframes marquee {
   from {
-    transform: translateX(0%);
+    transform: translateX(100vw);
   }
   to {
-    transform: translateX(-50%);
+    transform: translateX(-100%);
   }
 }
 .marquee-track {
   display: inline-flex;
   white-space: nowrap;
-  animation: marquee 85s linear infinite;
+  animation: marquee 180s linear infinite;
 }
 .marquee-track:hover {
   animation-play-state: paused;
