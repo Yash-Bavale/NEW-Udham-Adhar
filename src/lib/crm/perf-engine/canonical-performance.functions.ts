@@ -169,7 +169,7 @@ export const getCanonicalEmployeePerformance = createServerFn({ method: "POST" }
 
 const drillSchema = rangeSchema.extend({
   employeeId: z.string().uuid(),
-  kpi: z.enum([...HISTORICAL_KPIS, "current_assigned", "actionable_backlog", "hot", "customer_hold", "technical_hold", "callback_scheduled", "other_open"] as [string, ...string[]]),
+  kpi: z.enum([...HISTORICAL_KPIS, "current_assigned", "actionable_backlog", "hot", "customer_hold", "technical_hold", "callback_scheduled", "other_open"] as unknown as [string, ...string[]]),
   limit: z.number().int().min(1).max(1000).default(500),
   offset: z.number().int().min(0).default(0),
 });
