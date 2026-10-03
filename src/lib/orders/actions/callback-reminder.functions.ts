@@ -703,7 +703,7 @@ export async function completeHotOrderOnQualifyingAction(params: {
   // 5. Insert into application_events
   try {
     await admin.from("application_events").insert({
-      created_by: context.userId,
+      created_by: params.actorId ?? null,
       application_id: params.orderId,
       event_type: "callback_completed",
       note: `Call completed: ${params.actionName} action performed by ${actorName}${params.actionReason ? ` (${params.actionReason})` : ""}`,
