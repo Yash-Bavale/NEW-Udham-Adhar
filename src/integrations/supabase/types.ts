@@ -4960,6 +4960,21 @@ export type Database = {
         Args: { _from: Database["public"]["Enums"]["order_status_enum"] }
         Returns: Database["public"]["Enums"]["order_status_enum"][]
       }
+      assign_application: {
+        Args: {
+          p_actor?: string
+          p_actor_type: string
+          p_application_id: string
+          p_assignment_type: string
+          p_auto_assigned?: boolean
+          p_check_expected?: boolean
+          p_expected_previous?: string
+          p_new_assignee: string
+          p_reason?: string
+          p_source: string
+        }
+        Returns: Json
+      }
       assign_pool_pick: {
         Args: { _module: string; _service_id: string; _website_id: string }
         Returns: string

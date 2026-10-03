@@ -93,13 +93,18 @@ export async function autoAssignLeadOrOrder(opts: {
     const nowIso = new Date().toISOString();
 
     if (opts.applicationId) {
-      const { data: updatedApp } = await supabaseAdmin
-        .from("applications")
-        .update({ assigned_to: staffUserId, assigned_at: nowIso, auto_assigned: true, updated_at: nowIso } as never)
-        .eq("id", opts.applicationId)
-        .is("assigned_to", null)
-        .select("lead_id")
-        .maybeSingle();
+      // Atomic, row-locked; only assigns if still unassigned. History is written in the same transaction.
+      const { data: rpcRes } = await (supabaseAdmin as any).rpc("assign_application", {
+        p_application_id: opts.applicationId,
+        p_new_assignee: staffUserId,
+        p_assignment_type: "AUTO_ASSIGNMENT",
+        p_actor_type: "system",
+        p_source: "auto_assignment:round_robin",
+        p_check_expected: true,
+        p_expected_previous: null,
+        p_auto_assigned: true,
+      });
+      const updatedApp = (rpcRes as any)?.status === "assigned" ? { lead_id: (rpcRes as any).lead_id as string | null } : null;
 
       if (updatedApp?.lead_id) {
         await supabaseAdmin
