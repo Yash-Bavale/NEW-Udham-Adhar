@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Loader2, Search, X, Check } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { searchNicCodes, type NicResult } from "@/lib/onboarding/nic.functions";
+import { nicLabel } from "@/lib/onboarding/nic-fill";
 
 type Props = {
   value: string; // stored as "CODE — Description"
@@ -10,12 +11,14 @@ type Props = {
   digits: 2 | 4 | 5;
   required?: boolean;
   id?: string;
+  /** Called with the full 5-digit code so the form can fill 2/4/5-digit fields together. */
+  onPickCode?: (code5: string) => void;
 };
 
 const inputCls =
   "w-full rounded-xl border border-border bg-background px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-shadow";
 
-export function NicCodePicker({ value, onChange, activity, digits, required, id }: Props) {
+export function NicCodePicker({ value, onChange, activity, digits, required, id, onPickCode }: Props) {
   const fetchNic = useServerFn(searchNicCodes);
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
@@ -66,7 +69,7 @@ export function NicCodePicker({ value, onChange, activity, digits, required, id 
     : r.code;
 
   const trimmed = useMemo(() => {
-    if (digits === 5) return results;
+    if (digits === 5 || onPickCode) return results;
     const seen = new Set<string>();
     const out: NicResult[] = [];
     for (const r of results) {
@@ -79,7 +82,8 @@ export function NicCodePicker({ value, onChange, activity, digits, required, id 
   }, [results, digits]);
 
   function pick(r: NicResult) {
-    onChange(`${codeFor(r)} — ${r.description}`);
+    if (onPickCode) onPickCode(r.code);
+    else onChange(nicLabel(r.code, digits) ?? `${codeFor(r)} — ${r.description}`);
     setOpen(false);
   }
 
@@ -92,7 +96,7 @@ export function NicCodePicker({ value, onChange, activity, digits, required, id 
           value={value}
           required={required}
           onClick={() => setOpen(true)}
-          placeholder={`Click to search NIC ${digits}-digit code…`}
+          placeholder={onPickCode ? "Search activity — fills 2, 4 & 5-digit codes" : `Click to search NIC ${digits}-digit code…`}
           className={inputCls + " cursor-pointer"}
         />
         {value && (
@@ -130,7 +134,7 @@ export function NicCodePicker({ value, onChange, activity, digits, required, id 
               </div>
             )}
             {trimmed.map((r) => {
-              const display = codeFor(r);
+              const display = onPickCode ? r.code : codeFor(r);
               const selected = value.startsWith(`${display} `);
               return (
                 <button
@@ -149,7 +153,7 @@ export function NicCodePicker({ value, onChange, activity, digits, required, id 
             })}
           </div>
           <div className="border-t border-border px-3 py-1.5 text-[11px] text-muted-foreground bg-muted/30">
-            Showing NIC {digits}-digit suggestions{activity ? ` for ${activity}` : ""}.
+            {onPickCode ? "Pick one activity — all NIC codes fill automatically" : `Showing NIC ${digits}-digit suggestions`}{activity ? ` for ${activity}` : ""}.
           </div>
         </div>
       )}

@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { INDIA_STATES, PLANT_UNIT_TYPES, type FieldDef, type OnboardingSchema } from "@/lib/onboarding/schemas";
 import { INDIA_DISTRICTS } from "@/lib/onboarding/india-districts";
 import { NicCodePicker } from "./NicCodePicker";
+import { nicLabel } from "@/lib/onboarding/nic-fill";
 import { DateInputDMY } from "@/components/ui/DateInputDMY";
 
 
@@ -390,11 +391,13 @@ function FieldRenderer({
   value,
   allValues,
   onChange,
+  setMany,
 }: {
   field: FieldDef;
   value: string;
   allValues: Record<string, string>;
   onChange: (v: string) => void;
+  setMany?: (patch: Record<string, string>) => void;
 }) {
   const nicDigitsFromKey =
     field.key === "nic_2_digit" ? 2
@@ -493,9 +496,12 @@ function FieldRenderer({
           <option value="" disabled>
             Select state…
           </option>
-          {INDIA_STATES.map((s) => (
+          {value && !(INDIA_STATES as readonly string[]).includes(value) && (
+            <option value={value}>{value}</option>
+          )}
+          {INDIA_STATES.map((s, i) => (
             <option key={s} value={s}>
-              {s}
+              {i + 1}. {s}
             </option>
           ))}
         </select>
@@ -504,9 +510,12 @@ function FieldRenderer({
           <option value="" disabled>
             {currentState ? "Select district…" : "Select state first"}
           </option>
-          {districtOptions.map((d) => (
+          {value && !districtOptions.includes(value) && (
+            <option value={value}>{value}</option>
+          )}
+          {districtOptions.map((d, i) => (
             <option key={d} value={d}>
-              {d}
+              {i + 1}. {d}
             </option>
           ))}
         </select>
@@ -529,6 +538,20 @@ function FieldRenderer({
           digits={field.nicDigits ?? nicDigitsFromKey ?? 5}
           activity={activity}
           required={field.required}
+          onPickCode={
+            nicDigitsFromKey !== null && setMany
+              ? (code5) => {
+                  const patch: Record<string, string> = {};
+                  for (const d of [2, 4, 5] as const) {
+                    const k = `nic_${d}_digit`;
+                    const l = nicLabel(code5, d);
+                    if (l && k in allValues) patch[k] = l;
+                  }
+                  patch[field.key] = nicLabel(code5, nicDigitsFromKey as 2 | 4 | 5) ?? value;
+                  setMany(patch);
+                }
+              : undefined
+          }
         />
       ) : (
         <input
