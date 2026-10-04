@@ -1024,7 +1024,6 @@ export function CustomerJourneyMap(p: Props) {
         orderId={p.applicationId}
         busy={false}
         onConfirm={async (payload) => {
-          try {
             await fnUpdateFF({
               data: {
                 orderId: p.applicationId,
@@ -1036,10 +1035,7 @@ export function CustomerJourneyMap(p: Props) {
               } as any,
             });
             toast.success("E007 sent — order completed with certificate");
-            setDialog(null); invalidate();
-          } catch (e: any) {
-            toast.error(e?.message ?? "Completion failed");
-          }
+             invalidate();
         }}
       />
       {dialog?.kind === "consultation_completed" && (

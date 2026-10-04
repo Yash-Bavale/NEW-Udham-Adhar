@@ -49,6 +49,17 @@
   --color-status-done: var(--status-done);
   --color-status-urgent: var(--status-urgent);
   --color-status-docs: var(--status-docs);
+  --color-admin-surface: var(--admin-surface);
+  --color-admin-surface-2: var(--admin-surface-2);
+  --color-admin-border: var(--admin-border);
+  --color-admin-border-strong: var(--admin-border-strong);
+  --color-admin-fg: var(--admin-fg);
+  --color-admin-fg-muted: var(--admin-fg-muted);
+  --color-admin-primary: var(--admin-primary);
+  --color-admin-accent-soft: var(--admin-accent-soft);
+  --color-admin-success: var(--admin-success);
+  --color-admin-warn: var(--admin-warn);
+  --color-admin-danger: var(--admin-danger);
 }
 
 :root {
