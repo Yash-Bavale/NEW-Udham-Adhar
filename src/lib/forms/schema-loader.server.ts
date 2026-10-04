@@ -31,6 +31,18 @@ function normalize(row: DbSchemaRow, fallback: OnboardingSchema): OnboardingSche
     fields = fallback.fields;
   }
   const fallbackByKey = new Map(fallback.fields.map((f) => [f.key, f]));
+  // The NIC section is part of the service's standard form; custom builder
+  // schemas never include it, which would silently remove NIC code selection
+  // from the customer-facing form. Re-append it when missing.
+  const hasNic = fields.some(
+    (f) => f.type === "nic" || f.key === "section_nic" || f.key.startsWith("nic_"),
+  );
+  if (!hasNic) {
+    const nicFields = fallback.fields.filter(
+      (f) => f.type === "nic" || f.key === "section_nic" || f.key.startsWith("nic_"),
+    );
+    fields = [...fields, ...nicFields];
+  }
   const normalizedFields = fields.map((field) => {
     const fallbackField = fallbackByKey.get(field.key);
     if (fallbackField?.type !== "nic") return field;
