@@ -626,10 +626,9 @@ export function WorkspaceShell(p: Props) {
                 } as any,
               });
               toast.success("E007 sent — order completed with certificate");
-              setDialog(null);
               invalidate();
             } catch (e: any) {
-              toast.error(e?.message ?? "Completion failed");
+               throw e;
             }
           }}
         />
