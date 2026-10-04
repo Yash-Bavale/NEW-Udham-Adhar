@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Loader2, UploadCloud, AlertTriangle, FileCheck2, Mail, Check, FileText, RefreshCw, Send, CircleCheck, X } from "lucide-react";
+import { Loader2, UploadCloud, AlertTriangle, FileCheck2, Mail, Check, FileText, RefreshCw, Send, CircleCheck } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
