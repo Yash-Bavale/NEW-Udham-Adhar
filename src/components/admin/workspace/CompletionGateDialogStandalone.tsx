@@ -182,14 +182,14 @@ export function CompletionGateDialogStandalone({
                 })}
               </div>
 
-              <section className="space-y-2 rounded-md border border-admin-border p-3" aria-label="Upload Certificate">
-                <div className="flex flex-wrap items-start justify-between gap-2"><div><h3 className="text-sm font-semibold"><span className="mr-2 rounded bg-admin-accent-soft px-2 py-1 text-[11px] text-admin-primary">STEP 1</span> Upload Certificate</h3><p className="mt-2 text-xs text-admin-fg-muted">Upload the final Udyam certificate issued by the government.</p></div><span className="rounded-md border border-admin-border bg-admin-accent-soft px-2 py-1 text-[11px] text-admin-primary">Accepted formats<br /><span className="text-admin-fg-muted">PDF, JPG, PNG, WEBP · Max 10 MB</span></span></div>
+              <section className="space-y-2" aria-label="Upload Certificate">
+                <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="text-sm font-semibold">01 Upload Certificate</h3><span className="text-[11px] text-admin-fg-muted">PDF, JPG, PNG, WEBP · Max 10 MB</span></div>
                 {!file ? (
                   <div onDragOver={(e) => { e.preventDefault(); if (!locked) setDragOver(true); }} onDragLeave={() => setDragOver(false)} onDrop={(e) => { e.preventDefault(); setDragOver(false); chooseFile(e.dataTransfer.files?.[0] ?? null); }}
                     className={`flex min-h-28 flex-col items-center justify-center rounded-md border border-dashed p-4 text-center transition-colors ${dragOver ? "border-admin-primary bg-admin-accent-soft" : "border-admin-border-strong bg-admin-surface-2"}`}>
                     <UploadCloud className="mb-1 size-8 text-admin-primary" />
-                    <Button type="button" variant="link" className="h-auto p-0 font-semibold text-admin-fg" onClick={() => fileInput.current?.click()} disabled={locked}>Drag &amp; drop your certificate here</Button>
-                    <p className="text-xs text-admin-fg-muted">or click to browse</p>
+                    <p className="text-sm font-semibold">Upload Certificate</p>
+                    <Button type="button" variant="link" className="h-auto p-0 text-xs text-admin-fg-muted" onClick={() => fileInput.current?.click()} disabled={locked}>Drag &amp; drop or click to browse</Button>
                   </div>
                 ) : (
                   <div className={`flex items-center gap-3 rounded-md border p-3 ${fileError ? "border-admin-danger bg-destructive/5" : uploaded?.file === file ? "border-admin-success bg-admin-success/5" : "border-admin-border bg-admin-surface-2"}`}>
@@ -198,7 +198,7 @@ export function CompletionGateDialogStandalone({
                       <p className="truncate text-sm font-medium" title={file.name}>{file.name}</p>
                       <p className="text-xs text-admin-fg-muted">{formatSize(file.size)} · {uploaded?.file === file ? "Uploaded" : "Selected for upload"}</p>
                     </div>
-                    <span className={`hidden items-center gap-1 rounded-full px-2 py-1 text-[11px] font-semibold sm:inline-flex ${uploaded?.file === file ? "bg-admin-success/10 text-admin-success" : "bg-admin-accent-soft text-admin-primary"}`}><Check className="size-3" />{uploaded?.file === file ? "Certificate uploaded" : "File selected"}</span>
+                    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-semibold ${uploaded?.file === file ? "bg-admin-success/10 text-admin-success" : "bg-admin-accent-soft text-admin-primary"}`}><Check className="size-3" />{uploaded?.file === file ? "File uploaded" : "File selected"}</span>
                     <Button type="button" variant="ghost" size="sm" onClick={() => fileInput.current?.click()} disabled={locked} title="Replace file" aria-label="Replace file"><RefreshCw /></Button>
                   </div>
                 )}
@@ -206,25 +206,24 @@ export function CompletionGateDialogStandalone({
                 <input ref={fileInput} type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp" className="sr-only" tabIndex={-1} disabled={locked} onChange={(e) => { chooseFile(e.target.files?.[0] ?? null); e.target.value = ""; }} aria-label="Certificate file" />
               </section>
 
-              <section className="space-y-2 rounded-md border border-admin-border p-3">
-                <div><Label htmlFor="completion-cert-number" className="text-sm font-semibold"><span className="mr-2 rounded bg-admin-accent-soft px-2 py-1 text-[11px] text-admin-primary">STEP 2</span> Certificate / Document Number <span className="text-admin-danger">Required</span></Label><p className="mt-2 text-xs text-admin-fg-muted">Enter the Udyam certificate number as mentioned on the document.</p></div>
+              <section className="space-y-2">
+                <Label htmlFor="completion-cert-number" className="text-sm font-semibold">02 Certificate / Document Number <span className="text-admin-danger">Required</span></Label>
                 <Input id="completion-cert-number" value={certNumber} onChange={(e) => { setCertNumber(e.target.value); setError(null); }} onBlur={() => setNumberTouched(true)} disabled={locked} aria-invalid={numberTouched && !certNumber.trim()} aria-describedby={numberTouched && !certNumber.trim() ? "completion-number-error" : undefined} placeholder="e.g. UDYAM-MH-28-0012345" autoComplete="off" className="h-11 border-admin-border-strong bg-admin-surface" />
                 {numberTouched && !certNumber.trim() && <p id="completion-number-error" className="text-xs text-admin-danger" role="alert">Enter the certificate / document number.</p>}
               </section>
 
-              <section className="space-y-2 rounded-md border border-admin-border p-3">
-                <Label htmlFor="completion-notes" className="text-sm font-semibold"><span className="mr-2 rounded bg-admin-accent-soft px-2 py-1 text-[11px] text-admin-primary">STEP 3</span> Completion Notes <span className="font-normal text-admin-fg-muted">(Optional)</span></Label>
-                <p className="text-xs text-admin-fg-muted">Add any important notes that will be included in the customer email.</p>
-                <Textarea id="completion-notes" value={completionNotes} onChange={(e) => setCompletionNotes(e.target.value)} disabled={locked} rows={2} maxLength={2000} placeholder="Notes to include in the customer email" className="resize-y border-admin-border-strong bg-admin-surface" />
+              <section className="space-y-2">
+                <div className="flex justify-between gap-2"><Label htmlFor="completion-notes" className="text-sm font-semibold">03 Completion Notes <span className="font-normal text-admin-fg-muted">(Optional)</span></Label><span className="text-xs text-admin-fg-muted">{completionNotes.length}/500</span></div>
+                <Textarea id="completion-notes" value={completionNotes} onChange={(e) => setCompletionNotes(e.target.value)} disabled={locked} rows={2} maxLength={500} placeholder="Notes to include in the customer email" className="resize-y border-admin-border-strong bg-admin-surface" />
               </section>
 
               <div className="flex items-start gap-3 rounded-md border border-admin-border bg-admin-accent-soft p-3 text-xs">
                 <Mail className="mt-0.5 size-4 shrink-0 text-admin-primary" />
-                <div className="min-w-0"><p className="text-admin-fg-muted">Certificate will be sent to</p><p className="break-all font-semibold text-admin-fg">{recipientEmail ?? "No email on file"}</p></div>
+                <div className="min-w-0"><p className="text-admin-fg-muted">The certificate will be emailed to:</p><p className="break-all font-semibold text-admin-fg">{recipientEmail ?? "No email on file"}</p></div>
               </div>
               <div className="flex items-start gap-2 rounded-md border border-admin-warn/30 bg-admin-warn/5 p-3 text-xs text-admin-fg">
                 <AlertTriangle className="mt-0.5 size-4 shrink-0 text-admin-warn" />
-                <p>After the certificate email is queued, this order moves to <strong>Completed</strong>. All other customer documents for this order are then permanently deleted.</p>
+                <p>After the certificate email is sent, the order will move to <strong>COMPLETED</strong>. All other customer documents for this order will then be permanently deleted.</p>
               </div>
               {(working || error) && <div role={error ? "alert" : "status"} aria-live="polite" className={`flex items-start gap-2 rounded-md border p-3 text-sm ${error ? "border-admin-danger/40 bg-destructive/5 text-admin-danger" : "border-admin-border bg-admin-accent-soft text-admin-primary"}`}>
                 {error ? <AlertTriangle className="mt-0.5 size-4 shrink-0" /> : <Loader2 className="mt-0.5 size-4 shrink-0 animate-spin" />}
