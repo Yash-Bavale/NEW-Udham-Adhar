@@ -6,3 +6,4 @@
 - Customer Document Merge reuses the shared browser pdf-lib merge in src/lib/disputes/dispute-browser-pdf.ts (appendFileToPdf) and saves through the existing order document upload, so there is one PDF engine and one document store.
 - Keep the first NIC activity in the existing nic_2_digit/nic_4_digit/nic_5_digit form answers and store additional activities in nic_activities in the same submission, so older forms and order views remain compatible.
 - Add NIC activity fields through the form builder as the canonical 2/4/5-digit trio with shared visibility, so the customer form renders one search and activity list while retaining compatible answers.
+- Flatten saved form-builder sections with display-only section headings for customer forms and previews, so section boundaries remain visible without changing submitted answers.
