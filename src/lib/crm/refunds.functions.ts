@@ -147,18 +147,12 @@ export const markRefundProcessed = createServerFn({ method: "POST" })
       .update({
         refund_processed_at: new Date().toISOString(),
         refund_gateway_ref: data.gatewayRef,
-        documents_deleted_reason: "refund",
       } as never)
       .eq("id", app.id);
 
-    // Invoke documents deletion edge function (best-effort).
-    try {
-      await admin.functions.invoke("delete-order-documents", {
-        body: { application_id: app.id, reason: "refund" },
-      });
-    } catch (e) {
-      console.error("delete-order-documents invocation failed:", e);
-    }
+    // NOTE: customer documents are intentionally NOT deleted on refund/close.
+    // Deletion only happens on order completion. Closed/refunded orders must
+    // keep their documents so the order can be reopened if needed.
 
     // Update refund_requests row status to processed
     await admin
