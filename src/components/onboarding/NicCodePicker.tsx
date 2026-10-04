@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Loader2, Search, X, Check, ChevronsUpDown, CheckCircle2 } from "lucide-react";
+import { Loader2, Search, X, Check, ChevronsUpDown, CheckCircle2, Plus, Trash2 } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { searchNicCodes, type NicResult } from "@/lib/onboarding/nic.functions";
 import {
@@ -8,7 +8,9 @@ import {
   getNicDivisions,
   getNicSubclasses,
   nicLabel,
+  parseNicActivities,
   searchNicUnified,
+  type NicActivity,
   type NicOption,
 } from "@/lib/onboarding/nic-fill";
 import { Button } from "@/components/ui/button";
@@ -41,6 +43,74 @@ export function NicCodeSection({
   setMany,
   activity,
 }: NicSectionProps) {
+  const [adding, setAdding] = useState(false);
+  const [draft, setDraft] = useState<Record<string, string>>({ nic_2_digit: "", nic_4_digit: "", nic_5_digit: "" });
+  const [draftActivity, setDraftActivity] = useState<"Manufacturing" | "Services" | "Trading">(activity ?? "Services");
+  const [activityError, setActivityError] = useState("");
+  const extras = useMemo(() => parseNicActivities(values.nic_activities), [values.nic_activities]);
+  const selected = adding ? draft : values;
+  const updateSelection = (patch: Record<string, string>) => {
+    if (adding) setDraft((previous) => ({ ...previous, ...patch }));
+    else setMany(patch);
+    setActivityError("");
+  };
+  const updateField = (key: string, value: string) => {
+    if (adding) updateSelection({ [key]: value });
+    else onChange(key, value);
+  };
+  const firstActivity = values.nic_5_digit ? {
+    nic_2_digit: values.nic_2_digit,
+    nic_4_digit: values.nic_4_digit,
+    nic_5_digit: values.nic_5_digit,
+    activity_type: activity ?? "",
+  } : null;
+  const activities = firstActivity ? [firstActivity, ...extras] : extras;
+
+  function addActivity() {
+    if (!adding) {
+      if (!firstActivity) {
+        setActivityError("Select a 5-digit NIC activity first.");
+        return;
+      }
+      setDraft({ nic_2_digit: "", nic_4_digit: "", nic_5_digit: "" });
+      setDraftActivity(activity ?? "Services");
+      setAdding(true);
+      setActivityError("");
+      inputRef.current?.focus();
+      return;
+    }
+    const code2 = extractNicCode(draft.nic_2_digit);
+    const code4 = extractNicCode(draft.nic_4_digit);
+    const code5 = extractNicCode(draft.nic_5_digit);
+    if (code2.length !== 2 || code4.length !== 4 || code5.length !== 5 || !code5.startsWith(code4) || !code4.startsWith(code2)) {
+      setActivityError("Select a complete 5-digit NIC activity before adding it.");
+      return;
+    }
+    if (activities.some((item) => extractNicCode(item.nic_5_digit) === code5)) {
+      setActivityError("This activity has already been added.");
+      return;
+    }
+    const next: NicActivity = { nic_2_digit: draft.nic_2_digit, nic_4_digit: draft.nic_4_digit, nic_5_digit: draft.nic_5_digit, activity_type: draftActivity };
+    setMany({ nic_activities: JSON.stringify([...extras, next]) });
+    setDraft({ nic_2_digit: "", nic_4_digit: "", nic_5_digit: "" });
+    setAdding(false);
+    setActivityError("");
+  }
+
+  function removeActivity(index: number) {
+    if (index === 0 && firstActivity) {
+      const [promoted, ...remaining] = extras;
+      setMany({
+        nic_2_digit: promoted?.nic_2_digit ?? "",
+        nic_4_digit: promoted?.nic_4_digit ?? "",
+        nic_5_digit: promoted?.nic_5_digit ?? "",
+        nic_activities: JSON.stringify(remaining),
+      });
+    } else {
+      const extraIndex = firstActivity ? index - 1 : index;
+      setMany({ nic_activities: JSON.stringify(extras.filter((_, i) => i !== extraIndex)) });
+    }
+  }
   const fetchNic = useServerFn(searchNicCodes);
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
@@ -52,9 +122,9 @@ export function NicCodeSection({
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Derived current codes
-  const current2Code = extractNicCode(values.nic_2_digit);
-  const current4Code = extractNicCode(values.nic_4_digit);
-  const current5Code = extractNicCode(values.nic_5_digit);
+  const current2Code = extractNicCode(selected.nic_2_digit);
+  const current4Code = extractNicCode(selected.nic_4_digit);
+  const current5Code = extractNicCode(selected.nic_5_digit);
 
   // Close on outside click
   useEffect(() => {
@@ -134,13 +204,13 @@ export function NicCodeSection({
     const list = getNicSubclasses(current4Code);
     // If an existing value has a custom description or DB row, preserve it
     if (
-      values.nic_5_digit &&
-      !list.some((o) => o.code === current5Code || o.label === values.nic_5_digit)
+      selected.nic_5_digit &&
+      !list.some((o) => o.code === current5Code || o.label === selected.nic_5_digit)
     ) {
-      list.unshift({ code: current5Code, label: values.nic_5_digit });
+      list.unshift({ code: current5Code, label: selected.nic_5_digit });
     }
     return list;
-  }, [current4Code, values.nic_5_digit, current5Code]);
+  }, [current4Code, selected.nic_5_digit, current5Code]);
 
   function pickOption(option: NicOption) {
     if (option.level === 5) {
@@ -148,7 +218,7 @@ export function NicCodeSection({
       const l2 = nicLabel(option.code, 2);
       const l4 = nicLabel(option.code, 4);
       const l5 = nicLabel(option.code, 5, option.description) ?? option.label;
-      setMany({
+      updateSelection({
         nic_2_digit: l2 ?? "",
         nic_4_digit: l4 ?? "",
         nic_5_digit: l5,
@@ -157,7 +227,7 @@ export function NicCodeSection({
       // 4-digit selected: auto-set 2-digit and 4-digit, reset 5-digit to pending
       const l2 = nicLabel(option.code, 2);
       const l4 = nicLabel(option.code, 4, option.description) ?? option.label;
-      setMany({
+      updateSelection({
         nic_2_digit: l2 ?? "",
         nic_4_digit: l4,
         nic_5_digit: "",
@@ -165,7 +235,7 @@ export function NicCodeSection({
     } else if (option.level === 2) {
       // 2-digit selected: auto-set 2-digit, reset 4-digit and 5-digit
       const l2 = nicLabel(option.code, 2, option.description) ?? option.label;
-      setMany({
+      updateSelection({
         nic_2_digit: l2,
         nic_4_digit: "",
         nic_5_digit: "",
@@ -176,7 +246,7 @@ export function NicCodeSection({
   }
 
   function handleClear() {
-    setMany({
+    updateSelection({
       nic_2_digit: "",
       nic_4_digit: "",
       nic_5_digit: "",
@@ -206,8 +276,8 @@ export function NicCodeSection({
     }
   }
 
-  const hasAnySelection = Boolean(values.nic_2_digit || values.nic_4_digit || values.nic_5_digit);
-  const displaySummary = values.nic_5_digit || values.nic_4_digit || values.nic_2_digit || "";
+  const hasAnySelection = Boolean(selected.nic_2_digit || selected.nic_4_digit || selected.nic_5_digit);
+  const displaySummary = selected.nic_5_digit || selected.nic_4_digit || selected.nic_2_digit || "";
 
   return (
     <div className="md:col-span-2 pt-4 mt-2 border-t border-border space-y-4">
@@ -300,9 +370,9 @@ export function NicCodeSection({
 
             {unifiedResults.map((opt, index) => {
               const isSelected =
-                values.nic_5_digit.startsWith(`${opt.code} `) ||
-                values.nic_4_digit.startsWith(`${opt.code} `) ||
-                values.nic_2_digit.startsWith(`${opt.code} `);
+                selected.nic_5_digit.startsWith(`${opt.code} `) ||
+                selected.nic_4_digit.startsWith(`${opt.code} `) ||
+                selected.nic_2_digit.startsWith(`${opt.code} `);
 
               return (
                 <button
@@ -331,14 +401,14 @@ export function NicCodeSection({
       </div>
 
       {/* Status Banner */}
-      {values.nic_5_digit ? (
+      {selected.nic_5_digit ? (
         <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/20 px-3.5 py-2 text-xs text-emerald-700 dark:text-emerald-300 flex items-center gap-2">
           <CheckCircle2 className="size-4 shrink-0 text-emerald-600" />
           <span>
-            Activity selected: <strong>{values.nic_5_digit}</strong>
+            Activity selected: <strong>{selected.nic_5_digit}</strong>
           </span>
         </div>
-      ) : values.nic_4_digit ? (
+      ) : selected.nic_4_digit ? (
         <div className="rounded-lg bg-amber-500/10 border border-amber-500/20 px-3.5 py-2 text-xs text-amber-700 dark:text-amber-300 flex items-center gap-2">
           <span>
             4-digit class chosen. <strong>Select a 5-digit activity below</strong> to complete your application.
@@ -358,7 +428,7 @@ export function NicCodeSection({
             value={current2Code ? (nicLabel(current2Code, 2) ?? values.nic_2_digit) : ""}
             onChange={(e) => {
               const val = e.target.value;
-              setMany({
+              updateSelection({
                 nic_2_digit: val,
                 nic_4_digit: "",
                 nic_5_digit: "",
@@ -388,7 +458,7 @@ export function NicCodeSection({
             disabled={!current2Code}
             onChange={(e) => {
               const val = e.target.value;
-              setMany({
+              updateSelection({
                 nic_4_digit: val,
                 nic_5_digit: "",
               });
@@ -413,10 +483,10 @@ export function NicCodeSection({
           </label>
           <select
             id="f-nic_5_digit"
-            value={values.nic_5_digit || ""}
+            value={selected.nic_5_digit || ""}
             disabled={!current4Code}
             onChange={(e) => {
-              onChange("nic_5_digit", e.target.value);
+              updateField("nic_5_digit", e.target.value);
             }}
             className={selectCls}
           >
@@ -431,6 +501,38 @@ export function NicCodeSection({
           </select>
         </div>
       </div>
+      {adding && (
+        <div className="flex flex-wrap items-center gap-3">
+          <label htmlFor="nic-activity-type" className="text-sm font-medium text-foreground">Activity type</label>
+          <select id="nic-activity-type" value={draftActivity} onChange={(e) => setDraftActivity(e.target.value as typeof draftActivity)} className={selectCls + " w-auto"}>
+            <option value="Manufacturing">Manufacturing</option>
+            <option value="Services">Services</option>
+            <option value="Trading">Trading</option>
+          </select>
+        </div>
+      )}
+      <div className="flex flex-wrap items-center gap-2">
+        <Button type="button" onClick={addActivity} disabled={!firstActivity && !adding} className="gap-2">
+          <Plus className="size-4" /> Add Activity
+        </Button>
+        {adding && <Button type="button" variant="outline" onClick={() => { setAdding(false); setActivityError(""); }}>Cancel</Button>}
+      </div>
+      {activityError && <p role="alert" className="text-sm text-destructive">{activityError}</p>}
+      {activities.length > 0 && (
+        <div className="overflow-x-auto border border-border rounded-md">
+          <table className="w-full min-w-[580px] text-sm text-left">
+            <thead className="bg-muted text-foreground"><tr><th className="p-2">No.</th><th className="p-2">NIC 2 Digit</th><th className="p-2">NIC 4 Digit</th><th className="p-2">NIC 5 Digit</th><th className="p-2">Activity Type</th><th className="p-2">Remove</th></tr></thead>
+            <tbody className="divide-y divide-border">
+              {activities.map((item, index) => (
+                <tr key={`${extractNicCode(item.nic_5_digit)}-${index}`}>
+                  <td className="p-2">{index + 1}</td><td className="p-2">{item.nic_2_digit}</td><td className="p-2">{item.nic_4_digit}</td><td className="p-2">{item.nic_5_digit}</td><td className="p-2">{item.activity_type || "—"}</td>
+                  <td className="p-2"><Button type="button" size="icon" variant="ghost" aria-label={`Remove NIC activity ${index + 1}`} title="Remove activity" onClick={() => removeActivity(index)}><Trash2 className="size-4" /></Button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

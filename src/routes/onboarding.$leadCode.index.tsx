@@ -14,6 +14,11 @@ export const Route = createFileRoute("/onboarding/$leadCode/")({
   head: () => ({
     meta: [
       { title: "Complete your application — Business Help Services" },
+      { name: "description", content: "Complete your Business Help Services application details and activities." },
+      { property: "og:title", content: "Complete your application — Business Help Services" },
+      { property: "og:description", content: "Complete your Business Help Services application details and activities." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
       { name: "robots", content: "noindex,nofollow" },
     ],
   }),
@@ -79,6 +84,7 @@ function OnboardingDetailsPage() {
     const v = existing[f.key];
     initial[f.key] = v === undefined || v === null ? "" : String(v);
   }
+  initial.nic_activities = typeof existing.nic_activities === "string" ? existing.nic_activities : "";
   if (schemaKeys.has("applicant_name")) initial.applicant_name ||= data.lead.name ?? "";
   // Only prefill aadhaar_mobile when the active schema actually collects it
   // (New Udyam). Other services have their own `registered_mobile` field and
