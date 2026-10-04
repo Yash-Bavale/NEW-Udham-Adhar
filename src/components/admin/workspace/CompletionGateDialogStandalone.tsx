@@ -173,8 +173,8 @@ export function CompletionGateDialogStandalone({
             <div className="min-h-0 flex-1 space-y-2.5 overflow-y-auto px-5 pb-3 sm:px-6">
               <div className="grid grid-cols-3 gap-1 pb-2 pt-3 text-center" aria-label="Completion steps">
                 {(["Upload Certificate", "Certificate Number", "Send to Customer"] as const).map((label, index) => {
-                  const done = index === 0 ? Boolean(uploaded) : index === 1 ? Boolean(certNumber.trim()) : sendingConfirmed;
-                  const active = index === 0 ? !uploaded : index === 1 ? Boolean(uploaded && !certNumber.trim()) : Boolean(uploaded && certNumber.trim());
+                   const done = index === 0 ? Boolean(uploaded) : index === 1 ? Boolean(uploaded && certNumber.trim()) : sendingConfirmed;
+                   const active = index === 0 ? !uploaded : index === 1 ? Boolean(uploaded && !certNumber.trim()) : Boolean(uploaded && certNumber.trim());
                   return <div key={label} className="relative min-w-0 text-[11px]">
                     {index < 2 && <span aria-hidden="true" className="absolute left-[calc(50%+15px)] right-[calc(-50%+15px)] top-3 h-px bg-completion-border" />}
                     <span className={`relative mx-auto flex size-6 items-center justify-center rounded-full text-xs font-semibold ${done ? "bg-admin-success text-primary-foreground" : active ? "bg-completion-primary text-admin-surface shadow-sm" : "bg-admin-surface-2 text-admin-fg-muted"}`}>{done ? <Check className="size-3.5" /> : index + 1}</span>

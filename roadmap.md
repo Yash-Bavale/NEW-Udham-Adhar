@@ -1,6 +1,6 @@
 # Roadmap
 
-- [ ] Match Complete Service reference colors, sizing, upload and send states; verify on the order screen
+- [x] Match Complete Service reference colors, sizing, upload and send states; verify on the order screen (live delivery intentionally not exercised)
 
 - [x] Match the Complete Service dialog to the supplied UI while preserving real upload and sending states (destructive live send intentionally not exercised)
 - [x] Visually separate and highlight customer-facing form sections as shown in the form preview
