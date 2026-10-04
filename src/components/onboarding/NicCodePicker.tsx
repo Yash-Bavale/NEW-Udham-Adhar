@@ -98,18 +98,9 @@ export function NicCodeSection({
   }
 
   function removeActivity(index: number) {
-    if (index === 0 && firstActivity) {
-      const [promoted, ...remaining] = extras;
-      setMany({
-        nic_2_digit: promoted?.nic_2_digit ?? "",
-        nic_4_digit: promoted?.nic_4_digit ?? "",
-        nic_5_digit: promoted?.nic_5_digit ?? "",
-        nic_activities: JSON.stringify(remaining),
-      });
-    } else {
-      const extraIndex = firstActivity ? index - 1 : index;
-      setMany({ nic_activities: JSON.stringify(extras.filter((_, i) => i !== extraIndex)) });
-    }
+    const extraIndex = firstActivity ? index - 1 : index;
+    if (extraIndex < 0) return;
+    setMany({ nic_activities: JSON.stringify(extras.filter((_, i) => i !== extraIndex)) });
   }
   const fetchNic = useServerFn(searchNicCodes);
   const [open, setOpen] = useState(false);
@@ -512,7 +503,7 @@ export function NicCodeSection({
         </div>
       )}
       <div className="flex flex-wrap items-center gap-2">
-        <Button type="button" onClick={addActivity} disabled={!firstActivity && !adding} className="gap-2">
+        <Button type="button" onClick={addActivity} className="gap-2">
           <Plus className="size-4" /> {adding ? "Save Activity" : "Add Activity"}
         </Button>
         {adding && <Button type="button" variant="outline" onClick={() => { setAdding(false); setActivityError(""); }}>Cancel</Button>}
@@ -526,7 +517,7 @@ export function NicCodeSection({
               {activities.map((item, index) => (
                 <tr key={`${extractNicCode(item.nic_5_digit)}-${index}`}>
                   <td className="p-2">{index + 1}</td><td className="p-2">{item.nic_2_digit}</td><td className="p-2">{item.nic_4_digit}</td><td className="p-2">{item.nic_5_digit}</td><td className="p-2">{item.activity_type || "—"}</td>
-                  <td className="p-2"><Button type="button" size="icon" variant="ghost" aria-label={`Remove NIC activity ${index + 1}`} title="Remove activity" onClick={() => removeActivity(index)}><Trash2 className="size-4" /></Button></td>
+                  <td className="p-2">{index === 0 && firstActivity ? "Primary" : <Button type="button" size="icon" variant="ghost" aria-label={`Remove NIC activity ${index + 1}`} title="Remove activity" onClick={() => removeActivity(index)}><Trash2 className="size-4" /></Button>}</td>
                 </tr>
               ))}
             </tbody>
