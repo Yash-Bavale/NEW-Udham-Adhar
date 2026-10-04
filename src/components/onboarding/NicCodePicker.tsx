@@ -3,6 +3,7 @@ import { Loader2, Search, X, Check } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { searchNicCodes, type NicResult } from "@/lib/onboarding/nic.functions";
 import { nicLabel } from "@/lib/onboarding/nic-fill";
+import { NIC_CLASSES, NIC_DIVISIONS } from "@/lib/onboarding/nic-master";
 import { Button } from "@/components/ui/button";
 
 type Props = {
@@ -14,6 +15,8 @@ type Props = {
   id?: string;
   /** Called with the full 5-digit code so the form can fill 2/4/5-digit fields together. */
   onPickCode?: (code5: string) => void;
+  /** Main search can select an actual 2-, 4-, or 5-digit classification. */
+  onPickLevel?: (code: string, level: 2 | 4 | 5) => void;
   /** One editable search above the three saved NIC code fields. */
   inlineSearch?: boolean;
 };
@@ -21,7 +24,9 @@ type Props = {
 const inputCls =
   "w-full rounded-xl border border-border bg-background px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-shadow";
 
-export function NicCodePicker({ value, onChange, activity, digits, required, id, onPickCode, inlineSearch = false }: Props) {
+type LevelOption = { code: string; description: string; level: 2 | 4 | 5 };
+
+export function NicCodePicker({ value, onChange, activity, digits, required, id, onPickCode, onPickLevel, inlineSearch = false }: Props) {
   const fetchNic = useServerFn(searchNicCodes);
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
@@ -86,6 +91,24 @@ export function NicCodePicker({ value, onChange, activity, digits, required, id,
     return out;
   }, [results, digits]);
 
+  const levelOptions = useMemo(() => {
+    if (!inlineSearch || !q.trim()) return [];
+    const needle = q.trim().toLowerCase();
+    const matches = (code: string, description: string) =>
+      code.startsWith(needle) || description.toLowerCase().includes(needle);
+    const ranked = (source: Record<string, string>, level: 2 | 4): LevelOption[] =>
+      Object.entries(source)
+        .filter(([code, description]) => matches(code, description))
+        .sort(([a], [b]) => Number(b.startsWith(needle)) - Number(a.startsWith(needle)) || a.localeCompare(b))
+        .slice(0, 12)
+        .map(([code, description]) => ({ code, description, level }));
+    return [
+      ...ranked(NIC_DIVISIONS, 2),
+      ...ranked(NIC_CLASSES, 4),
+      ...results.map((r): LevelOption => ({ code: r.code, description: r.description, level: 5 })),
+    ];
+  }, [inlineSearch, q, results]);
+
   function pick(r: NicResult) {
     if (onPickCode) onPickCode(r.code);
     else onChange(nicLabel(r.code, digits) ?? `${codeFor(r)} — ${r.description}`);
@@ -93,19 +116,27 @@ export function NicCodePicker({ value, onChange, activity, digits, required, id,
     setQ("");
   }
 
+  function pickLevel(option: LevelOption) {
+    onPickLevel?.(option.code, option.level);
+    setOpen(false);
+    setQ("");
+  }
+
   function onSearchKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === "Escape") setOpen(false);
-    if (e.key === "ArrowDown" && trimmed.length) {
+    const optionCount = inlineSearch ? levelOptions.length : trimmed.length;
+    if (e.key === "ArrowDown" && optionCount) {
       e.preventDefault();
-      setActiveIndex((i) => Math.min(i + 1, trimmed.length - 1));
+      setActiveIndex((i) => Math.min(i + 1, optionCount - 1));
     }
-    if (e.key === "ArrowUp" && trimmed.length) {
+    if (e.key === "ArrowUp" && optionCount) {
       e.preventDefault();
       setActiveIndex((i) => Math.max(i - 1, 0));
     }
-    if (e.key === "Enter" && open && trimmed[activeIndex]) {
+    if (e.key === "Enter" && open && optionCount) {
       e.preventDefault();
-      pick(trimmed[activeIndex]);
+      if (inlineSearch && levelOptions[activeIndex]) pickLevel(levelOptions[activeIndex]);
+      else if (trimmed[activeIndex]) pick(trimmed[activeIndex]);
     }
   }
 
@@ -127,7 +158,7 @@ export function NicCodePicker({ value, onChange, activity, digits, required, id,
               aria-controls={id ? `${id}-results` : undefined}
               aria-autocomplete="list"
               autoComplete="off"
-              placeholder="Search NIC code or activity (e.g. 4651 or computers)"
+              placeholder="Type an activity or code (e.g. computers or 6209)"
               className={inputCls + " pl-10"}
             />
           </div>
@@ -175,12 +206,36 @@ export function NicCodePicker({ value, onChange, activity, digits, required, id,
             {err && (
               <div className="px-3 py-3 text-sm text-destructive">{err}</div>
             )}
-            {!err && !loading && trimmed.length === 0 && (
+            {!err && !loading && (inlineSearch ? levelOptions.length === 0 : trimmed.length === 0) && (
               <div className="px-3 py-6 text-center text-sm text-muted-foreground">
                 {q ? "No NIC codes match your search." : "Start typing to search NIC codes."}
               </div>
             )}
-            {trimmed.map((r) => {
+            {inlineSearch ? ([2, 4, 5] as const).map((level) => {
+              const options = levelOptions.filter((option) => option.level === level);
+              if (!options.length) return null;
+              return <div key={level} role="group" aria-label={`${level}-digit NIC codes`}>
+                <div className="sticky top-0 bg-muted px-3 py-1.5 text-xs font-semibold text-muted-foreground">{level}-digit NIC codes</div>
+                {options.map((option) => {
+                  const index = levelOptions.indexOf(option);
+                  const selected = value.startsWith(`${option.code} `);
+                  return <Button
+                    key={option.code}
+                    type="button"
+                    variant="ghost"
+                    role="option"
+                    aria-selected={selected}
+                    onClick={() => pickLevel(option)}
+                    onMouseEnter={() => setActiveIndex(index)}
+                    className={`h-auto min-h-10 w-full whitespace-normal text-left px-3 py-2 flex items-start justify-start gap-2 rounded-none border-b border-border/40 ${activeIndex === index ? "bg-muted/60" : ""}`}
+                  >
+                    <span className="min-w-[3.5rem] font-mono text-xs font-semibold text-brand-navy">{option.code}</span>
+                    <span className="flex-1 text-sm text-foreground">{option.description}</span>
+                    {selected && <Check className="mt-0.5 size-4 text-emerald-600" />}
+                  </Button>;
+                })}
+              </div>;
+            }) : trimmed.map((r) => {
               const display = onPickCode ? r.code : codeFor(r);
               const selected = value.startsWith(`${display} `);
               return (

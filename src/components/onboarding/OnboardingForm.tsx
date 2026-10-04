@@ -285,20 +285,20 @@ export function OnboardingForm({
                 {f.key === "section_nic" && schema.fields.some((field) => field.key === "nic_5_digit") && (
                   <div className="mt-4">
                     <label htmlFor="f-nic-main-search" className="block text-sm font-semibold text-foreground mb-1.5">
-                      Search NIC Code in Lesser Steps
+                      Search NIC activity (choose a 2-, 4- or 5-digit code)
                     </label>
                     <NicCodePicker
                       id="f-nic-main-search"
                       inlineSearch
-                      value={values.nic_5_digit ?? ""}
+                      value={values.nic_5_digit || values.nic_4_digit || values.nic_2_digit || ""}
                       digits={5}
                       activity={null}
                       onChange={() => setValues((s) => ({ ...s, nic_2_digit: "", nic_4_digit: "", nic_5_digit: "" }))}
-                      onPickCode={(code5) => setValues((s) => ({
+                      onPickLevel={(code, level) => setValues((s) => ({
                         ...s,
-                        nic_2_digit: nicLabel(code5, 2) ?? "",
-                        nic_4_digit: nicLabel(code5, 4) ?? "",
-                        nic_5_digit: nicLabel(code5, 5) ?? "",
+                        nic_2_digit: nicLabel(code, 2) ?? "",
+                        nic_4_digit: level >= 4 ? nicLabel(code, 4) ?? "" : "",
+                        nic_5_digit: level === 5 ? nicLabel(code, 5) ?? "" : "",
                       }))}
                     />
                   </div>
