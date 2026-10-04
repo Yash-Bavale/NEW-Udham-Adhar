@@ -1,5 +1,6 @@
 # Roadmap
 
+- [x] Use the New Udyam NIC search and Add Activity as the default NIC field format, including Update Udyam Certificate additional updates
 - [x] Add a government-style NIC activity list: first selection saved automatically, Add Activity saves further selections, visible to staff
 - [x] Make the main NIC search clearly labeled and allow numbered 2-, 4-, and 5-digit selections without inventing narrower codes
 - [x] Add a single government-style NIC activity search above the 2/4/5-digit fields and autofill them on selection

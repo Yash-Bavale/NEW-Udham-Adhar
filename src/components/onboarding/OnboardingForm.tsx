@@ -178,7 +178,12 @@ export function OnboardingForm({
       // When state changes, clear district so a stale value can't remain.
       if (k === "state" && s.state !== v) next.district = "";
       // Clear follow-up answers whose "show only when" rule no longer matches.
-      return clearHiddenFields(schema.fields, next);
+      const cleared = clearHiddenFields(schema.fields, next);
+      const nicFields = schema.fields.filter((field) => /^nic_[245]_digit$/.test(field.key));
+      if (nicFields.length && nicFields.every((field) => !isFieldVisible(field, schema.fields, cleared))) {
+        cleared.nic_activities = "";
+      }
+      return cleared;
     });
   }
 
@@ -293,13 +298,15 @@ export function OnboardingForm({
           if (isNicKey && (hasNicSection || f.key !== firstNicKey)) return null;
           if (f.type === "section" || isNicKey) {
             if (f.key === "section_nic" || isNicKey) {
+              if (f.key === "section_nic" && schema.fields.some((x) => /^nic_[245]_digit$/.test(x.key)) &&
+                !schema.fields.some((x) => /^nic_[245]_digit$/.test(x.key) && isFieldVisible(x, schema.fields, values))) return null;
               return (
                 <NicCodeSection
                   key={f.key}
-                  sectionLabel={isNicKey ? "20. National Industrial Classification (NIC) Code for Activities" : f.label}
+                  sectionLabel={isNicKey ? "National Industrial Classification (NIC) Code for Activities" : f.label}
                   values={values}
                   onChange={(k, v) => update(k, v)}
-                  setMany={(patch) => setValues((s) => ({ ...s, ...patch }))}
+                  setMany={(patch) => setValues((s) => clearHiddenFields(schema.fields, { ...s, ...patch }))}
                   activity={
                     values.major_activity === "Manufacturing" ||
                     values.major_activity === "Services" ||

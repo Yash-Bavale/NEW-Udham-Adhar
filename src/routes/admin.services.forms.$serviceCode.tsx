@@ -22,7 +22,15 @@ import { toast } from "sonner";
 
 
 export const Route = createFileRoute("/admin/services/forms/$serviceCode")({
-  head: () => ({ meta: [{ title: "Form Builder — Admin" }] }),
+  head: () => ({ meta: [
+    { title: "Service Form Builder — Business Help Services" },
+    { name: "description", content: "Configure service application questions and document requirements." },
+    { property: "og:title", content: "Service Form Builder — Business Help Services" },
+    { property: "og:description", content: "Configure service application questions and document requirements." },
+    { property: "og:type", content: "website" },
+    { name: "twitter:card", content: "summary" },
+    { name: "robots", content: "noindex,nofollow" },
+  ] }),
   component: FormBuilderPage,
 });
 
@@ -57,7 +65,7 @@ const NEW_FIELD: Record<Field["type"], () => Field> = {
   date:     () => ({ key: newKey("date"),    label: "Date",           type: "date" }),
   select:   () => ({ key: newKey("select"),  label: "Select",         type: "select", options: ["Option 1", "Option 2"] }),
   textarea: () => ({ key: newKey("notes"),   label: "Notes",          type: "textarea" }),
-  nic:      () => ({ key: newKey("nic"),     label: "NIC Code",       type: "nic", nicDigits: 5, activityFrom: "major_activity" }),
+  nic:      () => ({ key: "nic_5_digit", label: "NIC 5 Digit Code", type: "nic", nicDigits: 5, activityFrom: "major_activity" }),
   plants:   () => ({ key: newKey("plants"),  label: "Plants / Units", type: "plants" }),
   section:  () => ({ key: newKey("section"), label: "Section header", type: "section" }),
   state:    () => ({ key: "state",           label: "State",          type: "state" }),
@@ -160,6 +168,11 @@ function FormBuilderPage() {
     setSections((prev) => {
       const copy = prev.map((s) => ({ ...s, fields: [...s.fields] }));
       copy[selected.s].fields[selected.f] = { ...copy[selected.s].fields[selected.f], ...patch };
+      if ("visibleIf" in patch && /^nic_[245]_digit$/.test(copy[selected.s].fields[selected.f].key)) {
+        copy[selected.s].fields = copy[selected.s].fields.map((field) =>
+          /^nic_[245]_digit$/.test(field.key) ? { ...field, visibleIf: patch.visibleIf } : field,
+        );
+      }
       return copy;
     });
   }
@@ -192,9 +205,19 @@ function FormBuilderPage() {
   }
   function addField(s: number, type: Field["type"]) {
     if (type === "section") { addSection(); return; }
+    if (type === "nic" && sections.some((section) => section.fields.some((field) => /^nic_[245]_digit$/.test(field.key)))) {
+      toast.error("This form already has a NIC activity section.");
+      return;
+    }
     setSections((prev) => {
       const copy = prev.map((sec) => ({ ...sec, fields: [...sec.fields] }));
-      copy[s].fields.push(NEW_FIELD[type]());
+      if (type === "nic") {
+        copy[s].fields.push(
+          { key: "nic_2_digit", label: "NIC 2 Digit Code", type: "nic", nicDigits: 2, activityFrom: "major_activity", required: true },
+          { key: "nic_4_digit", label: "NIC 4 Digit Code", type: "nic", nicDigits: 4, activityFrom: "major_activity", required: true },
+          { ...NEW_FIELD.nic(), required: true },
+        );
+      } else copy[s].fields.push(NEW_FIELD[type]());
       return copy;
     });
     setTimeout(() => {
