@@ -177,6 +177,11 @@ export function OnboardingForm({
       const next = { ...s, [k]: v };
       // When state changes, clear district so a stale value can't remain.
       if (k === "state" && s.state !== v) next.district = "";
+      // Clear any conditional sub-fields that no longer apply (e.g. 19.1 when
+      // Major Activity switches away from Services).
+      for (const f of schema.fields) {
+        if (f.visibleIf && f.visibleIf.key === k && v !== f.visibleIf.equals) next[f.key] = "";
+      }
       return next;
     });
   }
@@ -279,10 +284,7 @@ export function OnboardingForm({
         {schema.fields.map((f) => {
           if (f.type === "note") return null;
           // Conditional fields (e.g. 19.1 shows only when Major Activity is Services).
-          if (f.visibleIf && values[f.visibleIf.key] !== f.visibleIf.equals) {
-            if (values[f.key]) update(f.key, "");
-            return null;
-          }
+          if (f.visibleIf && values[f.visibleIf.key] !== f.visibleIf.equals) return null;
           const isNicKey = f.key === "nic_2_digit" || f.key === "nic_4_digit" || f.key === "nic_5_digit";
           const hasNicSection = schema.fields.some((x) => x.key === "section_nic");
           const firstNicKey = schema.fields.find(
