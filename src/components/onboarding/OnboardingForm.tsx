@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Check, Loader2, Plus, Trash2 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { INDIA_STATES, PLANT_UNIT_TYPES, CHECKBOX_ON, clearHiddenFields, isFieldVisible, type FieldDef, type OnboardingSchema } from "@/lib/onboarding/schemas";
@@ -290,7 +290,7 @@ export function OnboardingForm({
   return (
     <form onSubmit={handle} className="space-y-5">
       <div className="grid md:grid-cols-2 gap-4">
-        {schema.fields.map((f, index) => {
+        {schema.fields.map((f) => {
           if (f.type === "note") return null;
           // Conditional fields (e.g. 19.1 shows only when Major Activity is Services).
           // 19.1 applies only to Services, even on older saved custom forms.
@@ -303,11 +303,6 @@ export function OnboardingForm({
           // Rendered together inside NicCodeSection; if the service form has no NIC
           // section heading, render the section in place of the first NIC field.
           if (isNicKey && (hasNicSection || f.key !== firstNicKey)) return null;
-          const sectionBoundary = f.type === "section" || (isNicKey && !hasNicSection && f.key === firstNicKey);
-          const previousSection = schema.fields.slice(0, index).some((field) => field.type === "section");
-          const nextSection = schema.fields.slice(index + 1).some((field) => field.type === "section");
-          const startGroup = sectionBoundary || (index === 0 && !previousSection);
-          const endGroup = !nextSection && !sectionBoundary;
           if (f.type === "section" || isNicKey) {
             if (f.key === "section_nic" || isNicKey) {
               if (f.key === "section_nic" && schema.fields.some((x) => /^nic_[245]_digit$/.test(x.key)) &&
