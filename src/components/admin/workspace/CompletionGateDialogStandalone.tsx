@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Loader2, UploadCloud, AlertTriangle, FileCheck2, Mail, Check, FileText, RefreshCw, Send, CircleCheck, Info, Eye } from "lucide-react";
+import { Loader2, UploadCloud, AlertTriangle, FileCheck2, Mail, Check, FileText, Send, CircleCheck, Info, Eye, X, ArrowRight } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -201,7 +201,7 @@ export function CompletionGateDialogStandalone({
                       <p className="text-[11px] text-admin-fg-muted">{formatSize(file.size)} · {uploaded?.file === file ? "Uploaded just now" : "Selected for upload"}</p>
                     </div>
                     <span className={`hidden items-center gap-1 rounded-full px-2 py-1 text-[10px] font-semibold sm:inline-flex ${uploaded?.file === file ? "bg-admin-success/10 text-admin-success" : "bg-completion-soft text-completion-primary"}`}><Check className="size-3" />{uploaded?.file === file ? "File uploaded" : "File selected"}</span>
-                    <Button type="button" variant="ghost" size="sm" onClick={() => fileInput.current?.click()} disabled={locked} title="Replace file" aria-label="Replace file"><RefreshCw /></Button>
+                    <Button type="button" variant="ghost" size="icon" className="size-7 shrink-0" onClick={() => chooseFile(null)} disabled={locked} title="Remove file" aria-label="Remove file"><X className="size-4" /></Button>
                   </div>}
                 {fileError && <p className="text-xs text-admin-danger" role="alert">{isEmpty ? "This file is empty. Choose another." : tooBig ? "This file exceeds 10 MB." : "Choose a PDF, JPG, PNG or WEBP file."}</p>}
                 <input ref={fileInput} type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp" className="sr-only" tabIndex={-1} disabled={locked} onChange={(e) => { chooseFile(e.target.files?.[0] ?? null); e.target.value = ""; }} aria-label="Certificate file" />
@@ -236,7 +236,7 @@ export function CompletionGateDialogStandalone({
              <DialogFooter className="flex-row justify-between gap-3 border-t border-admin-border px-5 py-3 sm:px-6">
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={locked}>Cancel</Button>
                <Button type="button" onClick={() => void submit()} disabled={locked || !file || Boolean(fileError) || !certNumber.trim() || !recipientEmail} className="min-w-44 bg-completion-primary text-admin-surface hover:bg-completion-primary/90">
-                {working ? <><Loader2 className="animate-spin" />{stage === "uploading" ? "Uploading certificate…" : stage === "preparing" ? "Preparing email…" : "Sending to customer…"}</> : <><Send />Upload &amp; Send Certificate</>}
+                {working ? <><Loader2 className="animate-spin" />{stage === "uploading" ? "Uploading certificate…" : stage === "preparing" ? "Preparing email…" : "Sending to customer…"}</> : <>Upload &amp; Send Certificate <ArrowRight className="size-4" /></>}
               </Button>
             </DialogFooter>
              {working && (
@@ -245,18 +245,21 @@ export function CompletionGateDialogStandalone({
                  <div className="mx-auto mb-3 flex size-14 items-center justify-center rounded-full bg-completion-soft text-completion-primary"><Send className="size-6" /></div>
                  <h3 className="mb-1 text-sm font-semibold">Sending Certificate to Customer</h3>
                  <p className="mb-4 text-xs text-admin-fg-muted">Please wait while we upload the file and send the email to the customer.</p>
-                {([
-                  ["Uploading file", stage !== "uploading", stage === "uploading"],
+                 {([
+                   ["Uploading file", stage !== "uploading", stage === "uploading" && !uploaded],
                    ["Processing document", stage === "sending", stage === "preparing"],
-                   ["Sending email & updating order", false, stage === "sending"],
-                ] as const).map(([label, done, active]) => (
+                   ["Sending email to customer", false, stage === "sending"],
+                   ["Updating order status", false, false],
+                   ["Finalizing", false, false],
+                 ] as const).map(([label, done, active]) => (
                    <div key={label} className="flex items-center gap-2 py-2 text-left text-xs">
-                    {done ? <Check className="size-4 shrink-0 text-admin-success" /> : active ? <Loader2 className="size-4 shrink-0 animate-spin text-admin-primary" /> : <span className="size-4 shrink-0 rounded-full border border-admin-border-strong" />}
-                    <span className="flex-1">{label}</span>
-                    <span className="text-admin-fg-muted">{done ? "Completed" : active ? "In progress" : "Pending"}</span>
-                  </div>
-                ))}
-                 <div className="mt-3 h-1 overflow-hidden rounded-full bg-completion-soft"><div className={`h-full bg-completion-primary transition-all duration-300 ${stage === "uploading" ? "w-1/4" : stage === "preparing" ? "w-1/2" : "w-3/4"}`} /></div>
+                     {done ? <Check className="size-4 shrink-0 text-admin-success" /> : active ? <Loader2 className="size-4 shrink-0 animate-spin text-completion-primary" /> : <span className="size-4 shrink-0 rounded-full border border-admin-border-strong" />}
+                     <span className="flex-1">{label}</span>
+                     <span className="text-admin-fg-muted">{done ? "Completed" : active ? "In progress" : "Pending"}</span>
+                   </div>
+                 ))}
+                 <div className="mt-3 h-1 overflow-hidden rounded-full bg-completion-soft"><div className={`h-full bg-completion-primary transition-all duration-300 ${stage === "uploading" && !uploaded ? "w-0" : stage === "preparing" ? "w-1/5" : "w-2/5"}`} /></div>
+                 <p className="mt-2 text-xs text-admin-fg-muted">{stage === "uploading" && !uploaded ? "0" : stage === "preparing" ? "1" : "2"} of 5 completed</p>
                </div>
               </div>
             )}
