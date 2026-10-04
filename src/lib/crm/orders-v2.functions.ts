@@ -915,7 +915,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       (() => {
         let q = admin
           .from("application_events")
-          .select("application_id, event_type, old_value, new_value, staff_name, staff_role, created_at");
+          .select("id, application_id, event_type, old_value, new_value, note, created_by, staff_name, staff_role, created_at");
         if (normalized.fromIso) q = q.gte("created_at", normalized.fromIso);
         if (normalized.toIso) q = q.lte("created_at", normalized.toIso);
         return q.order("created_at", { ascending: false }).limit(10000);
@@ -923,7 +923,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       (() => {
         let q = admin
           .from("certificates")
-          .select("application_id, issued_at, delivered_at, created_at");
+          .select("id, application_id, certificate_number, uploaded_by, issued_at, delivered_at, created_at");
         if (normalized.fromIso) q = q.gte("created_at", normalized.fromIso);
         if (normalized.toIso) q = q.lte("created_at", normalized.toIso);
         return q.order("created_at", { ascending: false }).limit(5000);
@@ -997,13 +997,13 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
     const [eventsRes, certsTableRes, actionLogsRes, globalActiveSchedulersRes] = await Promise.all([
       admin
         .from("application_events")
-        .select("application_id, event_type, old_value, new_value, staff_name, staff_role, created_at")
+        .select("id, application_id, event_type, old_value, new_value, note, created_by, staff_name, staff_role, created_at")
         .in("application_id", ids)
         .order("created_at", { ascending: false })
         .limit(10000),
       admin
         .from("certificates")
-        .select("application_id, issued_at, delivered_at, created_at")
+        .select("id, application_id, certificate_number, uploaded_by, issued_at, delivered_at, created_at")
         .in("application_id", ids)
         .order("created_at", { ascending: false }),
       (admin
@@ -1062,7 +1062,12 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
     const leadIds = Array.from(new Set(appList.map((a) => a.lead_id).filter(Boolean))) as string[];
     const customerIds = Array.from(new Set(appList.map((a) => a.customer_id).filter(Boolean))) as string[];
     const serviceIds = Array.from(new Set(appList.map((a) => a.service_id).filter(Boolean))) as string[];
-    const staffIds = Array.from(new Set(appList.map((a) => a.assigned_to).filter(Boolean))) as string[];
+    const staffIds = Array.from(new Set([
+      ...appList.map((a) => a.assigned_to),
+      ...Array.from(appEventsMap.values()).flat().map((e) => e.created_by),
+      ...Array.from(appSchedulersMap.values()).flat().map((s) => s.created_by),
+      ...Array.from(appCertsMap.values()).flat().map((c) => c.uploaded_by),
+    ].filter(Boolean))) as string[];
 
     const [leadsData, custsData, paysByApp, paysByLead, staffData] = await Promise.all([
       fetchInChunks<any>(leadIds, 100, (chunk) =>
@@ -1458,7 +1463,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       const isHumanStaff = (name?: string | null): boolean => {
         if (!name) return false;
         const n = String(name).trim().toLowerCase();
-        return n.length > 0 && n !== "system" && n !== "automated" && n !== "bot" && n !== "auto" && n !== "cron" && n !== "webhook" && n !== "system_job";
+        return n.length > 0 && !["system", "automated", "bot", "auto", "auto-assign", "cron", "webhook", "system_job"].includes(n);
       };
 
       // Action Logs (only if created by a human staff member, never automated cron/timeout)
@@ -1505,55 +1510,10 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         }
       }
 
-      // Manual Customer Delay marked by employee
-      if (a.customer_hold_started_at) {
-        const holdTime = new Date(a.customer_hold_started_at).getTime();
-        if (!hasDateFilter || (holdTime >= fromTime && holdTime <= toTime)) {
-          const staffName = staff?.display_name || staff?.full_name || null;
-          if (isHumanStaff(staffName)) {
-            const exists = actionHistoryList.some(
-              (x) => x.action_type.toUpperCase().includes("CUSTOMER_DELAY") && Math.abs(new Date(x.created_at).getTime() - holdTime) < 120000
-            );
-            if (!exists) {
-              actionHistoryList.push({
-                id: `cust-delay-${a.id}`,
-                action_type: "CUSTOMER_DELAY_ADDED",
-                title: "Customer Delay Added",
-                staff_name: staffName!,
-                created_at: a.customer_hold_started_at,
-                note: a.active_reason_text || a.workflow_delay_reason || "Customer delay placed by employee",
-              });
-            }
-          }
-        }
-      }
-
-      // Manual Technical Delay marked by employee
-      if (a.technical_hold_started_at) {
-        const holdTime = new Date(a.technical_hold_started_at).getTime();
-        if (!hasDateFilter || (holdTime >= fromTime && holdTime <= toTime)) {
-          const staffName = staff?.display_name || staff?.full_name || null;
-          if (isHumanStaff(staffName)) {
-            const exists = actionHistoryList.some(
-              (x) => x.action_type.toUpperCase().includes("TECHNICAL_DELAY") && Math.abs(new Date(x.created_at).getTime() - holdTime) < 120000
-            );
-            if (!exists) {
-              actionHistoryList.push({
-                id: `tech-delay-${a.id}`,
-                action_type: "TECHNICAL_DELAY_ADDED",
-                title: "Technical Delay Added",
-                staff_name: staffName!,
-                created_at: a.technical_hold_started_at,
-                note: a.active_reason_text || a.workflow_delay_reason || "Technical delay placed by employee",
-              });
-            }
-          }
-        }
-      }
-
-      // Certificates (issued / uploaded by human staff — this is the completion action)
+      // Certificates count only when the uploader is a known employee, not the current assignee.
       for (const c of thisAppCerts) {
-        const staffName = c.issued_by_name || staff?.display_name || staff?.full_name || "Staff";
+        const uploader = c.uploaded_by ? staffMap.get(c.uploaded_by) : null;
+        const staffName = uploader?.display_name || uploader?.full_name || null;
         if (!isHumanStaff(staffName)) continue;
 
         const ts = c.delivered_at || c.issued_at || c.created_at;
@@ -1577,9 +1537,10 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         }
       }
 
-      // Schedulers (Delays & Callbacks manually scheduled by staff)
+      // Schedulers (only those created by a known employee)
       for (const s of thisAppSchedulers) {
-        const staffName = (s as any).staff_name || staff?.display_name || staff?.full_name || null;
+        const creator = s.created_by ? staffMap.get(s.created_by) : null;
+        const staffName = creator?.display_name || creator?.full_name || null;
         if (!isHumanStaff(staffName)) continue;
 
         const t = new Date(s.created_at).getTime();
@@ -1628,16 +1589,24 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         }
       }
 
-      // Events (Manual staff events ONLY, strictly excluding System, automated closures, and customer actions)
+      // Events: require an actual employee actor; displayed names alone can say Auto-Assign.
       for (const ev of thisAppEvents) {
-        const staffName = ev.staff_name || null;
-        if (!isHumanStaff(staffName)) continue;
-
         const et = String(ev.event_type || "").toLowerCase();
         const nv = String(ev.new_value || "").toLowerCase();
         const note = String(ev.note || "").toLowerCase();
+        const actor = ev.created_by ? staffMap.get(ev.created_by) : null;
+        const staffName = actor?.display_name || actor?.full_name || null;
+        if (!isHumanStaff(staffName) || String(ev.staff_role || "").toLowerCase() === "system") continue;
 
         if (
+          et === "assignment_change" ||
+          et === "auto_assignment" ||
+          et === "pool_assignment" ||
+          et === "reassignment" ||
+          et === "unassignment" ||
+          et === "order_assigned" ||
+          et === "order_reassigned" ||
+          et.startsWith("auto_") ||
           et === "order_created" ||
           et === "lead_created" ||
           et === "payment_received" ||
@@ -1689,18 +1658,6 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
             });
           }
         }
-      }
-
-      // If completed in range by staff and no history entry yet
-      if (inRangeCompleted && isHumanStaff(staff?.display_name || staff?.full_name) && !actionHistoryList.some((x) => x.action_type.toLowerCase().includes("complet") || x.action_type.toLowerCase().includes("cert"))) {
-        actionHistoryList.push({
-          id: `comp-${a.id}`,
-          action_type: "ORDER_COMPLETED",
-          title: "Order Completed",
-          staff_name: (staff?.display_name || staff?.full_name)!,
-          created_at: compTimestamp ? new Date(compTimestamp).toISOString() : a.updated_at || a.created_at,
-          note: "Order fulfilled and marked completed",
-        });
       }
 
       // Sort actionHistoryList newest to oldest
