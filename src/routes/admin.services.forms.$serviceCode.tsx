@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft, ArrowUp, ArrowDown, Plus, Trash2, Eye, Save, History,
   Type, Mail, Phone, Hash, Calendar, ChevronDown, AlignLeft, Layers,
-  Building2, FileText, Search, Copy, X, CheckCircle2, Settings2, MapPin, StickyNote,
+  Building2, FileText, Search, Copy, X, CheckCircle2, Settings2, MapPin, StickyNote, CheckSquare,
   Upload, Loader2,
 } from "lucide-react";
 import {
@@ -44,6 +44,7 @@ const FIELD_META: Record<Field["type"], { label: string; icon: typeof Type; hint
   state:    { label: "State",        icon: MapPin,    hint: "Indian state dropdown" },
   district: { label: "District",     icon: MapPin,    hint: "District dropdown linked to state" },
   note:     { label: "Note",         icon: StickyNote, hint: "Staff internal note (hidden from customer)" },
+  checkbox: { label: "Checkbox",     icon: CheckSquare, hint: "Tick box (Yes when ticked)" },
 };
 
 const FIELD_TYPES = Object.keys(FIELD_META) as Field["type"][];
@@ -62,6 +63,7 @@ const NEW_FIELD: Record<Field["type"], () => Field> = {
   state:    () => ({ key: "state",           label: "State",          type: "state" }),
   district: () => ({ key: "district",        label: "District",       type: "district" }),
   note:     () => ({ key: newKey("note"),    label: "Staff Note",     type: "note", help: "Internal note text for staff" }),
+  checkbox: () => ({ key: newKey("check"),   label: "Checkbox",       type: "checkbox" }),
 };
 
 function newKey(prefix: string): string {
@@ -695,6 +697,13 @@ function FormBuilderPage() {
                       <Tf label="Activity source key" mono value={activeField.activityFrom ?? ""} onChange={(v) => updateField({ activityFrom: v || undefined })} />
                     </>
                   )}
+                  {activeField.type !== "section" && activeField.type !== "note" && (
+                    <ShowWhenEditor
+                      field={activeField}
+                      allFields={sections.flatMap((s) => s.fields)}
+                      onChange={(visibleIf) => updateField({ visibleIf })}
+                    />
+                  )}
                   {activeField.type !== "note" && (
                     <>
                       <Tf label="Default value" value={activeField.default ?? ""} onChange={(v) => updateField({ default: v || undefined })} />
@@ -1012,6 +1021,55 @@ function flatFieldsToSections(fields: Field[]): Section[] {
     }
   }
   return secs.length ? secs : [{ key: "default", label: "Details", fields }];
+}
+
+function ShowWhenEditor({
+  field,
+  allFields,
+  onChange,
+}: {
+  field: Field;
+  allFields: Field[];
+  onChange: (v: Field["visibleIf"]) => void;
+}) {
+  const parents = allFields.filter(
+    (f) => f.key !== field.key && (f.type === "select" || f.type === "checkbox"),
+  );
+  const rule = field.visibleIf;
+  const parent = parents.find((p) => p.key === rule?.key);
+  const values = parent?.type === "checkbox" ? ["Yes"] : parent?.options ?? [];
+  return (
+    <div className="rounded-md border bg-slate-50 p-2.5 space-y-2">
+      <div className="text-xs font-medium text-slate-600">Show only when</div>
+      <select
+        value={rule?.key ?? ""}
+        onChange={(e) => {
+          const key = e.target.value;
+          if (!key) return onChange(undefined);
+          const p = parents.find((x) => x.key === key);
+          const first = p?.type === "checkbox" ? "Yes" : p?.options?.[0] ?? "";
+          onChange({ key, equals: first });
+        }}
+        className="w-full rounded-md border bg-white px-2.5 py-1.5 text-sm"
+      >
+        <option value="">Always show</option>
+        {parents.map((p) => (
+          <option key={p.key} value={p.key}>{p.label}</option>
+        ))}
+      </select>
+      {rule?.key && (
+        <select
+          value={rule.equals}
+          onChange={(e) => onChange({ key: rule.key, equals: e.target.value })}
+          className="w-full rounded-md border bg-white px-2.5 py-1.5 text-sm"
+        >
+          {values.map((v) => (
+            <option key={v} value={v}>{parent?.type === "checkbox" ? "is ticked" : `is "${v}"`}</option>
+          ))}
+        </select>
+      )}
+    </div>
+  );
 }
 
 function Tf({ label, value, onChange, mono }: { label: string; value: string; onChange: (v: string) => void; mono?: boolean }) {

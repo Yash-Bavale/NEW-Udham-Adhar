@@ -14,7 +14,8 @@ export type FieldType =
   | "section"
   | "state"
   | "district"
-  | "note";
+  | "note"
+  | "checkbox";
 
 
 export type FieldDef = {
@@ -35,6 +36,48 @@ export type FieldDef = {
   /** Show this field only when the sibling field equals this value. */
   visibleIf?: { key: string; equals: string };
 };
+
+/** Value stored for a ticked checkbox field. */
+export const CHECKBOX_ON = "Yes";
+
+/** Built-in rule kept for older saved custom forms. */
+function ruleFor(f: FieldDef): FieldDef["visibleIf"] {
+  return f.visibleIf ?? (f.key === "major_activity_sub" ? { key: "major_activity", equals: "Services" } : undefined);
+}
+
+/**
+ * A field is shown when its "show only when" rule matches and the field it
+ * depends on is itself shown (so nested follow-up questions hide together).
+ */
+export function isFieldVisible(
+  field: FieldDef,
+  fields: readonly FieldDef[],
+  values: Record<string, unknown>,
+  depth = 0,
+): boolean {
+  const rule = ruleFor(field);
+  if (!rule || !rule.key) return true;
+  if (depth > 10) return false;
+  if (String(values[rule.key] ?? "") !== rule.equals) return false;
+  const parent = fields.find((x) => x.key === rule.key);
+  return parent ? isFieldVisible(parent, fields, values, depth + 1) : true;
+}
+
+/** Blank out answers for fields that are currently hidden. */
+export function clearHiddenFields(fields: readonly FieldDef[], values: Record<string, string>): Record<string, string> {
+  const next = { ...values };
+  for (let pass = 0; pass < 5; pass++) {
+    let changed = false;
+    for (const f of fields) {
+      if (next[f.key] && !isFieldVisible(f, fields, next)) {
+        next[f.key] = "";
+        changed = true;
+      }
+    }
+    if (!changed) break;
+  }
+  return next;
+}
 
 export type DocDef = {
   key: string;

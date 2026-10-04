@@ -1,3 +1,4 @@
+import { isFieldVisible } from "@/lib/onboarding/schemas";
 import { createServerFn } from "@tanstack/react-start";
 import { baseServiceCode } from "@/lib/services/base-code";
 import { z } from "zod";
@@ -215,6 +216,7 @@ export const submitOnboarding = createServerFn({ method: "POST" })
       const missing: string[] = [];
       for (const f of validationFields) {
         if (!f.required) continue;
+        if (!isFieldVisible(f, validationFields, mergedData)) continue;
         const v = mergedData[f.key];
         if (v === undefined || v === null || String(v).trim() === "") missing.push(f.label);
       }

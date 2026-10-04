@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Check, Loader2, Plus, Trash2 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
-import { INDIA_STATES, PLANT_UNIT_TYPES, type FieldDef, type OnboardingSchema } from "@/lib/onboarding/schemas";
+import { INDIA_STATES, PLANT_UNIT_TYPES, CHECKBOX_ON, clearHiddenFields, isFieldVisible, type FieldDef, type OnboardingSchema } from "@/lib/onboarding/schemas";
 import { INDIA_DISTRICTS } from "@/lib/onboarding/india-districts";
 import { NicCodePicker, NicCodeSection } from "./NicCodePicker";
 import { nicLabel } from "@/lib/onboarding/nic-fill";
@@ -177,15 +177,8 @@ export function OnboardingForm({
       const next = { ...s, [k]: v };
       // When state changes, clear district so a stale value can't remain.
       if (k === "state" && s.state !== v) next.district = "";
-      // Clear any conditional sub-fields that no longer apply (e.g. 19.1 when
-      // Major Activity switches away from Services).
-      for (const f of schema.fields) {
-        const visibleIf =
-          f.visibleIf ??
-          (f.key === "major_activity_sub" ? { key: "major_activity", equals: "Services" } : undefined);
-        if (visibleIf && visibleIf.key === k && v !== visibleIf.equals) next[f.key] = "";
-      }
-      return next;
+      // Clear follow-up answers whose "show only when" rule no longer matches.
+      return clearHiddenFields(schema.fields, next);
     });
   }
 
@@ -199,6 +192,7 @@ export function OnboardingForm({
     // 1. Validate required fields
     for (const f of schema.fields) {
       if (f.type === "note" || f.type === "section") continue;
+      if (!isFieldVisible(f, schema.fields, values)) continue;
       if (f.required) {
         const v = values[f.key];
         if (v === undefined || v === null || String(v).trim() === "") {
@@ -288,10 +282,7 @@ export function OnboardingForm({
           if (f.type === "note") return null;
           // Conditional fields (e.g. 19.1 shows only when Major Activity is Services).
           // 19.1 applies only to Services, even on older saved custom forms.
-          const visibleIf =
-            f.visibleIf ??
-            (f.key === "major_activity_sub" ? { key: "major_activity", equals: "Services" } : undefined);
-          if (visibleIf && values[visibleIf.key] !== visibleIf.equals) return null;
+          if (!isFieldVisible(f, schema.fields, values)) return null;
           const isNicKey = f.key === "nic_2_digit" || f.key === "nic_4_digit" || f.key === "nic_5_digit";
           const hasNicSection = schema.fields.some((x) => x.key === "section_nic");
           const firstNicKey = schema.fields.find(
@@ -510,6 +501,26 @@ function FieldRenderer({
 
   const currentState = allValues.state ?? "";
   const districtOptions = isDistrict ? INDIA_DISTRICTS[currentState] ?? [] : [];
+
+  if (field.type === "checkbox") {
+    return (
+      <div className="md:col-span-2">
+        <label htmlFor={id} className="flex items-center gap-2 text-sm font-semibold text-foreground cursor-pointer">
+          <input
+            id={id}
+            name={field.key}
+            type="checkbox"
+            className="h-4 w-4 accent-primary"
+            checked={value === CHECKBOX_ON}
+            onChange={(e) => onChange(e.target.checked ? CHECKBOX_ON : "")}
+          />
+          {field.label}
+          {field.required && <span className="text-destructive"> *</span>}
+        </label>
+        {field.help && <p className="mt-1 text-xs text-muted-foreground">{field.help}</p>}
+      </div>
+    );
+  }
 
   return (
     <div className={colSpan}>
