@@ -22,7 +22,15 @@ import { toast } from "sonner";
 
 
 export const Route = createFileRoute("/admin/services/forms/$serviceCode")({
-  head: () => ({ meta: [{ title: "Form Builder — Admin" }] }),
+  head: () => ({ meta: [
+    { title: "Service Form Builder — Business Help Services" },
+    { name: "description", content: "Configure service application questions and document requirements." },
+    { property: "og:title", content: "Service Form Builder — Business Help Services" },
+    { property: "og:description", content: "Configure service application questions and document requirements." },
+    { property: "og:type", content: "website" },
+    { name: "twitter:card", content: "summary" },
+    { name: "robots", content: "noindex,nofollow" },
+  ] }),
   component: FormBuilderPage,
 });
 

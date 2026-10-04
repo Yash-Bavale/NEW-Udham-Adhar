@@ -289,24 +289,24 @@ export function OnboardingForm({
           // 19.1 applies only to Services, even on older saved custom forms.
           if (!isFieldVisible(f, schema.fields, values)) return null;
           const isNicKey = f.key === "nic_2_digit" || f.key === "nic_4_digit" || f.key === "nic_5_digit";
-           const hasNicSection = schema.fields.some((x) => x.key === "section_nic");
+          const hasNicSection = schema.fields.some((x) => x.key === "section_nic");
           const firstNicKey = schema.fields.find(
             (x) => x.key === "nic_2_digit" || x.key === "nic_4_digit" || x.key === "nic_5_digit",
           )?.key;
           // Rendered together inside NicCodeSection; if the service form has no NIC
           // section heading, render the section in place of the first NIC field.
           if (isNicKey && (hasNicSection || f.key !== firstNicKey)) return null;
-           if (f.type === "section" || isNicKey) {
+          if (f.type === "section" || isNicKey) {
             if (f.key === "section_nic" || isNicKey) {
-               if (f.key === "section_nic" && schema.fields.some((x) => /^nic_[245]_digit$/.test(x.key)) &&
-                 !schema.fields.some((x) => /^nic_[245]_digit$/.test(x.key) && isFieldVisible(x, schema.fields, values))) return null;
+              if (f.key === "section_nic" && schema.fields.some((x) => /^nic_[245]_digit$/.test(x.key)) &&
+                !schema.fields.some((x) => /^nic_[245]_digit$/.test(x.key) && isFieldVisible(x, schema.fields, values))) return null;
               return (
                 <NicCodeSection
                   key={f.key}
-                   sectionLabel={isNicKey ? "National Industrial Classification (NIC) Code for Activities" : f.label}
+                  sectionLabel={isNicKey ? "National Industrial Classification (NIC) Code for Activities" : f.label}
                   values={values}
                   onChange={(k, v) => update(k, v)}
-                   setMany={(patch) => setValues((s) => clearHiddenFields(schema.fields, { ...s, ...patch }))}
+                  setMany={(patch) => setValues((s) => clearHiddenFields(schema.fields, { ...s, ...patch }))}
                   activity={
                     values.major_activity === "Manufacturing" ||
                     values.major_activity === "Services" ||
