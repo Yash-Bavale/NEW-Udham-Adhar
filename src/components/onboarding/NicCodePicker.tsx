@@ -98,8 +98,10 @@ export function NicCodePicker({ value, onChange, activity, digits, required, id,
       code.startsWith(needle) || description.toLowerCase().includes(needle);
     const ranked = (source: Record<string, string>, level: 2 | 4): LevelOption[] =>
       Object.entries(source)
-        .filter(([code, description]) => matches(code, description))
-        .sort(([a], [b]) => Number(b.startsWith(needle)) - Number(a.startsWith(needle)) || a.localeCompare(b))
+        .filter(([code, description]) => matches(code, description) || results.some((r) => r.code.startsWith(code)))
+        .sort(([a], [b]) =>
+          Number(matches(b, source[b])) - Number(matches(a, source[a])) ||
+          Number(b.startsWith(needle)) - Number(a.startsWith(needle)) || a.localeCompare(b))
         .slice(0, 12)
         .map(([code, description]) => ({ code, description, level }));
     return [
