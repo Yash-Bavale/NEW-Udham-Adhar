@@ -99,7 +99,7 @@ function SuccessPage() {
   useEffect(() => {
     if (elapsed >= TOTAL_SECONDS) {
       if (confirmed) {
-        navigate({ to: "/apply/$leadCode/summary", params: { leadCode }, replace: true });
+        navigate({ to: "/onboarding/$leadCode", params: { leadCode }, replace: true });
       }
       return;
     }
@@ -110,7 +110,7 @@ function SuccessPage() {
   // If confirmed after countdown ended, redirect immediately.
   useEffect(() => {
     if (confirmed && elapsed >= TOTAL_SECONDS) {
-      navigate({ to: "/apply/$leadCode/summary", params: { leadCode }, replace: true });
+      navigate({ to: "/onboarding/$leadCode", params: { leadCode }, replace: true });
     }
   }, [confirmed, elapsed, leadCode, navigate]);
 
