@@ -15,7 +15,7 @@ import {
   listCopyableForms,
   type BuilderSaveInput,
 } from "@/lib/crm/form-builder.functions";
-import { getSchema as getFallbackSchema } from "@/lib/onboarding/schemas";
+import { getSchema as getFallbackSchema, withSectionHeadings } from "@/lib/onboarding/schemas";
 import { OnboardingForm } from "@/components/onboarding/OnboardingForm";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
