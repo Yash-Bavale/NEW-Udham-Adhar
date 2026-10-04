@@ -24,6 +24,7 @@ import {
 } from "@/lib/crm/submissions-admin.functions";
 import { getDocumentSignedUrl } from "@/lib/onboarding/onboarding.functions";
 import { getSchema } from "@/lib/onboarding/schemas";
+import { parseNicActivities } from "@/lib/onboarding/nic-fill";
 import { Button } from "@/components/ui/button";
 import { formatIST, formatDateDMY } from "@/lib/datetime";
 import { useRealtimeTable } from "@/hooks/useRealtimeTable";
@@ -332,9 +333,10 @@ export function FormSubmissionPanel({
 
   const sections = groupFieldsBySection(serviceCode, activeSchema);
   const formData: Record<string, any> = submission?.form_data ?? {};
+  const additionalNicActivities = parseNicActivities(typeof formData.nic_activities === "string" ? formData.nic_activities : "");
   const renderedKeys = new Set(sections.flatMap((s) => s.fields.map((f) => f.key)));
   const extras = Object.keys(formData).filter((k) => {
-    if (renderedKeys.has(k)) return false;
+    if (renderedKeys.has(k) || k === "nic_activities") return false;
     if (k.startsWith("section_")) return false; // UI separator garbage
     const v = formData[k];
     if (v === undefined || v === null) return false;
@@ -570,6 +572,21 @@ export function FormSubmissionPanel({
 
 
 
+            {additionalNicActivities.length > 0 && (
+              <div className="px-5 py-4 border-t">
+                <p className="text-[11px] font-semibold uppercase text-slate-500 mb-3">Additional NIC activities</p>
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[550px] text-sm text-left">
+                    <thead><tr className="border-b"><th className="p-2">No.</th><th className="p-2">NIC 2 Digit</th><th className="p-2">NIC 4 Digit</th><th className="p-2">NIC 5 Digit</th><th className="p-2">Activity Type</th></tr></thead>
+                    <tbody>{additionalNicActivities.map((item, index) => (
+                      <tr key={`${item.nic_5_digit}-${index}`} className="border-b last:border-0">
+                        <td className="p-2">{index + 2}</td><td className="p-2">{item.nic_2_digit}</td><td className="p-2">{item.nic_4_digit}</td><td className="p-2">{item.nic_5_digit}</td><td className="p-2">{item.activity_type}</td>
+                      </tr>
+                    ))}</tbody>
+                  </table>
+                </div>
+              </div>
+            )}
             {extras.length > 0 && (
               <div className="px-5 py-4">
                 <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-3">

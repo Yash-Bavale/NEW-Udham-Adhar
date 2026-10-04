@@ -9,6 +9,34 @@ export type NicOption = {
   label: string;
 };
 
+export type NicActivity = {
+  nic_2_digit: string;
+  nic_4_digit: string;
+  nic_5_digit: string;
+  activity_type: string;
+};
+
+/** Extra NIC activities are stored with the existing form answers, not in a separate document store. */
+export function parseNicActivities(raw?: string | null): NicActivity[] {
+  if (!raw) return [];
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((item): item is NicActivity =>
+      item !== null && typeof item === "object" &&
+      typeof item.nic_2_digit === "string" && typeof item.nic_4_digit === "string" &&
+      typeof item.nic_5_digit === "string" && typeof item.activity_type === "string" &&
+      /^\d{2}$/.test(extractNicCode(item.nic_2_digit)) &&
+      /^\d{4}$/.test(extractNicCode(item.nic_4_digit)) &&
+      /^\d{5}$/.test(extractNicCode(item.nic_5_digit)) &&
+      extractNicCode(item.nic_5_digit).startsWith(extractNicCode(item.nic_4_digit)) &&
+      extractNicCode(item.nic_4_digit).startsWith(extractNicCode(item.nic_2_digit))
+    );
+  } catch {
+    return [];
+  }
+}
+
 /** Extracts numeric code (2, 4, or 5 digits) from stored value like "62 — Computer..." or "62". */
 export function extractNicCode(val?: string | null): string {
   if (!val) return "";
