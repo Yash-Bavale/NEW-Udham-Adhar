@@ -158,18 +158,20 @@ export function NicCodePicker({ value, onChange, activity, digits, required, id,
 
       {open && (
         <div className="absolute z-30 mt-1 w-full rounded-xl border border-border bg-background shadow-lg overflow-hidden">
-          <div className="flex items-center gap-2 border-b border-border px-3 py-2">
+          {!inlineSearch && <div className="flex items-center gap-2 border-b border-border px-3 py-2">
             <Search className="w-4 h-4 text-muted-foreground" />
             <input
               autoFocus
               value={q}
               onChange={(e) => setQ(e.target.value)}
+              onKeyDown={onSearchKeyDown}
               placeholder="Search by code or activity description…"
               className="w-full bg-transparent text-sm focus:outline-none"
             />
             {loading && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />}
-          </div>
+          </div>}
           <div id={id ? `${id}-results` : undefined} role={inlineSearch ? "listbox" : undefined} className="max-h-72 overflow-y-auto">
+            {inlineSearch && loading && <div className="px-3 py-3 text-sm text-muted-foreground"><Loader2 className="inline size-4 animate-spin mr-2" />Searching…</div>}
             {err && (
               <div className="px-3 py-3 text-sm text-destructive">{err}</div>
             )}
