@@ -150,7 +150,7 @@ export function CompletionGateDialogStandalone({
 
   return (
     <Dialog open={open} onOpenChange={(next) => { if (!next && locked) return; onOpenChange(next); }}>
-      <DialogContent onEscapeKeyDown={(e) => { if (locked) e.preventDefault(); }} onPointerDownOutside={(e) => { if (locked) e.preventDefault(); }} className={`w-[calc(100vw-2rem)] max-w-[540px] gap-0 border-admin-border bg-admin-surface p-0 text-admin-fg shadow-xl sm:rounded-lg [&>button]:text-admin-fg-muted ${locked ? "[&>button]:pointer-events-none [&>button]:opacity-40" : ""}`} aria-describedby="completion-description">
+      <DialogContent onEscapeKeyDown={(e) => { if (locked) e.preventDefault(); }} onPointerDownOutside={(e) => { if (locked) e.preventDefault(); }} className={`flex max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] max-w-[540px] flex-col gap-0 overflow-hidden border-admin-border bg-admin-surface p-0 text-admin-fg shadow-xl sm:rounded-lg [&>button]:text-admin-fg-muted ${locked ? "[&>button]:pointer-events-none [&>button]:opacity-40" : ""}`} aria-describedby="completion-description">
         {stage === "success" ? (
           <div className="flex min-h-72 flex-col items-center justify-center gap-3 px-6 py-12 text-center" role="status" aria-live="polite">
             <CircleCheck className="size-12 text-admin-success motion-safe:animate-in motion-safe:zoom-in-75" />
@@ -160,7 +160,7 @@ export function CompletionGateDialogStandalone({
           </div>
         ) : (
           <>
-            <DialogHeader className="px-6 pb-2 pt-5 pr-12">
+            <DialogHeader className="shrink-0 px-6 pb-2 pt-5 pr-12">
               <div className="flex items-start gap-4 text-left">
                 <div className="flex size-10 shrink-0 items-center justify-center rounded-md bg-completion-soft text-completion-primary"><FileCheck2 className="size-5" /></div>
                 <div className="min-w-0">
@@ -170,7 +170,7 @@ export function CompletionGateDialogStandalone({
                 </div>
               </div>
             </DialogHeader>
-            <div className="max-h-[calc(100dvh-135px)] space-y-2.5 overflow-y-auto px-5 pb-3 sm:px-6">
+            <div className="min-h-0 flex-1 space-y-2.5 overflow-y-auto px-5 pb-3 sm:px-6">
               <div className="grid grid-cols-3 gap-1 pb-2 pt-3 text-center" aria-label="Completion steps">
                 {(["Upload Certificate", "Certificate Number", "Send to Customer"] as const).map((label, index) => {
                   const done = index === 0 ? Boolean(uploaded) : index === 1 ? Boolean(certNumber.trim()) : sendingConfirmed;
@@ -233,9 +233,9 @@ export function CompletionGateDialogStandalone({
                 <span>{error || (stage === "uploading" ? "Uploading certificate…" : stage === "preparing" ? "Preparing certificate email…" : "Sending to customer…")}</span>
               </div>}
             </div>
-             <DialogFooter className="flex-row justify-between gap-3 border-t border-admin-border px-5 py-3 sm:px-6">
+             <DialogFooter className="shrink-0 flex-row justify-between gap-3 border-t border-admin-border px-5 py-3 sm:px-6">
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={locked}>Cancel</Button>
-               <Button type="button" onClick={() => void submit()} disabled={locked || !file || Boolean(fileError) || !certNumber.trim() || !recipientEmail} className="min-w-44 bg-completion-primary text-admin-surface hover:bg-completion-primary/90">
+                <Button type="button" onClick={() => void submit()} disabled={locked || !file || Boolean(fileError) || !certNumber.trim() || !recipientEmail} className="min-w-0 bg-completion-primary px-3 text-admin-surface hover:bg-completion-primary/90 sm:min-w-44">
                 {working ? <><Loader2 className="animate-spin" />{stage === "uploading" ? "Uploading certificate…" : stage === "preparing" ? "Preparing email…" : "Sending to customer…"}</> : <>Upload &amp; Send Certificate <ArrowRight className="size-4" /></>}
               </Button>
             </DialogFooter>
