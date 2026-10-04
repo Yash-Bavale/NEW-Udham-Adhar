@@ -9,7 +9,7 @@ import {
 } from "recharts";
 import {
   Activity, AlertTriangle, Bell, Briefcase, Database, Eye, EyeOff, Mail,
-  RefreshCw, Send, ShieldCheck, ShoppingBag, Target, TrendingDown, TrendingUp,
+  Send, ShieldCheck, ShoppingBag, Target, TrendingDown, TrendingUp,
   UserCheck, Users, Wallet, Globe,
 } from "lucide-react";
 import {
@@ -152,8 +152,6 @@ export function SuperAdminDashboard({
     };
   }, [kpisQuery.data, range.preset, queryClient, fetchKpis, fetchCharts]);
 
-  const isFetching = kpisQuery.isFetching || chartsQuery.isFetching || topServicesQuery.isFetching || secondaryQuery.isFetching;
-
   const handleRefresh = () => {
     kpisQuery.refetch();
     chartsQuery.refetch();
@@ -213,9 +211,6 @@ export function SuperAdminDashboard({
               }
             />
           )}
-          <Button variant="outline" size="sm" onClick={handleRefresh} className="h-9 gap-2">
-            <RefreshCw className={`size-3.5 ${isFetching ? "animate-spin" : ""}`} /> Refresh
-          </Button>
         </div>
       </div>
 
