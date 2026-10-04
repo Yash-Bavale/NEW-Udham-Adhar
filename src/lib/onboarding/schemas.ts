@@ -114,7 +114,9 @@ export type OnboardingSchema = {
 export function withSectionHeadings(sections: readonly { key: string; label: string; fields: readonly FieldDef[] }[]): FieldDef[] {
   return sections.flatMap((section) => {
     if (!section.fields.length) return [];
-    if (section.fields[0]?.type === "section") return [...section.fields];
+    if (section.fields[0]?.type === "section") {
+      return [{ ...section.fields[0], label: section.label || section.fields[0].label }, ...section.fields.slice(1)];
+    }
     const isNicSection = section.fields.some((field) => /^nic_[245]_digit$/.test(field.key));
     return [
       { key: isNicSection ? "section_nic" : `builder_section_${section.key}`, label: section.label, type: "section" as const },
@@ -204,6 +206,7 @@ const NEW_UDYAM: OnboardingSchema = {
   description:
     "Fill the Aadhaar, PAN, enterprise, bank and activity details required to prepare your Udyam registration request.",
   fields: [
+    { key: "section_details", label: "Details", type: "section" },
     { key: "aadhaar_number", label: "1. Aadhaar Number", type: "text", required: true, pattern: "^\\d{12}$", placeholder: "12 digit Aadhaar number" },
     { key: "applicant_name", label: "2. Your Name (as per Aadhaar)", type: "text", required: true, maxLength: 120 },
     { key: "business_type", label: "3. Type of Organisation / संगठन के प्रकार", type: "select", required: true, options: BUSINESS_TYPES },
@@ -242,6 +245,7 @@ const NEW_UDYAM: OnboardingSchema = {
     { key: "bank_name", label: "Bank Name", type: "text", required: true, maxLength: 120 },
     { key: "bank_ifsc", label: "IFSC Code", type: "text", required: true, pattern: "^[A-Z]{4}0[A-Z0-9]{6}$", maxLength: 11 },
     { key: "bank_account_no", label: "Bank Account Number", type: "text", required: true, maxLength: 30 },
+    { key: "section_major_activity", label: "19. Major Activity of Unit", type: "section" },
     { key: "major_activity", label: "19. Major Activity of Unit", type: "select", required: true, options: ACTIVITY_TYPES },
     { key: "major_activity_sub", label: "19.1 Major Activity Under Services", type: "select", required: false, options: SERVICES_SUBTYPE, visibleIf: { key: "major_activity", equals: "Services" } },
     { key: "section_nic", label: "20. National Industrial Classification (NIC) Code for Activities", type: "section" },

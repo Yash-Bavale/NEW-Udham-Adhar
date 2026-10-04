@@ -23,6 +23,7 @@ const selectCls =
 
 export type NicSectionProps = {
   sectionLabel?: string;
+  hideHeader?: boolean;
   values: Record<string, string>;
   onChange: (key: string, value: string) => void;
   setMany: (patch: Record<string, string>) => void;
@@ -38,6 +39,7 @@ export type NicSectionProps = {
  */
 export function NicCodeSection({
   sectionLabel = "20. National Industrial Classification (NIC) Code for Activities",
+  hideHeader = false,
   values,
   onChange,
   setMany,
@@ -271,16 +273,18 @@ export function NicCodeSection({
   const displaySummary = selected.nic_5_digit || selected.nic_4_digit || selected.nic_2_digit || "";
 
   return (
-    <div className="md:col-span-2 pt-4 mt-2 border-t border-border space-y-4">
+    <div className={`md:col-span-2 space-y-4 ${hideHeader ? "" : "pt-4 mt-2 border-t border-border"}`}>
       {/* Section Header */}
-      <div>
-        <h3 className="text-base md:text-lg font-bold font-display text-brand-navy-deep">
-          {sectionLabel}
-        </h3>
-        <p className="mt-1 text-xs text-muted-foreground">
-          Search your business activity or choose from the official classification hierarchy below.
-        </p>
-      </div>
+      {!hideHeader && (
+        <div>
+          <h3 className="text-base md:text-lg font-bold font-display text-brand-navy-deep">
+            {sectionLabel}
+          </h3>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Search your business activity or choose from the official classification hierarchy below.
+          </p>
+        </div>
+      )}
 
       {/* 1. Unified Intelligent Search */}
       <div className="relative" ref={wrapRef}>

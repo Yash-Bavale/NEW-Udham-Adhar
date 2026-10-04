@@ -188,11 +188,39 @@ export function CompletionGateDialogStandalone({
                   <div><h3 className="text-sm font-semibold"><span className="mr-2 rounded-md bg-completion-soft px-2 py-1 text-[10px] text-completion-primary">STEP 1</span>Upload Certificate</h3><p className="mt-1.5 text-[11px] text-admin-fg-muted">Upload the final certificate issued by the government.</p></div>
                   <div className="rounded-md border border-completion-border bg-completion-soft px-2.5 py-1.5 text-[10px] text-completion-primary"><span className="flex items-center gap-1 font-semibold"><Info className="size-3" />Accepted formats</span><span>PDF, JPG, PNG, WEBP · Max 10 MB</span></div>
                 </div>
-                <div onDragOver={(e) => { e.preventDefault(); if (!locked) setDragOver(true); }} onDragLeave={() => setDragOver(false)} onDrop={(e) => { e.preventDefault(); setDragOver(false); chooseFile(e.dataTransfer.files?.[0] ?? null); }}
-                  className={`flex min-h-24 flex-col items-center justify-center rounded-md border border-dashed p-3 text-center transition-colors ${dragOver ? "border-completion-primary bg-completion-soft" : "border-completion-border bg-admin-surface-2/40"}`}>
-                  <UploadCloud className="mb-1 size-8 text-completion-primary" />
-                  <p className="text-xs font-semibold">Drag &amp; drop your certificate here</p>
-                  <Button type="button" variant="link" className="h-auto p-0 text-[11px] text-admin-fg-muted" onClick={() => fileInput.current?.click()} disabled={locked}>or click to browse</Button>
+                <div
+                  role="button"
+                  tabIndex={locked ? -1 : 0}
+                  onClick={() => {
+                    if (!locked) fileInput.current?.click();
+                  }}
+                  onKeyDown={(e) => {
+                    if ((e.key === "Enter" || e.key === " ") && !locked) {
+                      e.preventDefault();
+                      fileInput.current?.click();
+                    }
+                  }}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    if (!locked) setDragOver(true);
+                  }}
+                  onDragLeave={() => setDragOver(false)}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setDragOver(false);
+                    chooseFile(e.dataTransfer.files?.[0] ?? null);
+                  }}
+                  className={`group flex min-h-24 flex-col items-center justify-center rounded-md border border-dashed p-3 text-center transition-all ${
+                    locked ? "cursor-not-allowed opacity-60" : "cursor-pointer hover:border-completion-primary hover:bg-completion-soft/60"
+                  } ${dragOver ? "border-completion-primary bg-completion-soft" : "border-completion-border bg-admin-surface-2/40"}`}
+                >
+                  <UploadCloud className="mb-1 size-8 text-completion-primary transition-transform group-hover:scale-110" />
+                  <p className="text-xs font-semibold text-admin-fg group-hover:text-completion-primary transition-colors">
+                    Drag &amp; drop your certificate here
+                  </p>
+                  <span className="text-[11px] text-admin-fg-muted group-hover:underline">
+                    or click to browse
+                  </span>
                 </div>
                 {file && <div className={`flex items-center gap-2 rounded-md border p-2 ${fileError ? "border-admin-danger bg-destructive/5" : uploaded?.file === file ? "border-admin-success/30 bg-admin-success/5" : "border-completion-border bg-completion-soft/40"}`}>
                     <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-admin-surface text-completion-primary"><FileText className="size-5" /></div>

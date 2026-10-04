@@ -774,20 +774,20 @@ function FormBuilderPage() {
                 </a>
               )}
 
-              {/* Form fields */}
-              <div className="rounded-xl border bg-white shadow-sm p-5">
-                <div className="mb-4">
-                  <div className="text-lg font-semibold text-slate-900">{title || "Untitled form"}</div>
-                  {description && <div className="text-sm text-slate-600 mt-1">{description}</div>}
-                </div>
-                <div className="pointer-events-none opacity-95 select-none" aria-hidden="false">
-                  <OnboardingForm
-                    schema={previewSchema}
-                    initial={{}}
-                    busy={false}
-                    onSubmit={async () => { /* preview only */ }}
-                  />
-                </div>
+              {/* Form header */}
+              <div className="rounded-xl border border-slate-200 bg-white shadow-xs p-5">
+                <div className="text-lg font-bold text-slate-900">{title || "Untitled form"}</div>
+                {description && <div className="text-sm text-slate-600 mt-1">{description}</div>}
+              </div>
+
+              {/* Form fields with separated & highlighted sections */}
+              <div className="pointer-events-none opacity-95 select-none" aria-hidden="false">
+                <OnboardingForm
+                  schema={previewSchema}
+                  initial={{}}
+                  busy={false}
+                  onSubmit={async () => { /* preview only */ }}
+                />
               </div>
 
               {/* Documents step preview (read-only) */}

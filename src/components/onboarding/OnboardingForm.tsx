@@ -287,59 +287,146 @@ export function OnboardingForm({
     }
   }
 
-  return (
-    <form onSubmit={handle} className="space-y-5">
-      <div className="grid md:grid-cols-2 gap-4">
-        {schema.fields.map((f) => {
-          if (f.type === "note") return null;
-          // Conditional fields (e.g. 19.1 shows only when Major Activity is Services).
-          // 19.1 applies only to Services, even on older saved custom forms.
-          if (!isFieldVisible(f, schema.fields, values)) return null;
-          const isNicKey = f.key === "nic_2_digit" || f.key === "nic_4_digit" || f.key === "nic_5_digit";
-          const hasNicSection = schema.fields.some((x) => x.key === "section_nic");
-          const firstNicKey = schema.fields.find(
-            (x) => x.key === "nic_2_digit" || x.key === "nic_4_digit" || x.key === "nic_5_digit",
-          )?.key;
-          // Rendered together inside NicCodeSection; if the service form has no NIC
-          // section heading, render the section in place of the first NIC field.
-          if (isNicKey && (hasNicSection || f.key !== firstNicKey)) return null;
-          if (f.type === "section" || isNicKey) {
-            if (f.key === "section_nic" || isNicKey) {
-              if (f.key === "section_nic" && schema.fields.some((x) => /^nic_[245]_digit$/.test(x.key)) &&
-                !schema.fields.some((x) => /^nic_[245]_digit$/.test(x.key) && isFieldVisible(x, schema.fields, values))) return null;
-              return (
-                <div key={f.key} className="md:col-span-2 rounded-md border border-border bg-card p-4 shadow-sm md:p-5">
-                <NicCodeSection
-                  sectionLabel={isNicKey ? "National Industrial Classification (NIC) Code for Activities" : f.label}
-                  values={values}
-                  onChange={(k, v) => update(k, v)}
-                  setMany={(patch) => setValues((s) => clearHiddenFields(schema.fields, { ...s, ...patch }))}
-                  activity={
-                    values.major_activity === "Manufacturing" ||
-                    values.major_activity === "Services" ||
-                    values.major_activity === "Trading"
-                      ? values.major_activity
-                      : null
-                  }
-                />
-                </div>
-              );
-            }
-            return (
-              <div key={f.key} className="md:col-span-2 mt-3 flex items-center gap-3 border-b-2 border-brand-navy bg-brand-navy/5 px-4 py-3">
-                <h3 className="text-base md:text-lg font-bold font-display text-brand-navy-deep">{f.label}</h3>
-              </div>
-            );
+  type SectionGroup = {
+    key: string;
+    label: string;
+    isNic: boolean;
+    fields: FieldDef[];
+  };
+
+  const sectionGroups = useMemo(() => {
+    const groups: SectionGroup[] = [];
+    let currentGroup: SectionGroup = {
+      key: "section_default",
+      label: "",
+      isNic: false,
+      fields: [],
+    };
+
+    for (const f of schema.fields) {
+      if (f.type === "note") continue;
+
+      const isNicKey = f.key === "nic_2_digit" || f.key === "nic_4_digit" || f.key === "nic_5_digit";
+
+      if (f.type === "section") {
+        const isNic = f.key === "section_nic" || /nic/i.test(f.key) || /nic.*code/i.test(f.label);
+        if (currentGroup.fields.length > 0 || currentGroup.isNic) {
+          groups.push(currentGroup);
+        }
+        currentGroup = {
+          key: f.key,
+          label: f.label,
+          isNic,
+          fields: [],
+        };
+        continue;
+      }
+
+      if (isNicKey) {
+        if (!currentGroup.isNic) {
+          if (currentGroup.fields.length > 0) {
+            groups.push(currentGroup);
           }
+          currentGroup = {
+            key: "section_nic",
+            label: "20. National Industrial Classification (NIC) Code for Activities",
+            isNic: true,
+            fields: [f],
+          };
+        } else {
+          currentGroup.fields.push(f);
+        }
+        continue;
+      }
+
+      if (currentGroup.isNic) {
+        groups.push(currentGroup);
+        currentGroup = {
+          key: `section_${f.key}`,
+          label: "",
+          isNic: false,
+          fields: [],
+        };
+      }
+
+      currentGroup.fields.push(f);
+    }
+
+    if (currentGroup.fields.length > 0 || currentGroup.isNic) {
+      groups.push(currentGroup);
+    }
+
+    return groups;
+  }, [schema.fields]);
+
+  return (
+    <form onSubmit={handle} className="space-y-6">
+      <div className="space-y-6">
+        {sectionGroups.map((group, groupIdx) => {
+          const visibleFields = group.fields.filter((f) => isFieldVisible(f, schema.fields, values));
+
+          if (group.isNic) {
+            const hasNicFields = schema.fields.some((x) => /^nic_[245]_digit$/.test(x.key));
+            const anyNicVisible =
+              !hasNicFields ||
+              schema.fields.some((x) => /^nic_[245]_digit$/.test(x.key) && isFieldVisible(x, schema.fields, values));
+            if (!anyNicVisible) return null;
+          } else if (visibleFields.length === 0) {
+            return null;
+          }
+
+          const showHeader = Boolean(group.label && (sectionGroups.length > 1 || group.label !== "Details"));
+
           return (
-            <FieldRenderer
-              key={f.key}
-              field={f}
-              value={values[f.key] ?? ""}
-              allValues={values}
-              onChange={(v) => update(f.key, v)}
-              setMany={(patch) => setValues((s) => ({ ...s, ...patch }))}
-            />
+            <div
+              key={group.key}
+              className="rounded-xl border border-slate-200 bg-white shadow-xs overflow-hidden transition-all"
+            >
+              {showHeader && (
+                <div className="border-b border-slate-100 bg-gradient-to-r from-slate-50 via-slate-50/70 to-white px-4 sm:px-5 py-3.5 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-indigo-600 text-white text-xs font-bold shadow-xs">
+                      {groupIdx + 1}
+                    </span>
+                    <h3 className="text-sm sm:text-base font-bold text-slate-900 tracking-tight truncate">
+                      {group.label}
+                    </h3>
+                  </div>
+                </div>
+              )}
+
+              <div className="p-4 sm:p-5">
+                {group.isNic ? (
+                  <NicCodeSection
+                    sectionLabel={group.label || "National Industrial Classification (NIC) Code for Activities"}
+                    hideHeader={showHeader}
+                    values={values}
+                    onChange={(k, v) => update(k, v)}
+                    setMany={(patch) => setValues((s) => clearHiddenFields(schema.fields, { ...s, ...patch }))}
+                    activity={
+                      values.major_activity === "Manufacturing" ||
+                      values.major_activity === "Services" ||
+                      values.major_activity === "Trading"
+                        ? values.major_activity
+                        : null
+                    }
+                  />
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {visibleFields.map((f) => (
+                      <FieldRenderer
+                        key={f.key}
+                        field={f}
+                        value={values[f.key] ?? ""}
+                        allValues={values}
+                        onChange={(v) => update(f.key, v)}
+                        setMany={(patch) => setValues((s) => ({ ...s, ...patch }))}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
           );
         })}
       </div>
