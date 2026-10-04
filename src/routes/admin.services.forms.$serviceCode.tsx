@@ -670,15 +670,11 @@ function FormBuilderPage() {
                     </>
                   )}
                   {activeField.type === "select" && (
-                    <label className="block text-sm">
-                      <div className="text-xs font-medium text-slate-600 mb-1">Options (one per line)</div>
-                      <textarea
-                        rows={6}
-                        value={(activeField.options ?? []).join("\n")}
-                        onChange={(e) => updateField({ options: e.target.value.split("\n").map((s) => s.trim()).filter(Boolean) })}
-                        className="w-full rounded-md border px-2.5 py-1.5 text-sm font-mono"
-                      />
-                    </label>
+                    <OptionsEditor
+                      key={activeField.key}
+                      options={activeField.options ?? []}
+                      onChange={(options) => updateField({ options })}
+                    />
                   )}
                   {activeField.type === "nic" && (
                     <>
