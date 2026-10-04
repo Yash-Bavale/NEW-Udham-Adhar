@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Loader2, UploadCloud, AlertTriangle, FileCheck2, Mail, Check, FileText, RefreshCw, Send, CircleCheck } from "lucide-react";
+import { Loader2, UploadCloud, AlertTriangle, FileCheck2, Mail, Check, FileText, RefreshCw, Send, CircleCheck, Info, Eye } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -42,6 +42,7 @@ export function CompletionGateDialogStandalone({
   const [numberTouched, setNumberTouched] = useState(false);
   const [uploaded, setUploaded] = useState<{ file: File; documentId: string } | null>(null);
   const [sendingConfirmed, setSendingConfirmed] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -66,7 +67,7 @@ export function CompletionGateDialogStandalone({
     if (!open) {
       setFile(null); setCertNumber(""); setCompletionNotes("");
       setStage("idle"); setDragOver(false); setError(null);
-      setNumberTouched(false); setUploaded(null); setSendingConfirmed(false);
+      setNumberTouched(false); setUploaded(null); setSendingConfirmed(false); setPreviewOpen(false);
     }
   }, [open]);
 
@@ -149,7 +150,7 @@ export function CompletionGateDialogStandalone({
 
   return (
     <Dialog open={open} onOpenChange={(next) => { if (!next && locked) return; onOpenChange(next); }}>
-      <DialogContent onEscapeKeyDown={(e) => { if (locked) e.preventDefault(); }} onPointerDownOutside={(e) => { if (locked) e.preventDefault(); }} className={`w-[calc(100vw-2rem)] max-w-[560px] gap-0 border-admin-border bg-admin-surface p-0 text-admin-fg shadow-xl sm:rounded-lg [&>button]:text-admin-fg-muted ${locked ? "[&>button]:pointer-events-none [&>button]:opacity-40" : ""}`} aria-describedby="completion-description">
+      <DialogContent onEscapeKeyDown={(e) => { if (locked) e.preventDefault(); }} onPointerDownOutside={(e) => { if (locked) e.preventDefault(); }} className={`w-[calc(100vw-2rem)] max-w-[540px] gap-0 border-admin-border bg-admin-surface p-0 text-admin-fg shadow-xl sm:rounded-lg [&>button]:text-admin-fg-muted ${locked ? "[&>button]:pointer-events-none [&>button]:opacity-40" : ""}`} aria-describedby="completion-description">
         {stage === "success" ? (
           <div className="flex min-h-72 flex-col items-center justify-center gap-3 px-6 py-12 text-center" role="status" aria-live="polite">
             <CircleCheck className="size-12 text-admin-success motion-safe:animate-in motion-safe:zoom-in-75" />
@@ -159,69 +160,71 @@ export function CompletionGateDialogStandalone({
           </div>
         ) : (
           <>
-            <DialogHeader className="px-5 pb-3 pt-5 pr-12 sm:px-6">
-              <div className="flex items-start gap-3 text-left">
-                <div className="flex size-10 shrink-0 items-center justify-center rounded-md bg-admin-accent-soft text-admin-primary"><FileCheck2 className="size-5" /></div>
+            <DialogHeader className="px-6 pb-2 pt-5 pr-12">
+              <div className="flex items-start gap-4 text-left">
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-md bg-completion-soft text-completion-primary"><FileCheck2 className="size-5" /></div>
                 <div className="min-w-0">
-                  <DialogTitle className="text-xl leading-6">Complete Service</DialogTitle>
-                  <p className="mt-1 text-sm font-semibold text-admin-fg">{serviceName}</p>
+                  <DialogTitle className="text-lg leading-6">Complete Service</DialogTitle>
+                  <p className="text-sm font-semibold text-admin-fg">{serviceName}</p>
                   <DialogDescription id="completion-description" className="mt-1 text-xs">Upload the certificate, add document number and we’ll send it to the customer.</DialogDescription>
                 </div>
               </div>
             </DialogHeader>
-            <div className="max-h-[calc(100dvh-170px)] space-y-2.5 overflow-y-auto px-4 pb-3 sm:px-5">
-              <div className="grid grid-cols-3 gap-1 py-3 text-center" aria-label="Completion steps">
+            <div className="max-h-[calc(100dvh-135px)] space-y-2.5 overflow-y-auto px-5 pb-3 sm:px-6">
+              <div className="grid grid-cols-3 gap-1 pb-2 pt-3 text-center" aria-label="Completion steps">
                 {(["Upload Certificate", "Certificate Number", "Send to Customer"] as const).map((label, index) => {
                   const done = index === 0 ? Boolean(uploaded) : index === 1 ? Boolean(certNumber.trim()) : sendingConfirmed;
                   const active = index === 0 ? !uploaded : index === 1 ? Boolean(uploaded && !certNumber.trim()) : Boolean(uploaded && certNumber.trim());
                   return <div key={label} className="relative min-w-0 text-[11px]">
-                    {index < 2 && <span aria-hidden="true" className="absolute left-[calc(50%+15px)] right-[calc(-50%+15px)] top-3 h-px bg-admin-border-strong" />}
-                    <span className={`relative mx-auto flex size-6 items-center justify-center rounded-full text-xs font-semibold ${done ? "bg-admin-success text-primary-foreground" : active ? "bg-admin-primary text-primary-foreground" : "bg-admin-surface-2 text-admin-fg-muted"}`}>{done ? <Check className="size-3.5" /> : index + 1}</span>
+                    {index < 2 && <span aria-hidden="true" className="absolute left-[calc(50%+15px)] right-[calc(-50%+15px)] top-3 h-px bg-completion-border" />}
+                    <span className={`relative mx-auto flex size-6 items-center justify-center rounded-full text-xs font-semibold ${done ? "bg-admin-success text-primary-foreground" : active ? "bg-completion-primary text-admin-surface shadow-sm" : "bg-admin-surface-2 text-admin-fg-muted"}`}>{done ? <Check className="size-3.5" /> : index + 1}</span>
                     <span className={`mt-1 block leading-tight ${active ? "font-semibold text-admin-fg" : "text-admin-fg-muted"}`}>{label}</span>
                   </div>;
                 })}
               </div>
 
-              <section className="space-y-2" aria-label="Upload Certificate">
-                <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="text-sm font-semibold">01 Upload Certificate</h3><span className="text-[11px] text-admin-fg-muted">PDF, JPG, PNG, WEBP · Max 10 MB</span></div>
-                {!file ? (
-                  <div onDragOver={(e) => { e.preventDefault(); if (!locked) setDragOver(true); }} onDragLeave={() => setDragOver(false)} onDrop={(e) => { e.preventDefault(); setDragOver(false); chooseFile(e.dataTransfer.files?.[0] ?? null); }}
-                    className={`flex min-h-28 flex-col items-center justify-center rounded-md border border-dashed p-4 text-center transition-colors ${dragOver ? "border-admin-primary bg-admin-accent-soft" : "border-admin-border-strong bg-admin-surface-2"}`}>
-                    <UploadCloud className="mb-1 size-8 text-admin-primary" />
-                    <p className="text-sm font-semibold">Upload Certificate</p>
-                    <Button type="button" variant="link" className="h-auto p-0 text-xs text-admin-fg-muted" onClick={() => fileInput.current?.click()} disabled={locked}>Drag &amp; drop or click to browse</Button>
-                  </div>
-                ) : (
-                  <div className={`flex items-center gap-3 rounded-md border p-3 ${fileError ? "border-admin-danger bg-destructive/5" : uploaded?.file === file ? "border-admin-success bg-admin-success/5" : "border-admin-border bg-admin-surface-2"}`}>
-                    <div className="flex size-10 shrink-0 items-center justify-center rounded-md bg-admin-surface text-admin-primary"><FileText className="size-5" /></div>
+              <section className="space-y-2 rounded-md border border-admin-border p-2.5" aria-label="Upload Certificate">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div><h3 className="text-sm font-semibold"><span className="mr-2 rounded-md bg-completion-soft px-2 py-1 text-[10px] text-completion-primary">STEP 1</span>Upload Certificate</h3><p className="mt-1.5 text-[11px] text-admin-fg-muted">Upload the final certificate issued by the government.</p></div>
+                  <div className="rounded-md border border-completion-border bg-completion-soft px-2.5 py-1.5 text-[10px] text-completion-primary"><span className="flex items-center gap-1 font-semibold"><Info className="size-3" />Accepted formats</span><span>PDF, JPG, PNG, WEBP · Max 10 MB</span></div>
+                </div>
+                <div onDragOver={(e) => { e.preventDefault(); if (!locked) setDragOver(true); }} onDragLeave={() => setDragOver(false)} onDrop={(e) => { e.preventDefault(); setDragOver(false); chooseFile(e.dataTransfer.files?.[0] ?? null); }}
+                  className={`flex min-h-24 flex-col items-center justify-center rounded-md border border-dashed p-3 text-center transition-colors ${dragOver ? "border-completion-primary bg-completion-soft" : "border-completion-border bg-admin-surface-2/40"}`}>
+                  <UploadCloud className="mb-1 size-8 text-completion-primary" />
+                  <p className="text-xs font-semibold">Drag &amp; drop your certificate here</p>
+                  <Button type="button" variant="link" className="h-auto p-0 text-[11px] text-admin-fg-muted" onClick={() => fileInput.current?.click()} disabled={locked}>or click to browse</Button>
+                </div>
+                {file && <div className={`flex items-center gap-2 rounded-md border p-2 ${fileError ? "border-admin-danger bg-destructive/5" : uploaded?.file === file ? "border-admin-success/30 bg-admin-success/5" : "border-completion-border bg-completion-soft/40"}`}>
+                    <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-admin-surface text-completion-primary"><FileText className="size-5" /></div>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium" title={file.name}>{file.name}</p>
-                      <p className="text-xs text-admin-fg-muted">{formatSize(file.size)} · {uploaded?.file === file ? "Uploaded" : "Selected for upload"}</p>
+                      <p className="truncate text-xs font-semibold" title={file.name}>{file.name}</p>
+                      <p className="text-[11px] text-admin-fg-muted">{formatSize(file.size)} · {uploaded?.file === file ? "Uploaded just now" : "Selected for upload"}</p>
                     </div>
-                    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-semibold ${uploaded?.file === file ? "bg-admin-success/10 text-admin-success" : "bg-admin-accent-soft text-admin-primary"}`}><Check className="size-3" />{uploaded?.file === file ? "File uploaded" : "File selected"}</span>
+                    <span className={`hidden items-center gap-1 rounded-full px-2 py-1 text-[10px] font-semibold sm:inline-flex ${uploaded?.file === file ? "bg-admin-success/10 text-admin-success" : "bg-completion-soft text-completion-primary"}`}><Check className="size-3" />{uploaded?.file === file ? "File uploaded" : "File selected"}</span>
                     <Button type="button" variant="ghost" size="sm" onClick={() => fileInput.current?.click()} disabled={locked} title="Replace file" aria-label="Replace file"><RefreshCw /></Button>
-                  </div>
-                )}
+                  </div>}
                 {fileError && <p className="text-xs text-admin-danger" role="alert">{isEmpty ? "This file is empty. Choose another." : tooBig ? "This file exceeds 10 MB." : "Choose a PDF, JPG, PNG or WEBP file."}</p>}
                 <input ref={fileInput} type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp" className="sr-only" tabIndex={-1} disabled={locked} onChange={(e) => { chooseFile(e.target.files?.[0] ?? null); e.target.value = ""; }} aria-label="Certificate file" />
               </section>
 
-              <section className="space-y-2">
-                <Label htmlFor="completion-cert-number" className="text-sm font-semibold">02 Certificate / Document Number <span className="text-admin-danger">Required</span></Label>
-                <Input id="completion-cert-number" value={certNumber} onChange={(e) => { setCertNumber(e.target.value); setError(null); }} onBlur={() => setNumberTouched(true)} disabled={locked} aria-invalid={numberTouched && !certNumber.trim()} aria-describedby={numberTouched && !certNumber.trim() ? "completion-number-error" : undefined} placeholder="e.g. UDYAM-MH-28-0012345" autoComplete="off" className="h-11 border-admin-border-strong bg-admin-surface" />
+              <section className="space-y-2 rounded-md border border-admin-border p-2.5">
+                <div><Label htmlFor="completion-cert-number" className="text-sm font-semibold"><span className="mr-2 rounded-md bg-completion-soft px-2 py-1 text-[10px] text-completion-primary">STEP 2</span>Certificate / Document Number</Label><p className="mt-1.5 text-[11px] text-admin-fg-muted">Enter the certificate number as mentioned on the document.</p></div>
+                <div className="relative"><FileText className="absolute left-3 top-3 size-4 text-admin-fg-muted" /><Input id="completion-cert-number" value={certNumber} onChange={(e) => { setCertNumber(e.target.value); setError(null); }} onBlur={() => setNumberTouched(true)} disabled={locked} aria-invalid={numberTouched && !certNumber.trim()} aria-describedby={numberTouched && !certNumber.trim() ? "completion-number-error" : undefined} placeholder="e.g. UDYAM-MH-28-0012345" autoComplete="off" className="h-10 border-admin-border-strong bg-admin-surface pl-9 pr-9" />{certNumber.trim() && <CircleCheck className="absolute right-3 top-3 size-4 text-admin-success" />}</div>
                 {numberTouched && !certNumber.trim() && <p id="completion-number-error" className="text-xs text-admin-danger" role="alert">Enter the certificate / document number.</p>}
               </section>
 
-              <section className="space-y-2">
-                <div className="flex justify-between gap-2"><Label htmlFor="completion-notes" className="text-sm font-semibold">03 Completion Notes <span className="font-normal text-admin-fg-muted">(Optional)</span></Label><span className="text-xs text-admin-fg-muted">{completionNotes.length}/500</span></div>
-                <Textarea id="completion-notes" value={completionNotes} onChange={(e) => setCompletionNotes(e.target.value)} disabled={locked} rows={2} maxLength={500} placeholder="Notes to include in the customer email" className="resize-y border-admin-border-strong bg-admin-surface" />
+              <section className="space-y-2 rounded-md border border-admin-border p-2.5">
+                <div><Label htmlFor="completion-notes" className="text-sm font-semibold"><span className="mr-2 rounded-md bg-completion-soft px-2 py-1 text-[10px] text-completion-primary">STEP 3</span>Completion Notes <span className="font-normal text-admin-fg-muted">(Optional)</span></Label><p className="mt-1.5 text-[11px] text-admin-fg-muted">Add any important notes that will be included in the customer email.</p></div>
+                <Textarea id="completion-notes" value={completionNotes} onChange={(e) => setCompletionNotes(e.target.value)} disabled={locked} rows={2} maxLength={500} placeholder="E.g. Certificate downloaded and verified. Sent to customer." className="resize-y border-admin-border-strong bg-admin-surface" />
+                <p className="text-right text-[10px] text-admin-fg-muted">{completionNotes.length}/500</p>
               </section>
 
-              <div className="flex items-start gap-3 rounded-md border border-admin-border bg-admin-accent-soft p-3 text-xs">
-                <Mail className="mt-0.5 size-4 shrink-0 text-admin-primary" />
-                <div className="min-w-0"><p className="text-admin-fg-muted">The certificate will be emailed to:</p><p className="break-all font-semibold text-admin-fg">{recipientEmail ?? "No email on file"}</p></div>
+              <div className="flex items-center gap-3 rounded-md border border-completion-border bg-completion-soft/50 px-3 py-2 text-[11px]">
+                <Mail className="size-4 shrink-0 text-completion-primary" />
+                <div className="min-w-0 flex-1"><p className="text-admin-fg-muted">The certificate will be emailed to:</p><p className="break-all font-semibold text-admin-fg">{recipientEmail ?? "No email on file"}</p></div>
+                <Button type="button" variant="outline" size="sm" className="h-7 shrink-0 border-completion-border bg-admin-surface px-2 text-[10px] text-completion-primary" onClick={() => setPreviewOpen(true)}><Eye className="size-3" />Preview Email</Button>
               </div>
-              <div className="flex items-start gap-2 rounded-md border border-admin-warn/30 bg-admin-warn/5 p-3 text-xs text-admin-fg">
+              <div className="flex items-start gap-2 rounded-md border border-admin-warn/30 bg-admin-warn/5 p-2.5 text-[11px] text-admin-fg">
                 <AlertTriangle className="mt-0.5 size-4 shrink-0 text-admin-warn" />
                 <p>After the certificate email is sent, the order will move to <strong>COMPLETED</strong>. All other customer documents for this order will then be permanently deleted.</p>
               </div>
@@ -230,31 +233,43 @@ export function CompletionGateDialogStandalone({
                 <span>{error || (stage === "uploading" ? "Uploading certificate…" : stage === "preparing" ? "Preparing certificate email…" : "Sending to customer…")}</span>
               </div>}
             </div>
-            <DialogFooter className="flex-row justify-between gap-3 border-t border-admin-border px-5 py-4 sm:px-6">
+             <DialogFooter className="flex-row justify-between gap-3 border-t border-admin-border px-5 py-3 sm:px-6">
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={locked}>Cancel</Button>
-              <Button type="button" onClick={() => void submit()} disabled={locked || !file || Boolean(fileError) || !certNumber.trim() || !recipientEmail} className="min-w-44">
+               <Button type="button" onClick={() => void submit()} disabled={locked || !file || Boolean(fileError) || !certNumber.trim() || !recipientEmail} className="min-w-44 bg-completion-primary text-admin-surface hover:bg-completion-primary/90">
                 {working ? <><Loader2 className="animate-spin" />{stage === "uploading" ? "Uploading certificate…" : stage === "preparing" ? "Preparing email…" : "Sending to customer…"}</> : <><Send />Upload &amp; Send Certificate</>}
               </Button>
             </DialogFooter>
-            {working && (
-              <div className="absolute left-[calc(100%+12px)] top-1/4 hidden w-72 rounded-md border border-admin-border bg-admin-surface p-4 text-admin-fg shadow-xl xl:block" role="status" aria-live="polite">
-                <h3 className="mb-3 text-sm font-semibold">Sending Certificate to Customer</h3>
+             {working && (
+               <div className="fixed inset-0 z-[60] flex items-center justify-center bg-admin-fg/30 p-4" role="status" aria-live="polite">
+               <div className="w-full max-w-72 rounded-md border border-admin-border bg-admin-surface p-5 text-center text-admin-fg shadow-xl">
+                 <div className="mx-auto mb-3 flex size-14 items-center justify-center rounded-full bg-completion-soft text-completion-primary"><Send className="size-6" /></div>
+                 <h3 className="mb-1 text-sm font-semibold">Sending Certificate to Customer</h3>
+                 <p className="mb-4 text-xs text-admin-fg-muted">Please wait while we upload the file and send the email to the customer.</p>
                 {([
                   ["Uploading file", stage !== "uploading", stage === "uploading"],
-                  ["Processing document", stage === "sending", stage === "preparing"],
-                  ["Sending email & updating order", false, stage === "sending"],
+                   ["Processing document", stage === "sending", stage === "preparing"],
+                   ["Sending email & updating order", false, stage === "sending"],
                 ] as const).map(([label, done, active]) => (
-                  <div key={label} className="flex items-center gap-2 border-t border-admin-border py-2 text-xs">
+                   <div key={label} className="flex items-center gap-2 py-2 text-left text-xs">
                     {done ? <Check className="size-4 shrink-0 text-admin-success" /> : active ? <Loader2 className="size-4 shrink-0 animate-spin text-admin-primary" /> : <span className="size-4 shrink-0 rounded-full border border-admin-border-strong" />}
                     <span className="flex-1">{label}</span>
                     <span className="text-admin-fg-muted">{done ? "Completed" : active ? "In progress" : "Pending"}</span>
                   </div>
                 ))}
+                 <div className="mt-3 h-1 overflow-hidden rounded-full bg-completion-soft"><div className={`h-full bg-completion-primary transition-all duration-300 ${stage === "uploading" ? "w-1/4" : stage === "preparing" ? "w-1/2" : "w-3/4"}`} /></div>
+               </div>
               </div>
             )}
           </>
         )}
       </DialogContent>
+      <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+        <DialogContent className="max-w-md border-admin-border bg-admin-surface text-admin-fg">
+          <DialogHeader><DialogTitle>Certificate email</DialogTitle><DialogDescription>Review the details that will be sent to the customer.</DialogDescription></DialogHeader>
+          <div className="space-y-3 text-sm"><p><span className="text-admin-fg-muted">To:</span> <span className="break-all">{recipientEmail ?? "No email on file"}</span></p><p><span className="text-admin-fg-muted">Service:</span> {serviceName}</p><p><span className="text-admin-fg-muted">Certificate number:</span> {certNumber.trim() || "Not entered"}</p><p><span className="text-admin-fg-muted">Attachment:</span> {file?.name ?? "No certificate selected"}</p>{completionNotes.trim() && <p className="whitespace-pre-wrap"><span className="text-admin-fg-muted">Notes:</span> {completionNotes.trim()}</p>}</div>
+          <DialogFooter><Button type="button" variant="outline" onClick={() => setPreviewOpen(false)}>Close</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   );
 }
