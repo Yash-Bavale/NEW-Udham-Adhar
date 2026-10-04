@@ -301,6 +301,9 @@ export function OnboardingForm({
                         nic_5_digit: level === 5 ? nicLabel(code, 5) ?? "" : "",
                       }))}
                     />
+                    <p className="mt-1.5 text-xs text-muted-foreground">
+                      Choosing a 2- or 4-digit category fills matching fields; choose a 5-digit activity to complete all three.
+                    </p>
                   </div>
                 )}
               </div>
