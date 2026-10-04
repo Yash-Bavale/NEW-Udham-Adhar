@@ -291,7 +291,7 @@ export function OnboardingForm({
               return (
                 <NicCodeSection
                   key={f.key}
-                  sectionLabel={f.label}
+                  sectionLabel={isNicKey ? "20. National Industrial Classification (NIC) Code for Activities" : f.label}
                   values={values}
                   onChange={(k, v) => update(k, v)}
                   setMany={(patch) => setValues((s) => ({ ...s, ...patch }))}
