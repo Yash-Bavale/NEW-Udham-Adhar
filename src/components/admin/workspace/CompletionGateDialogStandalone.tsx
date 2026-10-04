@@ -236,6 +236,22 @@ export function CompletionGateDialogStandalone({
                 {working ? <><Loader2 className="animate-spin" />{stage === "uploading" ? "Uploading certificate…" : stage === "preparing" ? "Preparing email…" : "Sending to customer…"}</> : <><Send />Upload &amp; Send Certificate</>}
               </Button>
             </DialogFooter>
+            {working && (
+              <div className="absolute left-[calc(100%+12px)] top-1/4 hidden w-72 rounded-md border border-admin-border bg-admin-surface p-4 text-admin-fg shadow-xl xl:block" role="status" aria-live="polite">
+                <h3 className="mb-3 text-sm font-semibold">Sending Certificate to Customer</h3>
+                {([
+                  ["Uploading file", stage !== "uploading", stage === "uploading"],
+                  ["Processing document", stage === "sending", stage === "preparing"],
+                  ["Sending email & updating order", false, stage === "sending"],
+                ] as const).map(([label, done, active]) => (
+                  <div key={label} className="flex items-center gap-2 border-t border-admin-border py-2 text-xs">
+                    {done ? <Check className="size-4 shrink-0 text-admin-success" /> : active ? <Loader2 className="size-4 shrink-0 animate-spin text-admin-primary" /> : <span className="size-4 shrink-0 rounded-full border border-admin-border-strong" />}
+                    <span className="flex-1">{label}</span>
+                    <span className="text-admin-fg-muted">{done ? "Completed" : active ? "In progress" : "Pending"}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </>
         )}
       </DialogContent>
