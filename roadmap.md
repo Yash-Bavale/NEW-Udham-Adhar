@@ -1,5 +1,7 @@
 # Roadmap
 
+- [ ] Match the Complete Service dialog to the supplied UI while preserving real upload and sending states
+- [ ] Visually separate and highlight customer-facing form sections as shown in the form preview
 - [x] Use the New Udyam NIC search and Add Activity as the default NIC field format, including Update Udyam Certificate additional updates
 - [x] Add a government-style NIC activity list: first selection saved automatically, Add Activity saves further selections, visible to staff
 - [x] Make the main NIC search clearly labeled and allow numbered 2-, 4-, and 5-digit selections without inventing narrower codes
