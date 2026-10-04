@@ -177,6 +177,14 @@ export function OnboardingForm({
       const next = { ...s, [k]: v };
       // When state changes, clear district so a stale value can't remain.
       if (k === "state" && s.state !== v) next.district = "";
+      // Clear any conditional sub-fields that no longer apply (e.g. 19.1 when
+      // Major Activity switches away from Services).
+      for (const f of schema.fields) {
+        const visibleIf =
+          f.visibleIf ??
+          (f.key === "major_activity_sub" ? { key: "major_activity", equals: "Services" } : undefined);
+        if (visibleIf && visibleIf.key === k && v !== visibleIf.equals) next[f.key] = "";
+      }
       return next;
     });
   }
@@ -278,6 +286,12 @@ export function OnboardingForm({
       <div className="grid md:grid-cols-2 gap-4">
         {schema.fields.map((f) => {
           if (f.type === "note") return null;
+          // Conditional fields (e.g. 19.1 shows only when Major Activity is Services).
+          // 19.1 applies only to Services, even on older saved custom forms.
+          const visibleIf =
+            f.visibleIf ??
+            (f.key === "major_activity_sub" ? { key: "major_activity", equals: "Services" } : undefined);
+          if (visibleIf && values[visibleIf.key] !== visibleIf.equals) return null;
           const isNicKey = f.key === "nic_2_digit" || f.key === "nic_4_digit" || f.key === "nic_5_digit";
           const hasNicSection = schema.fields.some((x) => x.key === "section_nic");
           const firstNicKey = schema.fields.find(
