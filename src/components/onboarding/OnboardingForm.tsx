@@ -3,7 +3,7 @@ import { Check, Loader2, Plus, Trash2 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { INDIA_STATES, PLANT_UNIT_TYPES, type FieldDef, type OnboardingSchema } from "@/lib/onboarding/schemas";
 import { INDIA_DISTRICTS } from "@/lib/onboarding/india-districts";
-import { NicCodePicker } from "./NicCodePicker";
+import { NicCodePicker, NicCodeSection } from "./NicCodePicker";
 import { nicLabel } from "@/lib/onboarding/nic-fill";
 import { DateInputDMY } from "@/components/ui/DateInputDMY";
 
@@ -278,34 +278,32 @@ export function OnboardingForm({
       <div className="grid md:grid-cols-2 gap-4">
         {schema.fields.map((f) => {
           if (f.type === "note") return null;
+          if (f.key === "nic_2_digit" || f.key === "nic_4_digit" || f.key === "nic_5_digit") {
+            // Rendered together inside NicCodeSection for unified intelligent search & hierarchy
+            return null;
+          }
           if (f.type === "section") {
+            if (f.key === "section_nic") {
+              return (
+                <NicCodeSection
+                  key={f.key}
+                  sectionLabel={f.label}
+                  values={values}
+                  onChange={(k, v) => update(k, v)}
+                  setMany={(patch) => setValues((s) => ({ ...s, ...patch }))}
+                  activity={
+                    values.major_activity === "Manufacturing" ||
+                    values.major_activity === "Services" ||
+                    values.major_activity === "Trading"
+                      ? values.major_activity
+                      : null
+                  }
+                />
+              );
+            }
             return (
               <div key={f.key} className="md:col-span-2 pt-4 mt-2 border-t border-border">
                 <h3 className="text-base md:text-lg font-bold font-display text-brand-navy-deep">{f.label}</h3>
-                {f.key === "section_nic" && schema.fields.some((field) => field.key === "nic_5_digit") && (
-                  <div className="mt-4">
-                    <label htmlFor="f-nic-main-search" className="block text-sm font-semibold text-foreground mb-1.5">
-                      Search NIC activity (choose a 2-, 4- or 5-digit code)
-                    </label>
-                    <NicCodePicker
-                      id="f-nic-main-search"
-                      inlineSearch
-                      value={values.nic_5_digit || values.nic_4_digit || values.nic_2_digit || ""}
-                      digits={5}
-                      activity={null}
-                      onChange={() => setValues((s) => ({ ...s, nic_2_digit: "", nic_4_digit: "", nic_5_digit: "" }))}
-                      onPickLevel={(code, level) => setValues((s) => ({
-                        ...s,
-                        nic_2_digit: nicLabel(code, 2) ?? "",
-                        nic_4_digit: level >= 4 ? nicLabel(code, 4) ?? "" : "",
-                        nic_5_digit: level === 5 ? nicLabel(code, 5) ?? "" : "",
-                      }))}
-                    />
-                    <p className="mt-1.5 text-xs text-muted-foreground">
-                      Choosing a 2- or 4-digit category fills matching fields; choose a 5-digit activity to complete all three.
-                    </p>
-                  </div>
-                )}
               </div>
             );
           }
