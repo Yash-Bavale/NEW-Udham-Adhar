@@ -923,7 +923,6 @@ export const markRefundProcessed = createServerFn({ method: "POST" })
       .update({
         refund_processed_at: processedAt,
         refund_gateway_ref: data.paymentReference,
-        documents_deleted_reason: "refund",
       } as never)
       .eq("id", data.orderId);
 
