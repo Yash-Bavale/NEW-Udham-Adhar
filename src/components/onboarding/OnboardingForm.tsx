@@ -278,16 +278,20 @@ export function OnboardingForm({
       <div className="grid md:grid-cols-2 gap-4">
         {schema.fields.map((f) => {
           if (f.type === "note") return null;
-          if (f.key === "nic_2_digit" || f.key === "nic_4_digit" || f.key === "nic_5_digit") {
-            // Rendered together inside NicCodeSection for unified intelligent search & hierarchy
-            return null;
-          }
-          if (f.type === "section") {
-            if (f.key === "section_nic") {
+          const isNicKey = f.key === "nic_2_digit" || f.key === "nic_4_digit" || f.key === "nic_5_digit";
+          const hasNicSection = schema.fields.some((x) => x.key === "section_nic");
+          const firstNicKey = schema.fields.find(
+            (x) => x.key === "nic_2_digit" || x.key === "nic_4_digit" || x.key === "nic_5_digit",
+          )?.key;
+          // Rendered together inside NicCodeSection; if the service form has no NIC
+          // section heading, render the section in place of the first NIC field.
+          if (isNicKey && (hasNicSection || f.key !== firstNicKey)) return null;
+          if (f.type === "section" || isNicKey) {
+            if (f.key === "section_nic" || isNicKey) {
               return (
                 <NicCodeSection
                   key={f.key}
-                  sectionLabel={f.label}
+                  sectionLabel={isNicKey ? "20. National Industrial Classification (NIC) Code for Activities" : f.label}
                   values={values}
                   onChange={(k, v) => update(k, v)}
                   setMany={(patch) => setValues((s) => ({ ...s, ...patch }))}
