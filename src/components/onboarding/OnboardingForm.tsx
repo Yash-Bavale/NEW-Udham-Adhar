@@ -284,7 +284,11 @@ export function OnboardingForm({
         {schema.fields.map((f) => {
           if (f.type === "note") return null;
           // Conditional fields (e.g. 19.1 shows only when Major Activity is Services).
-          if (f.visibleIf && values[f.visibleIf.key] !== f.visibleIf.equals) return null;
+          // 19.1 applies only to Services, even on older saved custom forms.
+          const visibleIf =
+            f.visibleIf ??
+            (f.key === "major_activity_sub" ? { key: "major_activity", equals: "Services" } : undefined);
+          if (visibleIf && values[visibleIf.key] !== visibleIf.equals) return null;
           const isNicKey = f.key === "nic_2_digit" || f.key === "nic_4_digit" || f.key === "nic_5_digit";
           const hasNicSection = schema.fields.some((x) => x.key === "section_nic");
           const firstNicKey = schema.fields.find(
