@@ -425,7 +425,7 @@ export function NicCodeSection({
           </label>
           <select
             id="f-nic_2_digit"
-            value={current2Code ? (nicLabel(current2Code, 2) ?? values.nic_2_digit) : ""}
+            value={current2Code ? (nicLabel(current2Code, 2) ?? selected.nic_2_digit) : ""}
             onChange={(e) => {
               const val = e.target.value;
               updateSelection({
@@ -454,7 +454,7 @@ export function NicCodeSection({
           </label>
           <select
             id="f-nic_4_digit"
-            value={current4Code ? (nicLabel(current4Code, 4) ?? values.nic_4_digit) : ""}
+            value={current4Code ? (nicLabel(current4Code, 4) ?? selected.nic_4_digit) : ""}
             disabled={!current2Code}
             onChange={(e) => {
               const val = e.target.value;
@@ -513,7 +513,7 @@ export function NicCodeSection({
       )}
       <div className="flex flex-wrap items-center gap-2">
         <Button type="button" onClick={addActivity} disabled={!firstActivity && !adding} className="gap-2">
-          <Plus className="size-4" /> Add Activity
+          <Plus className="size-4" /> {adding ? "Save Activity" : "Add Activity"}
         </Button>
         {adding && <Button type="button" variant="outline" onClick={() => { setAdding(false); setActivityError(""); }}>Cancel</Button>}
       </div>
