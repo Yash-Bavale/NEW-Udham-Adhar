@@ -60,6 +60,9 @@
   --color-admin-success: var(--admin-success);
   --color-admin-warn: var(--admin-warn);
   --color-admin-danger: var(--admin-danger);
+  --color-completion-primary: var(--completion-primary);
+  --color-completion-soft: var(--completion-soft);
+  --color-completion-border: var(--completion-border);
 }
 
 :root {
@@ -127,6 +130,9 @@
   --admin-success: #16A34A;
   --admin-warn: #D97706;
   --admin-danger: #DC2626;
+  --completion-primary: #463AD6;
+  --completion-soft: #F3F1FF;
+  --completion-border: #DDD9FF;
   --admin-info: #2E75B6;
   /* Flat — gradient tokens aliased to solids so legacy primitives stay coherent */
   --gradient-admin: #1F4E79;
@@ -182,6 +188,9 @@
   --admin-success: #22C55E;
   --admin-warn: #F59E0B;
   --admin-danger: #EF4444;
+  --completion-primary: #A9A1FF;
+  --completion-soft: #272446;
+  --completion-border: #514B83;
   --admin-info: #60A5FA;
   --gradient-admin: #2E75B6;
   --gradient-success: #22C55E;
