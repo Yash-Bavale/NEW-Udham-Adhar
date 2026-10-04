@@ -41,6 +41,7 @@ export function CompletionGateDialogStandalone({
   const [error, setError] = useState<string | null>(null);
   const [numberTouched, setNumberTouched] = useState(false);
   const [uploaded, setUploaded] = useState<{ file: File; documentId: string } | null>(null);
+  const [sendingConfirmed, setSendingConfirmed] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -65,7 +66,7 @@ export function CompletionGateDialogStandalone({
     if (!open) {
       setFile(null); setCertNumber(""); setCompletionNotes("");
       setStage("idle"); setDragOver(false); setError(null);
-      setNumberTouched(false); setUploaded(null);
+      setNumberTouched(false); setUploaded(null); setSendingConfirmed(false);
     }
   }, [open]);
 
@@ -125,6 +126,7 @@ export function CompletionGateDialogStandalone({
         certificateNumber: certNumber.trim(),
         completionNotes: completionNotes.trim() || undefined,
       });
+      setSendingConfirmed(true);
       setStage("success");
       closeTimer.current = setTimeout(() => onOpenChange(false), 1800);
     } catch (e: any) {
@@ -157,47 +159,46 @@ export function CompletionGateDialogStandalone({
           </div>
         ) : (
           <>
-            <DialogHeader className="border-b border-admin-border px-5 py-5 pr-12 sm:px-6">
+            <DialogHeader className="px-5 pb-3 pt-5 pr-12 sm:px-6">
               <div className="flex items-start gap-3 text-left">
                 <div className="flex size-10 shrink-0 items-center justify-center rounded-md bg-admin-accent-soft text-admin-primary"><FileCheck2 className="size-5" /></div>
                 <div className="min-w-0">
                   <DialogTitle className="text-xl leading-6">Complete Service</DialogTitle>
                   <p className="mt-1 text-sm font-semibold text-admin-fg">{serviceName}</p>
-                  <DialogDescription id="completion-description" className="mt-1 text-xs">Upload the certificate, add the document number and send it to the customer.</DialogDescription>
+                  <DialogDescription id="completion-description" className="mt-1 text-xs">Upload the certificate, add document number and we’ll send it to the customer.</DialogDescription>
                 </div>
               </div>
             </DialogHeader>
-            <div className="max-h-[calc(100dvh-190px)] space-y-4 overflow-y-auto px-5 py-5 sm:px-6">
-              <div className="grid grid-cols-3 gap-2 border-b border-admin-border pb-4" aria-label="Completion steps">
-                {(["Upload Certificate", "Certificate Number", "Completion Notes"] as const).map((label, index) => {
-                  const done = index === 0 ? Boolean(uploaded) : index === 1 ? Boolean(certNumber.trim()) : false;
-                  const active = index === 0 ? !file || !uploaded : index === 1 ? Boolean(file && !certNumber.trim()) : Boolean(file && certNumber.trim());
-                  return <div key={label} className={`flex min-w-0 items-center gap-1.5 text-[11px] font-semibold ${active ? "text-admin-primary" : "text-admin-fg-muted"}`}>
-                    <span className={`flex size-6 shrink-0 items-center justify-center rounded-full border ${done ? "border-admin-success bg-admin-success text-primary-foreground" : active ? "border-admin-primary bg-admin-primary text-primary-foreground" : "border-admin-border bg-admin-surface-2 text-admin-fg-muted"}`}>{done ? <Check className="size-3.5" /> : `0${index + 1}`}</span>
-                    <span className="leading-tight">{label}</span>
+            <div className="max-h-[calc(100dvh-170px)] space-y-2.5 overflow-y-auto px-4 pb-3 sm:px-5">
+              <div className="grid grid-cols-3 gap-1 py-3 text-center" aria-label="Completion steps">
+                {(["Upload Certificate", "Certificate Number", "Send to Customer"] as const).map((label, index) => {
+                  const done = index === 0 ? Boolean(uploaded) : index === 1 ? Boolean(certNumber.trim()) : sendingConfirmed;
+                  const active = index === 0 ? !uploaded : index === 1 ? Boolean(uploaded && !certNumber.trim()) : Boolean(uploaded && certNumber.trim());
+                  return <div key={label} className="relative min-w-0 text-[11px]">
+                    {index < 2 && <span aria-hidden="true" className="absolute left-[calc(50%+15px)] right-[calc(-50%+15px)] top-3 h-px bg-admin-border-strong" />}
+                    <span className={`relative mx-auto flex size-6 items-center justify-center rounded-full text-xs font-semibold ${done ? "bg-admin-success text-primary-foreground" : active ? "bg-admin-primary text-primary-foreground" : "bg-admin-surface-2 text-admin-fg-muted"}`}>{done ? <Check className="size-3.5" /> : index + 1}</span>
+                    <span className={`mt-1 block leading-tight ${active ? "font-semibold text-admin-fg" : "text-admin-fg-muted"}`}>{label}</span>
                   </div>;
                 })}
               </div>
 
               <section className="space-y-2" aria-label="Upload Certificate">
-                <div className="flex items-center justify-between gap-2"><h3 className="text-sm font-semibold">01 Upload Certificate</h3><span className="text-[11px] text-admin-fg-muted">PDF, JPG, PNG, WEBP · Max 10 MB</span></div>
+                <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="text-sm font-semibold">01 Upload Certificate</h3><span className="text-[11px] text-admin-fg-muted">PDF, JPG, PNG, WEBP · Max 10 MB</span></div>
                 {!file ? (
                   <div onDragOver={(e) => { e.preventDefault(); if (!locked) setDragOver(true); }} onDragLeave={() => setDragOver(false)} onDrop={(e) => { e.preventDefault(); setDragOver(false); chooseFile(e.dataTransfer.files?.[0] ?? null); }}
                     className={`flex min-h-28 flex-col items-center justify-center rounded-md border border-dashed p-4 text-center transition-colors ${dragOver ? "border-admin-primary bg-admin-accent-soft" : "border-admin-border-strong bg-admin-surface-2"}`}>
-                    <UploadCloud className="mb-2 size-7 text-admin-primary" />
-                    <Button type="button" variant="link" className="h-auto p-0 font-semibold" onClick={() => fileInput.current?.click()} disabled={locked}>Upload Certificate</Button>
-                    <p className="text-xs text-admin-fg-muted">Drag &amp; drop or click to browse</p>
+                    <UploadCloud className="mb-1 size-8 text-admin-primary" />
+                    <p className="text-sm font-semibold">Upload Certificate</p>
+                    <Button type="button" variant="link" className="h-auto p-0 text-xs text-admin-fg-muted" onClick={() => fileInput.current?.click()} disabled={locked}>Drag &amp; drop or click to browse</Button>
                   </div>
                 ) : (
                   <div className={`flex items-center gap-3 rounded-md border p-3 ${fileError ? "border-admin-danger bg-destructive/5" : uploaded?.file === file ? "border-admin-success bg-admin-success/5" : "border-admin-border bg-admin-surface-2"}`}>
                     <div className="flex size-10 shrink-0 items-center justify-center rounded-md bg-admin-surface text-admin-primary"><FileText className="size-5" /></div>
                     <div className="min-w-0 flex-1">
-                      <p className={`flex items-center gap-1 text-xs font-semibold ${fileError ? "text-admin-danger" : uploaded?.file === file ? "text-admin-success" : "text-admin-primary"}`}>
-                        {fileError ? "Invalid file" : uploaded?.file === file ? <><Check className="size-3.5" /> Certificate uploaded</> : "Certificate selected"}
-                      </p>
                       <p className="truncate text-sm font-medium" title={file.name}>{file.name}</p>
-                      <p className="text-xs text-admin-fg-muted">{formatSize(file.size)}</p>
+                      <p className="text-xs text-admin-fg-muted">{formatSize(file.size)} · {uploaded?.file === file ? "Uploaded" : "Selected for upload"}</p>
                     </div>
+                    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-semibold ${uploaded?.file === file ? "bg-admin-success/10 text-admin-success" : "bg-admin-accent-soft text-admin-primary"}`}><Check className="size-3" />{uploaded?.file === file ? "File uploaded" : "File selected"}</span>
                     <Button type="button" variant="ghost" size="sm" onClick={() => fileInput.current?.click()} disabled={locked} title="Replace file" aria-label="Replace file"><RefreshCw /></Button>
                   </div>
                 )}
@@ -206,23 +207,23 @@ export function CompletionGateDialogStandalone({
               </section>
 
               <section className="space-y-2">
-                <div className="flex items-center gap-2"><Label htmlFor="completion-cert-number" className="text-sm font-semibold">02 Certificate / Document Number</Label><span className="text-[11px] font-semibold text-admin-danger">Required</span></div>
+                <Label htmlFor="completion-cert-number" className="text-sm font-semibold">02 Certificate / Document Number <span className="text-admin-danger">Required</span></Label>
                 <Input id="completion-cert-number" value={certNumber} onChange={(e) => { setCertNumber(e.target.value); setError(null); }} onBlur={() => setNumberTouched(true)} disabled={locked} aria-invalid={numberTouched && !certNumber.trim()} aria-describedby={numberTouched && !certNumber.trim() ? "completion-number-error" : undefined} placeholder="e.g. UDYAM-MH-28-0012345" autoComplete="off" className="h-11 border-admin-border-strong bg-admin-surface" />
                 {numberTouched && !certNumber.trim() && <p id="completion-number-error" className="text-xs text-admin-danger" role="alert">Enter the certificate / document number.</p>}
               </section>
 
               <section className="space-y-2">
-                <Label htmlFor="completion-notes" className="text-sm font-semibold">03 Completion notes <span className="font-normal text-admin-fg-muted">· Optional</span></Label>
-                <Textarea id="completion-notes" value={completionNotes} onChange={(e) => setCompletionNotes(e.target.value)} disabled={locked} rows={2} maxLength={2000} placeholder="Notes to include in the customer email" className="resize-y border-admin-border-strong bg-admin-surface" />
+                <div className="flex justify-between gap-2"><Label htmlFor="completion-notes" className="text-sm font-semibold">03 Completion Notes <span className="font-normal text-admin-fg-muted">(Optional)</span></Label><span className="text-xs text-admin-fg-muted">{completionNotes.length}/500</span></div>
+                <Textarea id="completion-notes" value={completionNotes} onChange={(e) => setCompletionNotes(e.target.value)} disabled={locked} rows={2} maxLength={500} placeholder="Notes to include in the customer email" className="resize-y border-admin-border-strong bg-admin-surface" />
               </section>
 
               <div className="flex items-start gap-3 rounded-md border border-admin-border bg-admin-accent-soft p-3 text-xs">
                 <Mail className="mt-0.5 size-4 shrink-0 text-admin-primary" />
-                <div className="min-w-0"><p className="text-admin-fg-muted">Certificate will be sent to</p><p className="break-all font-semibold text-admin-fg">{recipientEmail ?? "No email on file"}</p></div>
+                <div className="min-w-0"><p className="text-admin-fg-muted">The certificate will be emailed to:</p><p className="break-all font-semibold text-admin-fg">{recipientEmail ?? "No email on file"}</p></div>
               </div>
               <div className="flex items-start gap-2 rounded-md border border-admin-warn/30 bg-admin-warn/5 p-3 text-xs text-admin-fg">
                 <AlertTriangle className="mt-0.5 size-4 shrink-0 text-admin-warn" />
-                <p>After the certificate email is queued, this order moves to <strong>Completed</strong>. All other customer documents for this order are then permanently deleted.</p>
+                <p>After the certificate email is sent, the order will move to <strong>COMPLETED</strong>. All other customer documents for this order will then be permanently deleted.</p>
               </div>
               {(working || error) && <div role={error ? "alert" : "status"} aria-live="polite" className={`flex items-start gap-2 rounded-md border p-3 text-sm ${error ? "border-admin-danger/40 bg-destructive/5 text-admin-danger" : "border-admin-border bg-admin-accent-soft text-admin-primary"}`}>
                 {error ? <AlertTriangle className="mt-0.5 size-4 shrink-0" /> : <Loader2 className="mt-0.5 size-4 shrink-0 animate-spin" />}
@@ -235,6 +236,22 @@ export function CompletionGateDialogStandalone({
                 {working ? <><Loader2 className="animate-spin" />{stage === "uploading" ? "Uploading certificate…" : stage === "preparing" ? "Preparing email…" : "Sending to customer…"}</> : <><Send />Upload &amp; Send Certificate</>}
               </Button>
             </DialogFooter>
+            {working && (
+              <div className="absolute left-[calc(100%+12px)] top-1/4 hidden w-72 rounded-md border border-admin-border bg-admin-surface p-4 text-admin-fg shadow-xl xl:block" role="status" aria-live="polite">
+                <h3 className="mb-3 text-sm font-semibold">Sending Certificate to Customer</h3>
+                {([
+                  ["Uploading file", stage !== "uploading", stage === "uploading"],
+                  ["Processing document", stage === "sending", stage === "preparing"],
+                  ["Sending email & updating order", false, stage === "sending"],
+                ] as const).map(([label, done, active]) => (
+                  <div key={label} className="flex items-center gap-2 border-t border-admin-border py-2 text-xs">
+                    {done ? <Check className="size-4 shrink-0 text-admin-success" /> : active ? <Loader2 className="size-4 shrink-0 animate-spin text-admin-primary" /> : <span className="size-4 shrink-0 rounded-full border border-admin-border-strong" />}
+                    <span className="flex-1">{label}</span>
+                    <span className="text-admin-fg-muted">{done ? "Completed" : active ? "In progress" : "Pending"}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </>
         )}
       </DialogContent>

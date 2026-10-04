@@ -308,8 +308,8 @@ export function OnboardingForm({
               if (f.key === "section_nic" && schema.fields.some((x) => /^nic_[245]_digit$/.test(x.key)) &&
                 !schema.fields.some((x) => /^nic_[245]_digit$/.test(x.key) && isFieldVisible(x, schema.fields, values))) return null;
               return (
+                <div key={f.key} className="md:col-span-2 rounded-md border border-border bg-card p-4 shadow-sm md:p-5">
                 <NicCodeSection
-                  key={f.key}
                   sectionLabel={isNicKey ? "National Industrial Classification (NIC) Code for Activities" : f.label}
                   values={values}
                   onChange={(k, v) => update(k, v)}
@@ -322,10 +322,11 @@ export function OnboardingForm({
                       : null
                   }
                 />
+                </div>
               );
             }
             return (
-              <div key={f.key} className="md:col-span-2 pt-4 mt-2 border-t border-border">
+              <div key={f.key} className="md:col-span-2 mt-3 flex items-center gap-3 border-b-2 border-brand-navy bg-brand-navy/5 px-4 py-3">
                 <h3 className="text-base md:text-lg font-bold font-display text-brand-navy-deep">{f.label}</h3>
               </div>
             );
