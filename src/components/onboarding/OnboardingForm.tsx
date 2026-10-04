@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Check, Loader2, Plus, Trash2 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
-import { INDIA_STATES, PLANT_UNIT_TYPES, type FieldDef, type OnboardingSchema } from "@/lib/onboarding/schemas";
+import { INDIA_STATES, PLANT_UNIT_TYPES, CHECKBOX_ON, clearHiddenFields, isFieldVisible, type FieldDef, type OnboardingSchema } from "@/lib/onboarding/schemas";
 import { INDIA_DISTRICTS } from "@/lib/onboarding/india-districts";
 import { NicCodePicker, NicCodeSection } from "./NicCodePicker";
 import { nicLabel } from "@/lib/onboarding/nic-fill";

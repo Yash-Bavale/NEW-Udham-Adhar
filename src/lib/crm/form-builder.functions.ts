@@ -19,6 +19,7 @@ const FIELD_TYPES = [
   "state",
   "district",
   "note",
+  "checkbox",
 ] as const;
 
 const FieldSchema = z.object({
@@ -34,6 +35,7 @@ const FieldSchema = z.object({
   nicDigits: z.union([z.literal(2), z.literal(4), z.literal(5)]).optional(),
   activityFrom: z.string().max(80).optional(),
   default: z.string().max(500).optional(),
+  visibleIf: z.object({ key: z.string().max(80), equals: z.string().max(200) }).optional(),
 });
 
 const SectionSchema = z.object({
