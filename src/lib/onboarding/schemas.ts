@@ -110,6 +110,18 @@ export type OnboardingSchema = {
   sample_form_label?: string;
 };
 
+/** Retain saved form-builder section boundaries in the flat customer renderer. */
+export function withSectionHeadings(sections: readonly { key: string; label: string; fields: readonly FieldDef[] }[]): FieldDef[] {
+  return sections.flatMap((section) => {
+    if (!section.fields.length) return [];
+    if (section.fields[0]?.type === "section") return [...section.fields];
+    return [
+      { key: `builder_section_${section.key}`, label: section.label, type: "section" as const },
+      ...section.fields,
+    ];
+  });
+}
+
 const BUSINESS_TYPES = [
   "Proprietary / एकल स्वामित्व",
   "Hindu Undivided Family / हिंदू अविभाजित परिवार (HUF)",

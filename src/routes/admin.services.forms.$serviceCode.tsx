@@ -138,7 +138,7 @@ function FormBuilderPage() {
   }, [data, serviceCode]);
 
   const previewSchema = useMemo(() => {
-    const fields = sections.flatMap((s) => s.fields);
+    const fields = withSectionHeadings(sections);
     return {
       title,
       description,

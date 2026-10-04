@@ -7,6 +7,7 @@ import {
   type OnboardingSchema,
   type FieldDef,
   type DocDef,
+  withSectionHeadings,
 } from "@/lib/onboarding/schemas";
 
 type DbSchemaRow = {
@@ -21,12 +22,12 @@ type DbSchemaRow = {
 };
 
 function normalize(row: DbSchemaRow, fallback: OnboardingSchema): OnboardingSchema {
-  // Support either flat `fields` or sectioned schema; flatten sections for legacy renderer.
+  // Preserve saved builder section boundaries when flattening for the customer renderer.
   let fields: FieldDef[] = [];
-  if (row.schema?.fields?.length) {
+  if (row.schema?.sections?.length) {
+    fields = withSectionHeadings(row.schema.sections);
+  } else if (row.schema?.fields?.length) {
     fields = row.schema.fields;
-  } else if (row.schema?.sections?.length) {
-    fields = row.schema.sections.flatMap((s) => s.fields);
   } else {
     fields = fallback.fields;
   }
