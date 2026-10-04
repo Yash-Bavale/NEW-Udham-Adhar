@@ -147,7 +147,7 @@ export function CompletionGateDialogStandalone({
 
   return (
     <Dialog open={open} onOpenChange={(next) => { if (!next && locked) return; onOpenChange(next); }}>
-      <DialogContent onEscapeKeyDown={(e) => { if (locked) e.preventDefault(); }} onPointerDownOutside={(e) => { if (locked) e.preventDefault(); }} className="w-[calc(100vw-2rem)] max-w-[560px] gap-0 border-admin-border bg-admin-surface p-0 text-admin-fg shadow-xl sm:rounded-lg [&>button]:text-admin-fg-muted [&>button]:disabled:pointer-events-none" aria-describedby="completion-description">
+      <DialogContent onEscapeKeyDown={(e) => { if (locked) e.preventDefault(); }} onPointerDownOutside={(e) => { if (locked) e.preventDefault(); }} className={`w-[calc(100vw-2rem)] max-w-[560px] gap-0 border-admin-border bg-admin-surface p-0 text-admin-fg shadow-xl sm:rounded-lg [&>button]:text-admin-fg-muted ${locked ? "[&>button]:pointer-events-none [&>button]:opacity-40" : ""}`} aria-describedby="completion-description">
         {stage === "success" ? (
           <div className="flex min-h-72 flex-col items-center justify-center gap-3 px-6 py-12 text-center" role="status" aria-live="polite">
             <CircleCheck className="size-12 text-admin-success motion-safe:animate-in motion-safe:zoom-in-75" />

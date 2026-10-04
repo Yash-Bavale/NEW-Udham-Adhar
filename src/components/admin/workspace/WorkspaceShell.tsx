@@ -614,7 +614,6 @@ export function WorkspaceShell(p: Props) {
           orderId={application.id}
           busy={false}
           onConfirm={async (payload) => {
-            try {
               await fnUpdateFF({
                 data: {
                   orderId: application.id,
@@ -627,9 +626,6 @@ export function WorkspaceShell(p: Props) {
               });
               toast.success("E007 sent — order completed with certificate");
               invalidate();
-            } catch (e: any) {
-               throw e;
-            }
           }}
         />
 
