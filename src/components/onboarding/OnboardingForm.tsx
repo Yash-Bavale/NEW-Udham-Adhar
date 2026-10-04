@@ -248,6 +248,13 @@ export function OnboardingForm({
       }
     }
 
+    // 2b. Date of Commencement must not be later than Date of Incorporation / Registration
+    if (values.incorporation_date && values.commencement_date && values.commencement_date > values.incorporation_date) {
+      setErr("Date of Commencement cannot be later than Date of Incorporation / Registration.");
+      setSubmitSuccess(false);
+      return;
+    }
+
     // 3. Validate field regex patterns
     for (const f of schema.fields) {
       if (f.type === "note" || f.type === "section") continue;
