@@ -310,7 +310,6 @@ export function OnboardingForm({
               return (
                 <div key={f.key} className="md:col-span-2 rounded-md border border-border bg-card p-4 shadow-sm md:p-5">
                 <NicCodeSection
-                  key={f.key}
                   sectionLabel={isNicKey ? "National Industrial Classification (NIC) Code for Activities" : f.label}
                   values={values}
                   onChange={(k, v) => update(k, v)}

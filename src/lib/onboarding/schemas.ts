@@ -115,8 +115,9 @@ export function withSectionHeadings(sections: readonly { key: string; label: str
   return sections.flatMap((section) => {
     if (!section.fields.length) return [];
     if (section.fields[0]?.type === "section") return [...section.fields];
+    const isNicSection = section.fields.some((field) => /^nic_[245]_digit$/.test(field.key));
     return [
-      { key: `builder_section_${section.key}`, label: section.label, type: "section" as const },
+      { key: isNicSection ? "section_nic" : `builder_section_${section.key}`, label: section.label, type: "section" as const },
       ...section.fields,
     ];
   });
