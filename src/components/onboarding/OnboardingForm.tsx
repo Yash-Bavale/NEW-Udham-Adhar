@@ -180,7 +180,10 @@ export function OnboardingForm({
       // Clear any conditional sub-fields that no longer apply (e.g. 19.1 when
       // Major Activity switches away from Services).
       for (const f of schema.fields) {
-        if (f.visibleIf && f.visibleIf.key === k && v !== f.visibleIf.equals) next[f.key] = "";
+        const visibleIf =
+          f.visibleIf ??
+          (f.key === "major_activity_sub" ? { key: "major_activity", equals: "Services" } : undefined);
+        if (visibleIf && visibleIf.key === k && v !== visibleIf.equals) next[f.key] = "";
       }
       return next;
     });
