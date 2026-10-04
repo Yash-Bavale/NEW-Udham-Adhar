@@ -292,7 +292,7 @@ export function OnboardingForm({
                       inlineSearch
                       value={values.nic_5_digit ?? ""}
                       digits={5}
-                      activity={values.major_activity === "Manufacturing" || values.major_activity === "Services" || values.major_activity === "Trading" ? values.major_activity : null}
+                      activity={null}
                       onChange={() => setValues((s) => ({ ...s, nic_2_digit: "", nic_4_digit: "", nic_5_digit: "" }))}
                       onPickCode={(code5) => setValues((s) => ({
                         ...s,

@@ -203,9 +203,9 @@ export function NicCodePicker({ value, onChange, activity, digits, required, id,
               );
             })}
           </div>
-          <div className="border-t border-border px-3 py-1.5 text-[11px] text-muted-foreground bg-muted/30">
+          {!inlineSearch && <div className="border-t border-border px-3 py-1.5 text-[11px] text-muted-foreground bg-muted/30">
             {onPickCode ? "Select an activity to fill all three NIC codes" : `Showing NIC ${digits}-digit suggestions`}{activity ? ` for ${activity}` : ""}.
-          </div>
+          </div>}
         </div>
       )}
     </div>
