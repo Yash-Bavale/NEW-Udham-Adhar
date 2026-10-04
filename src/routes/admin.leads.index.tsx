@@ -2,11 +2,12 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Fragment, useEffect, useMemo, useState } from "react";
-import { Search, ChevronLeft, ChevronRight, Download, Plus, X, ExternalLink, Calendar, Users as UsersIcon, ShieldAlert } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight, Download, Plus, X, ExternalLink, Calendar, Users as UsersIcon, ShieldAlert, RefreshCw, RotateCcw, Loader2 } from "lucide-react";
 import { formatIST, istDateKey, istDayLabel } from "@/lib/datetime";
 import { toast } from "sonner";
 import { usePermissions } from "@/hooks/usePermissions";
 import { DateRangePicker } from "@/components/ui/DateRangePicker";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   listLeads, listStaff, addLead, getLeadCounts, getLead, findLeadByCodeOrId,
   getLeadSourceBreakdown, type SourceBreakdown,
@@ -48,6 +49,17 @@ function formatAge(ms: number): string {
   return `${d}d ago`;
 }
 
+type RangePreset = "all" | "today" | "yesterday" | "7d" | "15d" | "30d" | "mtd" | "custom";
+const RANGE_PRESETS: { value: RangePreset; label: string }[] = [
+  { value: "all", label: "All" },
+  { value: "today", label: "Today" },
+  { value: "yesterday", label: "Yesterday" },
+  { value: "7d", label: "7 days" },
+  { value: "15d", label: "15 days" },
+  { value: "30d", label: "30 days" },
+  { value: "mtd", label: "This month" },
+  { value: "custom", label: "Custom" },
+];
 
 export const Route = createFileRoute("/admin/leads/")({ component: LeadsPage });
 
@@ -73,6 +85,7 @@ function LeadsPage() {
   const [websiteId, setWebsiteId] = useState<string>("");
   const [dateFrom, setDateFrom] = useState<string>("");
   const [dateTo, setDateTo] = useState<string>("");
+  const [datePreset, setDatePreset] = useState<RangePreset>("all");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const [defaultApplied, setDefaultApplied] = useState(false);
@@ -235,7 +248,73 @@ function LeadsPage() {
     return () => clearInterval(timer);
   }, []);
 
-  const { data, isLoading } = useQuery({
+  const applyDatePreset = (p: RangePreset) => {
+    setDatePreset(p);
+    setPage(1);
+    const now = new Date();
+    const tKey = istDateKey(now);
+    if (p === "all") {
+      setDateFrom("");
+      setDateTo("");
+    } else if (p === "today") {
+      setDateFrom(tKey);
+      setDateTo(tKey);
+    } else if (p === "yesterday") {
+      const yKey = istDateKey(new Date(now.getTime() - 86400000));
+      setDateFrom(yKey);
+      setDateTo(yKey);
+    } else if (p === "7d") {
+      const startKey = istDateKey(new Date(now.getTime() - 6 * 86400000));
+      setDateFrom(startKey);
+      setDateTo(tKey);
+    } else if (p === "15d") {
+      const startKey = istDateKey(new Date(now.getTime() - 14 * 86400000));
+      setDateFrom(startKey);
+      setDateTo(tKey);
+    } else if (p === "30d") {
+      const startKey = istDateKey(new Date(now.getTime() - 29 * 86400000));
+      setDateFrom(startKey);
+      setDateTo(tKey);
+    } else if (p === "mtd") {
+      const ist = new Date(now.getTime() + 5.5 * 3600 * 1000);
+      const monthStart = new Date(Date.UTC(ist.getUTCFullYear(), ist.getUTCMonth(), 1));
+      setDateFrom(istDateKey(monthStart));
+      setDateTo(tKey);
+    }
+  };
+
+  const dateRangeValue = useMemo(() => ({
+    from: dateFrom ? new Date(dateFrom.includes("T") ? dateFrom : `${dateFrom}T00:00:00+05:30`) : undefined,
+    to: dateTo ? new Date(dateTo.includes("T") ? dateTo : `${dateTo}T23:59:59+05:30`) : undefined,
+  }), [dateFrom, dateTo]);
+
+  const isFilterActive = Boolean(
+    search ||
+    status ||
+    source ||
+    (role.hasAny(["super_admin", "admin"]) ? assignee : assignee !== currentUserId) ||
+    service ||
+    websiteId ||
+    dateFrom ||
+    dateTo ||
+    datePreset !== "all"
+  );
+
+  const resetFilters = () => {
+    setSearchInput("");
+    setSearch("");
+    setStatus("");
+    setSource("");
+    setAssignee(role.hasAny(["super_admin", "admin"]) ? "" : currentUserId);
+    setService("");
+    setWebsiteId("");
+    setDateFrom("");
+    setDateTo("");
+    setDatePreset("all");
+    setPage(1);
+  };
+
+  const { data, isLoading, isFetching } = useQuery({
     queryKey: ["admin.leads", page, search, status, source, assignee, service, websiteId, dateFrom, dateTo],
     queryFn: () => listFn({ data: {
       page, pageSize: 25,
@@ -311,12 +390,123 @@ function LeadsPage() {
   }
 
   return (
-    <div className="space-y-5 pb-24">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Leads</h1>
-        <p className="text-sm" style={{ color: "var(--admin-fg-muted)" }}>
-          {data?.total ?? 0} total records
-        </p>
+    <div className="space-y-4 pb-24">
+      {/* Header & Date Range Selector */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900">Leads</h1>
+            {isFetching && !isLoading && (
+              <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-600 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-full animate-pulse">
+                <Loader2 className="size-3 animate-spin text-indigo-600" /> Updating…
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-slate-500 mt-0.5">
+            {data?.total ?? 0} total records
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <Tabs
+            value={datePreset}
+            onValueChange={(v) => applyDatePreset(v as RangePreset)}
+          >
+            <TabsList className="h-9">
+              {RANGE_PRESETS.map((p) => (
+                <TabsTrigger
+                  key={p.value}
+                  value={p.value}
+                  className="text-xs px-2.5"
+                >
+                  {p.label}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </Tabs>
+
+          {datePreset === "custom" && (
+            <DateRangePicker
+              value={dateRangeValue}
+              onChange={(range) => {
+                if (!range.from) {
+                  setDateFrom("");
+                  setDateTo("");
+                } else {
+                  setDateFrom(istDateKey(range.from));
+                  setDateTo(range.to ? istDateKey(range.to) : istDateKey(range.from));
+                }
+              }}
+            />
+          )}
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              refresh();
+              toast.success("Refreshing leads…");
+            }}
+            className="h-9 gap-1.5 text-xs text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 border-slate-200 shadow-2xs"
+            title="Refresh leads"
+          >
+            <RefreshCw className={`size-3.5 ${isFetching && !isLoading ? "animate-spin text-indigo-600" : "text-slate-500"}`} />
+            <span>Refresh</span>
+          </Button>
+
+          {isFilterActive && (
+            <button
+              type="button"
+              onClick={resetFilters}
+              className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg text-xs font-medium border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 transition-colors cursor-pointer"
+            >
+              <RotateCcw className="size-3.5" /> Reset Filters
+            </button>
+          )}
+
+          {/* Export */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setExportOpen(!exportOpen)}
+              disabled={!!exporting}
+              className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border border-slate-200 bg-white text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-50 shadow-2xs cursor-pointer"
+            >
+              <Download className="size-3.5 text-emerald-600" />
+              {exporting ? "Exporting…" : "Export"}
+            </button>
+            {exportOpen && (
+              <div
+                className="absolute right-0 mt-1 w-48 rounded-lg border border-slate-200 bg-white shadow-lg py-1 z-30 text-xs"
+              >
+                <button
+                  type="button"
+                  onClick={() => handleExport("csv")}
+                  className="w-full text-left px-3 py-2 hover:bg-slate-50 flex items-center gap-2 cursor-pointer text-slate-700"
+                >
+                  <span className="font-bold text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded">CSV</span> CSV Spreadsheet (.csv)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleExport("excel")}
+                  className="w-full text-left px-3 py-2 hover:bg-slate-50 flex items-center gap-2 cursor-pointer text-slate-700"
+                >
+                  <span className="font-bold text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded">XLS</span> Excel Spreadsheet (.xls)
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Add Lead */}
+          <button
+            type="button"
+            onClick={() => setShowAdd(true)}
+            className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg text-xs font-medium text-white hover:opacity-90 shadow-2xs cursor-pointer"
+            style={{ background: "var(--admin-primary)" }}
+          >
+            <Plus className="size-3.5" /> Add Lead
+          </button>
+        </div>
       </div>
 
       {/* Status pills with counts */}
@@ -339,149 +529,95 @@ function LeadsPage() {
         ))}
       </div>
 
-      {/* Filter bar */}
-      <div className="flex items-center gap-3 flex-wrap w-full max-w-full">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4" style={{ color: "var(--admin-fg-muted)" }} />
-          <input
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            placeholder="Search code, name, email, mobile…"
-            className="rounded-lg border pl-9 pr-3 py-2 text-sm w-80 outline-none focus:ring-2"
-            style={{ background: "var(--admin-surface)", borderColor: "var(--admin-border)", color: "var(--admin-fg)" }}
-          />
-        </div>
-        <select
-          value={websiteId}
-          onChange={(e) => { setWebsiteId(e.target.value); setPage(1); }}
-          className="rounded-lg border px-3 py-2 text-sm"
-          style={{ background: "var(--admin-surface)", borderColor: "var(--admin-border)", color: "var(--admin-fg)" }}
-        >
-          <option value="">All websites</option>
-          {(websiteTreeData?.websites ?? []).map((w: any) => (
-            <option key={w.id} value={w.id}>{w.name}</option>
-          ))}
-        </select>
-        <select
-          value={source}
-          onChange={(e) => { setSource(e.target.value); setPage(1); expandedChannel && setExpandedChannel(null); }}
-          className="rounded-lg border px-3 py-2 text-sm"
-          style={{ background: "var(--admin-surface)", borderColor: "var(--admin-border)", color: "var(--admin-fg)" }}
-        >
-          <option value="">All sources</option>
-          {/* Dynamic channels from DB */}
-          {(sourceData?.channels ?? []).map((ch) => (
-            <option key={ch.key} value={`__channel:${ch.key}`}>
-              {ch.icon} {ch.label} ({ch.count})
-            </option>
-          ))}
-          <optgroup label="── Specific sources ──">
-            {(sourceData?.items ?? []).map((item) => (
-              <option key={item.value} value={item.value}>
-                {item.label} ({item.count})
+      {/* Modern Filter Card */}
+      <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-xs">
+        <div className="flex flex-wrap gap-2.5 items-center">
+          {/* Search */}
+          <div className="relative min-w-[220px] max-w-xs flex-1">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
+            <input
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              placeholder="Search code, name, email, mobile…"
+              className="h-9 w-full rounded-lg border border-slate-200 bg-slate-50/50 pl-8 pr-7 text-xs text-slate-900 outline-none focus:bg-white focus:border-slate-300 focus:ring-1 focus:ring-slate-300"
+            />
+            {searchInput && (
+              <button
+                type="button"
+                onClick={() => { setSearchInput(""); setSearch(""); }}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+              >
+                <X className="size-3.5" />
+              </button>
+            )}
+          </div>
+
+          {/* All websites */}
+          <select
+            value={websiteId}
+            onChange={(e) => { setWebsiteId(e.target.value); setPage(1); }}
+            className="h-9 rounded-lg border border-slate-200 bg-slate-50/50 px-2.5 text-xs text-slate-700 outline-none focus:bg-white focus:border-slate-300 focus:ring-1 focus:ring-slate-300 max-w-[170px] truncate"
+          >
+            <option value="">All websites</option>
+            {(websiteTreeData?.websites ?? []).map((w: any) => (
+              <option key={w.id} value={w.id}>{w.name}</option>
+            ))}
+          </select>
+
+          {/* All sources */}
+          <select
+            value={source}
+            onChange={(e) => { setSource(e.target.value); setPage(1); expandedChannel && setExpandedChannel(null); }}
+            className="h-9 rounded-lg border border-slate-200 bg-slate-50/50 px-2.5 text-xs text-slate-700 outline-none focus:bg-white focus:border-slate-300 focus:ring-1 focus:ring-slate-300 max-w-[200px] truncate"
+          >
+            <option value="">All sources</option>
+            {(sourceData?.channels ?? []).map((ch) => (
+              <option key={ch.key} value={`__channel:${ch.key}`}>
+                {ch.icon} {ch.label} ({ch.count})
               </option>
             ))}
-          </optgroup>
-        </select>
-        <select
-          value={service}
-          onChange={(e) => setService(e.target.value)}
-          className="rounded-lg border px-3 py-2 text-sm max-w-[240px]"
-          style={{ background: "var(--admin-surface)", borderColor: "var(--admin-border)", color: "var(--admin-fg)" }}
-        >
-          <option value="">All active services</option>
-          {groupedServices.map((g) => (
-            <optgroup key={g.id} label={`🌐 ${g.websiteName}${g.domain ? ` (${g.domain})` : ''}`}>
-              {g.services.map((s: any) => (
-                <option key={s.id} value={s.service_name}>
-                  {s.service_name}
+            <optgroup label="── Specific sources ──">
+              {(sourceData?.items ?? []).map((item) => (
+                <option key={item.value} value={item.value}>
+                  {item.label} ({item.count})
                 </option>
               ))}
             </optgroup>
-          ))}
-        </select>
-        {role.hasAny(["super_admin", "admin"]) && (
+          </select>
+
+          {/* All active services */}
           <select
-            value={assignee}
-            onChange={(e) => setAssignee(e.target.value)}
-            className="rounded-lg border px-3 py-2 text-sm"
-            style={{ background: "var(--admin-surface)", borderColor: "var(--admin-border)", color: "var(--admin-fg)" }}
+            value={service}
+            onChange={(e) => { setService(e.target.value); setPage(1); }}
+            className="h-9 rounded-lg border border-slate-200 bg-slate-50/50 px-2.5 text-xs text-slate-700 outline-none focus:bg-white focus:border-slate-300 focus:ring-1 focus:ring-slate-300 max-w-[220px] truncate"
           >
-            <option value="">All assignees</option>
-            <option value="__unassigned">Unassigned</option>
-            {staffProfiles.map((p: any) => (
-              <option key={p.id} value={p.id}>{p.display_name || p.name || p.email}</option>
+            <option value="">All active services</option>
+            {groupedServices.map((g) => (
+              <optgroup key={g.id} label={`🌐 ${g.websiteName}${g.domain ? ` (${g.domain})` : ''}`}>
+                {g.services.map((s: any) => (
+                  <option key={s.id} value={s.service_name}>
+                    {s.service_name}
+                  </option>
+                ))}
+              </optgroup>
             ))}
           </select>
-        )}
-        <DateRangePicker
-          value={{
-            from: dateFrom ? new Date(dateFrom) : undefined,
-            to: dateTo ? new Date(dateTo) : undefined,
-          }}
-          onChange={(range) => {
-            setDateFrom(range.from ? range.from.toISOString().slice(0, 10) : "");
-            setDateTo(range.to ? range.to.toISOString().slice(0, 10) : "");
-          }}
-        />
-        <button
-          onClick={() => setShowAdd(true)}
-          className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-white hover:opacity-90 cursor-pointer"
-          style={{ background: "var(--admin-primary)" }}
-        >
-          <Plus className="size-4" /> Add Lead
-        </button>
-        <div className="relative">
-          <button
-            type="button"
-            onClick={() => setExportOpen(!exportOpen)}
-            disabled={!!exporting}
-            className="flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium hover:bg-[var(--admin-surface-2)] transition-colors disabled:opacity-50 cursor-pointer"
-            style={{ background: "var(--admin-surface)", borderColor: "var(--admin-border)", color: "var(--admin-fg)" }}
-          >
-            <Download className="size-4 text-emerald-600" />
-            {exporting ? "Exporting…" : "Export"}
-          </button>
-          {exportOpen && (
-            <div
-              className="absolute right-0 mt-1 w-48 rounded-lg border shadow-lg py-1 z-30 text-sm"
-              style={{ background: "var(--admin-surface)", borderColor: "var(--admin-border)" }}
+
+          {/* All assignees */}
+          {role.hasAny(["super_admin", "admin"]) && (
+            <select
+              value={assignee}
+              onChange={(e) => { setAssignee(e.target.value); setPage(1); }}
+              className="h-9 rounded-lg border border-slate-200 bg-slate-50/50 px-2.5 text-xs text-slate-700 outline-none focus:bg-white focus:border-slate-300 focus:ring-1 focus:ring-slate-300 max-w-[180px] truncate"
             >
-              <button
-                type="button"
-                onClick={() => handleExport("csv")}
-                className="w-full text-left px-3 py-2 hover:bg-[var(--admin-surface-2)] flex items-center gap-2 cursor-pointer"
-                style={{ color: "var(--admin-fg)" }}
-              >
-                <span className="font-bold text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded">CSV</span> CSV Spreadsheet (.csv)
-              </button>
-              <button
-                type="button"
-                onClick={() => handleExport("excel")}
-                className="w-full text-left px-3 py-2 hover:bg-[var(--admin-surface-2)] flex items-center gap-2 cursor-pointer"
-                style={{ color: "var(--admin-fg)" }}
-              >
-                <span className="font-bold text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded">XLS</span> Excel Spreadsheet (.xls)
-              </button>
-            </div>
+              <option value="">All assignees</option>
+              <option value="__unassigned">Unassigned</option>
+              {staffProfiles.map((p: any) => (
+                <option key={p.id} value={p.id}>{p.display_name || p.name || p.email}</option>
+              ))}
+            </select>
           )}
         </div>
-        {(source || service || websiteId || (role.hasAny(["super_admin", "admin"]) ? assignee : assignee !== currentUserId) || dateFrom || dateTo) && (
-          <button
-            onClick={() => {
-              setSource("");
-              setService("");
-              setWebsiteId("");
-              setAssignee(role.hasAny(["super_admin", "admin"]) ? "" : currentUserId);
-              setDateFrom("");
-              setDateTo("");
-            }}
-            className="flex items-center gap-1 text-xs px-2 py-1.5 rounded hover:bg-[var(--admin-surface-2)] cursor-pointer"
-            style={{ color: "var(--admin-fg-muted)" }}
-          >
-            <X className="size-3" /> Clear
-          </button>
-        )}
       </div>
 
       <SectionCard>
