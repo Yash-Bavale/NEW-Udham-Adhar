@@ -133,13 +133,55 @@ export async function createDisputePdfInBrowser(params: {
     }
   }
   if (params.invoiceUrl) {
-    const response = await fetch(params.invoiceUrl);
-    if (!response.ok) throw new Error("Could not load the saved invoice PDF");
-    const invoice = await PDFDocument.load(await response.arrayBuffer());
-    const pages = await output.copyPages(invoice, invoice.getPageIndices());
-    pages.forEach((page) => output.addPage(page));
+    await appendFileToPdf(output, params.invoiceUrl, "application/pdf", "the saved invoice PDF");
   }
   if (output.getPageCount() === 0) throw new Error("Select at least one email or invoice");
+  return output.save();
+}
+
+/**
+ * Shared merge step: appends a stored PDF or image (JPG/PNG/WEBP) to `output`.
+ * Used by the Dispute Manager (invoice) and Customer Document Merge.
+ */
+export async function appendFileToPdf(output: PDFDocument, url: string, mimeType: string | null | undefined, label: string) {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`Could not load ${label}`);
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  const type = String(mimeType || response.headers.get("content-type") || "").toLowerCase();
+  const isPdf = type.includes("pdf") || new TextDecoder().decode(bytes.slice(0, 5)) === "%PDF-";
+  if (isPdf) {
+    const source = await PDFDocument.load(bytes, { ignoreEncryption: true });
+    const pages = await output.copyPages(source, source.getPageIndices());
+    pages.forEach((page) => output.addPage(page));
+    return;
+  }
+  let image;
+  if (type.includes("png")) image = await output.embedPng(bytes);
+  else if (type.includes("jpeg") || type.includes("jpg")) image = await output.embedJpg(bytes);
+  else {
+    // WEBP/other images: convert through a canvas to PNG
+    const bitmap = await createImageBitmap(new Blob([bytes], { type: type || "image/*" }));
+    const canvas = document.createElement("canvas");
+    canvas.width = bitmap.width;
+    canvas.height = bitmap.height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error(`Could not read ${label}`);
+    ctx.drawImage(bitmap, 0, 0);
+    image = await output.embedPng(canvas.toDataURL("image/png"));
+  }
+  const margin = 24;
+  const scale = Math.min((A4_WIDTH - margin * 2) / image.width, (A4_HEIGHT - margin * 2) / image.height, 1);
+  const w = image.width * scale;
+  const h = image.height * scale;
+  const page = output.addPage([A4_WIDTH, A4_HEIGHT]);
+  page.drawImage(image, { x: (A4_WIDTH - w) / 2, y: A4_HEIGHT - margin - h, width: w, height: h });
+}
+
+/** Merge stored customer documents, in the given order, into one PDF. */
+export async function mergeDocumentsInBrowser(files: { url: string; mimeType?: string | null; label: string }[]) {
+  const output = await PDFDocument.create();
+  for (const file of files) await appendFileToPdf(output, file.url, file.mimeType, file.label);
+  if (output.getPageCount() === 0) throw new Error("Select at least one document");
   return output.save();
 }
 

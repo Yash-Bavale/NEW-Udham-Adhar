@@ -86,6 +86,7 @@ function FormBuilderPage() {
   const [description, setDescription] = useState("");
   const [sampleFormUrl, setSampleFormUrl] = useState("");
   const [sampleFormLabel, setSampleFormLabel] = useState("");
+  const [enableMerge, setEnableMerge] = useState(false);
   const [sections, setSections] = useState<Section[]>([]);
   const [documents, setDocuments] = useState<Doc[]>([]);
   const [activeSection, setActiveSection] = useState(0);
@@ -109,6 +110,7 @@ function FormBuilderPage() {
       const schemaAny = active.schema as { sections?: Section[]; fields?: Field[]; meta?: { sample_form_url?: string | null; sample_form_label?: string | null } } | null;
       setSampleFormUrl(schemaAny?.meta?.sample_form_url ?? "");
       setSampleFormLabel(schemaAny?.meta?.sample_form_label ?? "");
+      setEnableMerge(!!(schemaAny?.meta as { enable_document_merge?: boolean } | undefined)?.enable_document_merge);
       if (schemaAny?.sections?.length) setSections(schemaAny.sections);
       else if (schemaAny?.fields?.length) setSections(flatFieldsToSections(schemaAny.fields));
       else setSections([{ key: "default", label: "Details", fields: [] }]);
@@ -118,6 +120,7 @@ function FormBuilderPage() {
       setDescription(fb.description);
       setSampleFormUrl(fb.sample_form_url ?? "");
       setSampleFormLabel(fb.sample_form_label ?? "");
+      setEnableMerge(false);
       setDocuments(fb.documents.map((d) => ({ key: d.key, label: d.label, required: d.required, help: d.help, sample_url: d.sample_url, sample_label: d.sample_label })));
       setSections(flatFieldsToSections(fb.fields as unknown as Field[]));
     }
@@ -233,6 +236,7 @@ function FormBuilderPage() {
           documents,
           sample_form_url: sampleFormUrl || undefined,
           sample_form_label: sampleFormLabel || undefined,
+          enable_document_merge: enableMerge,
         },
       });
       await refetch();
@@ -255,6 +259,7 @@ function FormBuilderPage() {
     const schemaAny = row.schema as { sections?: Section[]; fields?: Field[]; meta?: { sample_form_url?: string | null; sample_form_label?: string | null } } | null;
     setSampleFormUrl(schemaAny?.meta?.sample_form_url ?? "");
     setSampleFormLabel(schemaAny?.meta?.sample_form_label ?? "");
+    setEnableMerge(!!(schemaAny?.meta as { enable_document_merge?: boolean } | undefined)?.enable_document_merge);
     if (schemaAny?.sections?.length) setSections(schemaAny.sections);
     else if (schemaAny?.fields?.length) setSections(flatFieldsToSections(schemaAny.fields));
     setShowHistory(false);
@@ -436,6 +441,20 @@ function FormBuilderPage() {
                 />
               </label>
             </div>
+            <label className="flex items-start gap-2 pt-2 border-t cursor-pointer">
+              <input
+                type="checkbox"
+                checked={enableMerge}
+                onChange={(e) => setEnableMerge(e.target.checked)}
+                className="mt-0.5"
+              />
+              <span>
+                <span className="block text-sm font-medium text-slate-800">Enable Customer Document Merge</span>
+                <span className="block text-[11px] text-slate-500">
+                  Staff see a "Merge PDF" button on the order to combine the customer's uploaded documents into one PDF.
+                </span>
+              </span>
+            </label>
           </div>
 
 

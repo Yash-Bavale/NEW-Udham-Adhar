@@ -72,6 +72,7 @@ const SaveInput = z.object({
     .optional()
     .or(z.literal("").transform(() => undefined)),
   sample_form_label: z.string().max(200).optional(),
+  enable_document_merge: z.boolean().optional(),
 });
 
 export type BuilderSaveInput = z.infer<typeof SaveInput>;
@@ -158,6 +159,7 @@ export const saveBuilderSchema = createServerFn({ method: "POST" })
       meta: {
         sample_form_url: data.sample_form_url ?? null,
         sample_form_label: data.sample_form_label ?? null,
+        enable_document_merge: data.enable_document_merge ?? false,
       },
     };
 

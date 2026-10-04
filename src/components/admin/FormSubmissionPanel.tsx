@@ -14,8 +14,10 @@ import {
   AlertTriangle,
   StickyNote,
   ExternalLink,
+  Layers,
 } from "lucide-react";
 import { SmartfloCallButton } from "@/components/admin/telephony/SmartfloCallButton";
+import { MergeDocumentsDialog } from "@/components/admin/MergeDocumentsDialog";
 import {
   getFormSubmissionForApplication,
   resendFormLink,
@@ -227,6 +229,7 @@ export function FormSubmissionPanel({
   const resendFn = useServerFn(resendFormLink);
   const urlFn = useServerFn(getDocumentSignedUrl);
   const [resending, setResending] = useState(false);
+  const [mergeOpen, setMergeOpen] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ["admin.formSubmission", applicationId],
@@ -291,6 +294,7 @@ export function FormSubmissionPanel({
   if (!data) return null;
 
   const { submission, documents, requiredDocs, serviceCode, lead, service, activeSchema } = data as any;
+  const mergeEnabled = !!activeSchema?.meta?.enable_document_merge;
   const serviceLabel: string =
     (service?.service_name as string) || (lead?.service as string) || serviceCode || "Service";
 
@@ -591,16 +595,42 @@ export function FormSubmissionPanel({
 
       {/* Documents */}
       <div className="px-5 py-4 border-t bg-white">
-        <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center justify-between mb-3 gap-2">
           <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
             Documents Uploaded
           </p>
-          <span className="text-xs text-slate-500">
-            {matchedRequired.length > 0
-              ? `${documents.length} of ${matchedRequired.length} expected`
-              : `${documents.length} uploaded`}
-          </span>
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-slate-500">
+              {matchedRequired.length > 0
+                ? `${documents.length} of ${matchedRequired.length} expected`
+                : `${documents.length} uploaded`}
+            </span>
+            {mergeEnabled && (
+              <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setMergeOpen(true)} disabled={documents.length === 0}>
+                <Layers className="size-3.5 mr-1" /> Merge PDF
+              </Button>
+            )}
+          </div>
         </div>
+        {mergeEnabled && (
+          <MergeDocumentsDialog
+            open={mergeOpen}
+            onOpenChange={setMergeOpen}
+            applicationId={applicationId}
+            applicationCode={(data as any)?.application?.application_code ?? null}
+            documents={documents.map((d: any) => ({
+              id: d.id,
+              doc_type: d.doc_type,
+              file_name: d.file_name,
+              mime_type: d.mime_type,
+              label: matchedRequired.find((r: any) => r.key === d.doc_type)?.label ?? String(d.doc_type).replace(/_/g, " "),
+            }))}
+            onSaved={() => {
+              qc.invalidateQueries({ queryKey: ["admin.formSubmission", applicationId] });
+              if (orderId) qc.invalidateQueries({ queryKey: ["admin.order", orderId] });
+            }}
+          />
+        )}
 
         {matchedRequired.length === 0 && documents.length === 0 && (
           <div className="text-sm text-slate-500">No documents required or uploaded.</div>
