@@ -1,6 +1,6 @@
 # Roadmap
 
-- [ ] Add a government-style NIC activity list: first selection saved automatically, Add Activity saves further selections, visible to staff
+- [x] Add a government-style NIC activity list: first selection saved automatically, Add Activity saves further selections, visible to staff
 - [x] Make the main NIC search clearly labeled and allow numbered 2-, 4-, and 5-digit selections without inventing narrower codes
 - [x] Add a single government-style NIC activity search above the 2/4/5-digit fields and autofill them on selection
 - [x] Preserve all failed emails (74 held safely, no loss, no duplicates)
