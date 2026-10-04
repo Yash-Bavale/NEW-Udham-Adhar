@@ -32,6 +32,8 @@ export type FieldDef = {
   activityFrom?: string;
   /** Optional default value pre-filled when the form loads. */
   default?: string;
+  /** Show this field only when the sibling field equals this value. */
+  visibleIf?: { key: string; equals: string };
 };
 
 export type DocDef = {
@@ -185,7 +187,7 @@ const NEW_UDYAM: OnboardingSchema = {
     { key: "bank_ifsc", label: "IFSC Code", type: "text", required: true, pattern: "^[A-Z]{4}0[A-Z0-9]{6}$", maxLength: 11 },
     { key: "bank_account_no", label: "Bank Account Number", type: "text", required: true, maxLength: 30 },
     { key: "major_activity", label: "19. Major Activity of Unit", type: "select", required: true, options: ACTIVITY_TYPES },
-    { key: "major_activity_sub", label: "19.1 Major Activity Under Services", type: "select", required: false, options: SERVICES_SUBTYPE, help: "Required only if Major Activity is Services." },
+    { key: "major_activity_sub", label: "19.1 Major Activity Under Services", type: "select", required: false, options: SERVICES_SUBTYPE, visibleIf: { key: "major_activity", equals: "Services" } },
     { key: "section_nic", label: "20. National Industrial Classification (NIC) Code for Activities", type: "section" },
     { key: "nic_2_digit", label: "NIC 2 Digit Code", type: "nic", required: true, nicDigits: 2, activityFrom: "major_activity" },
     { key: "nic_4_digit", label: "NIC 4 Digit Code", type: "nic", required: true, nicDigits: 4, activityFrom: "major_activity" },

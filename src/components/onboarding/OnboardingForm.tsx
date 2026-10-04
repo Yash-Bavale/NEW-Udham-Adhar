@@ -278,6 +278,11 @@ export function OnboardingForm({
       <div className="grid md:grid-cols-2 gap-4">
         {schema.fields.map((f) => {
           if (f.type === "note") return null;
+          // Conditional fields (e.g. 19.1 shows only when Major Activity is Services).
+          if (f.visibleIf && values[f.visibleIf.key] !== f.visibleIf.equals) {
+            if (values[f.key]) update(f.key, "");
+            return null;
+          }
           const isNicKey = f.key === "nic_2_digit" || f.key === "nic_4_digit" || f.key === "nic_5_digit";
           const hasNicSection = schema.fields.some((x) => x.key === "section_nic");
           const firstNicKey = schema.fields.find(
