@@ -3,6 +3,7 @@ import { Loader2, Search, X, Check } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { searchNicCodes, type NicResult } from "@/lib/onboarding/nic.functions";
 import { nicLabel } from "@/lib/onboarding/nic-fill";
+import { Button } from "@/components/ui/button";
 
 type Props = {
   value: string; // stored as "CODE — Description"
@@ -13,15 +14,18 @@ type Props = {
   id?: string;
   /** Called with the full 5-digit code so the form can fill 2/4/5-digit fields together. */
   onPickCode?: (code5: string) => void;
+  /** One editable search above the three saved NIC code fields. */
+  inlineSearch?: boolean;
 };
 
 const inputCls =
   "w-full rounded-xl border border-border bg-background px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-shadow";
 
-export function NicCodePicker({ value, onChange, activity, digits, required, id, onPickCode }: Props) {
+export function NicCodePicker({ value, onChange, activity, digits, required, id, onPickCode, inlineSearch = false }: Props) {
   const fetchNic = useServerFn(searchNicCodes);
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
+  const [activeIndex, setActiveIndex] = useState(0);
   const [results, setResults] = useState<NicResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -41,6 +45,7 @@ export function NicCodePicker({ value, onChange, activity, digits, required, id,
     if (!open) return;
     let cancelled = false;
     setLoading(true);
+    setResults([]);
     setErr(null);
     const t = window.setTimeout(async () => {
       try {
@@ -85,46 +90,88 @@ export function NicCodePicker({ value, onChange, activity, digits, required, id,
     if (onPickCode) onPickCode(r.code);
     else onChange(nicLabel(r.code, digits) ?? `${codeFor(r)} — ${r.description}`);
     setOpen(false);
+    setQ("");
+  }
+
+  function onSearchKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Escape") setOpen(false);
+    if (e.key === "ArrowDown" && trimmed.length) {
+      e.preventDefault();
+      setActiveIndex((i) => Math.min(i + 1, trimmed.length - 1));
+    }
+    if (e.key === "ArrowUp" && trimmed.length) {
+      e.preventDefault();
+      setActiveIndex((i) => Math.max(i - 1, 0));
+    }
+    if (e.key === "Enter" && open && trimmed[activeIndex]) {
+      e.preventDefault();
+      pick(trimmed[activeIndex]);
+    }
   }
 
   return (
     <div className="relative" ref={wrapRef}>
       <div className="flex gap-2">
-        <input
-          id={id}
-          readOnly
-          value={value}
-          required={required}
-          onClick={() => setOpen(true)}
-          placeholder={onPickCode ? "Search activity — fills 2, 4 & 5-digit codes" : `Click to search NIC ${digits}-digit code…`}
-          className={inputCls + " cursor-pointer"}
-        />
+        {inlineSearch ? (
+          <div className="relative flex-1 min-w-0">
+            <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+            <input
+              id={id}
+              value={open ? q : value}
+              onFocus={() => { setQ(""); setActiveIndex(0); setOpen(true); }}
+              onClick={() => setOpen(true)}
+              onChange={(e) => { setQ(e.target.value); setActiveIndex(0); setOpen(true); }}
+              onKeyDown={onSearchKeyDown}
+              role="combobox"
+              aria-expanded={open}
+              aria-controls={id ? `${id}-results` : undefined}
+              aria-autocomplete="list"
+              autoComplete="off"
+              placeholder="Search NIC code or activity (e.g. 4651 or computers)"
+              className={inputCls + " pl-10"}
+            />
+          </div>
+        ) : (
+          <input
+            id={id}
+            readOnly
+            value={value}
+            required={required}
+            onClick={() => setOpen(true)}
+            placeholder={onPickCode ? "Search activity — fills 2, 4 & 5-digit codes" : `Click to search NIC ${digits}-digit code…`}
+            className={inputCls + " cursor-pointer"}
+          />
+        )}
         {value && (
-          <button
+          <Button
             type="button"
             onClick={() => onChange("")}
-            className="rounded-xl border border-border px-3 text-muted-foreground hover:text-foreground"
-            aria-label="Clear"
+            variant="outline"
+            size="icon"
+            className="h-auto min-h-10 shrink-0 text-muted-foreground"
+            aria-label={inlineSearch ? "Clear NIC selection" : "Clear"}
           >
             <X className="w-4 h-4" />
-          </button>
+          </Button>
         )}
       </div>
 
       {open && (
         <div className="absolute z-30 mt-1 w-full rounded-xl border border-border bg-background shadow-lg overflow-hidden">
-          <div className="flex items-center gap-2 border-b border-border px-3 py-2">
+          {!inlineSearch && <div className="flex items-center gap-2 border-b border-border px-3 py-2">
             <Search className="w-4 h-4 text-muted-foreground" />
             <input
               autoFocus
               value={q}
               onChange={(e) => setQ(e.target.value)}
+              onKeyDown={onSearchKeyDown}
               placeholder="Search by code or activity description…"
               className="w-full bg-transparent text-sm focus:outline-none"
             />
             {loading && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />}
-          </div>
-          <div className="max-h-72 overflow-y-auto">
+          </div>}
+          <div id={id ? `${id}-results` : undefined} role={inlineSearch ? "listbox" : undefined} className="max-h-72 overflow-y-auto">
+            {inlineSearch && loading && <div className="px-3 py-3 text-sm text-muted-foreground"><Loader2 className="inline size-4 animate-spin mr-2" />Searching…</div>}
             {err && (
               <div className="px-3 py-3 text-sm text-destructive">{err}</div>
             )}
@@ -137,24 +184,28 @@ export function NicCodePicker({ value, onChange, activity, digits, required, id,
               const display = onPickCode ? r.code : codeFor(r);
               const selected = value.startsWith(`${display} `);
               return (
-                <button
+                <Button
                   key={r.code}
                   type="button"
+                  variant="ghost"
                   onClick={() => pick(r)}
-                  className="w-full text-left px-3 py-2 hover:bg-muted/60 flex items-start gap-2 border-b border-border/40 last:border-0"
+                  role={inlineSearch ? "option" : undefined}
+                  aria-selected={inlineSearch ? selected : undefined}
+                  onMouseEnter={() => setActiveIndex(trimmed.indexOf(r))}
+                  className={`h-auto min-h-10 w-full whitespace-normal text-left px-3 py-2 flex items-start justify-start gap-2 rounded-none border-b border-border/40 last:border-0 ${inlineSearch && activeIndex === trimmed.indexOf(r) ? "bg-muted/60" : ""}`}
                 >
                   <span className="font-mono text-xs font-semibold text-brand-navy min-w-[3.5rem]">
                     {display}
                   </span>
                   <span className="text-sm text-foreground flex-1">{r.description}</span>
                   {selected && <Check className="w-4 h-4 text-emerald-600 mt-0.5" />}
-                </button>
+                </Button>
               );
             })}
           </div>
-          <div className="border-t border-border px-3 py-1.5 text-[11px] text-muted-foreground bg-muted/30">
-            {onPickCode ? "Pick one activity — all NIC codes fill automatically" : `Showing NIC ${digits}-digit suggestions`}{activity ? ` for ${activity}` : ""}.
-          </div>
+          {!inlineSearch && <div className="border-t border-border px-3 py-1.5 text-[11px] text-muted-foreground bg-muted/30">
+            {onPickCode ? "Select an activity to fill all three NIC codes" : `Showing NIC ${digits}-digit suggestions`}{activity ? ` for ${activity}` : ""}.
+          </div>}
         </div>
       )}
     </div>

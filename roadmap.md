@@ -1,5 +1,6 @@
 # Roadmap
 
+- [x] Add a single government-style NIC activity search above the 2/4/5-digit fields and autofill them on selection
 - [x] Preserve all failed emails (74 held safely, no loss, no duplicates)
 - [x] Add ZeptoMail as a sending option (templates, queue, schedules untouched)
 - [ ] Switch sending to ZeptoMail — blocked: need ZeptoMail send token + verified sender address

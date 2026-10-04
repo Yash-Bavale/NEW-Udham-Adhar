@@ -281,9 +281,28 @@ export function OnboardingForm({
           if (f.type === "section") {
             return (
               <div key={f.key} className="md:col-span-2 pt-4 mt-2 border-t border-border">
-                <h3 className="text-base md:text-lg font-bold font-display text-brand-navy-deep">
-                  {f.label}
-                </h3>
+                <h3 className="text-base md:text-lg font-bold font-display text-brand-navy-deep">{f.label}</h3>
+                {f.key === "section_nic" && schema.fields.some((field) => field.key === "nic_5_digit") && (
+                  <div className="mt-4">
+                    <label htmlFor="f-nic-main-search" className="block text-sm font-semibold text-foreground mb-1.5">
+                      Search NIC Code in Lesser Steps
+                    </label>
+                    <NicCodePicker
+                      id="f-nic-main-search"
+                      inlineSearch
+                      value={values.nic_5_digit ?? ""}
+                      digits={5}
+                      activity={null}
+                      onChange={() => setValues((s) => ({ ...s, nic_2_digit: "", nic_4_digit: "", nic_5_digit: "" }))}
+                      onPickCode={(code5) => setValues((s) => ({
+                        ...s,
+                        nic_2_digit: nicLabel(code5, 2) ?? "",
+                        nic_4_digit: nicLabel(code5, 4) ?? "",
+                        nic_5_digit: nicLabel(code5, 5) ?? "",
+                      }))}
+                    />
+                  </div>
+                )}
               </div>
             );
           }
