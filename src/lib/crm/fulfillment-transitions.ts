@@ -132,6 +132,7 @@ export const FULFILLMENT_TRANSITIONS: Record<FulfillmentStatus, FulfillmentStatu
     "application_approved",
     "application_rejected",
     "order_completed",
+    "completed",
     "order_closed",
   ],
   technical_delay:                 ["form_submitted", "order_closed"],
@@ -148,7 +149,6 @@ export const FULFILLMENT_TRANSITIONS: Record<FulfillmentStatus, FulfillmentStatu
   application_rejected:            ["order_closed"],
   order_completed:                 [],
   order_closed:                    [],
-  order_reopened:                  ["form_submitted", "order_completed", "completed", "order_closed"],
   completed:                       [],
   cancelled:                       [],
 };

@@ -73,6 +73,7 @@ async function buildEmailDocument(email: PrintableEmail) {
 }
 
 async function renderEmailCanvas(email: PrintableEmail) {
+  // @ts-ignore - html2canvas runtime import in browser
   const html2canvas = (await import("html2canvas")).default;
   const iframe = document.createElement("iframe");
   iframe.setAttribute("sandbox", "allow-same-origin");
