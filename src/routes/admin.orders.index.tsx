@@ -902,19 +902,20 @@ return (
     </div>
 
     {/* Modern Filter Card */}
-    <div className="rounded-xl border border-slate-200 bg-white p-3.5 shadow-xs space-y-3">
-      <div className="flex flex-wrap gap-2.5 items-center">
+    <div className="rounded-xl border border-slate-200 bg-white p-2.5 sm:p-3.5 shadow-xs space-y-2.5 sm:space-y-3">
+      {/* Filters Row - Single horizontal row that dynamically shrinks proportionally without wrapping */}
+      <div className="flex flex-nowrap items-center gap-1.5 sm:gap-2 lg:gap-2.5 w-full min-w-0">
         {/* Stage Filter */}
         <Select value={stageFilter} onValueChange={setStageFilter}>
-          <SelectTrigger className="h-9 w-[160px] text-xs bg-slate-50/50 border-slate-200">
+          <SelectTrigger className="h-9 flex-1 min-w-0 px-2 sm:px-2.5 lg:px-3 text-xs bg-slate-50/50 border-slate-200 [&_svg]:shrink-0">
             <SelectValue placeholder="All Stages" />
           </SelectTrigger>
           <SelectContent className="max-h-[300px]">
             {STAGE_FILTER_OPTIONS.map((st) => (
               <SelectItem key={st.id} value={st.id}>
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5 truncate">
                   {st.id !== "all" && (
-                    <span className={`size-2 rounded-full ${st.tone === "emerald" ? "bg-emerald-500" :
+                    <span className={`size-2 shrink-0 rounded-full ${st.tone === "emerald" ? "bg-emerald-500" :
                         st.tone === "amber" ? "bg-amber-500" :
                           st.tone === "indigo" ? "bg-indigo-500" :
                             st.tone === "violet" ? "bg-violet-500" :
@@ -922,7 +923,7 @@ return (
                                 st.tone === "rose" ? "bg-rose-500" : "bg-slate-400"
                       }`} />
                   )}
-                  <span>{st.label}</span>
+                  <span className="truncate">{st.label}</span>
                 </div>
               </SelectItem>
             ))}
@@ -931,7 +932,9 @@ return (
 
         {/* Action Status Filter */}
         <Select value={actionStatusFilter} onValueChange={setActionStatusFilter}>
-          <SelectTrigger className="h-9 w-[170px] text-xs bg-slate-50/50 border-slate-200"><SelectValue placeholder="Action Status" /></SelectTrigger>
+          <SelectTrigger className="h-9 flex-[1.05] min-w-0 px-2 sm:px-2.5 lg:px-3 text-xs bg-slate-50/50 border-slate-200 [&_svg]:shrink-0">
+            <SelectValue placeholder="Action Status" />
+          </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Action Status</SelectItem>
             <SelectItem value="hot_orders">🔥 Hot Orders (Call Due Now)</SelectItem>
@@ -943,7 +946,7 @@ return (
 
         {/* Services Filter */}
         <Select value={serviceId} onValueChange={setServiceId}>
-          <SelectTrigger className="h-9 w-[220px] text-xs bg-slate-50/50 border-slate-200">
+          <SelectTrigger className="h-9 flex-[1.25] min-w-0 px-2 sm:px-2.5 lg:px-3 text-xs bg-slate-50/50 border-slate-200 [&_svg]:shrink-0">
             <SelectValue placeholder="All services" />
           </SelectTrigger>
           <SelectContent className="max-h-[380px]">
@@ -963,10 +966,80 @@ return (
           </SelectContent>
         </Select>
 
-        {/* Assignees Filter (Admin & Staff) */}
+        {/* Payment Status Filter */}
+        <Select value={paymentStatus} onValueChange={setPaymentStatus}>
+          <SelectTrigger className="h-9 flex-[0.9] min-w-0 px-2 sm:px-2.5 lg:px-3 text-xs bg-slate-50/50 border-slate-200 [&_svg]:shrink-0">
+            <SelectValue placeholder="Payment status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All payments</SelectItem>
+            <SelectItem value="Paid">Paid</SelectItem>
+            <SelectItem value="Partially Paid">Partially Paid</SelectItem>
+            <SelectItem value="Pending">Pending</SelectItem>
+            <SelectItem value="Refunded">Refunded</SelectItem>
+            <SelectItem value="Failed">Failed</SelectItem>
+          </SelectContent>
+        </Select>
+
+        {/* Fulfillment Stage Dropdown */}
+        <Select value={fulfillmentStatus} onValueChange={setFulfillmentStatus}>
+          <SelectTrigger className="h-9 flex-[1.25] min-w-0 px-2 sm:px-2.5 lg:px-3 text-xs bg-slate-50/50 border-slate-200 [&_svg]:shrink-0">
+            <SelectValue placeholder="Fulfillment stage" />
+          </SelectTrigger>
+          <SelectContent className="max-h-[360px]">
+            <SelectItem value="all">All Fulfillment Stages</SelectItem>
+            <SelectGroup>
+              <SelectLabel className="text-[10px] font-bold uppercase tracking-wider text-slate-400 px-2 py-1">In Progress</SelectLabel>
+              <SelectItem value="order_received">Order Received</SelectItem>
+              <SelectItem value="order_reopened">Order Reopened</SelectItem>
+              <SelectItem value="form_submitted">Form Submitted</SelectItem>
+              <SelectItem value="technical_delay">Technical Delay</SelectItem>
+              <SelectItem value="customer_delay">Customer Delay</SelectItem>
+              <SelectItem value="application_submitted">Application Submitted (Govt)</SelectItem>
+              <SelectItem value="consultation_completed">Consultation Completed</SelectItem>
+            </SelectGroup>
+            <SelectGroup>
+              <SelectLabel className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 px-2 py-1">Completed</SelectLabel>
+              <SelectItem value="application_approved">Application Approved</SelectItem>
+              <SelectItem value="order_completed">Order Completed</SelectItem>
+            </SelectGroup>
+            <SelectGroup>
+              <SelectLabel className="text-[10px] font-bold uppercase tracking-wider text-rose-600 px-2 py-1">Closed / Cancelled</SelectLabel>
+              <SelectItem value="application_rejected">Application Rejected</SelectItem>
+              <SelectItem value="order_closed">Order Closed</SelectItem>
+              <SelectItem value="cancelled">Cancelled</SelectItem>
+            </SelectGroup>
+          </SelectContent>
+        </Select>
+
+        {/* Pending Age */}
+        <div className={cn("min-w-0 flex items-center gap-1 sm:gap-1.5", pendingAge === "custom" ? "flex-[1.1]" : "flex-[0.85]")}>
+          <Select value={pendingAge} onValueChange={(v) => setPendingAge(v as PendingAge)}>
+            <SelectTrigger className="h-9 w-full min-w-0 px-2 sm:px-2.5 lg:px-3 text-xs bg-slate-50/50 border-slate-200 [&_svg]:shrink-0">
+              <SelectValue placeholder="Pending age" />
+            </SelectTrigger>
+            <SelectContent>
+              {PENDING_AGE_OPTIONS.map((o) => (
+                <SelectItem key={o.id} value={o.id}>{o.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {pendingAge === "custom" && (
+            <Input
+              type="number"
+              min={1}
+              value={customDays}
+              onChange={(e) => setCustomDays(e.target.value)}
+              placeholder="Days"
+              className="h-9 w-12 sm:w-14 shrink-0 px-1.5 text-xs bg-slate-50/50 border-slate-200"
+            />
+          )}
+        </div>
+
+        {/* Assignees Filter (Admin & Staff) - Positioned at the end of the filter row */}
         {role.hasAny(["admin", "super_admin", "operations", "manager", "executive", "support"]) && (
           <Select value={assignedTo} onValueChange={setAssignedTo}>
-            <SelectTrigger className="h-9 w-[190px] text-xs bg-slate-50/50 border-slate-200">
+            <SelectTrigger className="h-9 flex-[1.1] min-w-0 px-2 sm:px-2.5 lg:px-3 text-xs bg-slate-50/50 border-slate-200 [&_svg]:shrink-0">
               <SelectValue placeholder="All assignees" />
             </SelectTrigger>
             <SelectContent className="max-h-[380px]">
@@ -1004,73 +1077,10 @@ return (
             </SelectContent>
           </Select>
         )}
+      </div>
 
-        {/* Payment Status Filter */}
-        <Select value={paymentStatus} onValueChange={setPaymentStatus}>
-          <SelectTrigger className="h-9 w-[140px] text-xs bg-slate-50/50 border-slate-200"><SelectValue placeholder="Payment status" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All payments</SelectItem>
-            <SelectItem value="Paid">Paid</SelectItem>
-            <SelectItem value="Partially Paid">Partially Paid</SelectItem>
-            <SelectItem value="Pending">Pending</SelectItem>
-            <SelectItem value="Refunded">Refunded</SelectItem>
-            <SelectItem value="Failed">Failed</SelectItem>
-          </SelectContent>
-        </Select>
-
-        {/* Fulfillment Stage Dropdown */}
-        <Select value={fulfillmentStatus} onValueChange={setFulfillmentStatus}>
-          <SelectTrigger className="h-9 w-[180px] text-xs bg-slate-50/50 border-slate-200">
-            <SelectValue placeholder="Fulfillment stage" />
-          </SelectTrigger>
-          <SelectContent className="max-h-[360px]">
-            <SelectItem value="all">All Fulfillment Stages</SelectItem>
-            <SelectGroup>
-              <SelectLabel className="text-[10px] font-bold uppercase tracking-wider text-slate-400 px-2 py-1">In Progress</SelectLabel>
-              <SelectItem value="order_received">Order Received</SelectItem>
-              <SelectItem value="order_reopened">Order Reopened</SelectItem>
-              <SelectItem value="form_submitted">Form Submitted</SelectItem>
-              <SelectItem value="technical_delay">Technical Delay</SelectItem>
-              <SelectItem value="customer_delay">Customer Delay</SelectItem>
-              <SelectItem value="application_submitted">Application Submitted (Govt)</SelectItem>
-              <SelectItem value="consultation_completed">Consultation Completed</SelectItem>
-            </SelectGroup>
-            <SelectGroup>
-              <SelectLabel className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 px-2 py-1">Completed</SelectLabel>
-              <SelectItem value="application_approved">Application Approved</SelectItem>
-              <SelectItem value="order_completed">Order Completed</SelectItem>
-            </SelectGroup>
-            <SelectGroup>
-              <SelectLabel className="text-[10px] font-bold uppercase tracking-wider text-rose-600 px-2 py-1">Closed / Cancelled</SelectLabel>
-              <SelectItem value="application_rejected">Application Rejected</SelectItem>
-              <SelectItem value="order_closed">Order Closed</SelectItem>
-              <SelectItem value="cancelled">Cancelled</SelectItem>
-            </SelectGroup>
-          </SelectContent>
-        </Select>
-
-        {/* Pending Age */}
-        <Select value={pendingAge} onValueChange={(v) => setPendingAge(v as PendingAge)}>
-          <SelectTrigger className="h-9 w-[140px] text-xs bg-slate-50/50 border-slate-200">
-            <SelectValue placeholder="Pending age" />
-          </SelectTrigger>
-          <SelectContent>
-            {PENDING_AGE_OPTIONS.map((o) => (
-              <SelectItem key={o.id} value={o.id}>{o.label}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        {pendingAge === "custom" && (
-          <Input
-            type="number"
-            min={1}
-            value={customDays}
-            onChange={(e) => setCustomDays(e.target.value)}
-            placeholder="Days"
-            className="h-9 w-[80px] text-xs bg-slate-50/50 border-slate-200"
-          />
-        )}
-        {/* Sort Selector */}
+      {/* Sort Selector Row - Placed on its own row below filters */}
+      <div className="flex items-center pt-0.5">
         <Select
           value={
             sortField === "created_at"
@@ -1087,7 +1097,7 @@ return (
             else if (v === "stage_journey_asc") { setSortField("stage_journey"); setSortOrder("asc"); }
           }}
         >
-          <SelectTrigger className="h-9 w-[170px] text-xs bg-slate-50/50 border-slate-200">
+          <SelectTrigger className="h-9 w-[190px] sm:w-[210px] text-xs bg-slate-50/50 border-slate-200">
             <ArrowUpDown className="w-3.5 h-3.5 mr-1 text-slate-500 shrink-0" />
             <SelectValue placeholder="Sort order" />
           </SelectTrigger>
