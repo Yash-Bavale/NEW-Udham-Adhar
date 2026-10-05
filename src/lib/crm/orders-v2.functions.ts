@@ -426,7 +426,12 @@ export function isNeedsActionOrder(row: any): boolean {
   ]);
   if (progressedStages.has(stage) || progressedStages.has(fs)) return false;
 
-  // 6. Actively reopened orders (current state is reopened) and Hot Orders show in Needs Action
+  // 6. Exclude orders where qualifying human staff action has already been taken (they belong in Action Taken)
+  if (row.in_range_action_taken || (row.action_count && row.action_count > 0)) {
+    return false;
+  }
+
+  // 7. Actively reopened orders (current state is reopened) and Hot Orders show in Needs Action
   const isCurrentlyReopened =
     stage === "order_reopened" ||
     fs === "order_reopened" ||
@@ -590,6 +595,8 @@ export function isActionTakenOrder(row: any): boolean {
   ]);
 
   return Boolean(
+    row.in_range_action_taken ||
+    (row.action_count && row.action_count > 0) ||
     isTechnicalDelayOrder(row) ||
     isCustomerDelayOrder(row) ||
     isCallbackScheduledOrder(row) ||
@@ -611,6 +618,8 @@ export function bucketOfRow(
     workflow_status?: string | null;
     technical_hold_started_at?: string | null;
     is_terminal?: boolean;
+    in_range_action_taken?: boolean;
+    action_count?: number;
   },
   todayIst?: string,
 ): Exclude<Bucket, "all"> {
@@ -619,8 +628,10 @@ export function bucketOfRow(
   if (CLOSED_FS.has(fs) || row.stage === "closed") return "closed";
   if (COMPLETED_FS.has(fs) || row.stage === "completed") return "completed";
 
-  // Hot Orders: strictly under Hot Orders ONLY, never duplicate anywhere else
-  if (row.is_hot) return "hot_orders";
+  // Hot Orders: strictly under Hot Orders ONLY if genuinely hot and untouched by staff
+  if (row.is_hot && !row.in_range_action_taken && !((row as any).action_count && (row as any).action_count > 0)) {
+    return "hot_orders";
+  }
 
   // Call Back Scheduled: only active/future callbacks (fires_at > now)
   if (row.is_callback_scheduled || ((row as any).callback_reminder && !(row as any).callback_reminder.is_due)) return "reminders";
@@ -717,7 +728,13 @@ export function getOrderActionStatus(order: {
     "refund_requested",
   ]);
 
-  if (blueStatuses.has(fs) || blueStages.has(stage) || Boolean(order.form_link_sent_at)) {
+  if (
+    Boolean((order as any).in_range_action_taken) ||
+    Boolean((order as any).action_count && (order as any).action_count > 0) ||
+    blueStatuses.has(fs) ||
+    blueStages.has(stage) ||
+    Boolean(order.form_link_sent_at)
+  ) {
     return { label: "Action Taken", tone: "blue" };
   }
 
@@ -1155,24 +1172,13 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         .filter((p) => ["paid", "success", "successful"].includes(String(p.status)))
         .reduce((s, p) => s + Number(p.amount || 0), 0);
       const totalAmount = paidSum > 0 ? paidSum : Number(lead?.total_amount || 0);
-
-      const stage = computeOrderStage(
-        { lead_status_v2: lead?.lead_status_v2, status: lead?.status, payment_successful_at: paidAtByApp.get(a.id) ?? null },
-        {
-          form_submitted_at: a.form_submitted_at,
-          certificate_uploaded_at: a.certificate_uploaded_at,
-          fulfillment_status: a.fulfillment_status,
-          application_status: a.application_status,
-          workflow_status: (a as any).workflow_status,
-          closure_stage: (a as any).closure_stage,
-          refund_approved_at: (a as any).refund_approved_at,
-          refund_processed_at: (a as any).refund_processed_at,
-          order_status: (a as any).order_status,
-          technical_hold_started_at: (a as any).technical_hold_started_at,
-        },
-      );
-
       const payment_status = rollupPaymentStatus(payments, totalAmount);
+
+      const thisAppActionLogs = appActionLogsMap.get(a.id) ?? [];
+      const thisAppEvents = appEventsMap.get(a.id) ?? [];
+      const thisAppSchedulers = appSchedulersMap.get(a.id) ?? [];
+      const thisAppCerts = appCertsMap.get(a.id) ?? [];
+
       const cb = callbackMap.get(a.id);
       let parsedRemarks = null;
       if (cb?.remarks) {
@@ -1184,14 +1190,81 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       }
       const firesAtTime = cb?.fires_at ? new Date(cb.fires_at).getTime() : 0;
       const is_due = firesAtTime > 0 && firesAtTime <= now;
-      const is_reopened =
-        stage === "order_reopened" ||
+
+      // Check if order has a completed callback or completed scheduler
+      const hasCompletedCallback =
+        thisAppEvents.some((e) => {
+          const et = String(e.event_type || "").toLowerCase();
+          const note = String(e.note || "").toLowerCase();
+          return (
+            et.includes("callback_completed") ||
+            et.includes("consultation_completed") ||
+            note.includes("callback marked completed") ||
+            note.includes("call completed")
+          );
+        }) ||
+        thisAppSchedulers.some((s) => {
+          if (s.status !== "completed") return false;
+          const st = String(s.scheduler_type || "").toLowerCase();
+          return st.includes("reminder") || st.includes("callback") || st.includes("our_side");
+        });
+
+      const rawIsReopened =
         (a.fulfillment_status as any) === "order_reopened" ||
         (a as any).application_status === "order_reopened" ||
         (a as any).order_status === "REOPENED" ||
-        (a as any).workflow_status === "order_reopened";
+        (a as any).workflow_status === "order_reopened" ||
+        (a as any).workflow_status === "processing_resumed";
 
-      const fsLower = String(a.fulfillment_status ?? "").toLowerCase();
+      // If callback is completed, or if there is no active callback scheduler on the reopened order,
+      // it is no longer actively reopened or hot!
+      const is_reopened = rawIsReopened && !hasCompletedCallback && !!cb;
+
+      // Self-heal stale REOPENED row in applications table where callbacks are completed or no active scheduler
+      if (rawIsReopened && (hasCompletedCallback || !cb)) {
+        admin
+          .from("applications")
+          .update({
+            order_status: a.form_submitted_at ? "IN_PROCESSING" : "FORM_PENDING",
+            fulfillment_status: a.form_submitted_at ? "form_submitted" : "form_not_submitted",
+            workflow_status: "processing",
+            application_status: "under_process",
+            is_hot: false,
+            updated_at: new Date().toISOString(),
+          } as never)
+          .eq("id", a.id)
+          .then(({ error }: any) => {
+            if (error) console.warn("[listOrdersV2] self-heal error:", error);
+          });
+      }
+
+      const effectiveOrderStatus = is_reopened
+        ? (a as any).order_status
+        : ((a as any).order_status === "REOPENED" ? (a.form_submitted_at ? "IN_PROCESSING" : "FORM_PENDING") : (a as any).order_status);
+      const effectiveFulfillmentStatus = is_reopened
+        ? a.fulfillment_status
+        : (a.fulfillment_status === "order_reopened" ? (a.form_submitted_at ? "form_submitted" : "form_not_submitted") : a.fulfillment_status);
+      const effectiveWorkflowStatus = is_reopened
+        ? (a as any).workflow_status
+        : (((a as any).workflow_status === "order_reopened" || (a as any).workflow_status === "processing_resumed") ? "processing" : (a as any).workflow_status);
+
+      const stage = computeOrderStage(
+        { lead_status_v2: lead?.lead_status_v2, status: lead?.status, payment_successful_at: paidAtByApp.get(a.id) ?? null },
+        {
+          form_submitted_at: a.form_submitted_at,
+          certificate_uploaded_at: a.certificate_uploaded_at,
+          fulfillment_status: effectiveFulfillmentStatus,
+          application_status: is_reopened ? a.application_status : (a.application_status === "order_reopened" ? "under_process" : a.application_status),
+          workflow_status: effectiveWorkflowStatus,
+          closure_stage: (a as any).closure_stage,
+          refund_approved_at: (a as any).refund_approved_at,
+          refund_processed_at: (a as any).refund_processed_at,
+          order_status: effectiveOrderStatus,
+          technical_hold_started_at: (a as any).technical_hold_started_at,
+        },
+      );
+
+      const fsLower = String(effectiveFulfillmentStatus ?? "").toLowerCase();
       const isTerminal =
         !is_reopened && (
           stage === "completed" ||
@@ -1204,19 +1277,11 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
           (Boolean((a as any).closure_stage) && (a as any).closure_stage !== "none")
         );
 
-      const thisAppActionLogs = appActionLogsMap.get(a.id) ?? [];
-      const thisAppEvents = appEventsMap.get(a.id) ?? [];
-      const thisAppSchedulers = appSchedulersMap.get(a.id) ?? [];
-      const thisAppCerts = appCertsMap.get(a.id) ?? [];
-
-      const is_hot = !isTerminal && (is_due || is_reopened);
+      const is_hot = !isTerminal && !hasCompletedCallback && (is_due || is_reopened);
       let hot_started_at: string | null = null;
       if (is_hot) {
         if (is_reopened) {
-          const reopenEv = thisAppEvents.find(
-            (e) => e.event_type === "order_reopened" || e.event_type === "hot_priority_escalated"
-          );
-          hot_started_at = reopenEv?.created_at || a.updated_at || a.created_at;
+          hot_started_at = (a as any).reopened_at || a.updated_at || a.created_at;
         } else if (cb) {
           hot_started_at = cb.created_at || (cb.fires_at ? new Date(cb.fires_at).toISOString() : null) || a.updated_at || a.created_at;
         } else {
@@ -1669,7 +1734,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       return {
         id: a.id,
         application_code: a.application_code,
-        fulfillment_status: (a.fulfillment_status ?? "order_received") as FulfillmentStatus,
+        fulfillment_status: (effectiveFulfillmentStatus ?? "order_received") as FulfillmentStatus,
         lead_status_v2: lead?.lead_status_v2 ?? null,
         created_at: a.created_at,
         completed_at: compTimestamp ? new Date(compTimestamp).toISOString() : null,
@@ -1705,8 +1770,8 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
               note: thisAppEvents.find((e) => (e.event_type === "hot_priority_escalated" || e.event_type === "order_reopened") && (e.note?.includes("Ticket") || e.note?.includes("ticket")))?.note || null,
             }
           : null,
-        order_status: (a as any).order_status ?? (a as any).application_status ?? null,
-        workflow_status: (a as any).workflow_status,
+        order_status: effectiveOrderStatus ?? (a as any).application_status ?? null,
+        workflow_status: effectiveWorkflowStatus,
         technical_hold_started_at: (a as any).technical_hold_started_at,
         customer_hold_started_at: (a as any).customer_hold_started_at,
         form_link_sent_at: (a as any).form_link_sent_at ?? null,
@@ -2144,6 +2209,35 @@ export const getOrderDetailV2 = createServerFn({ method: "POST" })
       ticketEvent
     );
 
+    const rawIsReopened =
+      app.order_status === "REOPENED" ||
+      (app.fulfillment_status as any) === "order_reopened" ||
+      (app.workflow_status as any) === "order_reopened" ||
+      app.workflow_status === "processing_resumed";
+
+    if (rawIsReopened && (!activeHotSched || activeHotSched.status !== "active")) {
+      const nextOs = app.form_submitted_at ? "IN_PROCESSING" : "FORM_PENDING";
+      const nextFs = app.form_submitted_at ? "form_submitted" : "form_not_submitted";
+      app.order_status = nextOs;
+      app.fulfillment_status = nextFs;
+      app.workflow_status = "processing";
+      app.application_status = "under_process";
+      (app as any).is_hot = false;
+
+      admin
+        .from("applications")
+        .update({
+          order_status: nextOs,
+          fulfillment_status: nextFs,
+          workflow_status: "processing",
+          application_status: "under_process",
+          is_hot: false,
+          updated_at: new Date().toISOString(),
+        } as never)
+        .eq("id", app.id)
+        .then(() => {});
+    }
+
     const ticketEscalation = isFromTicket
       ? {
           isEscalated: true,
@@ -2151,7 +2245,10 @@ export const getOrderDetailV2 = createServerFn({ method: "POST" })
           ticketId: schedRemarks?.ticketId || activeHotSched?.ticket_id || null,
           note: schedRemarks?.note || ticketEvent?.note || null,
           isHot: Boolean(activeHotSched?.status === "active"),
-          isReopened: Boolean(app.order_status === "REOPENED" || app.fulfillment_status === "form_submitted"),
+          isReopened: Boolean(
+            (app.order_status === "REOPENED" || (app.fulfillment_status as any) === "order_reopened") &&
+            activeHotSched?.status === "active"
+          ),
           escalatedAt: activeHotSched?.started_at || ticketEvent?.created_at || app.reopened_at || null,
         }
       : null;

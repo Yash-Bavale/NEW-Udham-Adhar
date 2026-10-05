@@ -2000,7 +2000,7 @@ export function getOrderActionStatus(order: any): { label: string; tone: "red" |
   }
 
   const isTechDelay = order.fulfillment_status === "technical_delay" || order.callback_reminder?.remarks?.channel === "technical_delay";
-  if (order.is_hot) {
+  if (order.is_hot && !order.in_range_action_taken && !(order.action_count && order.action_count > 0)) {
     return { label: isTechDelay ? "Tech Delay Due" : "Call Due Now", tone: "red" };
   }
   if (order.is_callback_scheduled) {
@@ -2037,7 +2037,13 @@ export function getOrderActionStatus(order: any): { label: string; tone: "red" |
     "refund_requested",
   ]);
 
-  if (blueStatuses.has(fs) || blueStages.has(stage) || Boolean((order as any).form_link_sent_at)) {
+  if (
+    Boolean(order.in_range_action_taken) ||
+    Boolean(order.action_count && order.action_count > 0) ||
+    blueStatuses.has(fs) ||
+    blueStages.has(stage) ||
+    Boolean((order as any).form_link_sent_at)
+  ) {
     return { label: "Action Taken", tone: "blue" };
   }
 

@@ -437,7 +437,7 @@ export const resumeReopenedOrder = createServerFn({ method: "POST" })
 
     const now = new Date().toISOString();
     const nextFulfillmentStatus = preRow.form_submitted_at ? "form_submitted" : "form_not_submitted";
-    const nextOrderStatus = "UNDER_PROCESS";
+    const nextOrderStatus = "IN_PROCESSING";
 
     const { error: rpcError } = await context.supabase.rpc("transition_order_status", {
       _order_id: data.orderId,

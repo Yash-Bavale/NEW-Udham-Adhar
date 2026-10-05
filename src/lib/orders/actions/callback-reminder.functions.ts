@@ -453,21 +453,52 @@ export const completeOrderCallback = createServerFn({ method: "POST" })
     // 3. If order was in order_reopened stage, remove reopened hot state
     const { data: appRow } = await admin
       .from("applications")
-      .select("id, lead_id, fulfillment_status, order_status, form_submitted_at")
+      .select("id, lead_id, fulfillment_status, order_status, workflow_status, application_status, form_submitted_at")
       .eq("id", data.orderId)
       .maybeSingle();
 
-    if ((appRow as any)?.fulfillment_status === "order_reopened" || (appRow as any)?.order_status === "REOPENED") {
+    const fsCur = String(appRow?.fulfillment_status ?? "").toLowerCase();
+    const osCur = String(appRow?.order_status ?? "").toUpperCase();
+    const wsCur = String((appRow as any)?.workflow_status ?? "").toLowerCase();
+    const isReopenedOrder =
+      fsCur === "order_reopened" ||
+      osCur === "REOPENED" ||
+      wsCur === "order_reopened" ||
+      wsCur === "processing_resumed";
+
+    if (isReopenedOrder) {
       const nextFulfillment = appRow?.form_submitted_at ? "form_submitted" : "form_not_submitted";
-      await admin
+      const nextOrderStatus = appRow?.form_submitted_at ? "IN_PROCESSING" : "FORM_PENDING";
+      const { error: appUpErr } = await admin
         .from("applications")
         .update({
           fulfillment_status: nextFulfillment,
-          order_status: "UNDER_PROCESS",
+          order_status: nextOrderStatus,
           application_status: "under_process",
           workflow_status: "processing",
+          is_hot: false,
+          updated_at: nowIso,
         } as never)
         .eq("id", data.orderId);
+
+      if (appUpErr) {
+        console.error("[completeOrderCallback] applications update error, trying fallback:", appUpErr);
+        await admin
+          .from("applications")
+          .update({
+            fulfillment_status: nextFulfillment,
+            order_status: nextOrderStatus,
+            workflow_status: "processing",
+            updated_at: nowIso,
+          } as never)
+          .eq("id", data.orderId);
+      }
+    } else {
+      await admin
+        .from("applications")
+        .update({ is_hot: false, updated_at: nowIso } as never)
+        .eq("id", data.orderId)
+        .then(() => {});
     }
 
     let prevReason = null;
@@ -623,13 +654,14 @@ export async function completeHotOrderOnQualifyingAction(params: {
   // 2. Fetch order state to check if reopened / hot
   const { data: appRow } = await admin
     .from("applications")
-    .select("id, lead_id, customer_id, fulfillment_status, order_status, application_status, workflow_status")
+    .select("id, lead_id, customer_id, fulfillment_status, order_status, application_status, workflow_status, form_submitted_at")
     .eq("id", params.orderId)
     .maybeSingle();
 
   const fs = String(appRow?.fulfillment_status ?? "").toLowerCase();
-  const os = String(appRow?.order_status ?? "").toLowerCase();
-  const isReopenedHot = fs === "order_reopened" || os === "reopened";
+  const os = String(appRow?.order_status ?? "").toUpperCase();
+  const ws = String((appRow as any)?.workflow_status ?? "").toLowerCase();
+  const isReopenedHot = fs === "order_reopened" || os === "REOPENED" || ws === "order_reopened" || ws === "processing_resumed";
   const hasSchedulers = activeSchedulers && activeSchedulers.length > 0;
 
   if (!hasSchedulers && !isReopenedHot) {
@@ -648,6 +680,24 @@ export async function completeHotOrderOnQualifyingAction(params: {
       })
       .eq("application_id", params.orderId)
       .in("status", ["active", "paused"]);
+  }
+
+  if (isReopenedHot) {
+    const nextFulfillment = (appRow as any)?.form_submitted_at ? "form_submitted" : "form_not_submitted";
+    const nextOrderStatus = (appRow as any)?.form_submitted_at ? "IN_PROCESSING" : "FORM_PENDING";
+    const { error: appUpErr } = await admin
+      .from("applications")
+      .update({
+        fulfillment_status: nextFulfillment,
+        order_status: nextOrderStatus,
+        application_status: "under_process",
+        workflow_status: "processing",
+        updated_at: nowIso,
+      } as never)
+      .eq("id", params.orderId);
+    if (appUpErr) {
+      console.warn("[completeHotOrderOnQualifyingAction] applications update warning:", appUpErr);
+    }
   }
 
   const primaryScheduler = hasSchedulers ? activeSchedulers[0] : null;

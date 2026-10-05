@@ -254,12 +254,22 @@ export function CustomerJourneyMap(p: Props) {
       toast.success("Customer call marked completed — Hot Order removed");
       qc.invalidateQueries({ queryKey: ["active-order-callback", p.applicationId] });
       qc.invalidateQueries({ queryKey: ["order-callback-history", p.applicationId] });
+      qc.invalidateQueries({ queryKey: ["admin.order", p.applicationId] });
+      qc.invalidateQueries({ queryKey: ["admin.orders.v2"] });
       invalidate();
     },
     onError: (e: any) => toast.error(e?.message ?? "Failed to complete callback"),
   });
 
-  const isReopenedHot = !closed && !completed && (p.stage === "order_reopened" || p.fulfillmentStatus === "order_reopened" || (p.workflowStatus as string) === "reopened");
+  const hasCompletedCallback =
+    callbackHistory.some((h) => h.action_type === "CALLBACK_COMPLETED") ||
+    (events ?? []).some((e: any) => String(e?.event_type || "").includes("callback_completed"));
+
+  const isReopenedHot =
+    !closed &&
+    !completed &&
+    !hasCompletedCallback &&
+    (p.stage === "order_reopened" || p.fulfillmentStatus === "order_reopened" || (p.workflowStatus as string) === "reopened");
   const role = useRole();
   const isAdmin = role.hasAny(["super_admin", "admin"]);
 
