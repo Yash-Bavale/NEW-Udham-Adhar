@@ -118,7 +118,6 @@ export const deliverCertificate = createServerFn({ method: "POST" })
       .eq("id", data.certificateId)
       .single();
     if (!cert) throw new Error("Certificate not found");
-    if (cert.delivered_at) throw new Error("Already delivered");
     if (!cert.file_path) throw new Error("Certificate has no file");
 
     const [{ data: lead }, { data: app }] = await Promise.all([

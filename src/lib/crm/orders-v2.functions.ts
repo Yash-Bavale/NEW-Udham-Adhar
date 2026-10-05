@@ -2399,14 +2399,17 @@ export const updateFulfillmentStatus = createServerFn({ method: "POST" })
 
     const { data: app } = await admin
       .from("applications")
-      .select("id, application_code, fulfillment_status, lead_id, customer_id, service_id")
+      .select("id, application_code, fulfillment_status, lead_id, customer_id, service_id, order_status, reopened_at")
       .eq("id", data.orderId)
       .maybeSingle();
     if (!app) throw new Error("Order not found");
 
     const current = (app.fulfillment_status ?? "order_received") as FulfillmentStatus;
     const target = data.toStatus as FulfillmentStatus;
-    if (current === target) return { ok: true, noop: true };
+    const isCertUpload = (target === "completed" || target === "order_completed") && Boolean(data.certificateDocumentId);
+
+    // If already at target status, return no-op UNLESS this is an explicit certificate upload / deliver action.
+    if (current === target && !isCertUpload) return { ok: true, noop: true };
 
     // Verify admin override request against the caller's actual role.
     let isAdminOverride = false;
@@ -2420,6 +2423,11 @@ export const updateFulfillmentStatus = createServerFn({ method: "POST" })
       );
     }
 
+    const isReopened =
+      app.order_status === "REOPENED" ||
+      app.reopened_at != null ||
+      current === "order_reopened";
+
     const allowed = getAllowedFulfillmentTransitions(current);
     const curIdx = FULFILLMENT_STAGES.indexOf(current);
     const tgtIdx = FULFILLMENT_STAGES.indexOf(target);
@@ -2431,11 +2439,12 @@ export const updateFulfillmentStatus = createServerFn({ method: "POST" })
       current !== "cancelled" &&
       target !== "cancelled";
 
-    // Completing an order (with certificate) is allowed from any active stage —
-    // staff frequently upload the final certificate without walking through
-    // every intermediate fulfillment stage. All other transitions still follow
-    // the strict stepwise map.
-    const isCompleteWithCert = target === "completed" && current !== "cancelled" && current !== "completed";
+    // Completing an order (with certificate) is allowed from any active stage,
+    // when admin override is active, when the order has been reopened,
+    // or when staff explicitly provides a certificate to complete / re-issue.
+    const isCompleteWithCert =
+      (target === "completed" || target === "order_completed") &&
+      (isAdminOverride || isReopened || isCertUpload || (current !== "cancelled" && current !== "completed"));
 
     // B06 "Consultation Completed" is an intentional jump the operator can
     // trigger from any active stage — do not force it through the stepwise map.
@@ -2452,7 +2461,9 @@ export const updateFulfillmentStatus = createServerFn({ method: "POST" })
       );
     }
 
-    if (target === "completed") {
+    const isCompletionAction = target === "completed" || (target === "order_completed" && Boolean(data.certificateDocumentId));
+
+    if (isCompletionAction) {
       if (!data.certificateDocumentId) {
         throw new Error("Please upload the certificate PDF before marking this order complete.");
       }
@@ -2463,7 +2474,7 @@ export const updateFulfillmentStatus = createServerFn({ method: "POST" })
 
     // Update normal stage changes immediately. Completion is handled below only
     // after the certificate email has actually been accepted by SMTP.
-    if (target !== "completed") {
+    if (!isCompletionAction) {
       const upd: Record<string, unknown> = { fulfillment_status: target };
       const { error: upErr } = await admin.from("applications").update(upd as never).eq("id", data.orderId);
       if (upErr) throw new Error(upErr.message);
@@ -2484,7 +2495,7 @@ export const updateFulfillmentStatus = createServerFn({ method: "POST" })
       } as never);
     }
 
-    if (target === "completed") {
+    if (isCompletionAction) {
       const certNumber = data.certificateNumber!.trim();
       const completionNotes = data.completionNotes?.trim() || null;
       const now = new Date().toISOString();
@@ -2682,14 +2693,16 @@ export const updateFulfillmentStatus = createServerFn({ method: "POST" })
       }
 
 
+      const isReissue = current === "completed" || current === "order_completed" || isReopened;
       await admin.from("application_events").insert({
         application_id: data.orderId,
         lead_id: app.lead_id,
         customer_id: app.customer_id ?? null,
-        event_type: "application_completed",
+        event_type: isReissue ? "certificate_reissued" : "application_completed",
         new_value: "completed",
         note:
-          `Application completed. Certificate ${certNumber}` +
+          (isReissue ? "Certificate re-issued / resent. " : "Application completed. ") +
+          `Certificate ${certNumber}` +
           ` sent to ${recipientEmail}` +
           (completionNotes ? `. Notes: ${completionNotes}` : "."),
         created_by: context.userId,
