@@ -902,12 +902,12 @@ return (
     </div>
 
     {/* Modern Filter Card */}
-    <div className="rounded-xl border border-slate-200 bg-white p-2.5 sm:p-3.5 shadow-xs space-y-2.5 sm:space-y-3">
-      {/* Filters Row - Single horizontal row that dynamically shrinks proportionally without wrapping */}
-      <div className="flex flex-nowrap items-center gap-1.5 sm:gap-2 lg:gap-2.5 w-full min-w-0">
+    <div className="rounded-xl border border-slate-200 bg-white p-2.5 sm:p-3 shadow-xs">
+      {/* Filters Row - All filters and sort selector in 1 single horizontal row without wrapping */}
+      <div className="flex flex-nowrap items-center gap-1.5 sm:gap-2 w-full min-w-0">
         {/* Stage Filter */}
         <Select value={stageFilter} onValueChange={setStageFilter}>
-          <SelectTrigger className="h-9 flex-1 min-w-0 px-2 sm:px-2.5 lg:px-3 text-xs bg-slate-50/50 border-slate-200 [&_svg]:shrink-0">
+          <SelectTrigger className="h-9 flex-[0.95] min-w-0 px-1.5 sm:px-2 xl:px-2.5 text-xs bg-slate-50/50 border-slate-200 [&_svg]:shrink-0">
             <SelectValue placeholder="All Stages" />
           </SelectTrigger>
           <SelectContent className="max-h-[300px]">
@@ -932,7 +932,7 @@ return (
 
         {/* Action Status Filter */}
         <Select value={actionStatusFilter} onValueChange={setActionStatusFilter}>
-          <SelectTrigger className="h-9 flex-[1.05] min-w-0 px-2 sm:px-2.5 lg:px-3 text-xs bg-slate-50/50 border-slate-200 [&_svg]:shrink-0">
+          <SelectTrigger className="h-9 flex-[1] min-w-0 px-1.5 sm:px-2 xl:px-2.5 text-xs bg-slate-50/50 border-slate-200 [&_svg]:shrink-0">
             <SelectValue placeholder="Action Status" />
           </SelectTrigger>
           <SelectContent>
@@ -946,7 +946,7 @@ return (
 
         {/* Services Filter */}
         <Select value={serviceId} onValueChange={setServiceId}>
-          <SelectTrigger className="h-9 flex-[1.25] min-w-0 px-2 sm:px-2.5 lg:px-3 text-xs bg-slate-50/50 border-slate-200 [&_svg]:shrink-0">
+          <SelectTrigger className="h-9 flex-[1.15] min-w-0 px-1.5 sm:px-2 xl:px-2.5 text-xs bg-slate-50/50 border-slate-200 [&_svg]:shrink-0">
             <SelectValue placeholder="All services" />
           </SelectTrigger>
           <SelectContent className="max-h-[380px]">
@@ -968,7 +968,7 @@ return (
 
         {/* Payment Status Filter */}
         <Select value={paymentStatus} onValueChange={setPaymentStatus}>
-          <SelectTrigger className="h-9 flex-[0.9] min-w-0 px-2 sm:px-2.5 lg:px-3 text-xs bg-slate-50/50 border-slate-200 [&_svg]:shrink-0">
+          <SelectTrigger className="h-9 flex-[0.85] min-w-0 px-1.5 sm:px-2 xl:px-2.5 text-xs bg-slate-50/50 border-slate-200 [&_svg]:shrink-0">
             <SelectValue placeholder="Payment status" />
           </SelectTrigger>
           <SelectContent>
@@ -983,7 +983,7 @@ return (
 
         {/* Fulfillment Stage Dropdown */}
         <Select value={fulfillmentStatus} onValueChange={setFulfillmentStatus}>
-          <SelectTrigger className="h-9 flex-[1.25] min-w-0 px-2 sm:px-2.5 lg:px-3 text-xs bg-slate-50/50 border-slate-200 [&_svg]:shrink-0">
+          <SelectTrigger className="h-9 flex-[1.15] min-w-0 px-1.5 sm:px-2 xl:px-2.5 text-xs bg-slate-50/50 border-slate-200 [&_svg]:shrink-0">
             <SelectValue placeholder="Fulfillment stage" />
           </SelectTrigger>
           <SelectContent className="max-h-[360px]">
@@ -1013,9 +1013,9 @@ return (
         </Select>
 
         {/* Pending Age */}
-        <div className={cn("min-w-0 flex items-center gap-1 sm:gap-1.5", pendingAge === "custom" ? "flex-[1.1]" : "flex-[0.85]")}>
+        <div className={cn("min-w-0 flex items-center gap-1", pendingAge === "custom" ? "flex-[1.05]" : "flex-[0.8]")}>
           <Select value={pendingAge} onValueChange={(v) => setPendingAge(v as PendingAge)}>
-            <SelectTrigger className="h-9 w-full min-w-0 px-2 sm:px-2.5 lg:px-3 text-xs bg-slate-50/50 border-slate-200 [&_svg]:shrink-0">
+            <SelectTrigger className="h-9 w-full min-w-0 px-1.5 sm:px-2 xl:px-2.5 text-xs bg-slate-50/50 border-slate-200 [&_svg]:shrink-0">
               <SelectValue placeholder="Pending age" />
             </SelectTrigger>
             <SelectContent>
@@ -1036,10 +1036,10 @@ return (
           )}
         </div>
 
-        {/* Assignees Filter (Admin & Staff) - Positioned at the end of the filter row */}
+        {/* Assignees Filter (Admin & Staff) */}
         {role.hasAny(["admin", "super_admin", "operations", "manager", "executive", "support"]) && (
           <Select value={assignedTo} onValueChange={setAssignedTo}>
-            <SelectTrigger className="h-9 flex-[1.1] min-w-0 px-2 sm:px-2.5 lg:px-3 text-xs bg-slate-50/50 border-slate-200 [&_svg]:shrink-0">
+            <SelectTrigger className="h-9 flex-[1.05] min-w-0 px-1.5 sm:px-2 xl:px-2.5 text-xs bg-slate-50/50 border-slate-200 [&_svg]:shrink-0">
               <SelectValue placeholder="All assignees" />
             </SelectTrigger>
             <SelectContent className="max-h-[380px]">
@@ -1077,10 +1077,8 @@ return (
             </SelectContent>
           </Select>
         )}
-      </div>
 
-      {/* Sort Selector Row - Placed on its own row below filters */}
-      <div className="flex items-center pt-0.5">
+        {/* Sort Selector - Kept on the same single row */}
         <Select
           value={
             sortField === "created_at"
@@ -1097,7 +1095,7 @@ return (
             else if (v === "stage_journey_asc") { setSortField("stage_journey"); setSortOrder("asc"); }
           }}
         >
-          <SelectTrigger className="h-9 w-[190px] sm:w-[210px] text-xs bg-slate-50/50 border-slate-200">
+          <SelectTrigger className="h-9 flex-[1.05] min-w-0 px-1.5 sm:px-2 xl:px-2.5 text-xs bg-slate-50/50 border-slate-200 [&_svg]:shrink-0">
             <ArrowUpDown className="w-3.5 h-3.5 mr-1 text-slate-500 shrink-0" />
             <SelectValue placeholder="Sort order" />
           </SelectTrigger>
