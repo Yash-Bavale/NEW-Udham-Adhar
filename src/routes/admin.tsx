@@ -48,7 +48,10 @@ export const Route = createFileRoute("/admin")({
   },
   component: AdminLayout,
   errorComponent: ({ error }: any) => (
-    <div className="p-8 text-sm text-red-700">Admin error: {error.message}</div>
+    <div className="p-8 text-sm text-red-700">
+      Admin error: {error.message}{" "}
+      <button className="ml-2 underline" onClick={() => window.location.reload()}>Reload</button>
+    </div>
   ),
 });
 
