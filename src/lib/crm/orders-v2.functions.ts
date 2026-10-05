@@ -385,26 +385,17 @@ export function isNeedsActionOrder(row: any): boolean {
   const stage = String(row.stage ?? "").toLowerCase();
   const os = String(row.order_status ?? "").toUpperCase();
   const ws = String(row.workflow_status ?? "").toLowerCase();
-  const isReopened =
-    stage === "order_reopened" ||
-    fs === "order_reopened" ||
-    ws === "order_reopened" ||
-    os === "REOPENED" ||
-    Boolean(row.ticket_source?.isReopenedFromTicket);
 
-  // 1. Reopened orders and Hot Orders ALWAYS show in Needs Action
-  if (isReopened || row.is_hot) return true;
-
-  // 2. Exclude terminal states (completed / closed)
+  // 1. Exclude terminal states (completed / closed)
   if (stage === "completed" || stage === "closed" || COMPLETED_FS.has(fs) || CLOSED_FS.has(fs)) return false;
 
-  // 3. Exclude orders that already have an active scheduled callback (they belong in Call Back Scheduled)
+  // 2. Exclude orders that already have an active scheduled callback (they belong in Call Back Scheduled)
   if (row.is_callback_scheduled || (row.callback_reminder && !row.callback_reminder.is_due)) return false;
 
-  // 4. Exclude Technical Delay and Customer Delay (they belong in their dedicated tabs)
+  // 3. Exclude Technical Delay and Customer Delay (they belong in their dedicated tabs / Action Taken)
   if (isTechnicalDelayOrder(row) || isCustomerDelayOrder(row)) return false;
 
-  // 5. Exclude Form Not Submitted where form link has already been sent or awaiting customer form (Action Taken)
+  // 4. Exclude Form Not Submitted where form link has already been sent or awaiting customer form (Action Taken)
   if (
     Boolean(row.form_link_sent_at) ||
     fs === "awaiting_customer_form" ||
@@ -416,7 +407,7 @@ export function isNeedsActionOrder(row: any): boolean {
     return false;
   }
 
-  // 6. Exclude progressed stages like Certificate Ready, Submitted to Govt, Under Processing, Refunded
+  // 5. Exclude progressed stages like Certificate Ready, Submitted to Govt, Under Processing, Refunded
   const progressedStages = new Set([
     "submitted_to_govt",
     "under_processing",
@@ -434,6 +425,15 @@ export function isNeedsActionOrder(row: any): boolean {
     "government_processing",
   ]);
   if (progressedStages.has(stage) || progressedStages.has(fs)) return false;
+
+  // 6. Actively reopened orders (current state is reopened) and Hot Orders show in Needs Action
+  const isCurrentlyReopened =
+    stage === "order_reopened" ||
+    fs === "order_reopened" ||
+    ws === "order_reopened" ||
+    os === "REOPENED";
+
+  if (isCurrentlyReopened || row.is_hot) return true;
 
   // Untouched action-needed stages
   return (

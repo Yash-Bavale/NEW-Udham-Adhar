@@ -111,6 +111,19 @@ export const customerSideDelay = createServerFn({ method: "POST" })
       body: `24h auto-close timer started. Reason: ${reason?.label ?? "Awaiting customer information"}.`,
     });
 
+    try {
+      const { completeHotOrderOnQualifyingAction } = await import("@/lib/orders/actions/callback-reminder.functions");
+      await completeHotOrderOnQualifyingAction({
+        orderId: data.orderId,
+        actorId: context.userId,
+        actionName: "Customer Delay",
+        actionReason: `Customer Delay action performed: ${reason?.label || "Customer hold started"}`,
+        supabase: supabaseAdmin,
+      });
+    } catch (hotErr) {
+      console.warn("[customerSideDelay] completeHotOrderOnQualifyingAction warning:", hotErr);
+    }
+
     return {
       ok: true,
       order: updated,
@@ -182,6 +195,19 @@ export const ourSideDelay = createServerFn({ method: "POST" })
           ? `Manual reminder scheduled${data.remindAt ? ` for ${new Date(data.remindAt).toLocaleString("en-IN")}` : ""}.`
           : "30-min grace period before auto-reminders kick in.",
     });
+
+    try {
+      const { completeHotOrderOnQualifyingAction } = await import("@/lib/orders/actions/callback-reminder.functions");
+      await completeHotOrderOnQualifyingAction({
+        orderId: data.orderId,
+        actorId: context.userId,
+        actionName: "Technical Delay",
+        actionReason: "Technical Delay hold armed",
+        supabase: context.supabase,
+      });
+    } catch (hotErr) {
+      console.warn("[ourSideDelay] completeHotOrderOnQualifyingAction warning:", hotErr);
+    }
 
     return {
       ok: true,
