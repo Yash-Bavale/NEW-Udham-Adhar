@@ -21,16 +21,37 @@ export const Route = createFileRoute("/admin")({
     //    Uses the SECURITY DEFINER RPC `has_any_staff_role` which checks
     //    public.user_roles for any of: super_admin, admin, manager, executive,
     //    support, accounts, finance, operations.
-    const { data: isStaff, error: roleErr } = await supabase.rpc("has_any_staff_role", {
-      _user_id: data.user.id,
-    });
-    if (roleErr || isStaff !== true) {
-      throw redirect({ to: "/unauthorized" });
+    //    Only a definitive "false" answer means access denied. A temporary
+    //    network / token-refresh failure is retried and, if it persists, shown
+    //    as a retryable error instead of wrongly sending staff to /unauthorized.
+    let isStaff: boolean | null = null;
+    let lastErr: unknown = null;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      if (attempt > 0) {
+        await new Promise((r) => setTimeout(r, 600 * attempt));
+        await supabase.auth.refreshSession().catch(() => undefined);
+      }
+      const { data: res, error: roleErr } = await supabase.rpc("has_any_staff_role", {
+        _user_id: data.user.id,
+      });
+      if (!roleErr && typeof res === "boolean") {
+        isStaff = res;
+        break;
+      }
+      lastErr = roleErr;
+    }
+    if (isStaff === false) throw redirect({ to: "/unauthorized" });
+    if (isStaff !== true) {
+      console.warn("[admin] staff role check failed", lastErr);
+      throw new Error("Could not verify your access (connection problem). Please reload the page.");
     }
   },
   component: AdminLayout,
   errorComponent: ({ error }: any) => (
-    <div className="p-8 text-sm text-red-700">Admin error: {error.message}</div>
+    <div className="p-8 text-sm text-red-700">
+      Admin error: {error.message}{" "}
+      <button className="ml-2 underline" onClick={() => window.location.reload()}>Reload</button>
+    </div>
   ),
 });
 
