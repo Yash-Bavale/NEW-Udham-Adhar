@@ -619,8 +619,9 @@ function OrdersListPage() {
     queryKey: getOrdersQueryKey(normalizedFilter, page),
     queryFn: () => listFn({ data: queryPayload }),
     placeholderData: keepPreviousData,
-    staleTime: 10_000,
-    refetchInterval: 15_000,
+    // Live updates arrive through realtime subscriptions below; no timed polling.
+    staleTime: 30_000,
+    refetchOnWindowFocus: true,
     gcTime: 10 * 60 * 1000,
   });
 
@@ -676,18 +677,22 @@ useRealtimeTable("assignment_pool", () => {
   scheduleDebouncedInvalidation();
 });
 
-// Background prefetch for next page
+// Background prefetch for next page — only after the current page has finished loading,
+// so it never competes with the request the user is waiting on.
 useEffect(() => {
+  if (isFetching || !data) return;
   const totalPages = Math.ceil(total / pageSize);
-  if (page < totalPages) {
+  if (page >= totalPages) return;
+  const t = setTimeout(() => {
     const nextPagePayload = { ...queryPayload, page: page + 1 };
     qc.prefetchQuery({
       queryKey: getOrdersQueryKey(normalizedFilter, page + 1),
       queryFn: () => listFn({ data: nextPagePayload }),
       staleTime: 30 * 1000,
     });
-  }
-}, [page, total, queryPayload, normalizedFilter, qc, listFn, pageSize]);
+  }, 1500);
+  return () => clearTimeout(t);
+}, [isFetching, data, page, total, queryPayload, normalizedFilter, qc, listFn, pageSize]);
 
 const bulkAssignFn = useServerFn(bulkAssignOrders);
 const autoDistributeFn = useServerFn(autoDistributeSelectedOrders);
