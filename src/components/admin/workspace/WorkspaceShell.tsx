@@ -269,7 +269,7 @@ export function WorkspaceShell(p: Props) {
   const mutResumeReopened = useMutation({
     mutationFn: () => fnResumeReopened({ data: { orderId: p.orderId } }),
     onSuccess: (res: any) => {
-      toast.success(`Order resumed — moved to ${res?.nextStage === "form_not_submitted" ? "Form Not Submitted" : "Form Submitted"}`);
+      toast.success(`Order resumed — moved to ${res?.nextStage === "form_not_submitted" ? "Form Not Submitted Delay" : "Form Submitted"}`);
       invalidate();
     },
     onError: (e: Error) => toast.error(e.message),

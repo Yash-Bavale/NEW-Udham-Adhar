@@ -33,7 +33,7 @@ export interface JourneyStageDef {
 export const JOURNEY_STAGES: JourneyStageDef[] = [
   { key: "lead_received",     label: "Lead Received",              short: "Lead" },
   { key: "payment_received",  label: "Payment Received",           short: "Payment" },
-  { key: "order_received",    label: "Order Received",             short: "Order" },
+  { key: "order_received",    label: "Incomplete Form",            short: "Order" },
   { key: "form_submitted",    label: "Form Submitted",             short: "Form" },
   { key: "app_submitted",     label: "Application Submitted to Govt", short: "Govt Portal" },
   { key: "check_status",      label: "Check Final Status on Govt", short: "Final Status" },
@@ -123,7 +123,7 @@ export const JOURNEY_BRANCHES: JourneyBranch[] = [
     key: "form-not-submitted",
     track: "delay",
     parentStage: "order_received",
-    title: "Form Not Submitted",
+    title: "Form Not Submitted Delay",
     tone: "amber",
     description:
       "Send E002 → arms 8-hour auto-close with reason A7 (Required Documents or Communication Not Received).",
@@ -397,7 +397,7 @@ export function deriveJourneyLiveState(input: {
     if (activeSubKey === "govt-rejected") {
       subStateLabel = `Closed (Govt Rejected)${reasonCode ? ` · ${reasonCode}` : ""}`;
     } else if (activeSubKey === "form-not-submitted") {
-      subStateLabel = `Closed (Form Not Submitted)${reasonCode ? ` · ${reasonCode}` : ""}`;
+      subStateLabel = `Closed (Form Not Submitted Delay)${reasonCode ? ` · ${reasonCode}` : ""}`;
     } else if (activeSubKey === "customer-delay" || reasonCode?.startsWith("A") || reasonCode?.startsWith("C")) {
       subStateLabel = `Closed (Customer Delay)${reasonCode ? ` · ${reasonCode}` : ""}`;
     } else {
@@ -408,7 +408,7 @@ export function deriveJourneyLiveState(input: {
   } else if (isConsultationCompleted) {
     subStateLabel = "Order Completed";
   } else if (activeSubKey === "form-not-submitted") {
-    subStateLabel = "Form Not Submitted";
+    subStateLabel = "Form Not Submitted Delay";
   } else if (activeSubKey === "customer-delay") {
     subStateLabel = `Customer Delay${reasonCode ? ` (${reasonCode})` : ""}`;
   } else if (activeSubKey === "technical-delay") {

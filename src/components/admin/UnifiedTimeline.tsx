@@ -143,7 +143,7 @@ function resolveEventButtonTag(e: any): ButtonActionTagProps | null {
     note.includes("form link sent") ||
     note.includes("form not submitted")
   ) {
-    return { code: "B01", label: "Form Not Submitted", variant: "amber" };
+    return { code: "B01", label: "Form Not Submitted Delay", variant: "amber" };
   }
 
   // B09 - Reopen Order
@@ -197,7 +197,7 @@ function resolveEmailButtonTag(templateCode?: string | null): ButtonActionTagPro
   if (tc === "E005" || tc === "BHS_E005") return { code: "B06", label: "Consultation Done", variant: "violet" };
   if (tc === "E003" || tc === "BHS_E003") return { code: "B02", label: "Technical Delay", variant: "sky" };
   if (tc === "E004" || tc === "BHS_E004") return { code: "B04", label: "Customer Delay", variant: "amber" };
-  if (tc === "E002" || tc === "BHS_E002") return { code: "B01", label: "Form Not Submitted", variant: "amber" };
+  if (tc === "E002" || tc === "BHS_E002") return { code: "B01", label: "Form Not Submitted Delay", variant: "amber" };
   if (tc === "E011" || tc === "BHS_E011") return { code: "B03", label: "Issue Resolved", variant: "emerald" };
   if (tc === "E008" || tc === "BHS_E008") return { code: "B08", label: "App Rejected", variant: "rose" };
   if (tc === "E009" || tc === "E09" || tc === "BHS_E009") return { code: "B09", label: "Reopen Order", variant: "indigo" };
