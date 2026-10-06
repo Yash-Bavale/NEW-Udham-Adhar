@@ -1041,47 +1041,6 @@ return (
           )}
         </div>
 
-        {/* Assignees Filter (Admin & Staff) */}
-        {role.hasAny(["admin", "super_admin", "operations", "manager", "executive", "support"]) && (
-          <Select value={assignedTo} onValueChange={setAssignedTo}>
-            <SelectTrigger className="h-9 flex-[1.05] min-w-0 px-1.5 sm:px-2 xl:px-2.5 text-xs bg-slate-50/50 border-slate-200 [&_svg]:shrink-0">
-              <SelectValue placeholder="All assignees" />
-            </SelectTrigger>
-            <SelectContent className="max-h-[380px]">
-              <SelectItem value="all" className="font-bold text-slate-800">All assignees</SelectItem>
-              <SelectItem value="unassigned" className="text-slate-600">Unassigned</SelectItem>
-              
-              {activeStaffList.length > 0 && (
-                <SelectGroup>
-                  <SelectLabel className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-emerald-700 bg-emerald-50/80 rounded-md my-1 flex items-center gap-1">
-                    🟢 Active Workforce ({activeStaffList.length})
-                  </SelectLabel>
-                  {activeStaffList.map((s: any) => (
-                    <SelectItem key={s.id} value={s.id} className="pl-3 text-xs">
-                      {s.display_name || s.full_name || s.name || s.email}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              )}
-
-              {inactiveStaffList.length > 0 && (
-                <SelectGroup>
-                  <SelectLabel className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-rose-700 bg-rose-50/80 rounded-md my-1 flex items-center gap-1">
-                    ⚪ Inactive / Exited Staff ({inactiveStaffList.length})
-                  </SelectLabel>
-                  {inactiveStaffList.map((s: any) => (
-                    <SelectItem key={s.id} value={s.id} className="pl-3 text-xs text-slate-600">
-                      <div className="flex items-center justify-between gap-1.5 w-full">
-                        <span>{s.display_name || s.name || s.email}</span>
-                        <span className="text-[9px] text-rose-500 font-mono ml-1 uppercase">[{s.employment_status || "INACTIVE"}]</span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              )}
-            </SelectContent>
-          </Select>
-        )}
 
         {/* Sort Selector - Kept on the same single row */}
         <Select
@@ -1132,6 +1091,48 @@ return (
             <SelectItem value="stage_journey_asc">Stage (Journey Order)</SelectItem>
           </SelectContent>
         </Select>
+
+        {/* Assignees Filter (Admin & Staff) */}
+        {role.hasAny(["admin", "super_admin", "operations", "manager", "executive", "support"]) && (
+          <Select value={assignedTo} onValueChange={setAssignedTo}>
+            <SelectTrigger className="h-9 flex-[1.05] min-w-0 px-1.5 sm:px-2 xl:px-2.5 text-xs bg-slate-50/50 border-slate-200 [&_svg]:shrink-0">
+              <SelectValue placeholder="All assignees" />
+            </SelectTrigger>
+            <SelectContent className="max-h-[380px]">
+              <SelectItem value="all" className="font-bold text-slate-800">All assignees</SelectItem>
+              <SelectItem value="unassigned" className="text-slate-600">Unassigned</SelectItem>
+              
+              {activeStaffList.length > 0 && (
+                <SelectGroup>
+                  <SelectLabel className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-emerald-700 bg-emerald-50/80 rounded-md my-1 flex items-center gap-1">
+                    🟢 Active Workforce ({activeStaffList.length})
+                  </SelectLabel>
+                  {activeStaffList.map((s: any) => (
+                    <SelectItem key={s.id} value={s.id} className="pl-3 text-xs">
+                      {s.display_name || s.full_name || s.name || s.email}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              )}
+
+              {inactiveStaffList.length > 0 && (
+                <SelectGroup>
+                  <SelectLabel className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-rose-700 bg-rose-50/80 rounded-md my-1 flex items-center gap-1">
+                    ⚪ Inactive / Exited Staff ({inactiveStaffList.length})
+                  </SelectLabel>
+                  {inactiveStaffList.map((s: any) => (
+                    <SelectItem key={s.id} value={s.id} className="pl-3 text-xs text-slate-600">
+                      <div className="flex items-center justify-between gap-1.5 w-full">
+                        <span>{s.display_name || s.name || s.email}</span>
+                        <span className="text-[9px] text-rose-500 font-mono ml-1 uppercase">[{s.employment_status || "INACTIVE"}]</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              )}
+            </SelectContent>
+          </Select>
+        )}
       </div>
     </div>
 
