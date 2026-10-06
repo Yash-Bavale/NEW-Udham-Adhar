@@ -71,6 +71,13 @@ function ZohoExportPage() {
         >
           Download Zoho Import File{r ? ` (${r.rows.length})` : ""}
         </Button>
+        <Button
+          variant="secondary"
+          disabled={!r || !r.paymentRows?.length}
+          onClick={() => r && download(`zoho-payments_${from}_${to}.csv`, [r.paymentColumns, ...r.paymentRows.map((row) => r.paymentColumns.map((c) => (row as any)[c] ?? ""))])}
+        >
+          Download Zoho Payments File{r ? ` (${r.paymentRows?.length ?? 0})` : ""}
+        </Button>
         {r && r.issues.length > 0 && (
           <Button variant="outline" onClick={() => download(`zoho-errors_${from}_${to}.csv`, [["Invoice Number", "Field", "Error"], ...r.issues.map((i) => [i.invoice_number, i.field, i.error])])}>
             Download Error Report
