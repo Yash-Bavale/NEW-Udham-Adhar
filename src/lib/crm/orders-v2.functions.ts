@@ -990,7 +990,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
     );
 
     if (inRangeEventAppIds.length > 0) {
-      const extraApps = await fetchInChunks<any>(inRangeEventAppIds, 350, (chunk) =>
+      const extraApps = await fetchInChunks<any>(inRangeEventAppIds, 200, (chunk) =>
         buildBaseQuery().in("id", chunk)
       );
       (extraApps ?? []).forEach((a: any) => mergedAppMap.set(a.id, a));
@@ -1087,19 +1087,19 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
     ].filter(Boolean))) as string[];
 
     const [leadsData, custsData, paysByApp, paysByLead, staffData] = await Promise.all([
-      fetchInChunks<any>(leadIds, 350, (chunk) =>
+      fetchInChunks<any>(leadIds, 200, (chunk) =>
         admin.from("leads").select("id, name, email, mobile, total_amount, lead_status_v2, lead_code, status, lead_source, service, service_id").in("id", chunk)
       ),
-      fetchInChunks<any>(customerIds, 350, (chunk) =>
+      fetchInChunks<any>(customerIds, 200, (chunk) =>
         admin.from("customers").select("id, name, primary_mobile, primary_email").in("id", chunk)
       ),
-      fetchInChunks<any>(ids, 350, (chunk) =>
+      fetchInChunks<any>(ids, 200, (chunk) =>
         admin.from("payments").select("id, application_id, lead_id, status, amount, payment_date").in("application_id", chunk)
       ),
-      fetchInChunks<any>(leadIds, 350, (chunk) =>
+      fetchInChunks<any>(leadIds, 200, (chunk) =>
         admin.from("payments").select("id, application_id, lead_id, status, amount, payment_date").in("lead_id", chunk)
       ),
-      fetchInChunks<any>(staffIds, 350, (chunk) =>
+      fetchInChunks<any>(staffIds, 200, (chunk) =>
         admin.from("profiles").select("id, full_name, display_name, email").in("id", chunk)
       ),
     ]);
@@ -1122,7 +1122,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       new Set([...serviceIds, ...(leadsData ?? []).map((l: any) => l.service_id)].filter(Boolean))
     ) as string[];
 
-    const svcsData = await fetchInChunks<any>(allServiceIds, 350, (chunk) =>
+    const svcsData = await fetchInChunks<any>(allServiceIds, 200, (chunk) =>
       admin.from("services").select("id, service_name").in("id", chunk)
     );
 
