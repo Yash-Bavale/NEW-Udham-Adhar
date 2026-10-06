@@ -262,7 +262,7 @@ function Shell({ children, email }: { children: ReactNode; email?: string }) {
 
   const getSidebarBadge = (to: string): number => {
     // Notifications page: always show unread count (never suppressed)
-    if (to === "/admin/notifications") return sidebarCounts?.notifications ?? 0;
+    if (to === "/admin/notifications") return 0;
     // Leads: uses its own watcher — only new-since-last-visit
     if (to === "/admin/leads") return newLeads > 0 ? newLeads : 0;
     // All other clearable sections: suppress once visited
@@ -736,25 +736,9 @@ function NotificationsBell() {
       sub.subscription.unsubscribe();
     };
   }, []);
-  const { data } = useQuery<{ count: number }>({
-    queryKey: ["notifications", "unread-count"],
-    queryFn: async () => {
-      try {
-        return await fetchCount();
-      } catch {
-        // Swallow transient 401s during sign-in/out so the bell doesn't blank the page.
-        return { count: 0 };
-      }
-    },
-    refetchInterval: 60_000,
-    enabled: hasSession,
-    retry: false,
-  });
-  useRealtimeTable("notifications", () => {
-    if (!hasSession) return;
-    qc.invalidateQueries({ queryKey: ["notifications", "unread-count"] });
-  });
-  const count = data?.count ?? 0;
+  // Unread count removed by request: no polling, no live listener, no badge.
+  void fetchCount;
+  const count = 0;
 
   // Chime on count increase (after initial prime so mount doesn't ring).
   useEffect(() => {
@@ -883,7 +867,7 @@ function NotificationsBell() {
             </div>
             <button
               onClick={() => markAllMut.mutate()}
-              disabled={count === 0 || markAllMut.isPending}
+              disabled={markAllMut.isPending}
               className="text-[11px] font-medium text-indigo-600 hover:text-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               Mark all read
