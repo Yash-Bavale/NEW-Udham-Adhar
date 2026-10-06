@@ -89,7 +89,7 @@ export function useNewLeadsWatcher() {
       if (kind === "lead") return;
 
       // Check sound configuration
-      const soundEnabled = kind === "lead"
+      const soundEnabled = false
         ? localStorage.getItem("udyam.sound.leads") !== "false"
         : localStorage.getItem("udyam.sound.orders") !== "false";
 
@@ -101,7 +101,7 @@ export function useNewLeadsWatcher() {
       notify({ title, body, url, tag: dedupeKey });
 
       // Check CRM bottom-right in-app toast notification toggle
-      const toastEnabled = kind === "lead"
+      const toastEnabled = false
         ? localStorage.getItem("udyam.toast.leads") !== "false"
         : localStorage.getItem("udyam.toast.orders") !== "false";
 
