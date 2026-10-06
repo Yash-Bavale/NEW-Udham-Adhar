@@ -2566,6 +2566,107 @@ export type Database = {
         }
         Relationships: []
       }
+      order_action_logs: {
+        Row: {
+          action_type: string
+          created_at: string
+          created_at_ist: string
+          customer_id: string | null
+          employee_id: string | null
+          employee_name: string
+          employee_role: string | null
+          id: string
+          is_sla_breached: boolean
+          lead_id: string | null
+          new_stage: string | null
+          new_status: string | null
+          notes: string | null
+          order_id: string | null
+          previous_stage: string | null
+          previous_status: string | null
+          sla_status: string
+          source: string
+          time_spent_since_assignment_ms: number | null
+          time_spent_since_previous_action_ms: number | null
+          timestamp: string
+        }
+        Insert: {
+          action_type: string
+          created_at?: string
+          created_at_ist: string
+          customer_id?: string | null
+          employee_id?: string | null
+          employee_name: string
+          employee_role?: string | null
+          id?: string
+          is_sla_breached?: boolean
+          lead_id?: string | null
+          new_stage?: string | null
+          new_status?: string | null
+          notes?: string | null
+          order_id?: string | null
+          previous_stage?: string | null
+          previous_status?: string | null
+          sla_status?: string
+          source?: string
+          time_spent_since_assignment_ms?: number | null
+          time_spent_since_previous_action_ms?: number | null
+          timestamp?: string
+        }
+        Update: {
+          action_type?: string
+          created_at?: string
+          created_at_ist?: string
+          customer_id?: string | null
+          employee_id?: string | null
+          employee_name?: string
+          employee_role?: string | null
+          id?: string
+          is_sla_breached?: boolean
+          lead_id?: string | null
+          new_stage?: string | null
+          new_status?: string | null
+          notes?: string | null
+          order_id?: string | null
+          previous_stage?: string | null
+          previous_status?: string | null
+          sla_status?: string
+          source?: string
+          time_spent_since_assignment_ms?: number | null
+          time_spent_since_previous_action_ms?: number | null
+          timestamp?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_action_logs_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_stats"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "order_action_logs_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_action_logs_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_action_logs_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "applications"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       order_close_reasons: {
         Row: {
           category: string
