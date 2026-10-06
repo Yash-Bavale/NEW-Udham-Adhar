@@ -80,7 +80,7 @@ export const buildZohoInvoiceExport = createServerFn({ method: "POST" })
     for (let off = 0; ; off += 1000) {
       const { data: page, error } = await (admin as any)
         .from("invoices")
-        .select("id, invoice_number, lead_id, issued_at, base_amount, gst_amount, total_amount, cgst_amount, sgst_amount, igst_amount, cgst_rate, sgst_rate, igst_rate, sac_code, place_of_supply, customer_state_snapshot, customer_gstin_snapshot, company_state_snapshot, replaced_at")
+        .select("id, invoice_number, lead_id, payment_id, issued_at, base_amount, gst_amount, total_amount, cgst_amount, sgst_amount, igst_amount, cgst_rate, sgst_rate, igst_rate, sac_code, place_of_supply, customer_state_snapshot, customer_gstin_snapshot, company_state_snapshot, replaced_at")
         .gte("issued_at", fromIso)
         .lte("issued_at", toIso)
         .is("replaced_at", null)
@@ -210,7 +210,7 @@ export const buildZohoInvoiceExport = createServerFn({ method: "POST" })
     });
     return {
       columns: [...ZOHO_COLUMNS],
-      summary: { totalInvoices: invoices.length, valid, errors: invoices.length - valid, ...round(totals) },
+      summary: { totalInvoices: invoices.length, valid, errors: invoices.length - valid, excludedUnpaid: allCount - invoices.length, autoReconciled: adjusted, ...round(totals) },
       validTotals: round(validTotals),
       issues,
       rows,
