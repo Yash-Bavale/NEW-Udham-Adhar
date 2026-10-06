@@ -2274,6 +2274,8 @@ export type Database = {
         Row: {
           application_id: string | null
           base_amount: number
+          cancel_reason: string | null
+          cancelled_at: string | null
           cgst_amount: number
           cgst_rate: number
           company_gstin_snapshot: string | null
@@ -2283,6 +2285,7 @@ export type Database = {
           customer_id: string | null
           customer_state_snapshot: string | null
           delivery_status: string | null
+          duplicate_of: string | null
           email_attempts: number
           gst_amount: number
           id: string
@@ -2308,6 +2311,8 @@ export type Database = {
         Insert: {
           application_id?: string | null
           base_amount: number
+          cancel_reason?: string | null
+          cancelled_at?: string | null
           cgst_amount?: number
           cgst_rate?: number
           company_gstin_snapshot?: string | null
@@ -2317,6 +2322,7 @@ export type Database = {
           customer_id?: string | null
           customer_state_snapshot?: string | null
           delivery_status?: string | null
+          duplicate_of?: string | null
           email_attempts?: number
           gst_amount: number
           id?: string
@@ -2342,6 +2348,8 @@ export type Database = {
         Update: {
           application_id?: string | null
           base_amount?: number
+          cancel_reason?: string | null
+          cancelled_at?: string | null
           cgst_amount?: number
           cgst_rate?: number
           company_gstin_snapshot?: string | null
@@ -2351,6 +2359,7 @@ export type Database = {
           customer_id?: string | null
           customer_state_snapshot?: string | null
           delivery_status?: string | null
+          duplicate_of?: string | null
           email_attempts?: number
           gst_amount?: number
           id?: string
@@ -2407,6 +2416,13 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_duplicate_of_fkey"
+            columns: ["duplicate_of"]
+            isOneToOne: false
+            referencedRelation: "invoices"
             referencedColumns: ["id"]
           },
         ]

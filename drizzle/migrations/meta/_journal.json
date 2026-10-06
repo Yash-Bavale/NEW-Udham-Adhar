@@ -204,6 +204,13 @@
       "when": 1791279029259,
       "tag": "0028_orders_perf_indexes",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1791288851470,
+      "tag": "0029_invoice_cancellation_columns",
+      "breakpoints": true
     }
   ]
 }
