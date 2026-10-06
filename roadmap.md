@@ -16,4 +16,4 @@
 - [x] Rebuild dispute PDF output as exact selected email printouts plus selected invoice, without the summary/evidence cover or evidence branding
 - [x] Customer Document Merge (service toggle + Merge PDF on order)
 
-- [ ] Database optimization: measure usage, inspect slow queries/indexes, fix biggest cost drivers
+- [x] Database optimization: notifications index bloat fixed (60 MB → 184 kB); lead-insert speed still to review
