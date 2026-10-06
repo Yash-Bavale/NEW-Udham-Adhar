@@ -1762,6 +1762,289 @@ export type Database = {
         }
         Relationships: []
       }
+      employee_activity_log: {
+        Row: {
+          action_type: string
+          auth_user_id: string
+          created_at: string
+          employee_id: string
+          id: string
+          metadata: Json
+          new_stage: string | null
+          new_status: string | null
+          order_id: string | null
+          previous_stage: string | null
+          previous_status: string | null
+          session_id: string | null
+          ticket_id: string | null
+        }
+        Insert: {
+          action_type: string
+          auth_user_id: string
+          created_at?: string
+          employee_id: string
+          id?: string
+          metadata?: Json
+          new_stage?: string | null
+          new_status?: string | null
+          order_id?: string | null
+          previous_stage?: string | null
+          previous_status?: string | null
+          session_id?: string | null
+          ticket_id?: string | null
+        }
+        Update: {
+          action_type?: string
+          auth_user_id?: string
+          created_at?: string
+          employee_id?: string
+          id?: string
+          metadata?: Json
+          new_stage?: string | null
+          new_status?: string | null
+          order_id?: string | null
+          previous_stage?: string | null
+          previous_status?: string | null
+          session_id?: string | null
+          ticket_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_activity_log_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_activity_log_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "applications"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employee_login_history: {
+        Row: {
+          auth_user_id: string | null
+          browser: string | null
+          browser_version: string | null
+          created_at: string
+          device_type: string | null
+          email: string
+          employee_id: string | null
+          failure_reason: string | null
+          id: string
+          ip_address: string | null
+          login_at: string
+          login_method: string
+          operating_system: string | null
+          success: boolean
+          user_agent: string | null
+        }
+        Insert: {
+          auth_user_id?: string | null
+          browser?: string | null
+          browser_version?: string | null
+          created_at?: string
+          device_type?: string | null
+          email: string
+          employee_id?: string | null
+          failure_reason?: string | null
+          id?: string
+          ip_address?: string | null
+          login_at?: string
+          login_method?: string
+          operating_system?: string | null
+          success?: boolean
+          user_agent?: string | null
+        }
+        Update: {
+          auth_user_id?: string | null
+          browser?: string | null
+          browser_version?: string | null
+          created_at?: string
+          device_type?: string | null
+          email?: string
+          employee_id?: string | null
+          failure_reason?: string | null
+          id?: string
+          ip_address?: string | null
+          login_at?: string
+          login_method?: string
+          operating_system?: string | null
+          success?: boolean
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_login_history_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employee_security_events: {
+        Row: {
+          actor_id: string | null
+          auth_user_id: string | null
+          created_at: string
+          employee_id: string | null
+          event_type: string
+          id: string
+          ip_address: string | null
+          metadata: Json
+          session_id: string | null
+          user_agent: string | null
+        }
+        Insert: {
+          actor_id?: string | null
+          auth_user_id?: string | null
+          created_at?: string
+          employee_id?: string | null
+          event_type: string
+          id?: string
+          ip_address?: string | null
+          metadata?: Json
+          session_id?: string | null
+          user_agent?: string | null
+        }
+        Update: {
+          actor_id?: string | null
+          auth_user_id?: string | null
+          created_at?: string
+          employee_id?: string | null
+          event_type?: string
+          id?: string
+          ip_address?: string | null
+          metadata?: Json
+          session_id?: string | null
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_security_events_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employee_sessions: {
+        Row: {
+          active_seconds: number
+          auth_user_id: string
+          away_seconds: number
+          browser: string | null
+          browser_version: string | null
+          created_at: string
+          current_module: string | null
+          current_order_code: string | null
+          current_order_id: string | null
+          current_page: string | null
+          device_name: string | null
+          device_type: string | null
+          employee_id: string
+          id: string
+          idle_seconds: number
+          ip_address: string | null
+          is_active: boolean
+          last_action_text: string | null
+          last_activity_at: string
+          last_heartbeat_at: string
+          login_at: string
+          login_method: string
+          logout_at: string | null
+          logout_reason: string | null
+          operating_system: string | null
+          session_id: string
+          status: string
+          updated_at: string
+          user_agent: string | null
+        }
+        Insert: {
+          active_seconds?: number
+          auth_user_id: string
+          away_seconds?: number
+          browser?: string | null
+          browser_version?: string | null
+          created_at?: string
+          current_module?: string | null
+          current_order_code?: string | null
+          current_order_id?: string | null
+          current_page?: string | null
+          device_name?: string | null
+          device_type?: string | null
+          employee_id: string
+          id?: string
+          idle_seconds?: number
+          ip_address?: string | null
+          is_active?: boolean
+          last_action_text?: string | null
+          last_activity_at?: string
+          last_heartbeat_at?: string
+          login_at?: string
+          login_method?: string
+          logout_at?: string | null
+          logout_reason?: string | null
+          operating_system?: string | null
+          session_id: string
+          status?: string
+          updated_at?: string
+          user_agent?: string | null
+        }
+        Update: {
+          active_seconds?: number
+          auth_user_id?: string
+          away_seconds?: number
+          browser?: string | null
+          browser_version?: string | null
+          created_at?: string
+          current_module?: string | null
+          current_order_code?: string | null
+          current_order_id?: string | null
+          current_page?: string | null
+          device_name?: string | null
+          device_type?: string | null
+          employee_id?: string
+          id?: string
+          idle_seconds?: number
+          ip_address?: string | null
+          is_active?: boolean
+          last_action_text?: string | null
+          last_activity_at?: string
+          last_heartbeat_at?: string
+          login_at?: string
+          login_method?: string
+          logout_at?: string | null
+          logout_reason?: string | null
+          operating_system?: string | null
+          session_id?: string
+          status?: string
+          updated_at?: string
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_sessions_current_order_id_fkey"
+            columns: ["current_order_id"]
+            isOneToOne: false
+            referencedRelation: "applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_sessions_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       follow_ups: {
         Row: {
           application_id: string | null
@@ -5057,6 +5340,14 @@ export type Database = {
         Args: { p_mailbox: string; p_ttl_seconds?: number; p_worker_id: string }
         Returns: boolean
       }
+      admin_force_logout_all_sessions: {
+        Args: { p_employee_id: string; p_reason?: string }
+        Returns: Json
+      }
+      admin_force_logout_session: {
+        Args: { p_reason?: string; p_session_id: string }
+        Returns: Json
+      }
       allowed_order_transitions: {
         Args: { _from: Database["public"]["Enums"]["order_status_enum"] }
         Returns: Database["public"]["Enums"]["order_status_enum"][]
@@ -5200,6 +5491,27 @@ export type Database = {
           msg_id: number
           read_ct: number
         }[]
+      }
+      record_employee_heartbeat_v2: {
+        Args: {
+          p_active_seconds_delta?: number
+          p_away_seconds_delta?: number
+          p_browser?: string
+          p_browser_version?: string
+          p_current_module?: string
+          p_current_order_code?: string
+          p_current_order_id?: string
+          p_current_page?: string
+          p_device_type?: string
+          p_employee_id?: string
+          p_idle_seconds_delta?: number
+          p_ip_address?: string
+          p_last_action_text?: string
+          p_os?: string
+          p_presence_status: string
+          p_session_id: string
+        }
+        Returns: Json
       }
       release_email_ingestion_lock: {
         Args: { p_mailbox: string; p_worker_id: string }

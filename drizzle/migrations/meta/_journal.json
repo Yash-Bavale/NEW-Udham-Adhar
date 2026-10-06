@@ -176,6 +176,13 @@
       "when": 1791274208750,
       "tag": "0024_create_order_action_logs",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1791274333130,
+      "tag": "0025_employee_auth_sessions_security",
+      "breakpoints": true
     }
   ]
 }
