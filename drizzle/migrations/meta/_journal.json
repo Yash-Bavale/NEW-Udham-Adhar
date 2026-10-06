@@ -169,6 +169,27 @@
       "when": 1791021819951,
       "tag": "0023_atomic_order_assignment",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1791274208750,
+      "tag": "0024_create_order_action_logs",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1791274333130,
+      "tag": "0025_employee_auth_sessions_security",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1791274464411,
+      "tag": "0026_reindex_bloated_notifications",
+      "breakpoints": true
     }
   ]
 }
