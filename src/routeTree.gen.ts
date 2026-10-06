@@ -98,6 +98,7 @@ import { Route as AdminTrainingRouteImport } from './routes/admin.training'
 import { Route as AdminUsersRouteImport } from './routes/admin.users'
 import { Route as AdminWebsitesRouteImport } from './routes/admin.websites'
 import { Route as AdminWhatsappTemplatesRouteImport } from './routes/admin.whatsapp-templates'
+import { Route as AdminZohoExportRouteImport } from './routes/admin.zoho-export'
 import { Route as ApiHealthRouteImport } from './routes/api/health'
 import { Route as AppTokenRouteImport } from './routes/app.$token'
 import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
@@ -625,6 +626,11 @@ const AdminWhatsappTemplatesRoute = AdminWhatsappTemplatesRouteImport.update({
   path: '/whatsapp-templates',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminZohoExportRoute = AdminZohoExportRouteImport.update({
+  id: '/zoho-export',
+  path: '/zoho-export',
+  getParentRoute: () => AdminRoute,
+} as any)
 const ApiHealthRoute = ApiHealthRouteImport.update({
   id: '/api/health',
   path: '/api/health',
@@ -1114,6 +1120,7 @@ export interface FileRoutesByFullPath {
   '/admin/users': typeof AdminUsersRoute
   '/admin/websites': typeof AdminWebsitesRoute
   '/admin/whatsapp-templates': typeof AdminWhatsappTemplatesRoute
+  '/admin/zoho-export': typeof AdminZohoExportRoute
   '/api/health': typeof ApiHealthRoute
   '/app/$token': typeof AppTokenRoute
   '/auth/callback': typeof AuthCallbackRoute
@@ -1274,6 +1281,7 @@ export interface FileRoutesByTo {
   '/admin/users': typeof AdminUsersRoute
   '/admin/websites': typeof AdminWebsitesRoute
   '/admin/whatsapp-templates': typeof AdminWhatsappTemplatesRoute
+  '/admin/zoho-export': typeof AdminZohoExportRoute
   '/api/health': typeof ApiHealthRoute
   '/app/$token': typeof AppTokenRoute
   '/auth/callback': typeof AuthCallbackRoute
@@ -1438,6 +1446,7 @@ export interface FileRoutesById {
   '/admin/users': typeof AdminUsersRoute
   '/admin/websites': typeof AdminWebsitesRoute
   '/admin/whatsapp-templates': typeof AdminWhatsappTemplatesRoute
+  '/admin/zoho-export': typeof AdminZohoExportRoute
   '/api/health': typeof ApiHealthRoute
   '/app/$token': typeof AppTokenRoute
   '/auth/callback': typeof AuthCallbackRoute
@@ -1604,6 +1613,7 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/admin/websites'
     | '/admin/whatsapp-templates'
+    | '/admin/zoho-export'
     | '/api/health'
     | '/app/$token'
     | '/auth/callback'
@@ -1764,6 +1774,7 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/admin/websites'
     | '/admin/whatsapp-templates'
+    | '/admin/zoho-export'
     | '/api/health'
     | '/app/$token'
     | '/auth/callback'
@@ -1927,6 +1938,7 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/admin/websites'
     | '/admin/whatsapp-templates'
+    | '/admin/zoho-export'
     | '/api/health'
     | '/app/$token'
     | '/auth/callback'
@@ -2727,6 +2739,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminWhatsappTemplatesRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/zoho-export': {
+      id: '/admin/zoho-export'
+      path: '/zoho-export'
+      fullPath: '/admin/zoho-export'
+      preLoaderRoute: typeof AdminZohoExportRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/api/health': {
       id: '/api/health'
       path: '/api/health'
@@ -3404,6 +3423,7 @@ interface AdminRouteChildren {
   AdminUsersRoute: typeof AdminUsersRoute
   AdminWebsitesRoute: typeof AdminWebsitesRoute
   AdminWhatsappTemplatesRoute: typeof AdminWhatsappTemplatesRoute
+  AdminZohoExportRoute: typeof AdminZohoExportRoute
   AdminIndexRoute: typeof AdminIndexRoute
   AdminHelpEmailMatrixRoute: typeof AdminHelpEmailMatrixRoute
   AdminSupportTicketsRoute: typeof AdminSupportTicketsRouteWithChildren
@@ -3458,6 +3478,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminUsersRoute: AdminUsersRoute,
   AdminWebsitesRoute: AdminWebsitesRoute,
   AdminWhatsappTemplatesRoute: AdminWhatsappTemplatesRoute,
+  AdminZohoExportRoute: AdminZohoExportRoute,
   AdminIndexRoute: AdminIndexRoute,
   AdminHelpEmailMatrixRoute: AdminHelpEmailMatrixRoute,
   AdminSupportTicketsRoute: AdminSupportTicketsRouteWithChildren,
