@@ -281,8 +281,12 @@ export function PaymentsTransactionLedger({
                   to: dateTo ? new Date(dateTo) : undefined,
                 }}
                 onChange={(range) => {
-                  setDateFrom(range.from ? range.from.toISOString().slice(0, 10) : "");
-                  setDateTo(range.to ? range.to.toISOString().slice(0, 10) : "");
+                  const f = range.from ? new Date(range.from) : undefined;
+                  if (f) f.setHours(0, 0, 0, 0);
+                  const t = range.to ? new Date(range.to) : f ? new Date(f) : undefined;
+                  if (t) t.setHours(23, 59, 59, 999);
+                  setDateFrom(f ? f.toISOString() : "");
+                  setDateTo(t ? t.toISOString() : "");
                   setPage(1);
                 }}
               />
