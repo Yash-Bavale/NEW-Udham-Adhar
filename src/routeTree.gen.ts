@@ -56,6 +56,7 @@ import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as AdminActivityRouteImport } from './routes/admin.activity'
 import { Route as AdminApplicationsRouteImport } from './routes/admin.applications'
 import { Route as AdminAssignmentHistoryRouteImport } from './routes/admin.assignment-history'
+import { Route as AdminAttendanceRouteImport } from './routes/admin.attendance'
 import { Route as AdminAuditRouteImport } from './routes/admin.audit'
 import { Route as AdminCannedResponsesRouteImport } from './routes/admin.canned-responses'
 import { Route as AdminCertificatesRouteImport } from './routes/admin.certificates'
@@ -412,6 +413,11 @@ const AdminApplicationsRoute = AdminApplicationsRouteImport.update({
 const AdminAssignmentHistoryRoute = AdminAssignmentHistoryRouteImport.update({
   id: '/assignment-history',
   path: '/assignment-history',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminAttendanceRoute = AdminAttendanceRouteImport.update({
+  id: '/attendance',
+  path: '/attendance',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminAuditRoute = AdminAuditRouteImport.update({
@@ -1066,6 +1072,7 @@ export interface FileRoutesByFullPath {
   '/admin/activity': typeof AdminActivityRoute
   '/admin/applications': typeof AdminApplicationsRouteWithChildren
   '/admin/assignment-history': typeof AdminAssignmentHistoryRoute
+  '/admin/attendance': typeof AdminAttendanceRoute
   '/admin/audit': typeof AdminAuditRoute
   '/admin/canned-responses': typeof AdminCannedResponsesRoute
   '/admin/certificates': typeof AdminCertificatesRoute
@@ -1228,6 +1235,7 @@ export interface FileRoutesByTo {
   '/admin/activity': typeof AdminActivityRoute
   '/admin/applications': typeof AdminApplicationsRouteWithChildren
   '/admin/assignment-history': typeof AdminAssignmentHistoryRoute
+  '/admin/attendance': typeof AdminAttendanceRoute
   '/admin/audit': typeof AdminAuditRoute
   '/admin/canned-responses': typeof AdminCannedResponsesRoute
   '/admin/certificates': typeof AdminCertificatesRoute
@@ -1388,6 +1396,7 @@ export interface FileRoutesById {
   '/admin/activity': typeof AdminActivityRoute
   '/admin/applications': typeof AdminApplicationsRouteWithChildren
   '/admin/assignment-history': typeof AdminAssignmentHistoryRoute
+  '/admin/attendance': typeof AdminAttendanceRoute
   '/admin/audit': typeof AdminAuditRoute
   '/admin/canned-responses': typeof AdminCannedResponsesRoute
   '/admin/certificates': typeof AdminCertificatesRoute
@@ -1553,6 +1562,7 @@ export interface FileRouteTypes {
     | '/admin/activity'
     | '/admin/applications'
     | '/admin/assignment-history'
+    | '/admin/attendance'
     | '/admin/audit'
     | '/admin/canned-responses'
     | '/admin/certificates'
@@ -1715,6 +1725,7 @@ export interface FileRouteTypes {
     | '/admin/activity'
     | '/admin/applications'
     | '/admin/assignment-history'
+    | '/admin/attendance'
     | '/admin/audit'
     | '/admin/canned-responses'
     | '/admin/certificates'
@@ -1874,6 +1885,7 @@ export interface FileRouteTypes {
     | '/admin/activity'
     | '/admin/applications'
     | '/admin/assignment-history'
+    | '/admin/attendance'
     | '/admin/audit'
     | '/admin/canned-responses'
     | '/admin/certificates'
@@ -2419,6 +2431,13 @@ declare module '@tanstack/react-router' {
       path: '/assignment-history'
       fullPath: '/admin/assignment-history'
       preLoaderRoute: typeof AdminAssignmentHistoryRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/attendance': {
+      id: '/admin/attendance'
+      path: '/attendance'
+      fullPath: '/admin/attendance'
+      preLoaderRoute: typeof AdminAttendanceRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/audit': {
@@ -3343,6 +3362,7 @@ interface AdminRouteChildren {
   AdminActivityRoute: typeof AdminActivityRoute
   AdminApplicationsRoute: typeof AdminApplicationsRouteWithChildren
   AdminAssignmentHistoryRoute: typeof AdminAssignmentHistoryRoute
+  AdminAttendanceRoute: typeof AdminAttendanceRoute
   AdminAuditRoute: typeof AdminAuditRoute
   AdminCannedResponsesRoute: typeof AdminCannedResponsesRoute
   AdminCertificatesRoute: typeof AdminCertificatesRoute
@@ -3396,6 +3416,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminActivityRoute: AdminActivityRoute,
   AdminApplicationsRoute: AdminApplicationsRouteWithChildren,
   AdminAssignmentHistoryRoute: AdminAssignmentHistoryRoute,
+  AdminAttendanceRoute: AdminAttendanceRoute,
   AdminAuditRoute: AdminAuditRoute,
   AdminCannedResponsesRoute: AdminCannedResponsesRoute,
   AdminCertificatesRoute: AdminCertificatesRoute,
