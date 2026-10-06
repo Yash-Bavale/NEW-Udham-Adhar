@@ -183,10 +183,8 @@ export function RevenueDashboardView() {
           <div className="flex flex-wrap items-center gap-2">
             <DateRangePicker
               preset={preset as DateRangePresetKey}
-              onPresetChange={(p) => {
-                setPreset(p as RevenueRangePreset);
-                setFromIso(undefined);
-                setToIso(undefined);
+              onPresetChange={() => {
+                /* handled in onChange so custom dates are not wiped */
               }}
               value={{
                 from: fromIso ? new Date(fromIso) : undefined,
@@ -195,7 +193,7 @@ export function RevenueDashboardView() {
               onChange={(range, pKey) => {
                 // Hand-picked dates must be applied as a custom range covering whole days,
                 // otherwise the server keeps using the previous preset (e.g. "Today").
-                const isPreset = pKey && pKey !== "custom";
+                const isPreset = pKey && pKey !== "custom" && pKey !== "15d";
                 if (isPreset) {
                   setPreset(pKey as RevenueRangePreset);
                   setFromIso(undefined);
