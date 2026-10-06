@@ -170,7 +170,8 @@ export function useEmployeePresence(options?: {
         if (res && res.terminated) {
           alert(res.logout_reason || "Your active session has been terminated by an administrator.");
           const { supabase } = await import("@/integrations/supabase/client");
-          await supabase.auth.signOut();
+          try { window.sessionStorage.removeItem("crm_employee_session_id"); } catch { /* ignore */ }
+          await supabase.auth.signOut({ scope: "local" });
           window.location.href = "/admin-login";
         }
       } catch (err) {

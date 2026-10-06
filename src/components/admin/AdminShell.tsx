@@ -355,7 +355,8 @@ function Shell({ children, email }: { children: ReactNode; email?: string }) {
       <button
         onClick={async () => {
           if (isMobile) setMobileOpen(false);
-          await supabase.auth.signOut();
+          try { window.sessionStorage.removeItem("crm_employee_session_id"); } catch { /* ignore */ }
+          await supabase.auth.signOut({ scope: "local" });
           navigate({ to: "/admin-login" });
         }}
         title={sidebarCollapsed && !isMobile ? "Logout" : undefined}
@@ -479,7 +480,8 @@ function Shell({ children, email }: { children: ReactNode; email?: string }) {
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             <NotificationsBell />
             <UserMenu email={email} onSignOut={async () => {
-              await supabase.auth.signOut();
+              try { window.sessionStorage.removeItem("crm_employee_session_id"); } catch { /* ignore */ }
+          await supabase.auth.signOut({ scope: "local" });
               navigate({ to: "/admin-login" });
             }} />
           </div>
