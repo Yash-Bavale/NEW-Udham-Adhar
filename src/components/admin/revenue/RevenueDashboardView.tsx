@@ -193,9 +193,22 @@ export function RevenueDashboardView() {
                 to: toIso ? new Date(toIso) : undefined,
               }}
               onChange={(range, pKey) => {
-                if (pKey) setPreset(pKey as RevenueRangePreset);
-                setFromIso(range.from ? range.from.toISOString() : undefined);
-                setToIso(range.to ? range.to.toISOString() : undefined);
+                // Hand-picked dates must be applied as a custom range covering whole days,
+                // otherwise the server keeps using the previous preset (e.g. "Today").
+                const isPreset = pKey && pKey !== "custom";
+                if (isPreset) {
+                  setPreset(pKey as RevenueRangePreset);
+                  setFromIso(undefined);
+                  setToIso(undefined);
+                  return;
+                }
+                setPreset("custom" as RevenueRangePreset);
+                const from = range.from ? new Date(range.from) : undefined;
+                if (from) from.setHours(0, 0, 0, 0);
+                const to = range.to ? new Date(range.to) : from ? new Date(from) : undefined;
+                if (to) to.setHours(23, 59, 59, 999);
+                setFromIso(from ? from.toISOString() : undefined);
+                setToIso(to ? to.toISOString() : undefined);
               }}
             />
 
