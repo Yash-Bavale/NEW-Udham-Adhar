@@ -80,7 +80,7 @@ export const buildZohoInvoiceExport = createServerFn({ method: "POST" })
     for (let off = 0; ; off += 1000) {
       const { data: page, error } = await (admin as any)
         .from("invoices")
-        .select("id, invoice_number, lead_id, issued_at, base_amount, gst_amount, total_amount, cgst_amount, sgst_amount, igst_amount, cgst_rate, sgst_rate, igst_rate, sac_code, place_of_supply, customer_state_snapshot, customer_gstin_snapshot, company_state_snapshot, replaced_at")
+        .select("id, invoice_number, lead_id, payment_id, issued_at, base_amount, gst_amount, total_amount, cgst_amount, sgst_amount, igst_amount, cgst_rate, sgst_rate, igst_rate, sac_code, place_of_supply, customer_state_snapshot, customer_gstin_snapshot, company_state_snapshot, replaced_at")
         .gte("issued_at", fromIso)
         .lte("issued_at", toIso)
         .is("replaced_at", null)
@@ -90,6 +90,25 @@ export const buildZohoInvoiceExport = createServerFn({ method: "POST" })
       invoices.push(...(page ?? []));
       if (!page || page.length < 1000) break;
     }
+
+    // Only invoices backed by a successful, gateway-approved, non-test payment
+    const payIds = [...new Set(invoices.map((i) => i.payment_id).filter(Boolean))];
+    const approved = new Set<string>();
+    for (let i = 0; i < payIds.length; i += 200) {
+      const { data: ps, error } = await admin
+        .from("payments")
+        .select("id, status, is_test_payment, razorpay_payment_id, payu_mihpayid, transaction_id")
+        .in("id", payIds.slice(i, i + 200));
+      if (error) throw new Error(error.message);
+      for (const p of ps ?? []) {
+        const gw = p.razorpay_payment_id || p.payu_mihpayid || p.transaction_id;
+        if (String(p.status).toLowerCase() === "paid" && !p.is_test_payment && gw) approved.add(p.id);
+      }
+    }
+    const allCount = invoices.length;
+    const eligible = invoices.filter((i) => i.payment_id && approved.has(i.payment_id));
+    invoices.length = 0;
+    invoices.push(...eligible);
 
     const leadIds = [...new Set(invoices.map((i) => i.lead_id).filter(Boolean))];
     const leads = new Map<string, any>();
@@ -107,6 +126,7 @@ export const buildZohoInvoiceExport = createServerFn({ method: "POST" })
     const totals = { taxable: 0, cgst: 0, sgst: 0, igst: 0, total: 0 };
     const validTotals = { taxable: 0, cgst: 0, sgst: 0, igst: 0, total: 0 };
     let valid = 0;
+    let adjusted = 0;
 
     for (const inv of invoices) {
       const no = inv.invoice_number ?? `(no number ${String(inv.id).slice(0, 8)})`;
@@ -114,11 +134,22 @@ export const buildZohoInvoiceExport = createServerFn({ method: "POST" })
       const add = (field: string, error: string) => errs.push({ invoice_number: no, field, error });
       const lead = inv.lead_id ? leads.get(inv.lead_id) : null;
 
-      const base = num(inv.base_amount), gst = num(inv.gst_amount), total = num(inv.total_amount);
-      const cg = num(inv.cgst_amount) || 0, sg = num(inv.sgst_amount) || 0, ig = num(inv.igst_amount) || 0;
+      const total = num(inv.total_amount);
+      let base = num(inv.base_amount), gst = num(inv.gst_amount);
+      let cg = num(inv.cgst_amount) || 0, sg = num(inv.sgst_amount) || 0, ig = num(inv.igst_amount) || 0;
       const igRate = num(inv.igst_rate) || 0, cgRate = num(inv.cgst_rate) || 0, sgRate = num(inv.sgst_rate) || 0;
-      const isIntra = cg > 0 || sg > 0;
-      const rate = isIntra ? cgRate + sgRate : igRate;
+      const isIntra = cg > 0 || sg > 0 || cgRate > 0 || sgRate > 0;
+      let rate = isIntra ? cgRate + sgRate : igRate;
+      // GST charged but rate missing → standard 18% for services
+      if (!(rate > 0) && gst > 0) rate = 18;
+
+      // Self-reconcile tax-inclusive amounts: total (amount paid) is the source of truth
+      if (total > 0 && (Number.isNaN(base) || Number.isNaN(gst) || Math.abs(r2(base + gst) - r2(total)) > 0.01)) {
+        base = r2(total / (1 + rate / 100));
+        gst = r2(total - base);
+        if (isIntra) { cg = r2(gst / 2); sg = r2(gst - cg); ig = 0; } else { ig = gst; cg = 0; sg = 0; }
+        adjusted++;
+      }
       totals.taxable += base || 0; totals.cgst += cg; totals.sgst += sg; totals.igst += ig; totals.total += total || 0;
 
       if (!inv.invoice_number) add("Invoice Number", "Missing invoice number");
@@ -179,7 +210,7 @@ export const buildZohoInvoiceExport = createServerFn({ method: "POST" })
     });
     return {
       columns: [...ZOHO_COLUMNS],
-      summary: { totalInvoices: invoices.length, valid, errors: invoices.length - valid, ...round(totals) },
+      summary: { totalInvoices: invoices.length, valid, errors: invoices.length - valid, excludedUnpaid: allCount - invoices.length, autoReconciled: adjusted, ...round(totals) },
       validTotals: round(validTotals),
       issues,
       rows,
