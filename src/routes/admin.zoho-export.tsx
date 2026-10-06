@@ -26,8 +26,9 @@ const csvCell = (v: string) => (/[",\n\r]/.test(v) ? `"${v.replace(/"/g, '""')}"
 function download(name: string, lines: string[][]) {
   const blob = new Blob(["\uFEFF" + lines.map((l) => l.map(csvCell).join(",")).join("\r\n")], { type: "text/csv;charset=utf-8" });
   const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob); a.download = name; a.click();
-  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
 }
 
 function ZohoExportPage() {
@@ -40,7 +41,6 @@ function ZohoExportPage() {
     onError: (e: any) => toast.error(e?.message ?? "Validation failed"),
   });
   const r = m.data;
-  const stale = r && (m.variables as any) === undefined;
 
   const cards = r ? [
     ["Total Invoices", String(r.summary.totalInvoices)],
@@ -66,7 +66,7 @@ function ZohoExportPage() {
         <Button onClick={() => m.mutate()} disabled={m.isPending}>{m.isPending ? "Validating…" : "Fetch & Validate"}</Button>
         <Button
           variant="secondary"
-          disabled={!r || r.rows.length === 0 || !!stale}
+          disabled={!r || r.rows.length === 0}
           onClick={() => r && download(`zoho-invoices_${from}_${to}.csv`, [r.columns, ...r.rows.map((row) => r.columns.map((c) => (row as any)[c] ?? ""))])}
         >
           Download Zoho Import File{r ? ` (${r.rows.length})` : ""}

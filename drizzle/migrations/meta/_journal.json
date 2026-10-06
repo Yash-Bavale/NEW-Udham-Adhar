@@ -204,6 +204,20 @@
       "when": 1791279029259,
       "tag": "0028_orders_perf_indexes",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1791288851470,
+      "tag": "0029_invoice_cancellation_columns",
+      "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1791288905130,
+      "tag": "0030_invoices_one_active_per_payment",
+      "breakpoints": true
     }
   ]
 }

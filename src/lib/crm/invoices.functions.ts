@@ -78,6 +78,7 @@ export async function generateAndStore(paymentId: string, actor?: { id?: string 
     .from("invoices")
     .select("id, invoice_number, pdf_path")
     .eq("payment_id", paymentId)
+    .is("cancelled_at", null)
     .maybeSingle();
 
   // GST split — pin SNAPSHOTS so future changes to company state don't alter history.
@@ -124,9 +125,19 @@ export async function generateAndStore(paymentId: string, actor?: { id?: string 
       })
       .select("id, invoice_number")
       .single();
-    if (invErr || !row) throw new Error(invErr?.message ?? "Could not create invoice");
-    invoiceId = row.id;
-    invoiceNumber = row.invoice_number!;
+    if (invErr?.code === "23505") {
+      // Another confirmation created the invoice at the same moment — reuse it.
+      const { data: winner } = await admin
+        .from("invoices").select("id, invoice_number")
+        .eq("payment_id", paymentId).is("cancelled_at", null).maybeSingle();
+      if (!winner) throw new Error(invErr.message);
+      invoiceId = winner.id;
+      invoiceNumber = winner.invoice_number!;
+    } else {
+      if (invErr || !row) throw new Error(invErr?.message ?? "Could not create invoice");
+      invoiceId = row.id;
+      invoiceNumber = row.invoice_number!;
+    }
   }
 
   const data: InvoiceData = {
@@ -199,6 +210,7 @@ export async function loadInvoiceAttachmentByPayment(paymentId: string): Promise
     .from("invoices")
     .select("invoice_number, pdf_path, application_id, lead_id")
     .eq("payment_id", paymentId)
+    .is("cancelled_at", null)
     .maybeSingle();
   if (!inv?.pdf_path) return null;
   const { data: blob, error } = await admin.storage.from(BUCKET).download(inv.pdf_path);
@@ -249,6 +261,7 @@ export async function markInvoiceEmailedByPayment(
       .from("invoices")
       .select("id, email_attempts")
       .eq("payment_id", paymentId)
+      .is("cancelled_at", null)
       .maybeSingle();
     if (!inv?.id) return;
     const actor = { id: null, label: opts.actorLabel ?? "webhook" };
@@ -315,7 +328,7 @@ export const resendInvoiceEmail = createServerFn({ method: "POST" })
     const { data: inv } = await admin
       .from("invoices")
       .select("id, invoice_number, issued_at, sac_code, place_of_supply, cgst_amount, sgst_amount, igst_amount, base_amount, gst_amount, total_amount")
-      .eq("payment_id", data.paymentId).maybeSingle();
+      .eq("payment_id", data.paymentId).is("cancelled_at", null).maybeSingle();
 
     const { data: appRow } = payment.application_id
       ? await admin.from("applications").select("id, application_code").eq("id", payment.application_id).maybeSingle()
@@ -600,7 +613,7 @@ export const listPaymentsAdmin = createServerFn({ method: "POST" })
         ? admin.from("applications").select("id, application_code").in("id", appIds)
         : Promise.resolve({ data: [] as any[] }),
       payIds.length
-        ? admin.from("invoices").select("id, payment_id, invoice_number, pdf_path").in("payment_id", payIds)
+        ? admin.from("invoices").select("id, payment_id, invoice_number, pdf_path").in("payment_id", payIds).is("cancelled_at", null)
         : Promise.resolve({ data: [] as any[] }),
     ]);
 

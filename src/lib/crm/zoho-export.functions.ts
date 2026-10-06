@@ -83,7 +83,7 @@ export const buildZohoInvoiceExport = createServerFn({ method: "POST" })
         .select("id, invoice_number, lead_id, payment_id, issued_at, base_amount, gst_amount, total_amount, cgst_amount, sgst_amount, igst_amount, cgst_rate, sgst_rate, igst_rate, sac_code, place_of_supply, customer_state_snapshot, customer_gstin_snapshot, company_state_snapshot, replaced_at")
         .gte("issued_at", fromIso)
         .lte("issued_at", toIso)
-        .is("replaced_at", null)
+        .is("cancelled_at", null)
         .order("issued_at", { ascending: true })
         .range(off, off + 999);
       if (error) throw new Error(error.message);
