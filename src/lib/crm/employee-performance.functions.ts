@@ -157,7 +157,7 @@ const isUuid = (val?: string | null): boolean => {
 };
 
 const STAGE_DISPLAY_NAMES: Record<string, string> = {
-  order_received: "Order Received",
+  order_received: "Incomplete Form",
   awaiting_customer_form: "Awaiting Form",
   waiting_for_customer_submission: "Customer Form Pending",
   form_submitted: "Form Submitted",

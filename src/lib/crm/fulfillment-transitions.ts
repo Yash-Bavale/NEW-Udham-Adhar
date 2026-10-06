@@ -59,7 +59,7 @@ export const FULFILLMENT_CODE: Record<FulfillmentStatus, string> = {
 };
 
 export const FULFILLMENT_LABEL: Record<FulfillmentStatus, string> = {
-  order_received:                  "Order Received",
+  order_received:                  "Incomplete Form",
   awaiting_customer_form:          "Awaiting Customer Form",
   waiting_for_customer_submission: "Waiting for Customer Submission",
   form_submitted:                  "Form Submitted",

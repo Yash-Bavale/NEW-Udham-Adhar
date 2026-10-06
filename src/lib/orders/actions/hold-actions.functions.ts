@@ -527,7 +527,7 @@ export const resumeReopenedOrder = createServerFn({ method: "POST" })
         previousStatus: "REOPENED",
         newStatus: nextOrderStatus,
         previousStage: "Order Reopened",
-        newStage: nextFulfillmentStatus === "form_submitted" ? "Form Submitted" : "Form Not Submitted",
+        newStage: nextFulfillmentStatus === "form_submitted" ? "Form Submitted" : "Form Not Submitted Delay",
         notes: data.note || "Order resumed from reopened state",
         source: "employee",
         supabase: supabaseAdmin,
@@ -544,7 +544,7 @@ export const resumeReopenedOrder = createServerFn({ method: "POST" })
         actorId: context.userId,
         actorName: staffName,
         actionName: "Order Resumed",
-        actionReason: data.note || `Order resumed from reopened state into ${nextFulfillmentStatus === "form_submitted" ? "Form Submitted" : "Form Not Submitted"}`,
+        actionReason: data.note || `Order resumed from reopened state into ${nextFulfillmentStatus === "form_submitted" ? "Form Submitted" : "Form Not Submitted Delay"}`,
         supabase: supabaseAdmin,
       });
     } catch (hotErr) {

@@ -995,7 +995,7 @@ return (
             <SelectItem value="all">All Fulfillment Stages</SelectItem>
             <SelectGroup>
               <SelectLabel className="text-[10px] font-bold uppercase tracking-wider text-slate-400 px-2 py-1">In Progress</SelectLabel>
-              <SelectItem value="order_received">Order Received</SelectItem>
+              <SelectItem value="order_received">Incomplete Form</SelectItem>
               <SelectItem value="order_reopened">Order Reopened</SelectItem>
               <SelectItem value="form_submitted">Form Submitted</SelectItem>
               <SelectItem value="technical_delay">Technical Delay</SelectItem>

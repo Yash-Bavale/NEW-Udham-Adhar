@@ -429,7 +429,7 @@ export const sendFormLink = createServerFn({ method: "POST" })
       await completeHotOrderOnQualifyingAction({
         orderId: order.id,
         actorId: context.userId,
-        actionName: "Form Not Submitted",
+        actionName: "Form Not Submitted Delay",
         actionReason: "Form link / reminder email sent",
       });
     } catch (hotErr) {
