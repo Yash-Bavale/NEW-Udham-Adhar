@@ -190,6 +190,13 @@
       "when": 1791274464411,
       "tag": "0026_reindex_bloated_notifications",
       "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1791275312324,
+      "tag": "0027_fast_lead_attribution",
+      "breakpoints": true
     }
   ]
 }
