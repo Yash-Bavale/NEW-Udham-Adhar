@@ -33,8 +33,31 @@ export const ZOHO_COLUMNS = [
   "Notes",
 ] as const;
 
+/** Zoho Books "Customer Payments" import columns (from Zoho's sample_payments template). */
+export const ZOHO_PAYMENT_COLUMNS = [
+  "Payment Number Prefix",
+  "Payment Number Suffix",
+  "Customer Name",
+  "Place of Supply",
+  "GST Treatment",
+  "GST Identification Number (GSTIN)",
+  "Payment Type",
+  "Date",
+  "Mode",
+  "Exchange Rate",
+  "Amount",
+  "Description",
+  "Deposit To",
+  "Reference Number",
+  "Invoice Number",
+  "Invoice Amount",
+  "Withholding Tax Amount",
+  "Branch Name",
+] as const;
+export type ZohoPaymentRow = Record<(typeof ZOHO_PAYMENT_COLUMNS)[number], string>;
+
 const STATE_CODES: Record<string, string> = {
-  "andaman and nicobar islands": "AN", "andhra pradesh": "AP", "arunachal pradesh": "AR", assam: "AS",
+  "andaman and nicobar islands": "AN", "andhra pradesh": "AD", "arunachal pradesh": "AR", assam: "AS",
   bihar: "BR", chandigarh: "CH", chhattisgarh: "CG", "dadra and nagar haveli and daman and diu": "DN",
   "daman and diu": "DD", delhi: "DL", "new delhi": "DL", goa: "GA", gujarat: "GJ", haryana: "HR",
   "himachal pradesh": "HP", "jammu and kashmir": "JK", jharkhand: "JH", karnataka: "KA", kerala: "KL",
@@ -48,6 +71,8 @@ const GSTIN_RE = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/;
 function stateCode(s: string | null | undefined): string | null {
   if (!s) return null;
   const t = s.trim();
+  // Zoho uses "AD" for Andhra Pradesh; CRM/GST data often stores "AP"
+  if (t.toUpperCase() === "AP") return "AD";
   if (/^[A-Za-z]{2}$/.test(t) && Object.values(STATE_CODES).includes(t.toUpperCase())) return t.toUpperCase();
   return STATE_CODES[t.toLowerCase().replace(/&/g, "and").replace(/\s+/g, " ")] ?? null;
 }
@@ -94,15 +119,16 @@ export const buildZohoInvoiceExport = createServerFn({ method: "POST" })
     // Only invoices backed by a successful, gateway-approved, non-test payment
     const payIds = [...new Set(invoices.map((i) => i.payment_id).filter(Boolean))];
     const approved = new Set<string>();
+    const payInfo = new Map<string, any>();
     for (let i = 0; i < payIds.length; i += 200) {
       const { data: ps, error } = await admin
         .from("payments")
-        .select("id, status, is_test_payment, razorpay_payment_id, payu_mihpayid, transaction_id")
+        .select("id, status, is_test_payment, razorpay_payment_id, payu_mihpayid, transaction_id, gateway_name, payment_date, created_at")
         .in("id", payIds.slice(i, i + 200));
       if (error) throw new Error(error.message);
       for (const p of ps ?? []) {
         const gw = p.razorpay_payment_id || p.payu_mihpayid || p.transaction_id;
-        if (String(p.status).toLowerCase() === "paid" && !p.is_test_payment && gw) approved.add(p.id);
+        if (String(p.status).toLowerCase() === "paid" && !p.is_test_payment && gw) { approved.add(p.id); payInfo.set(p.id, p); }
       }
     }
     const allCount = invoices.length;
@@ -123,6 +149,7 @@ export const buildZohoInvoiceExport = createServerFn({ method: "POST" })
 
     const issues: ZohoIssue[] = [];
     const rows: ZohoRow[] = [];
+    const paymentRows: ZohoPaymentRow[] = [];
     const totals = { taxable: 0, cgst: 0, sgst: 0, igst: 0, total: 0 };
     const validTotals = { taxable: 0, cgst: 0, sgst: 0, igst: 0, total: 0 };
     let valid = 0;
@@ -203,6 +230,33 @@ export const buildZohoInvoiceExport = createServerFn({ method: "POST" })
         "Supply Type": rate > 0 ? "Taxable" : "Exempted",
         "Notes": "",
       });
+      // Matching payment row: stable unique number derived from the invoice number (max 16 chars)
+      const p = payInfo.get(inv.payment_id);
+      const m = String(inv.invoice_number).match(/^([A-Za-z]+)-?(\d{2})?(\d{2})-?(\d+)$/);
+      const prefix = m ? `P${m[1].toUpperCase()}-` : "PAY-";
+      const suffix = m ? `${m[3]}${m[4]}` : String(paymentRows.length + 1);
+      const gwName = String(p?.gateway_name ?? "").toLowerCase();
+      const mode = gwName.includes("razor") ? "Razorpay" : gwName.includes("payu") ? "PayU" : (p?.gateway_name || "Online");
+      paymentRows.push({
+        "Payment Number Prefix": prefix,
+        "Payment Number Suffix": suffix,
+        "Customer Name": customer,
+        "Place of Supply": pos!,
+        "GST Treatment": gstin ? "business_gst" : "consumer",
+        "GST Identification Number (GSTIN)": gstin,
+        "Payment Type": "Invoice Payment",
+        "Date": istDate(p?.payment_date ?? inv.issued_at ?? p?.created_at),
+        "Mode": mode,
+        "Exchange Rate": "1",
+        "Amount": r2(total).toFixed(2),
+        "Description": `Payment for ${inv.invoice_number}`,
+        "Deposit To": "Undeposited Funds",
+        "Reference Number": String(p?.razorpay_payment_id || p?.payu_mihpayid || p?.transaction_id || "").slice(0, 50),
+        "Invoice Number": inv.invoice_number,
+        "Invoice Amount": r2(total).toFixed(2),
+        "Withholding Tax Amount": "0",
+        "Branch Name": "Head Office",
+      });
     }
 
     const round = (t: typeof totals) => ({
@@ -214,5 +268,7 @@ export const buildZohoInvoiceExport = createServerFn({ method: "POST" })
       validTotals: round(validTotals),
       issues,
       rows,
+      paymentColumns: [...ZOHO_PAYMENT_COLUMNS],
+      paymentRows,
     };
   });
