@@ -1469,8 +1469,8 @@ return (
                   )}
                 </div>
               </th>
-              {isAdmin && <th className="text-left font-semibold px-3 py-2.5">Assigned</th>}
               {!hideMoney && <th className="text-right font-semibold px-3 py-2.5">Amount</th>}
+              {isAdmin && <th className="text-left font-semibold px-3 py-2.5">Assigned</th>}
             </tr>
           </thead>
           <tbody>
