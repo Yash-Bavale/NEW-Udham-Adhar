@@ -15,3 +15,5 @@
 - [ ] Smartflo config: agent_id column (done), listStaffUsers mapping (done), secrets SMARTFLO_WEBHOOK_SECRET/FALLBACK_TYPE/FALLBACK_ID (pending user form), webhook portal config answer (done), verify + publish
 - [x] Rebuild dispute PDF output as exact selected email printouts plus selected invoice, without the summary/evidence cover or evidence branding
 - [x] Customer Document Merge (service toggle + Merge PDF on order)
+
+- [ ] Database optimization: measure usage, inspect slow queries/indexes, fix biggest cost drivers
