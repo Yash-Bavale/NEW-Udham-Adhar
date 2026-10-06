@@ -242,7 +242,7 @@ export const submitOnboarding = createServerFn({ method: "POST" })
 
       // Check Plants requirement on server
       const plantsField = validationFields.find((f) => String(f.type) === "plants" || f.key === "plants");
-      if (plantsField) {
+      if (plantsField && isFieldVisible(plantsField, validationFields, mergedData)) {
         const rawPlants = mergedData[plantsField.key || "plants"];
         let plantArr: any[] = [];
         if (typeof rawPlants === "string" && rawPlants.trim()) {
@@ -264,12 +264,16 @@ export const submitOnboarding = createServerFn({ method: "POST" })
       // Pattern validation (case-insensitive flag "i")
       for (const f of validationFields) {
         if (!f.pattern) continue;
+        if (!isFieldVisible(f, validationFields, mergedData)) continue;
         const v = mergedData[f.key];
         if (v === undefined || v === null || String(v).trim() === "") continue;
         const valStr = String(v).trim();
-        const pat = f.pattern.startsWith("^") && f.pattern.endsWith("$")
-          ? f.pattern
-          : `^(${f.pattern})$`;
+        const rawPat = /^UDYAM-X+-X+-X+$/i.test(f.pattern.trim())
+          ? "^(UDYAM-[A-Z]{2}-\\d{2}-\\d{7}|[A-Z0-9-]{8,25})$"
+          : f.pattern;
+        const pat = rawPat.startsWith("^") && rawPat.endsWith("$")
+          ? rawPat
+          : `^(${rawPat})$`;
         try {
           if (!new RegExp(pat, "i").test(valStr)) {
             throw new Error(`Invalid format for ${f.label}.`);

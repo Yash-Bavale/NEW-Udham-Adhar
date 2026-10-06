@@ -60,6 +60,9 @@ function toTitleCase(input: string): string {
 export function validatePattern(pattern: string, val: string): boolean {
   if (!pattern || !val) return true;
   const trimmed = val.trim();
+  if (/^UDYAM-X+-X+-X+$/i.test(pattern.trim())) {
+    pattern = "^(UDYAM-[A-Z]{2}-\\d{2}-\\d{7}|[A-Z0-9-]{8,25})$";
+  }
   try {
     const anchored = pattern.startsWith("^") && pattern.endsWith("$")
       ? pattern
@@ -210,7 +213,7 @@ export function OnboardingForm({
 
     // 1b. Validate compulsory Plants/Units details
     const plantsField = schema.fields.find((f) => f.type === "plants" || f.key === "plants");
-    if (plantsField) {
+    if (plantsField && isFieldVisible(plantsField, schema.fields, values)) {
       const parsedPlants = parsePlants(values[plantsField.key] ?? "");
       if (parsedPlants.length === 0) {
         setErr("At least one Plant / Unit detail is required. Please fill in address details for Plant / Unit #1.");
