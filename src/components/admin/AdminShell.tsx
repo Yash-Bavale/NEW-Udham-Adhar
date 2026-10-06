@@ -111,6 +111,7 @@ const NAV: NavGroup[] = [
       { to: "/admin/reports", label: "Reports", icon: BarChart3, module: "reports", requireAnyRole: ADMIN_ROLES },
       { to: "/admin/dispute-manager", label: "Dispute Manager", icon: ShieldAlert, requireAnyRole: SUPPORT_ROLES },
       { to: "/admin/performance", label: "Employee Performance", icon: BarChart3, requireAnyRole: ADMIN_ROLES },
+      { to: "/admin/attendance", label: "Attendance & Payroll", icon: History, requireAnyRole: ADMIN_ROLES },
       { to: "/admin/audit", label: "Audit Log", icon: ScrollText, module: "audit_log", requireAnyRole: ADMIN_ROLES },
       { to: "/admin/seo", label: "SEO", icon: Globe, requireAnyRole: ADMIN_ROLES },
     ],
