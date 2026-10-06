@@ -216,6 +216,7 @@ export async function finalizePaidPayment(paymentId: string, opts: FinalizeOpts)
       .from("invoices")
       .select("invoice_number, issued_at, sac_code, place_of_supply, cgst_amount, sgst_amount, igst_amount, base_amount, gst_amount, total_amount, last_emailed_at")
       .eq("payment_id", payment.id)
+      .is("cancelled_at", null)
       .maybeSingle();
     invoiceRow = inv;
   } catch (e) {

@@ -44,6 +44,7 @@ async function fetchRows(month: string, state?: string, gateway?: string) {
     )
     .gte("issued_at", from)
     .lt("issued_at", to)
+    .is("cancelled_at", null)
     .order("issued_at", { ascending: true });
 
   const { data: invs, error } = await q;
