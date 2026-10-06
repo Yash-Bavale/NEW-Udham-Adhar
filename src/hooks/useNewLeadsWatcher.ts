@@ -85,6 +85,9 @@ export function useNewLeadsWatcher() {
         invalidateOrdersData();
       }
 
+      // Leads never ring, pop up, or send desktop alerts — the list refreshes silently.
+      if (kind === "lead") return;
+
       // Check sound configuration
       const soundEnabled = kind === "lead"
         ? localStorage.getItem("udyam.sound.leads") !== "false"
