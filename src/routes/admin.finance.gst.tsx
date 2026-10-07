@@ -2,6 +2,7 @@ import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
+import { toast } from "sonner";
 import { getGstReport, exportGstReportCsv, exportGstr1Csv } from "@/lib/finance/gst-report.functions";
 
 export const Route = createFileRoute("/admin/finance/gst")({
@@ -43,22 +44,23 @@ function GstReportPage() {
             className="rounded border px-3 py-1.5 text-sm" />
           <button
             onClick={async () => {
-              const res = await exportFn({ data: { month } });
-              const blob = new Blob([res.csv], { type: "text/csv" });
-              const url = URL.createObjectURL(blob);
-              const a = document.createElement("a");
-              a.href = url; a.download = res.filename; a.click();
-              URL.revokeObjectURL(url);
+              try {
+                const res = await exportFn({ data: { month } });
+                downloadCsv(res.csv, res.filename);
+              } catch (e: any) {
+                toast.error(e?.message || "Export failed");
+              }
             }}
             className="rounded bg-slate-900 text-white px-3 py-1.5 text-sm">Export CSV</button>
           <button
             onClick={async () => {
-              const res = await gstr1Fn({ data: { month } });
-              const blob = new Blob([res.csv], { type: "text/csv" });
-              const url = URL.createObjectURL(blob);
-              const a = document.createElement("a");
-              a.href = url; a.download = res.filename; a.click();
-              URL.revokeObjectURL(url);
+              try {
+                const res = await gstr1Fn({ data: { month } });
+                downloadCsv(res.csv, res.filename);
+                toast.success(`GSTR-1 exported (${res.count} invoices)`);
+              } catch (e: any) {
+                toast.error(e?.message || "GSTR-1 export failed");
+              }
             }}
             className="rounded border border-slate-900 px-3 py-1.5 text-sm">Export GSTR-1</button>
         </div>
@@ -123,4 +125,13 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
       <div className="p-4">{children}</div>
     </div>
   );
+}
+
+function downloadCsv(csv: string, filename: string) {
+  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
