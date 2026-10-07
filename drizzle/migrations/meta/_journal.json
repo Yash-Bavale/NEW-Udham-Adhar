@@ -218,6 +218,20 @@
       "when": 1791288905130,
       "tag": "0030_invoices_one_active_per_payment",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1791351605013,
+      "tag": "0031_migration",
+      "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1791351733973,
+      "tag": "0032_migration",
+      "breakpoints": true
     }
   ]
 }

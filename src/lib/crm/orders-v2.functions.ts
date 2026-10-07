@@ -381,6 +381,7 @@ const NEEDS_ACTION_STAGES: OrderStage[] = ["lead_received", "payment_done", "for
 
 export function isNeedsActionOrder(row: any): boolean {
   if (row.is_terminal) return false;
+  if (row.customer_resumed_pending) return true;
   const fs = String(row.fulfillment_status ?? "").toLowerCase();
   const stage = String(row.stage ?? "").toLowerCase();
   const os = String(row.order_status ?? "").toUpperCase();
@@ -632,6 +633,9 @@ export function bucketOfRow(
   if (row.is_hot && !row.in_range_action_taken && !((row as any).action_count && (row as any).action_count > 0)) {
     return "hot_orders";
   }
+
+  // Customer submitted the form after Customer Delay / Form Not Submitted Delay → Need Action
+  if ((row as any).customer_resumed_pending) return "needs_action";
 
   // Call Back Scheduled: only active/future callbacks (fires_at > now)
   if (row.is_callback_scheduled || ((row as any).callback_reminder && !(row as any).callback_reminder.is_due)) return "reminders";
@@ -1786,6 +1790,15 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         in_range_action_taken: inRangeActionTaken,
         latest_action_at: actionHistoryList[0]?.created_at ?? null,
         action_count: actionCount,
+        // Customer submitted the form after a delay; stays in Need Action until staff act on it.
+        customer_resumed_pending: (() => {
+          if (isTerminal) return false;
+          const ev = thisAppEvents.find((e: any) => e.event_type === "customer_form_resumed");
+          if (!ev || String(a.fulfillment_status ?? "") !== "form_submitted") return false;
+          const resumedAt = new Date(ev.created_at).getTime();
+          const lastAction = actionHistoryList[0]?.created_at ? new Date(actionHistoryList[0].created_at).getTime() : 0;
+          return lastAction <= resumedAt;
+        })(),
         action_history: actionHistoryList,
       };
     });
