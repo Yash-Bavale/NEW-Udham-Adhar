@@ -2,7 +2,7 @@ import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { getGstReport, exportGstReportCsv } from "@/lib/finance/gst-report.functions";
+import { getGstReport, exportGstReportCsv, exportGstr1Csv } from "@/lib/finance/gst-report.functions";
 
 export const Route = createFileRoute("/admin/finance/gst")({
   beforeLoad: async () => {
@@ -25,6 +25,7 @@ function GstReportPage() {
   const [month, setMonth] = useState(defaultMonth);
   const getFn = useServerFn(getGstReport);
   const exportFn = useServerFn(exportGstReportCsv);
+  const gstr1Fn = useServerFn(exportGstr1Csv);
 
   const { data, isLoading } = useQuery({
     queryKey: ["admin.gst", month],
@@ -50,6 +51,16 @@ function GstReportPage() {
               URL.revokeObjectURL(url);
             }}
             className="rounded bg-slate-900 text-white px-3 py-1.5 text-sm">Export CSV</button>
+          <button
+            onClick={async () => {
+              const res = await gstr1Fn({ data: { month } });
+              const blob = new Blob([res.csv], { type: "text/csv" });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement("a");
+              a.href = url; a.download = res.filename; a.click();
+              URL.revokeObjectURL(url);
+            }}
+            className="rounded border border-slate-900 px-3 py-1.5 text-sm">Export GSTR-1</button>
         </div>
       </div>
 
