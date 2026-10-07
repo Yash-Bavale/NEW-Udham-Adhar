@@ -683,6 +683,22 @@ export const listInvoicesAdmin = createServerFn({ method: "POST" })
     if (data.gstType === "igst") q = q.gt("igst_amount", 0);
     if (data.gstType === "cgst_sgst") q = q.gt("cgst_amount", 0);
 
+    // Search across ALL invoices (not just the current page)
+    if (data.q && data.q.trim()) {
+      const term = data.q.trim().replace(/[%,()]/g, " ");
+      const like = `%${term}%`;
+      const [{ data: ml }, { data: ma }] = await Promise.all([
+        admin.from("leads").select("id").or(`name.ilike.${like},email.ilike.${like},lead_code.ilike.${like},mobile.ilike.${like}`).limit(200),
+        admin.from("applications").select("id").ilike("application_code", like).limit(200),
+      ]);
+      const ors = [`invoice_number.ilike.${like}`];
+      const lids = (ml ?? []).map((r: any) => r.id);
+      const aids = (ma ?? []).map((r: any) => r.id);
+      if (lids.length) ors.push(`lead_id.in.(${lids.join(",")})`);
+      if (aids.length) ors.push(`application_id.in.(${aids.join(",")})`);
+      q = q.or(ors.join(","));
+    }
+
     const { data: rows, count, error } = await q.range(offset, offset + data.pageSize - 1);
     if (error) throw new Error(error.message);
 
