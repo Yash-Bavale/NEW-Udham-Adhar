@@ -295,7 +295,6 @@ export async function finalizePaidPayment(paymentId: string, opts: FinalizeOpts)
         };
         // First payment → E001 order confirmation. Top-up → E013 supplementary
         // payment receipt (no second "order confirmed" mail for one order).
-        const templateKey = isTopUp ? "topup_payment_received" : "order_confirmation";
         try {
           await enqueueFromTemplateInternal(
             templateKey,
