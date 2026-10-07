@@ -11,7 +11,7 @@ async function getAdmin() {
 async function assertFinance(supabase: any, userId: string) {
   const { data: roles } = await supabase.from("user_roles").select("role").eq("user_id", userId);
   const ok = (roles ?? []).some(
-    (r: any) => r.role === "super_admin" || r.role === "finance" || r.role === "admin",
+    (r: any) => r.role === "super_admin" || r.role === "finance" || r.role === "admin" || r.role === "accounts",
   );
   if (!ok) throw new Error("Forbidden");
 }
@@ -246,6 +246,7 @@ export const exportGstr1Csv = createServerFn({ method: "POST" })
         .gte("issued_at", from).lt("issued_at", to)
         .is("cancelled_at", null)
         .order("issued_at", { ascending: true })
+        .order("id", { ascending: true })
         .range(off, off + 999);
       if (error) throw new Error(error.message);
       rows.push(...(page ?? []));
