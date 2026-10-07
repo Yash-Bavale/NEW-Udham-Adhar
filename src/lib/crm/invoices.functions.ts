@@ -741,13 +741,6 @@ export const listInvoicesAdmin = createServerFn({ method: "POST" })
     });
 
     if (data.serviceId) enriched = enriched.filter((r) => r.service_id === data.serviceId);
-    if (data.q) {
-      const needle = data.q.toLowerCase();
-      enriched = enriched.filter((r) =>
-        [r.customer_name, r.customer_email, r.invoice_number, r.lead_code, r.application_code]
-          .some((v) => (v ?? "").toString().toLowerCase().includes(needle)),
-      );
-    }
 
     return { rows: enriched, total: count ?? enriched.length, page: data.page, pageSize: data.pageSize };
   });
