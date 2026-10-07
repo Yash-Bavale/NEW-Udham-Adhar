@@ -33,33 +33,49 @@ type Row = {
 };
 
 async function fetchRows(month: string, state?: string, gateway?: string) {
-  const from = `${month}-01T00:00:00Z`;
-  const d = new Date(from);
-  const to = new Date(d.getFullYear(), d.getMonth() + 1, 1).toISOString();
+  // IST month boundaries
+  const [y, m] = month.split("-").map(Number);
+  const from = new Date(Date.UTC(y, m - 1, 1) - 330 * 60000).toISOString();
+  const to = new Date(Date.UTC(y, m, 1) - 330 * 60000).toISOString();
+  const admin = await getAdmin();
 
-  let q = (await getAdmin())
-    .from("invoices")
-    .select(
-      "id, invoice_number, issued_at, base_amount, gst_amount, cgst_amount, sgst_amount, igst_amount, total_amount, place_of_supply, sac_code, lead_id, payment_id",
-    )
-    .gte("issued_at", from)
-    .lt("issued_at", to)
-    .is("cancelled_at", null)
-    .order("issued_at", { ascending: true });
+  // Page through all invoices (DB returns max 1000 rows per request)
+  const rows: Row[] = [];
+  for (let off = 0; ; off += 1000) {
+    const { data: page, error } = await admin
+      .from("invoices")
+      .select(
+        "id, invoice_number, issued_at, base_amount, gst_amount, cgst_amount, sgst_amount, igst_amount, total_amount, place_of_supply, sac_code, lead_id, payment_id",
+      )
+      .gte("issued_at", from)
+      .lt("issued_at", to)
+      .is("cancelled_at", null)
+      .order("issued_at", { ascending: true })
+      .order("id", { ascending: true })
+      .range(off, off + 999);
+    if (error) throw new Error(error.message);
+    rows.push(...((page ?? []) as Row[]));
+    if (!page || page.length < 1000) break;
+  }
 
-  const { data: invs, error } = await q;
-  if (error) throw new Error(error.message);
-  let rows = (invs ?? []) as Row[];
-
-  // Hydrate lead state + name + gateway
-  const leadIds = [...new Set(rows.map((r) => r.lead_id))];
-  const payIds = [...new Set(rows.map((r) => r.payment_id))];
-  const [{ data: leads }, { data: pays }] = await Promise.all([
-    (await getAdmin()).from("leads").select("id, name, state, lead_code, service").in("id", leadIds),
-    (await getAdmin()).from("payments").select("id, gateway_name, transaction_id").in("id", payIds),
+  // Hydrate lead state + name + gateway (chunked)
+  const chunk = <T,>(a: T[], n: number) => Array.from({ length: Math.ceil(a.length / n) }, (_, i) => a.slice(i * n, i * n + n));
+  const leadIds = [...new Set(rows.map((r) => r.lead_id).filter(Boolean))];
+  const payIds = [...new Set(rows.map((r) => r.payment_id).filter(Boolean))];
+  const leads: any[] = [];
+  const pays: any[] = [];
+  await Promise.all([
+    ...chunk(leadIds, 200).map(async (ids) => {
+      const { data } = await admin.from("leads").select("id, name, state, lead_code, service").in("id", ids);
+      leads.push(...(data ?? []));
+    }),
+    ...chunk(payIds, 200).map(async (ids) => {
+      const { data } = await admin.from("payments").select("id, gateway_name, transaction_id").in("id", ids);
+      pays.push(...(data ?? []));
+    }),
   ]);
-  const leadMap = new Map((leads ?? []).map((l: any) => [l.id, l]));
-  const payMap = new Map((pays ?? []).map((p: any) => [p.id, p]));
+  const leadMap = new Map(leads.map((l: any) => [l.id, l]));
+  const payMap = new Map(pays.map((p: any) => [p.id, p]));
 
   const enriched = rows.map((r) => {
     const l = leadMap.get(r.lead_id) || {};
