@@ -251,9 +251,9 @@ export function OnboardingForm({
       }
     }
 
-    // 2b. Date of Commencement must not be later than Date of Incorporation / Registration
-    if (values.incorporation_date && values.commencement_date && values.commencement_date > values.incorporation_date) {
-      setErr("Date of Commencement cannot be later than Date of Incorporation / Registration.");
+    // 2b. Date of Commencement must not be earlier than Date of Incorporation / Registration
+    if (values.incorporation_date && values.commencement_date && values.commencement_date < values.incorporation_date) {
+      setErr("Date of Commencement cannot be earlier than Date of Incorporation / Registration.");
       setSubmitSuccess(false);
       return;
     }
@@ -809,12 +809,12 @@ function PlantsField({ value, onChange }: { value: string; onChange: (v: string)
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <PlantInput label="Unit / Plant Name *" value={p.unit_name} onChange={(v) => setField(i, "unit_name", v)} />
-              <PlantInput label="Flat / Door / Block No. *" value={p.address_flat} onChange={(v) => setField(i, "address_flat", v)} />
-              <PlantInput label="Name of Premises / Building" value={p.address_premises} onChange={(v) => setField(i, "address_premises", v)} />
-              <PlantInput label="Village / Town *" value={p.address_village} onChange={(v) => setField(i, "address_village", v)} />
-              <PlantInput label="Block" value={p.address_block} onChange={(v) => setField(i, "address_block", v)} />
-              <PlantInput label="Road / Street / Lane *" value={p.address_road} onChange={(v) => setField(i, "address_road", v)} />
-              <PlantInput label="City *" value={p.city} onChange={(v) => setField(i, "city", v)} />
+              <PlantInput label="Flat / Door / Block No. *" value={p.address_flat} onChange={(v) => setField(i, "address_flat", v)} maxLength={20} />
+              <PlantInput label="Name of Premises / Building" value={p.address_premises} onChange={(v) => setField(i, "address_premises", v)} maxLength={50} />
+              <PlantInput label="Village / Town *" value={p.address_village} onChange={(v) => setField(i, "address_village", v)} maxLength={30} />
+              <PlantInput label="Block" value={p.address_block} onChange={(v) => setField(i, "address_block", v)} maxLength={30} />
+              <PlantInput label="Road / Street / Lane *" value={p.address_road} onChange={(v) => setField(i, "address_road", v)} maxLength={30} />
+              <PlantInput label="City *" value={p.city} onChange={(v) => setField(i, "city", v)} maxLength={25} />
               <PlantInput label="PIN Code *" value={p.pincode} onChange={(v) => setField(i, "pincode", v)} inputMode="numeric" maxLength={6} />
               <PlantSelect label="State *" value={p.state} onChange={(v) => setField(i, "state", v)}
                 options={INDIA_STATES as unknown as string[]} placeholder="Select state…" />

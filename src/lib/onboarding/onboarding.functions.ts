@@ -225,8 +225,8 @@ export const submitOnboarding = createServerFn({ method: "POST" })
       // Date of Commencement must not be later than Date of Incorporation / Registration
       const incDate = mergedData.incorporation_date;
       const comDate = mergedData.commencement_date;
-      if (incDate && comDate && String(comDate) > String(incDate)) {
-        throw new Error("Date of Commencement cannot be later than Date of Incorporation / Registration.");
+      if (incDate && comDate && String(comDate) < String(incDate)) {
+        throw new Error("Date of Commencement cannot be earlier than Date of Incorporation / Registration.");
       }
 
       // Sanitize inputs (e.g. lowercase emails)
@@ -257,6 +257,19 @@ export const submitOnboarding = createServerFn({ method: "POST" })
           const p = plantArr[i] || {};
           if (!p.unit_name || !p.city || !p.state || !p.pincode) {
             throw new Error(`Plant / Unit #${i + 1} is missing required address details.`);
+          }
+          const limits: Array<[string, string, number]> = [
+            ["address_flat", "Flat / Door / Block No.", 20],
+            ["address_premises", "Name of Premises / Building", 50],
+            ["address_village", "Village / Town", 30],
+            ["address_block", "Block", 30],
+            ["address_road", "Road / Street / Lane", 30],
+            ["city", "City", 25],
+          ];
+          for (const [k, label, max] of limits) {
+            if (p[k] && String(p[k]).length > max) {
+              throw new Error(`Plant / Unit #${i + 1}: ${label} can be at most ${max} characters.`);
+            }
           }
         }
       }
