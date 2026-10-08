@@ -16,7 +16,7 @@ type Props = {
 };
 
 /** "Call via Smartflo" — rings the logged-in employee's Smartflo phone, then the customer. */
-export function SmartfloCallButton({ mobile, customerId, leadId, applicationId, className, label = "Call via Smartflo", compact }: Props) {
+export function SmartfloCallButton({ mobile, customerId, leadId, applicationId, className, label = "Call customer", compact }: Props) {
   const call = useServerFn(initiateClickToCall);
   const qc = useQueryClient();
   const [busy, setBusy] = useState(false);
@@ -34,7 +34,7 @@ export function SmartfloCallButton({ mobile, customerId, leadId, applicationId, 
           applicationId: applicationId ?? null,
         },
       });
-      toast.success(r?.alreadyInProgress ? "This call is already in progress" : "Calling customer… answer your Smartflo phone first");
+      toast.success(r?.alreadyInProgress ? "This call is already in progress" : "Calling customer… answer your phone first");
       qc.invalidateQueries({ queryKey: ["my-call-state"] });
     } catch (e: any) {
       toast.error(e?.message || "Could not start the call");
@@ -48,7 +48,7 @@ export function SmartfloCallButton({ mobile, customerId, leadId, applicationId, 
       type="button"
       onClick={onClick}
       disabled={busy}
-      title="Rings your Smartflo phone, then connects the customer"
+      title="Rings your phone or browser phone, then connects the customer"
       className={
         className ??
         `inline-flex items-center justify-center gap-1.5 rounded-lg bg-emerald-600 px-3 ${compact ? "py-1" : "py-1.5"} text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed transition`
