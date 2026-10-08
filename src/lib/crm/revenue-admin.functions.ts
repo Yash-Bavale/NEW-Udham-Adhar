@@ -602,6 +602,15 @@ const LedgerSchema = z.object({
   dateTo: z.string().optional(),
 });
 
+// Count a payment on the day it was actually paid (payment_date), falling back to created_at
+// when it never went through — same rule as the Revenue dashboard KPIs.
+function paidDayFilter(from?: string, to?: string): string | null {
+  if (!from && !to) return null;
+  const pd = [from && `payment_date.gte.${from}`, to && `payment_date.lte.${to}`].filter(Boolean);
+  const cd = ["payment_date.is.null", from && `created_at.gte.${from}`, to && `created_at.lte.${to}`].filter(Boolean);
+  return `and(${pd.join(",")}),and(${cd.join(",")})`;
+}
+
 export const listPaymentLedger = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => LedgerSchema.parse(i ?? {}))
@@ -635,8 +644,8 @@ export const listPaymentLedger = createServerFn({ method: "POST" })
     if (data.paymentMethod) q = q.ilike("payu_mode", `%${data.paymentMethod}%`);
     if (data.minAmount !== undefined) q = q.gte("amount", data.minAmount);
     if (data.maxAmount !== undefined) q = q.lte("amount", data.maxAmount);
-    if (data.dateFrom) q = q.gte("created_at", data.dateFrom);
-    if (data.dateTo) q = q.lte("created_at", data.dateTo);
+    const ledgerDay = paidDayFilter(data.dateFrom, data.dateTo);
+    if (ledgerDay) q = q.or(ledgerDay);
 
     if (data.search) {
       const s = data.search.replace(/[,()]/g, " ").trim();
@@ -654,19 +663,12 @@ export const listPaymentLedger = createServerFn({ method: "POST" })
     let qFailed = admin.from("payments").select("id", { count: "exact", head: true }).in("status", ["failed", "attempted"]);
     let qRefunded = admin.from("payments").select("id", { count: "exact", head: true }).eq("status", "refunded");
 
-    if (data.dateFrom) {
-      baseCountQ = baseCountQ.gte("created_at", data.dateFrom);
-      qSuccess = qSuccess.gte("created_at", data.dateFrom);
-      qPending = qPending.gte("created_at", data.dateFrom);
-      qFailed = qFailed.gte("created_at", data.dateFrom);
-      qRefunded = qRefunded.gte("created_at", data.dateFrom);
-    }
-    if (data.dateTo) {
-      baseCountQ = baseCountQ.lte("created_at", data.dateTo);
-      qSuccess = qSuccess.lte("created_at", data.dateTo);
-      qPending = qPending.lte("created_at", data.dateTo);
-      qFailed = qFailed.lte("created_at", data.dateTo);
-      qRefunded = qRefunded.lte("created_at", data.dateTo);
+    if (ledgerDay) {
+      baseCountQ = baseCountQ.or(ledgerDay);
+      qSuccess = qSuccess.or(ledgerDay);
+      qPending = qPending.or(ledgerDay);
+      qFailed = qFailed.or(ledgerDay);
+      qRefunded = qRefunded.or(ledgerDay);
     }
     if (data.gateway) {
       baseCountQ = baseCountQ.ilike("gateway_name", `%${data.gateway}%`);
@@ -778,8 +780,8 @@ export const exportRevenueTransactions = createServerFn({ method: "POST" })
 
         if (data.gateway) q = q.ilike("gateway_name", `%${data.gateway}%`);
         if (data.paymentMethod) q = q.ilike("payu_mode", `%${data.paymentMethod}%`);
-        if (data.dateFrom) q = q.gte("created_at", data.dateFrom);
-        if (data.dateTo) q = q.lte("created_at", data.dateTo);
+        const exportDay = paidDayFilter(data.dateFrom, data.dateTo);
+        if (exportDay) q = q.or(exportDay);
         if (data.minAmount !== undefined) q = q.gte("amount", data.minAmount);
         if (data.maxAmount !== undefined) q = q.lte("amount", data.maxAmount);
 
