@@ -1018,33 +1018,43 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
 
     const ids = appList.map((a) => a.id);
 
-    const [eventsRes, certsTableRes, actionLogsRes, globalActiveSchedulersRes] = await Promise.all([
-      admin
-        .from("application_events")
-        .select("id, application_id, event_type, old_value, new_value, note, created_by, staff_name, staff_role, created_at")
-        .in("application_id", ids)
-        .order("created_at", { ascending: false })
-        .limit(10000),
-      admin
-        .from("certificates")
-        .select("id, application_id, certificate_number, uploaded_by, issued_at, delivered_at, created_at")
-        .in("application_id", ids)
-        .order("created_at", { ascending: false }),
-      (admin
-        .from("order_action_logs" as any) as any)
-        .select("order_id, action_type, new_status, new_stage, employee_id, created_at")
-        .in("order_id", ids)
-        .order("created_at", { ascending: false })
-        .limit(10000),
-      admin
-        .from("order_schedulers")
-        .select("id, application_id, status, scheduler_type, fires_at, remarks, created_at, created_by")
-        .in("application_id", ids)
-        .order("created_at", { ascending: false })
-        .limit(5000),
+    // Chunked: a single .in() with thousands of ids exceeds URL limits and
+    // silently returns nothing (no callbacks → no Hot / Call Back counts).
+    const [eventsData, certsData, actionLogsData, globalActiveSchedulers] = await Promise.all([
+      fetchInChunks<any>(ids, 200, (chunk) =>
+        admin
+          .from("application_events")
+          .select("id, application_id, event_type, old_value, new_value, note, created_by, staff_name, staff_role, created_at")
+          .in("application_id", chunk)
+          .order("created_at", { ascending: false })
+          .limit(10000),
+      ),
+      fetchInChunks<any>(ids, 200, (chunk) =>
+        admin
+          .from("certificates")
+          .select("id, application_id, certificate_number, uploaded_by, issued_at, delivered_at, created_at")
+          .in("application_id", chunk)
+          .order("created_at", { ascending: false }),
+      ),
+      fetchInChunks<any>(ids, 200, (chunk) =>
+        (admin.from("order_action_logs" as any) as any)
+          .select("order_id, action_type, new_status, new_stage, employee_id, created_at")
+          .in("order_id", chunk)
+          .order("created_at", { ascending: false })
+          .limit(10000),
+      ),
+      fetchInChunks<any>(ids, 200, (chunk) =>
+        admin
+          .from("order_schedulers")
+          .select("id, application_id, status, scheduler_type, fires_at, remarks, created_at, created_by")
+          .in("application_id", chunk)
+          .order("created_at", { ascending: false })
+          .limit(5000),
+      ),
     ]);
-
-    const globalActiveSchedulers = globalActiveSchedulersRes.data;
+    const eventsRes = { data: eventsData };
+    const certsTableRes = { data: certsData };
+    const actionLogsRes = { data: actionLogsData };
 
     // Index all action logs, events, schedulers, and certificates per application
     const appActionLogsMap = new Map<string, any[]>();
