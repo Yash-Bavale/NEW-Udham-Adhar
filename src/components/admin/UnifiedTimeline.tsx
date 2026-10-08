@@ -456,7 +456,7 @@ export function UnifiedTimeline({ events, payments, documents, emailLogs, create
 
     out.sort((a, b) => new Date(b.ts).getTime() - new Date(a.ts).getTime());
     return out;
-  }, [events, payments, documents, emailLogs, createdAt, hideMoney, workflowEvents]);
+  }, [events, payments, documents, emailLogs, createdAt, hideMoney, workflowEvents, staffNames]);
 
   const visible = showAll ? items : items.slice(0, 12);
 
