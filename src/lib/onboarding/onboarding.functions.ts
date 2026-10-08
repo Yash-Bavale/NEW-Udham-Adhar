@@ -225,8 +225,8 @@ export const submitOnboarding = createServerFn({ method: "POST" })
       // Date of Commencement must not be later than Date of Incorporation / Registration
       const incDate = mergedData.incorporation_date;
       const comDate = mergedData.commencement_date;
-      if (incDate && comDate && String(comDate) > String(incDate)) {
-        throw new Error("Date of Commencement cannot be later than Date of Incorporation / Registration.");
+      if (incDate && comDate && String(comDate) < String(incDate)) {
+        throw new Error("Date of Commencement cannot be earlier than Date of Incorporation / Registration.");
       }
 
       // Sanitize inputs (e.g. lowercase emails)
