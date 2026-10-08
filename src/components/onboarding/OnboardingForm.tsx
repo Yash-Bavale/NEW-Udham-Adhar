@@ -312,8 +312,9 @@ export function OnboardingForm({
       const isNicKey = f.key === "nic_2_digit" || f.key === "nic_4_digit" || f.key === "nic_5_digit";
 
       if (f.type === "section") {
-        const isNic = f.key === "section_nic" || /nic/i.test(f.key) || /nic.*code/i.test(f.label);
-        if (currentGroup.fields.length > 0 || currentGroup.isNic) {
+        // Only an explicit NIC heading starts a NIC block; other section names never do.
+        const isNic = f.key === "section_nic";
+        if (currentGroup.fields.length > 0) {
           groups.push(currentGroup);
         }
         currentGroup = {
@@ -331,8 +332,10 @@ export function OnboardingForm({
             groups.push(currentGroup);
           }
           currentGroup = {
-            key: "section_nic",
-            label: "20. National Industrial Classification (NIC) Code for Activities",
+            key: `section_nic_${f.key}`,
+            label: currentGroup.fields.length === 0 && currentGroup.label
+              ? currentGroup.label
+              : "National Industrial Classification (NIC) Code",
             isNic: true,
             fields: [f],
           };
@@ -343,7 +346,7 @@ export function OnboardingForm({
       }
 
       if (currentGroup.isNic) {
-        groups.push(currentGroup);
+        if (currentGroup.fields.length > 0) groups.push(currentGroup);
         currentGroup = {
           key: `section_${f.key}`,
           label: "",
@@ -355,7 +358,7 @@ export function OnboardingForm({
       currentGroup.fields.push(f);
     }
 
-    if (currentGroup.fields.length > 0 || currentGroup.isNic) {
+    if (currentGroup.fields.length > 0) {
       groups.push(currentGroup);
     }
 
@@ -368,13 +371,8 @@ export function OnboardingForm({
         {sectionGroups.map((group, groupIdx) => {
           const visibleFields = group.fields.filter((f) => isFieldVisible(f, schema.fields, values));
 
-          if (group.isNic) {
-            const hasNicFields = schema.fields.some((x) => /^nic_[245]_digit$/.test(x.key));
-            const anyNicVisible =
-              !hasNicFields ||
-              schema.fields.some((x) => /^nic_[245]_digit$/.test(x.key) && isFieldVisible(x, schema.fields, values));
-            if (!anyNicVisible) return null;
-          } else if (visibleFields.length === 0) {
+          // NIC block shows only when its own NIC fields are visible (e.g. "Update NIC Code" ticked).
+          if (visibleFields.length === 0) {
             return null;
           }
 
