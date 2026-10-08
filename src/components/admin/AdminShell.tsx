@@ -71,7 +71,6 @@ const NAV: NavGroup[] = [
     label: "Work",
     items: [
       { to: "/admin/leads", label: "Leads", icon: Users, module: "leads", requireAnyRole: ADMIN_ROLES },
-      { to: "/admin/orders", label: "Orders", icon: ShoppingBag, module: "orders", requireAnyRole: ALL_STAFF_ROLES },
       { to: "/admin/training", label: "Training", icon: GraduationCap, requireAnyRole: ALL_STAFF_ROLES },
       { to: "/admin/customers", label: "Customers", icon: UserCircle2, module: "customers", requireAnyRole: ADMIN_ROLES },
       { to: "/admin/documents", label: "Documents", icon: FileText, module: "documents", requireAnyRole: ADMIN_ROLES },
@@ -84,7 +83,6 @@ const NAV: NavGroup[] = [
     label: "Service",
     items: [
       { to: "/admin/complaints", label: "Complaints & Contact Forms", icon: MessageSquareWarning, module: "complaints", requireAnyRole: SUPPORT_ROLES },
-      { to: "/admin/tickets", label: "Support Tickets", icon: LifeBuoy, module: "tickets", requireAnyRole: SUPPORT_ROLES },
       { to: "/admin/canned-responses", label: "Canned Responses", icon: LifeBuoy, module: "tickets", requireAnyRole: SUPPORT_ROLES },
       { to: "/admin/quarantine", label: "Email Quarantine", icon: Mail, module: "tickets", requireAnyRole: SUPPORT_ROLES },
       { to: "/admin/websites", label: "Websites", icon: Globe, requireAnyRole: ADMIN_ROLES },
@@ -121,7 +119,6 @@ const NAV: NavGroup[] = [
     id: "admin",
     label: "System",
     items: [
-      { to: "/admin/employees", label: "Employees", icon: UserCog, module: "employees", requireAnyRole: ADMIN_ROLES },
       { to: "/admin/assignment-history", label: "Assignment & Leaves", icon: History, requireAnyRole: ADMIN_ROLES },
       { to: "/admin/live-calls", label: "Live Calls", icon: Activity, requireAnyRole: ADMIN_ROLES },
       { to: "/admin/sessions", label: "Sessions & Security", icon: ShieldAlert, requireAnyRole: ADMIN_ROLES },
