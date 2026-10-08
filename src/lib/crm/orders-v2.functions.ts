@@ -382,9 +382,6 @@ const NEEDS_ACTION_STAGES: OrderStage[] = ["lead_received", "payment_done", "for
 export function isNeedsActionOrder(row: any): boolean {
   if (row.is_terminal) return false;
   if (row.customer_resumed_pending) return true;
-  // Hot = callback came due or order reopened → needs staff action now,
-  // regardless of actions taken before it became hot.
-  if (row.is_hot) return true;
   const fs = String(row.fulfillment_status ?? "").toLowerCase();
   const stage = String(row.stage ?? "").toLowerCase();
   const os = String(row.order_status ?? "").toUpperCase();
