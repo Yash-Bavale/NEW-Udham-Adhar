@@ -61,9 +61,9 @@ const NAV: NavGroup[] = [
     items: [
       { to: "/admin/dashboard", label: "Executive Dashboard", icon: LayoutDashboard, module: "dashboard", requireAnyRole: ADMIN_ROLES },
       { to: "/admin/my-work", label: "My Dashboard", icon: Inbox },
-      { to: "/admin/activity", label: "Activity", icon: Activity, requireAnyRole: ADMIN_ROLES },
-      { to: "/admin/notifications", label: "Notifications", icon: Bell },
-      { to: "/admin/my-performance", label: "My Performance", icon: BarChart3, requireAnyRole: ALL_STAFF_ROLES },
+      { to: "/admin/orders", label: "Orders", icon: ShoppingBag, module: "orders", requireAnyRole: ALL_STAFF_ROLES },
+      { to: "/admin/tickets", label: "Support Tickets", icon: LifeBuoy, module: "tickets", requireAnyRole: SUPPORT_ROLES },
+      { to: "/admin/employees", label: "Employees", icon: UserCog, module: "employees", requireAnyRole: ADMIN_ROLES },
     ],
   },
   {
@@ -195,8 +195,6 @@ function Shell({ children, email }: { children: ReactNode; email?: string }) {
       label: "Overview",
       items: [
         { to: "/admin/my-work", label: "My Dashboard", icon: Inbox },
-        { to: "/admin/notifications", label: "Notifications", icon: Bell },
-        { to: "/admin/my-performance", label: "My Performance", icon: BarChart3 },
       ],
     },
     {
