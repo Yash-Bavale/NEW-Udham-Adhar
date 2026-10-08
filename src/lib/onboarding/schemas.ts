@@ -117,9 +117,9 @@ export function withSectionHeadings(sections: readonly { key: string; label: str
     if (section.fields[0]?.type === "section") {
       return [{ ...section.fields[0], label: section.label || section.fields[0].label }, ...section.fields.slice(1)];
     }
-    const isNicSection = section.fields.some((field) => /^nic_[245]_digit$/.test(field.key));
+    // Never mark the whole section as NIC: NIC renders only where its fields sit.
     return [
-      { key: isNicSection ? "section_nic" : `builder_section_${section.key}`, label: section.label, type: "section" as const },
+      { key: `builder_section_${section.key}`, label: section.label, type: "section" as const },
       ...section.fields,
     ];
   });
