@@ -34,6 +34,31 @@ export const initiateClickToCall = createServerFn({ method: "POST" })
     if (meErr) throw new Error("Could not load your profile.");
     if (!me) throw new Error("Your employee profile was not found.");
     if (me.is_active !== true) throw new Error("Your account is not active, so you cannot place calls.");
+
+    const cd = await import("@/lib/telephony/callerdesk.server");
+    if (cd.activeProvider() === "callerdesk") {
+      const agentMobile = normalizeIndianMobile(me.mobile);
+      if (!agentMobile) throw new Error("Your profile has no valid mobile number. Ask an admin to add the number you use in CallerDesk.");
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const db = supabaseAdmin as any;
+      const since = new Date(Date.now() - 90_000).toISOString();
+      const { data: dupe } = await db.from("telephony_calls").select("id, ref_id")
+        .eq("employee_id", context.userId).eq("direction", "outbound")
+        .eq("called_number", destination).in("status", ["ringing", "answered"])
+        .gte("started_at", since).limit(1).maybeSingle();
+      if (dupe) return { ok: true as const, alreadyInProgress: true as const, refId: dupe.ref_id ?? null };
+      const { campid } = await cd.callerDeskClickToCall(agentMobile, destination);
+      const refId = campid ?? `cd-${crypto.randomUUID()}`;
+      const { data: row, error } = await db.from("telephony_calls").insert({
+        provider: "callerdesk", call_id: refId, ref_id: refId, direction: "outbound",
+        status: "ringing", last_event: "initiated", employee_id: context.userId, agent_id: agentMobile,
+        customer_id: data.customerId ?? null, lead_id: data.leadId ?? null, application_id: data.applicationId ?? null,
+        caller_number: agentMobile, called_number: destination, started_at: new Date().toISOString(),
+      }).select("id").maybeSingle();
+      if (error) return { ok: true as const, refId, recorded: false as const };
+      return { ok: true as const, refId, recorded: true as const, callRowId: row?.id ?? null };
+    }
+
     const agentId = typeof me.smartflo_agent_id === "string" ? me.smartflo_agent_id.trim() : "";
     if (!agentId) throw new Error("No Smartflo Agent ID is set on your profile. Ask an admin to add it.");
 
