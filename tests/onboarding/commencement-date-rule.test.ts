@@ -1,17 +1,17 @@
 import { describe, expect, it } from "vitest";
 
-// Mirrors the rule added in OnboardingForm.tsx (client) and
-// onboarding.functions.ts (server): commencement must not be after incorporation.
+// Mirrors OnboardingForm.tsx and onboarding.functions.ts:
+// commencement must not be earlier than incorporation.
 function violatesRule(incorporation?: string, commencement?: string): boolean {
-  return Boolean(incorporation && commencement && commencement > incorporation);
+  return Boolean(incorporation && commencement && commencement < incorporation);
 }
 
 describe("commencement vs incorporation date rule", () => {
-  it("rejects commencement later than incorporation", () => {
-    expect(violatesRule("2024-01-10", "2024-06-01")).toBe(true);
+  it("rejects commencement earlier than incorporation", () => {
+    expect(violatesRule("2026-10-07", "2026-10-01")).toBe(true);
   });
-  it("allows commencement before incorporation", () => {
-    expect(violatesRule("2024-06-01", "2024-01-10")).toBe(false);
+  it("allows commencement after incorporation", () => {
+    expect(violatesRule("2024-01-10", "2024-06-01")).toBe(false);
   });
   it("allows equal dates", () => {
     expect(violatesRule("2024-03-15", "2024-03-15")).toBe(false);
