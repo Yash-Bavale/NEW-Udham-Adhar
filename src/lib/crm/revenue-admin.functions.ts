@@ -331,8 +331,8 @@ export const getRevenueOverview = createServerFn({ method: "POST" })
         admin
           .from("payments")
           .select("id, lead_id, application_id, amount, base_amount, gst_amount, gateway_name, payu_mode, status, payment_date, created_at, leads:lead_id (service)")
-          .gte("created_at", r.startIso)
-          .lte("created_at", r.endIso)
+          // Count a payment on the day it was actually paid (payment_date), falling back to created_at.
+          .or(`and(payment_date.gte.${r.startIso},payment_date.lte.${r.endIso}),and(payment_date.is.null,created_at.gte.${r.startIso},created_at.lte.${r.endIso})`)
           .order("created_at", { ascending: true }),
       ),
     );
@@ -343,8 +343,7 @@ export const getRevenueOverview = createServerFn({ method: "POST" })
         admin
           .from("payments")
           .select("id, amount, status, created_at")
-          .gte("created_at", r.prevStartIso)
-          .lte("created_at", r.prevEndIso)
+          .or(`and(payment_date.gte.${r.prevStartIso},payment_date.lte.${r.prevEndIso}),and(payment_date.is.null,created_at.gte.${r.prevStartIso},created_at.lte.${r.prevEndIso})`)
           .order("created_at", { ascending: true }),
       ),
     );
