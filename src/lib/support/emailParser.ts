@@ -194,25 +194,90 @@ export function parseEmailHtml(rawHtml: string | null | undefined): ParsedEmailH
   };
 }
 
+function escapeRegex(s: string) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * Replace cid: references in HTML email bodies with accessible URLs from attachments
+ */
+export function resolveInlineImages(
+  html: string,
+  attachments?: Array<{
+    fileName?: string;
+    file_name?: string;
+    url?: string | null;
+    cid?: string | null;
+    zoho_attachment_id?: string | null;
+  }> | null,
+): string {
+  if (!html) return html;
+  let out = html;
+
+  if (attachments && attachments.length > 0) {
+    const imagesWithUrls = attachments.filter((a) => a.url);
+
+    for (const att of imagesWithUrls) {
+      if (!att.url) continue;
+      const identifiers = [
+        att.cid,
+        att.zoho_attachment_id,
+        att.fileName,
+        att.file_name,
+      ].filter(Boolean) as string[];
+
+      for (const id of identifiers) {
+        const cidRegex = new RegExp(`src=["']cid:${escapeRegex(id)}["']`, "gi");
+        out = out.replace(cidRegex, `src="${att.url}" data-resolved-cid="true"`);
+
+        const bareCidRegex = new RegExp(`cid:${escapeRegex(id)}`, "gi");
+        out = out.replace(bareCidRegex, att.url);
+      }
+    }
+
+    // If there is only one unresolved cid and exactly one image attachment, map them directly
+    const remainingCids = out.match(/cid:[^"'\s>]+/gi);
+    if (remainingCids && remainingCids.length === 1 && imagesWithUrls.length === 1) {
+      out = out.replace(remainingCids[0], imagesWithUrls[0].url!);
+    }
+  }
+
+  // Gracefully handle any remaining unresolvable cid:... images to prevent native broken image icons
+  out = out.replace(
+    /<img([^>]*?)src=["']cid:([^"']+)["']([^>]*?)>/gi,
+    '<div class="inline-flex items-center gap-1.5 px-2.5 py-1.5 my-2 rounded-md bg-amber-50 text-amber-900 border border-amber-200 text-xs font-medium"><span>📷 Customer Screenshot / Embedded Image</span></div>',
+  );
+
+  return out;
+}
+
 /**
  * High-level helper to produce clean display content for any email record
  */
 export function parseEmailMessage(input: {
   bodyHtml?: string | null;
   bodyText?: string | null;
+  attachments?: Array<{
+    fileName?: string;
+    file_name?: string;
+    url?: string | null;
+    cid?: string | null;
+    zoho_attachment_id?: string | null;
+  }> | null;
 }): ParsedEmailMessage {
   const rawHtml = input.bodyHtml && input.bodyHtml.trim() ? input.bodyHtml : null;
   const rawText = input.bodyText && input.bodyText.trim() ? input.bodyText : null;
 
   if (rawHtml) {
-    const parsedHtml = parseEmailHtml(rawHtml);
+    const htmlWithImages = resolveInlineImages(rawHtml, input.attachments);
+    const parsedHtml = parseEmailHtml(htmlWithImages);
     return {
       isHtml: true,
-      content: parsedHtml.newHtml || rawHtml,
+      content: parsedHtml.newHtml || htmlWithImages,
       quotedContent: parsedHtml.quotedHtml,
       hasQuoted: parsedHtml.hasQuotedHtml,
-      rawHtml,
-      rawText: rawText ? decodeHtmlEntities(rawText) : htmlToPlainText(rawHtml),
+      rawHtml: htmlWithImages,
+      rawText: rawText ? decodeHtmlEntities(rawText) : htmlToPlainText(htmlWithImages),
     };
   }
 

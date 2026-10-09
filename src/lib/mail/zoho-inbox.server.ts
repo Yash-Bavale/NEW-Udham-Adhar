@@ -148,6 +148,8 @@ export type ZohoAttachmentMeta = {
   attachmentName: string;
   attachmentSize: string | number;
   contentType?: string;
+  cid?: string;
+  isInline?: boolean;
 };
 
 /** Discover all folders in Zoho and filter for relevant inbound folders.
@@ -260,7 +262,7 @@ export async function getMessageContent(
   return { html: null, text: c };
 }
 
-/** List attachments associated with an inbound message. */
+/** List attachments associated with an inbound message (including inline screenshots). */
 export async function fetchMessageAttachmentsList(
   messageId: string,
   folderId: string,
@@ -268,41 +270,68 @@ export async function fetchMessageAttachmentsList(
   const accountId = await resolveAccountId();
   try {
     const data = await zohoFetch<{ data?: unknown }>(
-      `/api/accounts/${accountId}/folders/${folderId}/messages/${messageId}/attachmentinfo`,
+      `/api/accounts/${accountId}/folders/${folderId}/messages/${messageId}/attachmentinfo?includeInline=true`,
     );
     const payload = data?.data;
-    const list = Array.isArray(payload)
-      ? payload
-      : payload && typeof payload === "object" && Array.isArray((payload as { attachments?: unknown }).attachments)
-        ? (payload as { attachments: Array<{ attachmentId?: string; attachmentName?: string; attachmentSize?: string | number; contentType?: string }> }).attachments
-        : [];
-    return list.map((a) => ({
-      attachmentId: String(a.attachmentId || ""),
-      attachmentName: a.attachmentName || "attachment",
-      attachmentSize: a.attachmentSize || 0,
-      contentType: a.contentType || "application/octet-stream",
-    })).filter((a) => a.attachmentId);
+    const rawList: any[] = [];
+    if (Array.isArray(payload)) {
+      rawList.push(...payload);
+    } else if (payload && typeof payload === "object") {
+      const obj = payload as Record<string, any>;
+      if (Array.isArray(obj.attachments)) rawList.push(...obj.attachments);
+      if (Array.isArray(obj.inline)) rawList.push(...obj.inline);
+      if (Array.isArray(obj.attachment)) rawList.push(...obj.attachment);
+    }
+
+    return rawList
+      .map((a: any) => ({
+        attachmentId: String(a.attachmentId || a.attachment_id || a.id || ""),
+        attachmentName: a.attachmentName || a.fileName || a.name || "attachment",
+        attachmentSize: a.attachmentSize || a.size || 0,
+        contentType: a.contentType || a.mimeType || "application/octet-stream",
+        cid: a.cid || a.contentId || a.content_id || undefined,
+        isInline: Boolean(a.isInline || a.inline || a.cid || a.contentId),
+      }))
+      .filter((a) => a.attachmentId);
   } catch (e) {
     console.warn(`[zoho-inbox] fetchMessageAttachmentsList error for msg ${messageId}:`, e);
     return [];
   }
 }
 
-/** Download raw attachment bytes from Zoho Mail API. */
+/** Download raw attachment bytes from Zoho Mail API. Handles regular and inline parts. */
 export async function downloadZohoAttachment(
   messageId: string,
   folderId: string,
   attachmentId: string,
   attachmentName: string,
+  isInline?: boolean,
+  cid?: string,
 ): Promise<{ buffer: Buffer; contentType: string } | null> {
   const accountId = await resolveAccountId();
   const token = await getZohoAccessToken();
-  const encodedName = encodeURIComponent(attachmentName);
-  const url = `${MAIL_HOST}/api/accounts/${accountId}/folders/${folderId}/messages/${messageId}/attachments/${attachmentId}?fileName=${encodedName}`;
+  const encodedName = encodeURIComponent(attachmentName || "attachment");
+  const primaryUrl = `${MAIL_HOST}/api/accounts/${accountId}/folders/${folderId}/messages/${messageId}/attachments/${attachmentId}?fileName=${encodedName}`;
 
-  const res = await fetch(url, {
+  let res = await fetch(primaryUrl, {
     headers: { Authorization: `Zoho-oauthtoken ${token}` },
   });
+
+  // If standard attachment URL fails and this is inline or has CID, attempt inline download endpoint
+  if (!res.ok && (isInline || cid || attachmentId)) {
+    const inlineParam = encodeURIComponent(cid || attachmentId);
+    const inlineUrl = `${MAIL_HOST}/api/accounts/${accountId}/folders/${folderId}/messages/${messageId}/inline?contentId=${inlineParam}`;
+    try {
+      const inlineRes = await fetch(inlineUrl, {
+        headers: { Authorization: `Zoho-oauthtoken ${token}` },
+      });
+      if (inlineRes.ok) {
+        res = inlineRes;
+      }
+    } catch {
+      // Fall through to error handler below
+    }
+  }
 
   if (!res.ok) {
     const errText = await res.text().catch(() => "");

@@ -12,6 +12,8 @@ export type IngestedAttachmentResult = {
   mimeType: string;
   storagePath: string;
   zohoAttachmentId: string;
+  cid?: string;
+  isInline?: boolean;
 };
 
 /**
@@ -45,6 +47,8 @@ export async function processInboundAttachments(input: {
         input.folderId,
         meta.attachmentId,
         meta.attachmentName,
+        meta.isInline,
+        meta.cid,
       );
 
       if (!downloaded || !downloaded.buffer) {
@@ -66,6 +70,8 @@ export async function processInboundAttachments(input: {
         throw new Error(`Storage upload error: ${uploadErr.message}`);
       }
 
+      const identifier = meta.cid || meta.attachmentId;
+
       await (supabaseAdmin.from("ticket_reply_attachments" as any) as any).insert({
         ticket_id: input.ticketId,
         ticket_reply_id: input.ticketReplyId,
@@ -74,7 +80,7 @@ export async function processInboundAttachments(input: {
         mime_type: downloaded.contentType || meta.contentType || "application/octet-stream",
         storage_bucket: bucket,
         storage_path: storagePath,
-        zoho_attachment_id: meta.attachmentId,
+        zoho_attachment_id: identifier,
       } as never);
 
       results.push({
@@ -82,7 +88,9 @@ export async function processInboundAttachments(input: {
         fileSize: Number(meta.attachmentSize || downloaded.buffer.length),
         mimeType: downloaded.contentType || meta.contentType || "application/octet-stream",
         storagePath,
-        zohoAttachmentId: meta.attachmentId,
+        zohoAttachmentId: identifier,
+        cid: meta.cid,
+        isInline: meta.isInline,
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Attachment upload failed";

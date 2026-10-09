@@ -19,6 +19,148 @@ async function getAdmin() {
   return m.supabaseAdmin;
 }
 
+function escapeRegex(s: string) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * On-demand sync helper to fetch missing inbound attachments & inline screenshots from Zoho Mail.
+ * Automatically runs if a ticket has inbound emails with zero saved attachments, or can be called explicitly.
+ */
+export async function syncTicketInboundAttachments(ticketId: string): Promise<any[]> {
+  try {
+    const admin = await getAdmin();
+    const { data: ticket } = await admin
+      .from("support_tickets")
+      .select("id, ticket_number, application_id, customer_id, ticket_email")
+      .eq("id", ticketId)
+      .maybeSingle();
+
+    if (!ticket) return [];
+
+    const { data: existingAtts } = await (admin.from("ticket_reply_attachments" as any) as any)
+      .select("id, ticket_reply_id, zoho_attachment_id, storage_path")
+      .eq("ticket_id", ticketId);
+
+    const existingAttIds = new Set((existingAtts ?? []).map((a: any) => a.zoho_attachment_id).filter(Boolean));
+
+    const { data: replies } = await admin
+      .from("ticket_replies")
+      .select("id, direction, email_message_id, created_at")
+      .eq("ticket_id", ticketId)
+      .in("direction", ["inbound", "incoming"]);
+
+    let emailLogsQuery = admin
+      .from("email_logs")
+      .select("id, zoho_mail_uid, message_id, direction, body_html")
+      .in("direction", ["incoming", "inbound"])
+      .not("zoho_mail_uid", "is", null);
+
+    if (ticket.application_id) {
+      emailLogsQuery = emailLogsQuery.eq("application_id", ticket.application_id);
+    } else if (ticket.customer_id) {
+      emailLogsQuery = emailLogsQuery.eq("customer_id", ticket.customer_id);
+    }
+
+    const { data: matchedEmailLogs } = await emailLogsQuery;
+    const emailLogsWithUid = (matchedEmailLogs ?? []).filter((e: any) => Boolean(e.zoho_mail_uid));
+
+    if (emailLogsWithUid.length === 0) return [];
+
+    let folders: Array<{ folderId: string; folderName: string }> = [];
+    try {
+      const { discoverZohoFolders } = await import("@/lib/mail/zoho-inbox.server");
+      folders = await discoverZohoFolders();
+    } catch (e) {
+      console.warn("[syncTicketInboundAttachments] discoverZohoFolders warning:", e);
+      return [];
+    }
+
+    const { fetchMessageAttachmentsList, downloadZohoAttachment } = await import("@/lib/mail/zoho-inbox.server");
+    const newAttachments: any[] = [];
+
+    for (const em of emailLogsWithUid) {
+      const zohoUid = em.zoho_mail_uid;
+      const matchingReply = (replies ?? []).find(
+        (r: any) => r.email_message_id && (r.email_message_id === em.message_id)
+      ) || (replies ?? [])[0];
+      const replyId = matchingReply?.id || null;
+
+      for (const folder of folders) {
+        try {
+          const list = await fetchMessageAttachmentsList(zohoUid, folder.folderId);
+          if (!list || list.length === 0) continue;
+
+          for (const meta of list) {
+            const idKey = meta.cid || meta.attachmentId;
+            if (existingAttIds.has(idKey)) continue;
+
+            const downloaded = await downloadZohoAttachment(
+              zohoUid,
+              folder.folderId,
+              meta.attachmentId,
+              meta.attachmentName,
+              meta.isInline,
+              meta.cid,
+            );
+
+            if (!downloaded || !downloaded.buffer) continue;
+
+            const safeFilename = meta.attachmentName.replace(/[^a-zA-Z0-9._-]/g, "_");
+            const storagePath = `support-tickets/${ticketId}/${replyId || "inbound"}/${Date.now()}_${safeFilename}`;
+            const bucket = "documents";
+
+            const { error: upErr } = await admin.storage
+              .from(bucket)
+              .upload(storagePath, downloaded.buffer, {
+                contentType: downloaded.contentType || meta.contentType || "application/octet-stream",
+                upsert: true,
+              });
+
+            if (upErr) {
+              console.warn("[syncTicketInboundAttachments] Upload error:", upErr.message);
+              continue;
+            }
+
+            const { data: inserted, error: insErr } = await (admin.from("ticket_reply_attachments" as any) as any)
+              .insert({
+                ticket_id: ticketId,
+                ticket_reply_id: replyId,
+                file_name: meta.attachmentName,
+                file_size: Number(meta.attachmentSize || downloaded.buffer.length),
+                mime_type: downloaded.contentType || meta.contentType || "application/octet-stream",
+                storage_bucket: bucket,
+                storage_path: storagePath,
+                zoho_attachment_id: idKey,
+              })
+              .select()
+              .single();
+
+            if (!insErr && inserted) {
+              existingAttIds.add(idKey);
+              newAttachments.push(inserted);
+            }
+          }
+          break;
+        } catch {
+          // Continue to next folder
+        }
+      }
+    }
+
+    return newAttachments;
+  } catch (err) {
+    console.warn("[syncTicketInboundAttachments] error:", err);
+    return [];
+  }
+}
+
+export const syncTicketAttachmentsFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({ ticketId: z.string().uuid() }).parse(i))
+  .handler(async ({ data }) => {
+    return await syncTicketInboundAttachments(data.ticketId);
+  });
 
 export const getTicketWorkspace = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -236,6 +378,7 @@ export const getTicketWorkspace = createServerFn({ method: "POST" })
       activeScheduler,
       parentTicket,
       childTickets,
+      rawAttachmentsList,
     ] = await Promise.all([
       admin
         .from("ticket_replies")
@@ -351,6 +494,13 @@ export const getTicketWorkspace = createServerFn({ method: "POST" })
         .eq("parent_ticket_id" as any, data.ticketId)
         .order("created_at", { ascending: false })
         .then((r) => r.data ?? [], () => []),
+
+      admin
+        .from("ticket_reply_attachments" as any)
+        .select("id, ticket_id, ticket_reply_id, file_name, file_size, mime_type, storage_bucket, storage_path, zoho_attachment_id, created_at")
+        .eq("ticket_id", data.ticketId)
+        .order("created_at", { ascending: true })
+        .then((r: any) => r.data ?? [], () => []),
     ]);
 
     const parentTicketData = parentTicket;
@@ -398,7 +548,7 @@ export const getTicketWorkspace = createServerFn({ method: "POST" })
       try {
         const { data: matchedEmails } = await admin
           .from("email_logs")
-          .select("id, subject, from_email, to_email, direction, body_html, body_text, created_at, sent_at, status, message_id, template_code, application_id")
+          .select("id, subject, from_email, to_email, direction, body_html, body_text, created_at, sent_at, status, message_id, template_code, application_id, zoho_mail_uid")
           .or(mailOrs.join(","));
 
         allMatchedEmails = matchedEmails ?? [];
@@ -408,6 +558,59 @@ export const getTicketWorkspace = createServerFn({ method: "POST" })
         });
       } catch (e) {
         console.warn("[getTicketWorkspace] email_logs query warning:", e);
+      }
+    }
+
+    // 9.5. Hydrate ticket reply attachments & resolve signed URLs
+    let attachmentsList: any[] = (rawAttachmentsList as any[]) ?? [];
+
+    if (attachmentsList.length === 0 && allMatchedEmails.some((e: any) => e.zoho_mail_uid)) {
+      try {
+        const synced = await syncTicketInboundAttachments(data.ticketId);
+        if (synced && synced.length > 0) {
+          attachmentsList = synced;
+        }
+      } catch (sErr) {
+        console.warn("[getTicketWorkspace] auto-sync attachments failed:", sErr);
+      }
+    }
+
+    const signedUrlMap = new Map<string, string>();
+    await Promise.all(
+      attachmentsList.map(async (att: any) => {
+        try {
+          const { data: signed } = await admin.storage
+            .from(att.storage_bucket || "documents")
+            .createSignedUrl(att.storage_path, 60 * 60 * 24 * 7);
+          if (signed?.signedUrl) {
+            signedUrlMap.set(att.storage_path, signed.signedUrl);
+          }
+        } catch (err) {
+          void err;
+        }
+      })
+    );
+
+    const attachmentsWithUrls = attachmentsList.map((att: any) => ({
+      ...att,
+      fileName: att.file_name,
+      fileSize: att.file_size,
+      mimeType: att.mime_type,
+      storagePath: att.storage_path,
+      url: signedUrlMap.get(att.storage_path) || null,
+      isImage: Boolean(
+        att.mime_type?.startsWith("image/") ||
+        /\.(png|jpe?g|webp|gif|bmp|svg)$/i.test(att.file_name)
+      ),
+      cid: att.zoho_attachment_id || null,
+    }));
+
+    const replyAttachmentsMap = new Map<string, any[]>();
+    for (const att of attachmentsWithUrls) {
+      if (att.ticket_reply_id) {
+        const list = replyAttachmentsMap.get(att.ticket_reply_id) || [];
+        list.push(att);
+        replyAttachmentsMap.set(att.ticket_reply_id, list);
       }
     }
 
@@ -429,16 +632,39 @@ export const getTicketWorkspace = createServerFn({ method: "POST" })
         }) ?? null;
       }
 
+      const replyAtts = (r.id && replyAttachmentsMap.has(r.id))
+        ? replyAttachmentsMap.get(r.id)!
+        : attachmentsWithUrls;
+
+      let resolvedBodyHtml = linkedEmail?.body_html ?? null;
+      if (resolvedBodyHtml && attachmentsWithUrls.length > 0) {
+        for (const att of attachmentsWithUrls) {
+          if (att.url) {
+            if (att.cid) {
+              const cidRx = new RegExp(`src=["']cid:${escapeRegex(att.cid)}["']`, "gi");
+              resolvedBodyHtml = resolvedBodyHtml.replace(cidRx, `src="${att.url}" data-resolved-cid="true"`);
+              const bareCidRx = new RegExp(`cid:${escapeRegex(att.cid)}`, "gi");
+              resolvedBodyHtml = resolvedBodyHtml.replace(bareCidRx, att.url);
+            }
+            if (att.fileName) {
+              const fnRx = new RegExp(`src=["']cid:${escapeRegex(att.fileName)}["']`, "gi");
+              resolvedBodyHtml = resolvedBodyHtml.replace(fnRx, `src="${att.url}" data-resolved-cid="true"`);
+            }
+          }
+        }
+      }
+
       return {
         ...r,
         author_name: r.created_by
           ? nameMap.get(r.created_by) ?? "Staff"
           : (r.direction === "inbound" ? (displayCustomer?.name ?? "Customer") : "System"),
         subject: linkedEmail?.subject ?? null,
-        body_html: linkedEmail?.body_html ?? null,
+        body_html: resolvedBodyHtml,
         from_email: linkedEmail?.from_email ?? null,
         template_code: linkedEmail?.template_code ?? null,
         email_status: linkedEmail?.status ?? (r.emailed_at ? "sent" : null),
+        attachments: replyAtts,
       };
     });
 
@@ -514,6 +740,7 @@ export const getTicketWorkspace = createServerFn({ method: "POST" })
       // candidateOrders: non-empty only when order_link_status = "needs_review"
       // and application_id is null. Contains active applications for the customer.
       candidateOrders,
+      ticketReplyAttachments: attachmentsWithUrls,
       customerStats: {
         lifetimeValue,
         totalOrders: Number(customerData?.total_applications ?? prevOrdersList.length),

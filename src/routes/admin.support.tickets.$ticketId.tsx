@@ -12,9 +12,9 @@ import {
   MapPin, ShieldAlert, FileText, ChevronLeft, ChevronRight, Plus, Download,
   Bold, Italic, Underline, Strikethrough, List, ListOrdered, Quote,
   AlignLeft, AlignCenter, AlignRight, Image as ImageIcon, Search, Tag,
-  ChevronRight as ChevronRightIcon, RefreshCw, Flame, Reply, XCircle
+  ChevronRight as ChevronRightIcon, RefreshCw, Flame, Reply, XCircle, ZoomIn
 } from "lucide-react";
-import { getTicketWorkspace, linkTicketToApplication, unlinkTicketFromApplication } from "@/lib/crm/ticket-workspace.functions";
+import { getTicketWorkspace, linkTicketToApplication, unlinkTicketFromApplication, syncTicketAttachmentsFn } from "@/lib/crm/ticket-workspace.functions";
 import { computeOrderStage, STAGE_META, STAGE_BADGE_CLASS, type OrderStage } from "@/lib/crm/computeOrderStage";
 import {
   replyToTicket, updateTicket, getAdjacentTickets,
@@ -112,6 +112,21 @@ function formatBytes(bytes?: number | null) {
 
 // ── unified message type ───────────────────────────────────
 
+export type MsgAttachment = {
+  id: string;
+  file_name?: string;
+  fileName?: string;
+  file_path?: string;
+  storage_path?: string;
+  size_bytes?: number;
+  file_size?: number;
+  url?: string | null;
+  isImage?: boolean;
+  mime_type?: string;
+  mimeType?: string;
+  cid?: string | null;
+};
+
 type Msg =
   | {
       kind: "inbound";
@@ -120,8 +135,8 @@ type Msg =
       from_email: string | null;
       subject: string | null;
       body_text: string;
-      body_html: string | null;
-      attachments?: Array<{ id: string; file_name: string; file_path: string; size_bytes?: number }>;
+      body_html?: string | null;
+      attachments?: Array<MsgAttachment>;
     }
   | {
       kind: "outbound";
@@ -134,6 +149,7 @@ type Msg =
       template_hint: string | null;
       status: string | null;
       author_name?: string | null;
+      attachments?: Array<MsgAttachment | any>;
     }
   | {
       kind: "note";
@@ -141,6 +157,8 @@ type Msg =
       created_at: string;
       author_name: string;
       body_text: string;
+      body_html?: string | null;
+      attachments?: Array<MsgAttachment | any>;
     };
 
 function extractTemplateHint(subject: string | null, bodyHtml: string | null): string | null {
@@ -185,6 +203,20 @@ function TicketWorkspace() {
   const closeConsult = useServerFn(closeTicketConsultationT001);
   const closeReply = useServerFn(closeTicketReplyReasonT002);
   const closeRefund = useServerFn(closeTicketRefundR002);
+  const syncAttachmentsFn = useServerFn(syncTicketAttachmentsFn);
+
+  const doSyncAttachments = useMutation({
+    mutationFn: () => syncAttachmentsFn({ data: { ticketId } }),
+    onSuccess: (newAtts) => {
+      if (newAtts && newAtts.length > 0) {
+        toast.success(`Synced ${newAtts.length} image/attachment(s) from email!`);
+      } else {
+        toast.info("Checked email: no additional attachments found.");
+      }
+      invalidate();
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Sync failed"),
+  });
 
   // Queries
   const { data, isLoading, isError, refetch } = useQuery({
@@ -345,6 +377,7 @@ function TicketWorkspace() {
     const t = data.ticket as any;
     const cust = t?.customers ?? {};
     const docs = (data.documents ?? []) as any[];
+    const allTicketAtts = ((data as any).ticketReplyAttachments ?? []) as any[];
 
     // 1. Initial ticket description
     const desc = (t?.description ?? "").trim();
@@ -363,6 +396,7 @@ function TicketWorkspace() {
           body_text: decodeHtmlEntities(desc),
         });
       } else {
+        const initialAtts = allTicketAtts.filter((a: any) => !a.ticket_reply_id);
         out.push({
           kind: "inbound",
           id: `ticket-desc-${t.id}`,
@@ -371,7 +405,7 @@ function TicketWorkspace() {
           subject: t.subject ?? null,
           body_text: decodeHtmlEntities(desc),
           body_html: null,
-          attachments: docs.length > 0 ? docs.slice(0, 2) : undefined,
+          attachments: initialAtts.length > 0 ? initialAtts : (docs.length > 0 ? docs.slice(0, 2) : undefined),
         });
       }
     }
@@ -389,6 +423,9 @@ function TicketWorkspace() {
       } else if (r.direction === "inbound" || r.direction === "incoming") {
         const text = decodeHtmlEntities(r.reply_text ?? "");
         const hasAttachmentMention = /attach|document|proof|pdf|file/i.test(text);
+        const replyAtts = (r.attachments && r.attachments.length > 0)
+          ? r.attachments
+          : allTicketAtts.filter((a: any) => !a.ticket_reply_id || a.ticket_reply_id === r.id);
         out.push({
           kind: "inbound",
           id: `ri-${r.id}`,
@@ -397,7 +434,7 @@ function TicketWorkspace() {
           subject: r.subject ?? null,
           body_text: text,
           body_html: r.body_html ?? null,
-          attachments: hasAttachmentMention && docs.length > 0 ? docs : undefined,
+          attachments: replyAtts.length > 0 ? replyAtts : (hasAttachmentMention && docs.length > 0 ? docs : undefined),
         });
       } else {
         out.push({
@@ -411,6 +448,7 @@ function TicketWorkspace() {
           template_hint: r.template_code ?? extractTemplateHint(r.subject, r.body_html),
           status: r.email_status ?? (r.emailed_at ? "Sent" : "Sent"),
           author_name: r.author_name ?? "Business Help Services",
+          attachments: r.attachments,
         });
       }
     }
@@ -439,7 +477,7 @@ function TicketWorkspace() {
             subject: em.subject ?? null,
             body_html: em.body_html ?? null,
             body_text: text,
-            attachments: hasAttachmentMention && docs.length > 0 ? docs : undefined,
+            attachments: allTicketAtts.length > 0 ? allTicketAtts : (hasAttachmentMention && docs.length > 0 ? docs : undefined),
           });
         } else {
           out.push({
@@ -921,6 +959,17 @@ function TicketWorkspace() {
                   Reopen &amp; Hot 🔥
                 </button>
               )}
+
+              <button
+                type="button"
+                onClick={() => doSyncAttachments.mutate()}
+                disabled={doSyncAttachments.isPending}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition-all shadow-2xs shrink-0 cursor-pointer disabled:opacity-50"
+                title="Fetch any missing customer images, screenshots or attachments directly from email"
+              >
+                <RefreshCw className={`size-3 text-slate-500 ${doSyncAttachments.isPending ? "animate-spin text-blue-600" : ""}`} />
+                <span>{doSyncAttachments.isPending ? "Syncing..." : "Sync Images"}</span>
+              </button>
             </div>
           </div>
 
@@ -1944,6 +1993,7 @@ function MessageCard({
   onReply?: () => void;
 }) {
   const [showRawText, setShowRawText] = useState(false);
+  const [lightboxImage, setLightboxImage] = useState<{ url: string; name: string } | null>(null);
   // Default compact view so messages open cleanly and agent reads fresh reply first
   const [isExpanded, setIsExpanded] = useState(false);
   const parsed = useMemo(
@@ -1951,8 +2001,9 @@ function MessageCard({
       parseEmailMessage({
         bodyHtml: (msg as any).body_html,
         bodyText: msg.body_text,
+        attachments: msg.attachments as any,
       }),
-    [(msg as any).body_html, msg.body_text]
+    [(msg as any).body_html, msg.body_text, msg.attachments]
   );
 
   // 1. Internal Note Card (Centered with amber highlight)
@@ -2115,44 +2166,210 @@ function MessageCard({
               </div>
             )}
 
-            {/* Attachments Display */}
-            {msg.attachments && msg.attachments.length > 0 && (
-              <div className="pt-2">
-                <div className="flex flex-wrap gap-2">
-                  {msg.attachments.map((doc) => (
-                    <div
-                      key={doc.id}
-                      className="p-2 bg-white hover:bg-slate-50 rounded-lg border border-slate-200 flex items-center justify-between gap-3 min-w-[220px] max-w-sm transition-colors shadow-2xs"
-                    >
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <div className="size-7 rounded bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center shrink-0 font-bold text-[10px]">
-                          PDF
-                        </div>
-                        <div className="min-w-0">
-                          <div className="text-xs font-medium text-slate-800 truncate" title={doc.file_name}>
-                            {doc.file_name || "document.pdf"}
-                          </div>
-                          <div className="text-[10px] text-slate-400">
-                            {formatBytes(doc.size_bytes ?? 0)}
-                          </div>
-                        </div>
-                      </div>
+            {/* Attachments & Image Gallery */}
+            {msg.attachments && msg.attachments.length > 0 && (() => {
+              const imageAttachments = msg.attachments.filter(
+                (a: any) =>
+                  a.isImage ||
+                  a.mimeType?.startsWith("image/") ||
+                  a.mime_type?.startsWith("image/") ||
+                  /\.(png|jpe?g|webp|gif|bmp|svg)$/i.test(a.fileName || a.file_name || "")
+              );
+              const nonImageAttachments = msg.attachments.filter(
+                (a: any) => !imageAttachments.includes(a)
+              );
 
-                      <button
-                        type="button"
-                        onClick={() => onDownloadDoc(doc)}
-                        className="p-1 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors shrink-0"
-                        title="Download attachment"
-                      >
-                        <Download className="size-3.5" />
-                      </button>
+              return (
+                <div className="pt-2.5 space-y-3">
+                  {/* Image Gallery with High-Quality Previews & Lightbox Zoom */}
+                  {imageAttachments.length > 0 && (
+                    <div className="space-y-1.5">
+                      <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                        <ImageIcon className="size-3.5 text-blue-600 shrink-0" />
+                        <span>Customer Images & Screenshots ({imageAttachments.length})</span>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        {imageAttachments.map((img: any, idx: number) => {
+                          const imgUrl = img.url;
+                          const imgName = img.fileName || img.file_name || `image_${idx + 1}.png`;
+                          const imgSize = img.fileSize || img.file_size || img.size_bytes || 0;
+
+                          return (
+                            <div
+                              key={img.id || idx}
+                              className="group relative rounded-xl border border-slate-200/90 bg-slate-50 overflow-hidden shadow-2xs hover:shadow-xs transition-all"
+                            >
+                              <div
+                                className="relative aspect-video max-h-56 bg-slate-100 flex items-center justify-center overflow-hidden cursor-pointer"
+                                onClick={() => imgUrl && setLightboxImage({ url: imgUrl, name: imgName })}
+                              >
+                                {imgUrl ? (
+                                  <img
+                                    src={imgUrl}
+                                    alt={imgName}
+                                    className="w-full h-full object-contain group-hover:scale-[1.02] transition-transform duration-200"
+                                    loading="lazy"
+                                  />
+                                ) : (
+                                  <div className="flex flex-col items-center gap-1 text-slate-400 p-4">
+                                    <ImageIcon className="size-8" />
+                                    <span className="text-xs">Image loading...</span>
+                                  </div>
+                                )}
+                                <div className="absolute inset-0 bg-slate-900/0 group-hover:bg-slate-900/25 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
+                                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/90 text-slate-900 font-semibold text-xs shadow-md">
+                                    <ZoomIn className="size-3.5" /> Enlarge
+                                  </span>
+                                </div>
+                              </div>
+
+                              <div className="p-2 bg-white border-t border-slate-100 flex items-center justify-between gap-2">
+                                <div className="min-w-0 flex-1">
+                                  <div className="text-xs font-medium text-slate-800 truncate" title={imgName}>
+                                    {imgName}
+                                  </div>
+                                  <div className="text-[10px] text-slate-400">
+                                    {imgSize ? formatBytes(imgSize) : "Image file"}
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-1 shrink-0">
+                                  {imgUrl && (
+                                    <>
+                                      <button
+                                        type="button"
+                                        onClick={() => setLightboxImage({ url: imgUrl, name: imgName })}
+                                        className="p-1 rounded text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors"
+                                        title="View full image"
+                                      >
+                                        <Eye className="size-3.5" />
+                                      </button>
+                                      <a
+                                        href={imgUrl}
+                                        download={imgName}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="p-1 rounded text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors"
+                                        title="Download image"
+                                      >
+                                        <Download className="size-3.5" />
+                                      </a>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
-                  ))}
+                  )}
+
+                  {/* Document Attachments (PDFs, Docs, etc.) */}
+                  {nonImageAttachments.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {nonImageAttachments.map((doc: any) => {
+                        const docName = doc.fileName || doc.file_name || "document.pdf";
+                        const docSize = doc.fileSize || doc.file_size || doc.size_bytes || 0;
+                        const docUrl = doc.url;
+                        const isPdf = /\.pdf$/i.test(docName);
+
+                        return (
+                          <div
+                            key={doc.id}
+                            className="p-2 bg-white hover:bg-slate-50 rounded-lg border border-slate-200 flex items-center justify-between gap-3 min-w-[220px] max-w-sm transition-colors shadow-2xs"
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <div
+                                className={`size-7 rounded border flex items-center justify-center shrink-0 font-bold text-[10px] ${
+                                  isPdf
+                                    ? "bg-rose-50 border-rose-200 text-rose-600"
+                                    : "bg-blue-50 border-blue-200 text-blue-600"
+                                }`}
+                              >
+                                {isPdf ? "PDF" : "DOC"}
+                              </div>
+                              <div className="min-w-0">
+                                <div className="text-xs font-medium text-slate-800 truncate" title={docName}>
+                                  {docName}
+                                </div>
+                                <div className="text-[10px] text-slate-400">
+                                  {formatBytes(docSize)}
+                                </div>
+                              </div>
+                            </div>
+
+                            {docUrl ? (
+                              <a
+                                href={docUrl}
+                                download={docName}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="p-1 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors shrink-0"
+                                title="Download attachment"
+                              >
+                                <Download className="size-3.5" />
+                              </a>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => onDownloadDoc(doc)}
+                                className="p-1 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors shrink-0"
+                                title="Download attachment"
+                              >
+                                <Download className="size-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
-              </div>
-            )}
+              );
+            })()}
           </div>
         </div>
+
+        {/* Fullscreen Lightbox Modal for Image Inspection */}
+        {lightboxImage && (
+          <div
+            className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4"
+            onClick={() => setLightboxImage(null)}
+          >
+            <div
+              className="relative max-w-5xl max-h-[92vh] w-full bg-slate-900 rounded-2xl overflow-hidden shadow-2xl flex flex-col border border-slate-700"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="p-3 bg-slate-900 border-b border-slate-800 flex items-center justify-between text-white text-xs">
+                <span className="font-semibold truncate pr-4 text-slate-200">{lightboxImage.name}</span>
+                <div className="flex items-center gap-2 shrink-0">
+                  <a
+                    href={lightboxImage.url}
+                    download={lightboxImage.name}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-2.5 py-1 rounded bg-blue-600 hover:bg-blue-500 text-white font-medium flex items-center gap-1 transition-colors"
+                  >
+                    <Download className="size-3" /> Download
+                  </a>
+                  <button
+                    onClick={() => setLightboxImage(null)}
+                    className="p-1 rounded hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
+                  >
+                    <X className="size-4" />
+                  </button>
+                </div>
+              </div>
+              <div className="p-3 flex items-center justify-center overflow-auto max-h-[calc(92vh-60px)] bg-slate-950/50">
+                <img
+                  src={lightboxImage.url}
+                  alt={lightboxImage.name}
+                  className="max-w-full max-h-[82vh] object-contain rounded-lg shadow-lg"
+                />
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
