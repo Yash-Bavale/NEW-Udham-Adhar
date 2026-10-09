@@ -182,7 +182,7 @@ export const resumeFromHold = createServerFn({ method: "POST" })
     // order's recipient (customers.primary_email can be stale across orders).
     const { data: preRow, error: preRowError } = await supabaseAdmin
       .from("applications")
-      .select("technical_hold_kind, workflow_status, fulfillment_status, lead_id, customer_id, application_code")
+      .select("technical_hold_kind, workflow_status, fulfillment_status, lead_id, customer_id, application_code, form_submitted_at")
       .eq("id", data.orderId)
       .maybeSingle();
     if (preRowError) throw new Error(`Unable to read the technical-delay state: ${preRowError.message}`);
@@ -258,8 +258,10 @@ export const resumeFromHold = createServerFn({ method: "POST" })
         workflow_status: "processing",
         workflow_delay_reason: null,
         workflow_expected_review_at: null,
-        // Delay resolved → revert to S04 Form Submitted (happy-flow hub)
-        fulfillment_status: "form_submitted",
+        // Delay resolved → Form Submitted only if the customer really submitted the form
+        ...(((preRow as any).form_submitted_at)
+          ? { fulfillment_status: "form_submitted" }
+          : { fulfillment_status: "form_not_submitted", order_status: "FORM_PENDING" }),
       } as never)
       .eq("id", data.orderId);
 
@@ -354,17 +356,20 @@ export const resumeFromCustomerDelay = createServerFn({ method: "POST" })
 
     const { data: preRow, error: preErr } = await supabaseAdmin
       .from("applications")
-      .select("order_status, fulfillment_status")
+      .select("order_status, fulfillment_status, form_submitted_at")
       .eq("id", data.orderId)
       .maybeSingle();
     if (preErr) throw new Error(preErr.message);
     if (!preRow) throw new Error("Order not found.");
+    // Only advance to Form Submitted when the customer actually submitted the form.
+    const formSubmitted = Boolean((preRow as any).form_submitted_at);
+    const resumeStage = formSubmitted ? "form_submitted" : "form_not_submitted";
 
     // Best-effort status transition; the fulfillment stage below is the
     // authoritative S04 marker for the journey map.
     const { error: rpcError } = await context.supabase.rpc("transition_order_status", {
       _order_id: data.orderId,
-      _new_status: "FORM_RECEIVED",
+      _new_status: formSubmitted ? "FORM_RECEIVED" : "FORM_PENDING",
     });
     if (rpcError) console.warn("[resumeFromCustomerDelay] transition skipped:", rpcError.message);
 
@@ -382,7 +387,8 @@ export const resumeFromCustomerDelay = createServerFn({ method: "POST" })
     const { error } = await supabaseAdmin
       .from("applications")
       .update({
-        fulfillment_status: "form_submitted",
+        fulfillment_status: resumeStage,
+        ...(formSubmitted ? {} : { order_status: "FORM_PENDING" }),
         customer_hold_started_at: null,
         active_reason_id: null,
         active_reason_text: null,
@@ -397,7 +403,7 @@ export const resumeFromCustomerDelay = createServerFn({ method: "POST" })
       application_id: data.orderId,
       event_type: "fulfillment_status_change",
       old_value: String(preRow.fulfillment_status ?? ""),
-      new_value: "form_submitted",
+      new_value: resumeStage,
       note: "Customer side delay resolved — order resumed",
       staff_name: "Admin",
       staff_role: "admin",
