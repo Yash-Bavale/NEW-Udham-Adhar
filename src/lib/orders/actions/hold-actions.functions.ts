@@ -403,7 +403,7 @@ export const resumeFromCustomerDelay = createServerFn({ method: "POST" })
       application_id: data.orderId,
       event_type: "fulfillment_status_change",
       old_value: String(preRow.fulfillment_status ?? ""),
-      new_value: "form_submitted",
+      new_value: resumeStage,
       note: "Customer side delay resolved — order resumed",
       staff_name: "Admin",
       staff_role: "admin",
