@@ -169,6 +169,69 @@
       "when": 1791021819951,
       "tag": "0023_atomic_order_assignment",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1791274208750,
+      "tag": "0024_create_order_action_logs",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1791274333130,
+      "tag": "0025_employee_auth_sessions_security",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1791274464411,
+      "tag": "0026_reindex_bloated_notifications",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1791275312324,
+      "tag": "0027_fast_lead_attribution",
+      "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1791279029259,
+      "tag": "0028_orders_perf_indexes",
+      "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1791288851470,
+      "tag": "0029_invoice_cancellation_columns",
+      "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1791288905130,
+      "tag": "0030_invoices_one_active_per_payment",
+      "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1791351605013,
+      "tag": "0031_migration",
+      "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1791351733973,
+      "tag": "0032_migration",
+      "breakpoints": true
     }
   ]
 }

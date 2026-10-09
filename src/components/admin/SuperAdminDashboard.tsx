@@ -399,7 +399,7 @@ const KpiGrid = memo(function KpiGrid({ data, loading, range }: { data?: Dashboa
         href={withRange("/admin/orders?filter=technical_delay")}
         subs={<>
           <StatChip label="Customer Delay" value={m.customerDelay} tone="rose" href={withRange("/admin/orders?filter=customer_delay")} />
-          <StatChip label="Form Not Submitted" value={m.formNotSubmitted} tone="amber" href={withRange("/admin/orders?filter=form_not_submitted")} />
+          <StatChip label="Form Not Submitted Delay" value={m.formNotSubmitted} tone="amber" href={withRange("/admin/orders?filter=form_not_submitted")} />
         </>}
       />
       <ModernKpi

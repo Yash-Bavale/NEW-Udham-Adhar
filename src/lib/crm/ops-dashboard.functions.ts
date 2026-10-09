@@ -275,7 +275,7 @@ export const getOpsDashboard = createServerFn({ method: "GET" })
 
     // Service pipeline — by fulfillment_status (canonical 6 stages)
     const pipelineStages: Array<[string, string]> = [
-      ["Order Received", "order_received"],
+      ["Incomplete Form", "order_received"],
       ["Documents Received", "documents_received"],
       ["Verification Pending", "verification_pending"],
       ["Application Submitted", "application_submitted"],

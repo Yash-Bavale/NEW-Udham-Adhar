@@ -117,9 +117,9 @@ export function withSectionHeadings(sections: readonly { key: string; label: str
     if (section.fields[0]?.type === "section") {
       return [{ ...section.fields[0], label: section.label || section.fields[0].label }, ...section.fields.slice(1)];
     }
-    const isNicSection = section.fields.some((field) => /^nic_[245]_digit$/.test(field.key));
+    // Never mark the whole section as NIC: NIC renders only where its fields sit.
     return [
-      { key: isNicSection ? "section_nic" : `builder_section_${section.key}`, label: section.label, type: "section" as const },
+      { key: `builder_section_${section.key}`, label: section.label, type: "section" as const },
       ...section.fields,
     ];
   });
@@ -225,12 +225,12 @@ const NEW_UDYAM: OnboardingSchema = {
     { key: "gender", label: "12. Gender", type: "select", required: true, options: GENDER },
     { key: "specially_abled", label: "13. Specially Abled (Divyang)", type: "select", required: true, options: YES_NO },
     { key: "section_address", label: "14. Official Address of Enterprise", type: "section" },
-    { key: "address_flat", label: "Flat / Door / Block No.", type: "text", required: true, maxLength: 120 },
-    { key: "address_premises", label: "Name of Premises / Building", type: "text", required: false, maxLength: 160 },
-    { key: "address_village", label: "Village / Town", type: "text", required: true, maxLength: 120 },
-    { key: "address_block", label: "Block", type: "text", required: false, maxLength: 120 },
-    { key: "address_road", label: "Road / Street / Lane", type: "text", required: true, maxLength: 160 },
-    { key: "city", label: "City", type: "text", required: true, maxLength: 80 },
+    { key: "address_flat", label: "Flat / Door / Block No.", type: "text", required: true, maxLength: 20 },
+    { key: "address_premises", label: "Name of Premises / Building", type: "text", required: false, maxLength: 50 },
+    { key: "address_village", label: "Village / Town", type: "text", required: true, maxLength: 30 },
+    { key: "address_block", label: "Block", type: "text", required: false, maxLength: 30 },
+    { key: "address_road", label: "Road / Street / Lane", type: "text", required: true, maxLength: 30 },
+    { key: "city", label: "City", type: "text", required: true, maxLength: 25 },
     { key: "pincode", label: "PIN Code", type: "text", required: true, pattern: "^\\d{6}$", maxLength: 6 },
     { key: "state", label: "State", type: "select", required: true, options: INDIA_STATES },
     { key: "district", label: "District", type: "select", required: true },

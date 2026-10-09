@@ -1,4 +1,6 @@
 import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import {
   Activity, CreditCard, FileText, Mail, MessageSquare, GitCommit, Upload, FileCheck2, UserCog,
   Cog, AlarmClock, PhoneCall,
@@ -143,7 +145,7 @@ function resolveEventButtonTag(e: any): ButtonActionTagProps | null {
     note.includes("form link sent") ||
     note.includes("form not submitted")
   ) {
-    return { code: "B01", label: "Form Not Submitted", variant: "amber" };
+    return { code: "B01", label: "Form Not Submitted Delay", variant: "amber" };
   }
 
   // B09 - Reopen Order
@@ -197,7 +199,7 @@ function resolveEmailButtonTag(templateCode?: string | null): ButtonActionTagPro
   if (tc === "E005" || tc === "BHS_E005") return { code: "B06", label: "Consultation Done", variant: "violet" };
   if (tc === "E003" || tc === "BHS_E003") return { code: "B02", label: "Technical Delay", variant: "sky" };
   if (tc === "E004" || tc === "BHS_E004") return { code: "B04", label: "Customer Delay", variant: "amber" };
-  if (tc === "E002" || tc === "BHS_E002") return { code: "B01", label: "Form Not Submitted", variant: "amber" };
+  if (tc === "E002" || tc === "BHS_E002") return { code: "B01", label: "Form Not Submitted Delay", variant: "amber" };
   if (tc === "E011" || tc === "BHS_E011") return { code: "B03", label: "Issue Resolved", variant: "emerald" };
   if (tc === "E008" || tc === "BHS_E008") return { code: "B08", label: "App Rejected", variant: "rose" };
   if (tc === "E009" || tc === "E09" || tc === "BHS_E009") return { code: "B09", label: "Reopen Order", variant: "indigo" };
@@ -247,6 +249,24 @@ export function UnifiedTimeline({ events, payments, documents, emailLogs, create
   const [showAll, setShowAll] = useState(false);
   const wf = useOrderWorkflow(applicationId ?? null);
   const workflowEvents = applicationId ? wf.events : [];
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const assigneeIds = Array.from(new Set(
+    (events ?? []).filter((e: any) => e.event_type === "assignment_change")
+      .flatMap((e: any) => [e.old_value, e.new_value])
+      .filter((v: any) => typeof v === "string" && UUID_RE.test(v)),
+  )).sort() as string[];
+  const { data: staffNames } = useQuery({
+    queryKey: ["timeline-staff-names", assigneeIds],
+    enabled: assigneeIds.length > 0,
+    staleTime: 10 * 60_000,
+    queryFn: async () => {
+      const { data } = await supabase.from("profiles").select("id, full_name, display_name, email").in("id", assigneeIds);
+      const m: Record<string, string> = {};
+      for (const p of data ?? []) m[p.id] = (p as any).display_name || p.full_name || p.email || p.id;
+      return m;
+    },
+  });
+  const nameOf = (v: string | null | undefined) => (v ? staffNames?.[v] ?? v : "Unassigned");
 
   const items: Item[] = useMemo(() => {
     const out: Item[] = [];
@@ -357,7 +377,7 @@ export function UnifiedTimeline({ events, payments, documents, emailLogs, create
       } else if (e.event_type === "assignment_change") {
         icon = UserCog; tone = "violet"; title = "Assignee updated";
         detail = e.old_value || e.new_value
-          ? <span className="text-[11px]">{e.old_value ?? "Unassigned"} → {e.new_value ?? "Unassigned"}</span>
+          ? <span className="text-[11px]">{nameOf(e.old_value)} → {nameOf(e.new_value)}</span>
           : null;
       } else if (e.event_type === "note_added") {
         icon = MessageSquare; tone = "amber"; title = "Internal note";
@@ -436,7 +456,7 @@ export function UnifiedTimeline({ events, payments, documents, emailLogs, create
 
     out.sort((a, b) => new Date(b.ts).getTime() - new Date(a.ts).getTime());
     return out;
-  }, [events, payments, documents, emailLogs, createdAt, hideMoney, workflowEvents]);
+  }, [events, payments, documents, emailLogs, createdAt, hideMoney, workflowEvents, staffNames]);
 
   const visible = showAll ? items : items.slice(0, 12);
 

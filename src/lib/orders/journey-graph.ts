@@ -103,13 +103,13 @@ export const NODES: NodeDef[] = [
   /* ── ROW 1: Main horizontal path ── */
   {
     id: "order_rec", x: 20, y: 165, w: 110, h: 60,
-    label: "Order Received",
+    label: "Incomplete Form",
     icon: "shoppingBag", kind: "stage", tone: "maroon",
     badgeBottom: "E001",
   },
   {
     id: "form_not", x: 165, y: 165, w: 130, h: 60,
-    label: "Form Not Submitted",
+    label: "Form Not Submitted Delay",
     icon: "fileText", kind: "stage", tone: "slate",
   },
   {
@@ -190,7 +190,7 @@ export const NODES: NodeDef[] = [
   /* ── ROW 3: Bottom exception row ── */
   {
     id: "b01_reminder", x: 132, y: 415, w: 196, h: 110,
-    label: "Form Not Submitted",
+    label: "Form Not Submitted Delay",
     subtitle: "Send information Incomplete mail",
     highlightText: "Order Autoclosed in 8 hrs",
     icon: "mailWarn", kind: "action", tone: "amber",

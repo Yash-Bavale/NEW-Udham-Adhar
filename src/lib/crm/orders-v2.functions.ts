@@ -381,6 +381,10 @@ const NEEDS_ACTION_STAGES: OrderStage[] = ["lead_received", "payment_done", "for
 
 export function isNeedsActionOrder(row: any): boolean {
   if (row.is_terminal) return false;
+  if (row.customer_resumed_pending) return true;
+  // Hot = callback came due or order reopened → needs staff action now,
+  // regardless of actions taken before it became hot.
+  if (row.is_hot) return true;
   const fs = String(row.fulfillment_status ?? "").toLowerCase();
   const stage = String(row.stage ?? "").toLowerCase();
   const os = String(row.order_status ?? "").toUpperCase();
@@ -633,6 +637,9 @@ export function bucketOfRow(
     return "hot_orders";
   }
 
+  // Customer submitted the form after Customer Delay / Form Not Submitted Delay → Need Action
+  if ((row as any).customer_resumed_pending) return "needs_action";
+
   // Call Back Scheduled: only active/future callbacks (fires_at > now)
   if (row.is_callback_scheduled || ((row as any).callback_reminder && !(row as any).callback_reminder.is_due)) return "reminders";
 
@@ -763,7 +770,7 @@ async function fetchInChunks<T>(
   for (let i = 0; i < ids.length; i += chunkSize) {
     chunks.push(ids.slice(i, i + chunkSize));
   }
-  const batchSize = 5;
+  const batchSize = 10;
   for (let b = 0; b < chunks.length; b += batchSize) {
     const currentBatch = chunks.slice(b, b + batchSize);
     const resList = await Promise.all(currentBatch.map((c) => fetchFn(c)));
@@ -990,7 +997,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
     );
 
     if (inRangeEventAppIds.length > 0) {
-      const extraApps = await fetchInChunks<any>(inRangeEventAppIds, 100, (chunk) =>
+      const extraApps = await fetchInChunks<any>(inRangeEventAppIds, 200, (chunk) =>
         buildBaseQuery().in("id", chunk)
       );
       (extraApps ?? []).forEach((a: any) => mergedAppMap.set(a.id, a));
@@ -1011,33 +1018,43 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
 
     const ids = appList.map((a) => a.id);
 
-    const [eventsRes, certsTableRes, actionLogsRes, globalActiveSchedulersRes] = await Promise.all([
-      admin
-        .from("application_events")
-        .select("id, application_id, event_type, old_value, new_value, note, created_by, staff_name, staff_role, created_at")
-        .in("application_id", ids)
-        .order("created_at", { ascending: false })
-        .limit(10000),
-      admin
-        .from("certificates")
-        .select("id, application_id, certificate_number, uploaded_by, issued_at, delivered_at, created_at")
-        .in("application_id", ids)
-        .order("created_at", { ascending: false }),
-      (admin
-        .from("order_action_logs" as any) as any)
-        .select("order_id, action_type, new_status, new_stage, employee_id, created_at")
-        .in("order_id", ids)
-        .order("created_at", { ascending: false })
-        .limit(10000),
-      admin
-        .from("order_schedulers")
-        .select("id, application_id, status, scheduler_type, fires_at, remarks, created_at, created_by")
-        .in("application_id", ids)
-        .order("created_at", { ascending: false })
-        .limit(5000),
+    // Chunked: a single .in() with thousands of ids exceeds URL limits and
+    // silently returns nothing (no callbacks → no Hot / Call Back counts).
+    const [eventsData, certsData, actionLogsData, globalActiveSchedulers] = await Promise.all([
+      fetchInChunks<any>(ids, 200, (chunk) =>
+        admin
+          .from("application_events")
+          .select("id, application_id, event_type, old_value, new_value, note, created_by, staff_name, staff_role, created_at")
+          .in("application_id", chunk)
+          .order("created_at", { ascending: false })
+          .limit(10000),
+      ),
+      fetchInChunks<any>(ids, 200, (chunk) =>
+        admin
+          .from("certificates")
+          .select("id, application_id, certificate_number, uploaded_by, issued_at, delivered_at, created_at")
+          .in("application_id", chunk)
+          .order("created_at", { ascending: false }),
+      ),
+      fetchInChunks<any>(ids, 200, (chunk) =>
+        (admin.from("order_action_logs" as any) as any)
+          .select("order_id, action_type, new_status, new_stage, employee_id, created_at")
+          .in("order_id", chunk)
+          .order("created_at", { ascending: false })
+          .limit(10000),
+      ),
+      fetchInChunks<any>(ids, 200, (chunk) =>
+        admin
+          .from("order_schedulers")
+          .select("id, application_id, status, scheduler_type, fires_at, remarks, created_at, created_by")
+          .in("application_id", chunk)
+          .order("created_at", { ascending: false })
+          .limit(5000),
+      ),
     ]);
-
-    const globalActiveSchedulers = globalActiveSchedulersRes.data;
+    const eventsRes = { data: eventsData };
+    const certsTableRes = { data: certsData };
+    const actionLogsRes = { data: actionLogsData };
 
     // Index all action logs, events, schedulers, and certificates per application
     const appActionLogsMap = new Map<string, any[]>();
@@ -1087,19 +1104,19 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
     ].filter(Boolean))) as string[];
 
     const [leadsData, custsData, paysByApp, paysByLead, staffData] = await Promise.all([
-      fetchInChunks<any>(leadIds, 100, (chunk) =>
+      fetchInChunks<any>(leadIds, 200, (chunk) =>
         admin.from("leads").select("id, name, email, mobile, total_amount, lead_status_v2, lead_code, status, lead_source, service, service_id").in("id", chunk)
       ),
-      fetchInChunks<any>(customerIds, 100, (chunk) =>
+      fetchInChunks<any>(customerIds, 200, (chunk) =>
         admin.from("customers").select("id, name, primary_mobile, primary_email").in("id", chunk)
       ),
-      fetchInChunks<any>(ids, 100, (chunk) =>
+      fetchInChunks<any>(ids, 200, (chunk) =>
         admin.from("payments").select("id, application_id, lead_id, status, amount, payment_date").in("application_id", chunk)
       ),
-      fetchInChunks<any>(leadIds, 100, (chunk) =>
+      fetchInChunks<any>(leadIds, 200, (chunk) =>
         admin.from("payments").select("id, application_id, lead_id, status, amount, payment_date").in("lead_id", chunk)
       ),
-      fetchInChunks<any>(staffIds, 100, (chunk) =>
+      fetchInChunks<any>(staffIds, 200, (chunk) =>
         admin.from("profiles").select("id, full_name, display_name, email").in("id", chunk)
       ),
     ]);
@@ -1122,7 +1139,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       new Set([...serviceIds, ...(leadsData ?? []).map((l: any) => l.service_id)].filter(Boolean))
     ) as string[];
 
-    const svcsData = await fetchInChunks<any>(allServiceIds, 100, (chunk) =>
+    const svcsData = await fetchInChunks<any>(allServiceIds, 200, (chunk) =>
       admin.from("services").select("id, service_name").in("id", chunk)
     );
 
@@ -1786,6 +1803,15 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         in_range_action_taken: inRangeActionTaken,
         latest_action_at: actionHistoryList[0]?.created_at ?? null,
         action_count: actionCount,
+        // Customer submitted the form after a delay; stays in Need Action until staff act on it.
+        customer_resumed_pending: (() => {
+          if (isTerminal) return false;
+          const ev = thisAppEvents.find((e: any) => e.event_type === "customer_form_resumed");
+          if (!ev || String(a.fulfillment_status ?? "") !== "form_submitted") return false;
+          const resumedAt = new Date(ev.created_at).getTime();
+          const lastAction = actionHistoryList[0]?.created_at ? new Date(actionHistoryList[0].created_at).getTime() : 0;
+          return lastAction <= resumedAt;
+        })(),
         action_history: actionHistoryList,
       };
     });
@@ -2133,7 +2159,7 @@ export const getOrderDetailV2 = createServerFn({ method: "POST" })
     let payments = (paysRes.data ?? []) as any[];
     const payIds = payments.map((p) => p.id);
     const invoicePromise = payIds.length > 0
-      ? admin.from("invoices").select("id, payment_id, invoice_number, pdf_path, issued_at, last_emailed_at, email_attempts, last_email_status, delivery_status, replaced_at").in("payment_id", payIds)
+      ? admin.from("invoices").select("id, payment_id, invoice_number, pdf_path, issued_at, last_emailed_at, email_attempts, last_email_status, delivery_status, replaced_at").in("payment_id", payIds).is("cancelled_at", null)
       : Promise.resolve({ data: [] });
 
     const [wfRes, invsRes] = await Promise.all([workflowPromise, invoicePromise]);

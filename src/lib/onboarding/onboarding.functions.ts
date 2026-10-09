@@ -225,8 +225,8 @@ export const submitOnboarding = createServerFn({ method: "POST" })
       // Date of Commencement must not be later than Date of Incorporation / Registration
       const incDate = mergedData.incorporation_date;
       const comDate = mergedData.commencement_date;
-      if (incDate && comDate && String(comDate) > String(incDate)) {
-        throw new Error("Date of Commencement cannot be later than Date of Incorporation / Registration.");
+      if (incDate && comDate && String(comDate) < String(incDate)) {
+        throw new Error("Date of Commencement cannot be earlier than Date of Incorporation / Registration.");
       }
 
       // Sanitize inputs (e.g. lowercase emails)
@@ -242,7 +242,7 @@ export const submitOnboarding = createServerFn({ method: "POST" })
 
       // Check Plants requirement on server
       const plantsField = validationFields.find((f) => String(f.type) === "plants" || f.key === "plants");
-      if (plantsField) {
+      if (plantsField && isFieldVisible(plantsField, validationFields, mergedData)) {
         const rawPlants = mergedData[plantsField.key || "plants"];
         let plantArr: any[] = [];
         if (typeof rawPlants === "string" && rawPlants.trim()) {
@@ -258,18 +258,35 @@ export const submitOnboarding = createServerFn({ method: "POST" })
           if (!p.unit_name || !p.city || !p.state || !p.pincode) {
             throw new Error(`Plant / Unit #${i + 1} is missing required address details.`);
           }
+          const limits: Array<[string, string, number]> = [
+            ["address_flat", "Flat / Door / Block No.", 20],
+            ["address_premises", "Name of Premises / Building", 50],
+            ["address_village", "Village / Town", 30],
+            ["address_block", "Block", 30],
+            ["address_road", "Road / Street / Lane", 30],
+            ["city", "City", 25],
+          ];
+          for (const [k, label, max] of limits) {
+            if (p[k] && String(p[k]).length > max) {
+              throw new Error(`Plant / Unit #${i + 1}: ${label} can be at most ${max} characters.`);
+            }
+          }
         }
       }
 
       // Pattern validation (case-insensitive flag "i")
       for (const f of validationFields) {
         if (!f.pattern) continue;
+        if (!isFieldVisible(f, validationFields, mergedData)) continue;
         const v = mergedData[f.key];
         if (v === undefined || v === null || String(v).trim() === "") continue;
         const valStr = String(v).trim();
-        const pat = f.pattern.startsWith("^") && f.pattern.endsWith("$")
-          ? f.pattern
-          : `^(${f.pattern})$`;
+        const rawPat = /^UDYAM-X+-X+-X+$/i.test(f.pattern.trim())
+          ? "^(UDYAM-[A-Z]{2}-\\d{2}-\\d{7}|[A-Z0-9-]{8,25})$"
+          : f.pattern;
+        const pat = rawPat.startsWith("^") && rawPat.endsWith("$")
+          ? rawPat
+          : `^(${rawPat})$`;
         try {
           if (!new RegExp(pat, "i").test(valStr)) {
             throw new Error(`Invalid format for ${f.label}.`);

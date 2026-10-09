@@ -157,11 +157,11 @@ const isUuid = (val?: string | null): boolean => {
 };
 
 const STAGE_DISPLAY_NAMES: Record<string, string> = {
-  order_received: "Order Received",
+  order_received: "Incomplete Form",
   awaiting_customer_form: "Awaiting Form",
   waiting_for_customer_submission: "Customer Form Pending",
   form_submitted: "Form Submitted",
-  form_not_submitted: "Form Not Submitted",
+  form_not_submitted: "Form Not Submitted Delay",
   technical_delay: "Technical Delay Marked",
   customer_delay: "Customer Delay Marked",
   government_processing: "Govt Processing Started",
@@ -183,7 +183,7 @@ const STAGE_DISPLAY_NAMES: Record<string, string> = {
   closed: "Order Closed",
   cancelled: "Order Cancelled",
   payment_pending: "Payment Pending",
-  payment_done: "Order Received",
+  payment_done: "Incomplete Form",
   order_reopened: "Order Reopened",
   new_lead: "New Lead",
   send_form_link: "Form Link Resent",

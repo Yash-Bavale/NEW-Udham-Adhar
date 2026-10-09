@@ -203,8 +203,8 @@ const BUCKET_CARDS: BucketCardItem[] = [
 
 const STAGE_FILTER_OPTIONS: Array<{ id: string; label: string; tone: string }> = [
   { id: "all", label: "All Stages", tone: "slate" },
-  { id: "payment_done", label: "Order Received", tone: "emerald" },
-  { id: "form_not_submitted", label: "Form Not Submitted", tone: "amber" },
+  { id: "payment_done", label: "Incomplete Form", tone: "emerald" },
+  { id: "form_not_submitted", label: "Form Not Submitted Delay", tone: "amber" },
   { id: "order_reopened", label: "Order Reopened", tone: "violet" },
   { id: "form_submitted", label: "Form Submitted", tone: "indigo" },
   { id: "technical_delay", label: "Technical Delay", tone: "sky" },
@@ -619,8 +619,9 @@ function OrdersListPage() {
     queryKey: getOrdersQueryKey(normalizedFilter, page),
     queryFn: () => listFn({ data: queryPayload }),
     placeholderData: keepPreviousData,
-    staleTime: 10_000,
-    refetchInterval: 15_000,
+    // Live updates arrive through realtime subscriptions below; no timed polling.
+    staleTime: 30_000,
+    refetchOnWindowFocus: true,
     gcTime: 10 * 60 * 1000,
   });
 
@@ -676,18 +677,22 @@ useRealtimeTable("assignment_pool", () => {
   scheduleDebouncedInvalidation();
 });
 
-// Background prefetch for next page
+// Background prefetch for next page — only after the current page has finished loading,
+// so it never competes with the request the user is waiting on.
 useEffect(() => {
+  if (isFetching || !data) return;
   const totalPages = Math.ceil(total / pageSize);
-  if (page < totalPages) {
+  if (page >= totalPages) return;
+  const t = setTimeout(() => {
     const nextPagePayload = { ...queryPayload, page: page + 1 };
     qc.prefetchQuery({
       queryKey: getOrdersQueryKey(normalizedFilter, page + 1),
       queryFn: () => listFn({ data: nextPagePayload }),
       staleTime: 30 * 1000,
     });
-  }
-}, [page, total, queryPayload, normalizedFilter, qc, listFn, pageSize]);
+  }, 1500);
+  return () => clearTimeout(t);
+}, [isFetching, data, page, total, queryPayload, normalizedFilter, qc, listFn, pageSize]);
 
 const bulkAssignFn = useServerFn(bulkAssignOrders);
 const autoDistributeFn = useServerFn(autoDistributeSelectedOrders);
@@ -990,7 +995,7 @@ return (
             <SelectItem value="all">All Fulfillment Stages</SelectItem>
             <SelectGroup>
               <SelectLabel className="text-[10px] font-bold uppercase tracking-wider text-slate-400 px-2 py-1">In Progress</SelectLabel>
-              <SelectItem value="order_received">Order Received</SelectItem>
+              <SelectItem value="order_received">Incomplete Form</SelectItem>
               <SelectItem value="order_reopened">Order Reopened</SelectItem>
               <SelectItem value="form_submitted">Form Submitted</SelectItem>
               <SelectItem value="technical_delay">Technical Delay</SelectItem>
@@ -1036,8 +1041,7 @@ return (
           )}
         </div>
 
-        {/* Assignees Filter (Admin & Staff) */}
-        {/* Sort Selector */}
+        {/* Sort Selector - Kept on the same single row */}
         <Select
           value={
             sortField === "created_at"
@@ -1087,7 +1091,7 @@ return (
           </SelectContent>
         </Select>
 
-        {/* Assignees Filter (Admin & Staff) - Kept at last */}
+        {/* Assignees Filter (Admin & Staff) */}
         {role.hasAny(["admin", "super_admin", "operations", "manager", "executive", "support"]) && (
           <Select value={assignedTo} onValueChange={setAssignedTo}>
             <SelectTrigger className="h-9 flex-[1.05] min-w-0 px-1.5 sm:px-2 xl:px-2.5 text-xs bg-slate-50/50 border-slate-200 [&_svg]:shrink-0">
@@ -1465,8 +1469,8 @@ return (
                   )}
                 </div>
               </th>
-              {isAdmin && <th className="text-left font-semibold px-3 py-2.5">Assigned</th>}
               {!hideMoney && <th className="text-right font-semibold px-3 py-2.5">Amount</th>}
+              {isAdmin && <th className="text-left font-semibold px-3 py-2.5">Assigned</th>}
             </tr>
           </thead>
           <tbody>
@@ -2265,15 +2269,15 @@ function OrderRow({
         </div>
       </td>
 
-      {/* 7. Assigned */}
-      {isAdmin && <td className="px-2 py-2.5 text-slate-600 whitespace-nowrap text-[12px]">{order.assigned_name ?? "Unassigned"}</td>}
-
-      {/* 8. Amount */}
+      {/* 7. Amount */}
       {!hideMoney && (
         <td className="px-2 py-2.5 text-right font-semibold text-slate-900 whitespace-nowrap text-[13px]">
           {formatINR(order.total_amount)}
         </td>
       )}
+
+      {/* 8. Assigned */}
+      {isAdmin && <td className="px-2 py-2.5 text-slate-600 whitespace-nowrap text-[12px]">{order.assigned_name ?? "Unassigned"}</td>}
     </tr>
   );
 }

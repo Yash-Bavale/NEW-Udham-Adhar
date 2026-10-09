@@ -23,7 +23,7 @@ import {
   resendFormLink,
 } from "@/lib/crm/submissions-admin.functions";
 import { getDocumentSignedUrl } from "@/lib/onboarding/onboarding.functions";
-import { getSchema } from "@/lib/onboarding/schemas";
+import { getSchema, isFieldVisible } from "@/lib/onboarding/schemas";
 import { parseNicActivities } from "@/lib/onboarding/nic-fill";
 import { Button } from "@/components/ui/button";
 import { formatIST, formatDateDMY } from "@/lib/datetime";
@@ -301,10 +301,20 @@ export function FormSubmissionPanel({
 
   const isDraft = !!submission && (submission.status !== "submitted" || !submission.submitted_at);
 
-  // Resolve full schema once so we know which fields are required.
-  const fullSchema = serviceCode ? getSchema(serviceCode) : null;
-  const requiredFields = (fullSchema?.fields ?? []).filter(
-    (f: any) => f.required && f.type !== "section",
+  // Use the configured custom form when present, so required/visibility rules
+  // match exactly what the customer saw. Hidden (branched-away) fields are never required.
+  const customFields: any[] = activeSchema?.sections?.length
+    ? activeSchema.sections.flatMap((s: any) => s.fields ?? [])
+    : [];
+  const schemaFields: any[] = customFields.length
+    ? customFields
+    : (serviceCode ? getSchema(serviceCode)?.fields ?? [] : []);
+  const answerValues: Record<string, unknown> = submission?.form_data ?? {};
+  const visibleKeys = new Set(
+    schemaFields.filter((f: any) => isFieldVisible(f, schemaFields, answerValues)).map((f: any) => f.key),
+  );
+  const requiredFields = schemaFields.filter(
+    (f: any) => f.required && f.type !== "section" && f.type !== "note" && visibleKeys.has(f.key),
   );
   const requiredKeys = new Set(requiredFields.map((f: any) => f.key));
   const isBlank = (v: any) =>
@@ -496,6 +506,7 @@ export function FormSubmissionPanel({
                   </p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3">
                     {section.fields.map((f) => {
+                      if (schemaFields.length && !visibleKeys.has(f.key) && schemaFields.some((x: any) => x.key === f.key)) return null;
                       if (f.type === "note") {
                         const noteText = (f.help || f.default || f.placeholder || f.label || "").trim();
                         return (

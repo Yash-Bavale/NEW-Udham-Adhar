@@ -60,6 +60,9 @@ function toTitleCase(input: string): string {
 export function validatePattern(pattern: string, val: string): boolean {
   if (!pattern || !val) return true;
   const trimmed = val.trim();
+  if (/^UDYAM-X+-X+-X+$/i.test(pattern.trim())) {
+    pattern = "^(UDYAM-[A-Z]{2}-\\d{2}-\\d{7}|[A-Z0-9-]{8,25})$";
+  }
   try {
     const anchored = pattern.startsWith("^") && pattern.endsWith("$")
       ? pattern
@@ -210,7 +213,7 @@ export function OnboardingForm({
 
     // 1b. Validate compulsory Plants/Units details
     const plantsField = schema.fields.find((f) => f.type === "plants" || f.key === "plants");
-    if (plantsField) {
+    if (plantsField && isFieldVisible(plantsField, schema.fields, values)) {
       const parsedPlants = parsePlants(values[plantsField.key] ?? "");
       if (parsedPlants.length === 0) {
         setErr("At least one Plant / Unit detail is required. Please fill in address details for Plant / Unit #1.");
@@ -248,9 +251,9 @@ export function OnboardingForm({
       }
     }
 
-    // 2b. Date of Commencement must not be later than Date of Incorporation / Registration
-    if (values.incorporation_date && values.commencement_date && values.commencement_date > values.incorporation_date) {
-      setErr("Date of Commencement cannot be later than Date of Incorporation / Registration.");
+    // 2b. Date of Commencement must not be earlier than Date of Incorporation / Registration
+    if (values.incorporation_date && values.commencement_date && values.commencement_date < values.incorporation_date) {
+      setErr("Date of Commencement cannot be earlier than Date of Incorporation / Registration.");
       setSubmitSuccess(false);
       return;
     }
@@ -309,8 +312,9 @@ export function OnboardingForm({
       const isNicKey = f.key === "nic_2_digit" || f.key === "nic_4_digit" || f.key === "nic_5_digit";
 
       if (f.type === "section") {
-        const isNic = f.key === "section_nic" || /nic/i.test(f.key) || /nic.*code/i.test(f.label);
-        if (currentGroup.fields.length > 0 || currentGroup.isNic) {
+        // Only an explicit NIC heading starts a NIC block; other section names never do.
+        const isNic = f.key === "section_nic";
+        if (currentGroup.fields.length > 0) {
           groups.push(currentGroup);
         }
         currentGroup = {
@@ -328,8 +332,10 @@ export function OnboardingForm({
             groups.push(currentGroup);
           }
           currentGroup = {
-            key: "section_nic",
-            label: "20. National Industrial Classification (NIC) Code for Activities",
+            key: `section_nic_${f.key}`,
+            label: currentGroup.fields.length === 0 && currentGroup.label
+              ? currentGroup.label
+              : "National Industrial Classification (NIC) Code",
             isNic: true,
             fields: [f],
           };
@@ -340,7 +346,7 @@ export function OnboardingForm({
       }
 
       if (currentGroup.isNic) {
-        groups.push(currentGroup);
+        if (currentGroup.fields.length > 0) groups.push(currentGroup);
         currentGroup = {
           key: `section_${f.key}`,
           label: "",
@@ -352,7 +358,7 @@ export function OnboardingForm({
       currentGroup.fields.push(f);
     }
 
-    if (currentGroup.fields.length > 0 || currentGroup.isNic) {
+    if (currentGroup.fields.length > 0) {
       groups.push(currentGroup);
     }
 
@@ -365,13 +371,8 @@ export function OnboardingForm({
         {sectionGroups.map((group, groupIdx) => {
           const visibleFields = group.fields.filter((f) => isFieldVisible(f, schema.fields, values));
 
-          if (group.isNic) {
-            const hasNicFields = schema.fields.some((x) => /^nic_[245]_digit$/.test(x.key));
-            const anyNicVisible =
-              !hasNicFields ||
-              schema.fields.some((x) => /^nic_[245]_digit$/.test(x.key) && isFieldVisible(x, schema.fields, values));
-            if (!anyNicVisible) return null;
-          } else if (visibleFields.length === 0) {
+          // NIC block shows only when its own NIC fields are visible (e.g. "Update NIC Code" ticked).
+          if (visibleFields.length === 0) {
             return null;
           }
 
@@ -806,12 +807,12 @@ function PlantsField({ value, onChange }: { value: string; onChange: (v: string)
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <PlantInput label="Unit / Plant Name *" value={p.unit_name} onChange={(v) => setField(i, "unit_name", v)} />
-              <PlantInput label="Flat / Door / Block No. *" value={p.address_flat} onChange={(v) => setField(i, "address_flat", v)} />
-              <PlantInput label="Name of Premises / Building" value={p.address_premises} onChange={(v) => setField(i, "address_premises", v)} />
-              <PlantInput label="Village / Town *" value={p.address_village} onChange={(v) => setField(i, "address_village", v)} />
-              <PlantInput label="Block" value={p.address_block} onChange={(v) => setField(i, "address_block", v)} />
-              <PlantInput label="Road / Street / Lane *" value={p.address_road} onChange={(v) => setField(i, "address_road", v)} />
-              <PlantInput label="City *" value={p.city} onChange={(v) => setField(i, "city", v)} />
+              <PlantInput label="Flat / Door / Block No. *" value={p.address_flat} onChange={(v) => setField(i, "address_flat", v)} maxLength={20} />
+              <PlantInput label="Name of Premises / Building" value={p.address_premises} onChange={(v) => setField(i, "address_premises", v)} maxLength={50} />
+              <PlantInput label="Village / Town *" value={p.address_village} onChange={(v) => setField(i, "address_village", v)} maxLength={30} />
+              <PlantInput label="Block" value={p.address_block} onChange={(v) => setField(i, "address_block", v)} maxLength={30} />
+              <PlantInput label="Road / Street / Lane *" value={p.address_road} onChange={(v) => setField(i, "address_road", v)} maxLength={30} />
+              <PlantInput label="City *" value={p.city} onChange={(v) => setField(i, "city", v)} maxLength={25} />
               <PlantInput label="PIN Code *" value={p.pincode} onChange={(v) => setField(i, "pincode", v)} inputMode="numeric" maxLength={6} />
               <PlantSelect label="State *" value={p.state} onChange={(v) => setField(i, "state", v)}
                 options={INDIA_STATES as unknown as string[]} placeholder="Select state…" />

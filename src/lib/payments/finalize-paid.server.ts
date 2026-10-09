@@ -216,19 +216,24 @@ export async function finalizePaidPayment(paymentId: string, opts: FinalizeOpts)
       .from("invoices")
       .select("invoice_number, issued_at, sac_code, place_of_supply, cgst_amount, sgst_amount, igst_amount, base_amount, gst_amount, total_amount, last_emailed_at")
       .eq("payment_id", payment.id)
+      .is("cancelled_at", null)
       .maybeSingle();
     invoiceRow = inv;
   } catch (e) {
     console.error("[finalize] invoice generation failed", e);
   }
 
-  // 5) E001 email — send ONCE per payment. Check BOTH invoices table AND email_queue
-  // to prevent race conditions when webhooks and browser redirects hit concurrently.
+  // 5) Confirmation email — send ONCE per payment. First payment gets E001,
+  // a top-up gets E013. The duplicate guard must match the template this
+  // payment is about to send: checking the whole lead for E001 would see the
+  // FIRST payment's confirmation and wrongly suppress the top-up receipt.
+  const templateKey = isTopUp ? "topup_payment_received" : "order_confirmation";
+  const guardCodes = isTopUp ? ["E013", "topup_payment_received"] : ["E001", "order_confirmation"];
   const { data: existingEmailQueue } = await supabaseAdmin
     .from("email_queue")
     .select("id")
     .eq("lead_id", payment.lead_id)
-    .in("template_code", ["E001", "order_confirmation"])
+    .in("template_code", guardCodes)
     .maybeSingle();
 
   const alreadyEmailed = !!invoiceRow?.last_emailed_at || !!existingEmailQueue;
@@ -290,7 +295,6 @@ export async function finalizePaidPayment(paymentId: string, opts: FinalizeOpts)
         };
         // First payment → E001 order confirmation. Top-up → E013 supplementary
         // payment receipt (no second "order confirmed" mail for one order).
-        const templateKey = isTopUp ? "topup_payment_received" : "order_confirmation";
         try {
           await enqueueFromTemplateInternal(
             templateKey,

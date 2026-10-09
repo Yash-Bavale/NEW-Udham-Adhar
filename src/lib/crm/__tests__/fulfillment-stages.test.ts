@@ -60,7 +60,7 @@ describe("S01–S12 fulfillment catalog", () => {
   });
 
   it("labelForFulfillment resolves canonical + legacy values", () => {
-    expect(labelForFulfillment("order_received")).toBe("Order Received");
+    expect(labelForFulfillment("order_received")).toBe("Incomplete Form");
     expect(labelForFulfillment("certificate_rejected")).toContain("Rejected");
     expect(labelForFulfillment(null)).toBe("—");
   });

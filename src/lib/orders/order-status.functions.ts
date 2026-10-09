@@ -7,7 +7,7 @@ export type OrderStatus = Database['public']['Enums']['order_status_enum'];
 export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
   NEW_ORDER: 'New Order',
   PAYMENT_RECEIVED: 'Payment Received',
-  ORDER_RECEIVED: 'Order Received',
+  ORDER_RECEIVED: 'Incomplete Form',
   FORM_PENDING: 'Form Pending',
   FORM_RECEIVED: 'Form Received',
   WAITING_CUSTOMER_INFO: 'Waiting for Customer Info',

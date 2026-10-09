@@ -61,9 +61,9 @@ const NAV: NavGroup[] = [
     items: [
       { to: "/admin/dashboard", label: "Executive Dashboard", icon: LayoutDashboard, module: "dashboard", requireAnyRole: ADMIN_ROLES },
       { to: "/admin/my-work", label: "My Dashboard", icon: Inbox },
-      { to: "/admin/activity", label: "Activity", icon: Activity, requireAnyRole: ADMIN_ROLES },
-      { to: "/admin/notifications", label: "Notifications", icon: Bell },
-      { to: "/admin/my-performance", label: "My Performance", icon: BarChart3, requireAnyRole: ALL_STAFF_ROLES },
+      { to: "/admin/orders", label: "Orders", icon: ShoppingBag, module: "orders", requireAnyRole: ALL_STAFF_ROLES },
+      { to: "/admin/tickets", label: "Support Tickets", icon: LifeBuoy, module: "tickets", requireAnyRole: SUPPORT_ROLES },
+      { to: "/admin/employees", label: "Employees", icon: UserCog, module: "employees", requireAnyRole: ADMIN_ROLES },
     ],
   },
   {
@@ -71,7 +71,6 @@ const NAV: NavGroup[] = [
     label: "Work",
     items: [
       { to: "/admin/leads", label: "Leads", icon: Users, module: "leads", requireAnyRole: ADMIN_ROLES },
-      { to: "/admin/orders", label: "Orders", icon: ShoppingBag, module: "orders", requireAnyRole: ALL_STAFF_ROLES },
       { to: "/admin/training", label: "Training", icon: GraduationCap, requireAnyRole: ALL_STAFF_ROLES },
       { to: "/admin/customers", label: "Customers", icon: UserCircle2, module: "customers", requireAnyRole: ADMIN_ROLES },
       { to: "/admin/documents", label: "Documents", icon: FileText, module: "documents", requireAnyRole: ADMIN_ROLES },
@@ -84,7 +83,6 @@ const NAV: NavGroup[] = [
     label: "Service",
     items: [
       { to: "/admin/complaints", label: "Complaints & Contact Forms", icon: MessageSquareWarning, module: "complaints", requireAnyRole: SUPPORT_ROLES },
-      { to: "/admin/tickets", label: "Support Tickets", icon: LifeBuoy, module: "tickets", requireAnyRole: SUPPORT_ROLES },
       { to: "/admin/canned-responses", label: "Canned Responses", icon: LifeBuoy, module: "tickets", requireAnyRole: SUPPORT_ROLES },
       { to: "/admin/quarantine", label: "Email Quarantine", icon: Mail, module: "tickets", requireAnyRole: SUPPORT_ROLES },
       { to: "/admin/websites", label: "Websites", icon: Globe, requireAnyRole: ADMIN_ROLES },
@@ -96,6 +94,7 @@ const NAV: NavGroup[] = [
     label: "Finance",
     items: [
       { to: "/admin/invoices", label: "Invoices", icon: Receipt, module: "invoices", requireAnyRole: FINANCE_ROLES },
+      { to: "/admin/zoho-export", label: "Zoho Export", icon: Receipt, module: "invoices", requireAnyRole: FINANCE_ROLES },
       { to: "/admin/payments", label: "Payments", icon: CreditCard, module: "payments", requireAnyRole: FINANCE_ROLES },
       { to: "/admin/payment-audit", label: "Payment Audit", icon: CreditCard, module: "payments", requireAnyRole: FINANCE_ROLES },
       { to: "/admin/gateways", label: "Gateways", icon: Banknote, module: "payments", requireAnyRole: ADMIN_ROLES },
@@ -111,6 +110,7 @@ const NAV: NavGroup[] = [
       { to: "/admin/reports", label: "Reports", icon: BarChart3, module: "reports", requireAnyRole: ADMIN_ROLES },
       { to: "/admin/dispute-manager", label: "Dispute Manager", icon: ShieldAlert, requireAnyRole: SUPPORT_ROLES },
       { to: "/admin/performance", label: "Employee Performance", icon: BarChart3, requireAnyRole: ADMIN_ROLES },
+      { to: "/admin/attendance", label: "Attendance & Payroll", icon: History, requireAnyRole: ADMIN_ROLES },
       { to: "/admin/audit", label: "Audit Log", icon: ScrollText, module: "audit_log", requireAnyRole: ADMIN_ROLES },
       { to: "/admin/seo", label: "SEO", icon: Globe, requireAnyRole: ADMIN_ROLES },
     ],
@@ -119,7 +119,6 @@ const NAV: NavGroup[] = [
     id: "admin",
     label: "System",
     items: [
-      { to: "/admin/employees", label: "Employees", icon: UserCog, module: "employees", requireAnyRole: ADMIN_ROLES },
       { to: "/admin/assignment-history", label: "Assignment & Leaves", icon: History, requireAnyRole: ADMIN_ROLES },
       { to: "/admin/live-calls", label: "Live Calls", icon: Activity, requireAnyRole: ADMIN_ROLES },
       { to: "/admin/sessions", label: "Sessions & Security", icon: ShieldAlert, requireAnyRole: ADMIN_ROLES },
@@ -193,8 +192,6 @@ function Shell({ children, email }: { children: ReactNode; email?: string }) {
       label: "Overview",
       items: [
         { to: "/admin/my-work", label: "My Dashboard", icon: Inbox },
-        { to: "/admin/notifications", label: "Notifications", icon: Bell },
-        { to: "/admin/my-performance", label: "My Performance", icon: BarChart3 },
       ],
     },
     {
@@ -262,7 +259,7 @@ function Shell({ children, email }: { children: ReactNode; email?: string }) {
 
   const getSidebarBadge = (to: string): number => {
     // Notifications page: always show unread count (never suppressed)
-    if (to === "/admin/notifications") return sidebarCounts?.notifications ?? 0;
+    if (to === "/admin/notifications") return 0;
     // Leads: uses its own watcher — only new-since-last-visit
     if (to === "/admin/leads") return newLeads > 0 ? newLeads : 0;
     // All other clearable sections: suppress once visited
@@ -355,7 +352,8 @@ function Shell({ children, email }: { children: ReactNode; email?: string }) {
       <button
         onClick={async () => {
           if (isMobile) setMobileOpen(false);
-          await supabase.auth.signOut();
+          try { window.sessionStorage.removeItem("crm_employee_session_id"); } catch { /* ignore */ }
+          await supabase.auth.signOut({ scope: "local" });
           navigate({ to: "/admin-login" });
         }}
         title={sidebarCollapsed && !isMobile ? "Logout" : undefined}
@@ -479,7 +477,8 @@ function Shell({ children, email }: { children: ReactNode; email?: string }) {
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             <NotificationsBell />
             <UserMenu email={email} onSignOut={async () => {
-              await supabase.auth.signOut();
+              try { window.sessionStorage.removeItem("crm_employee_session_id"); } catch { /* ignore */ }
+          await supabase.auth.signOut({ scope: "local" });
               navigate({ to: "/admin-login" });
             }} />
           </div>
@@ -734,25 +733,9 @@ function NotificationsBell() {
       sub.subscription.unsubscribe();
     };
   }, []);
-  const { data } = useQuery<{ count: number }>({
-    queryKey: ["notifications", "unread-count"],
-    queryFn: async () => {
-      try {
-        return await fetchCount();
-      } catch {
-        // Swallow transient 401s during sign-in/out so the bell doesn't blank the page.
-        return { count: 0 };
-      }
-    },
-    refetchInterval: 60_000,
-    enabled: hasSession,
-    retry: false,
-  });
-  useRealtimeTable("notifications", () => {
-    if (!hasSession) return;
-    qc.invalidateQueries({ queryKey: ["notifications", "unread-count"] });
-  });
-  const count = data?.count ?? 0;
+  // Unread count removed by request: no polling, no live listener, no badge.
+  void fetchCount;
+  const count = 0;
 
   // Chime on count increase (after initial prime so mount doesn't ring).
   useEffect(() => {
@@ -881,7 +864,7 @@ function NotificationsBell() {
             </div>
             <button
               onClick={() => markAllMut.mutate()}
-              disabled={count === 0 || markAllMut.isPending}
+              disabled={markAllMut.isPending}
               className="text-[11px] font-medium text-indigo-600 hover:text-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               Mark all read

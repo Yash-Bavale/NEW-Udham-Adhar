@@ -200,28 +200,7 @@ export const createLead = createServerFn({ method: "POST" })
     // created_at equal to the actual payment time.
 
 
-    // Emit internal CRM notifications to staff/admins
-    try {
-      const { emitToRole } = await import("@/lib/notifications/emit.server");
-      await emitToRole("admin", {
-        kind: "form_submitted",
-        title: "New Lead Received",
-        body: `${data.name} (${data.service}) — ${data.mobile}`,
-        href: `/admin/leads/${leadId}`,
-        entityKind: "lead",
-        entityId: leadId,
-      });
-      await emitToRole("super_admin", {
-        kind: "form_submitted",
-        title: "New Lead Received",
-        body: `${data.name} (${data.service}) — ${data.mobile}`,
-        href: `/admin/leads/${leadId}`,
-        entityKind: "lead",
-        entityId: leadId,
-      });
-    } catch (e: unknown) {
-      console.error("Lead creation notification failed:", e);
-    }
+    // Lead notifications intentionally disabled — the bell never rings for leads.
 
     return {
       leadId,

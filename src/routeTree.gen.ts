@@ -56,6 +56,7 @@ import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as AdminActivityRouteImport } from './routes/admin.activity'
 import { Route as AdminApplicationsRouteImport } from './routes/admin.applications'
 import { Route as AdminAssignmentHistoryRouteImport } from './routes/admin.assignment-history'
+import { Route as AdminAttendanceRouteImport } from './routes/admin.attendance'
 import { Route as AdminAuditRouteImport } from './routes/admin.audit'
 import { Route as AdminCannedResponsesRouteImport } from './routes/admin.canned-responses'
 import { Route as AdminCertificatesRouteImport } from './routes/admin.certificates'
@@ -97,6 +98,7 @@ import { Route as AdminTrainingRouteImport } from './routes/admin.training'
 import { Route as AdminUsersRouteImport } from './routes/admin.users'
 import { Route as AdminWebsitesRouteImport } from './routes/admin.websites'
 import { Route as AdminWhatsappTemplatesRouteImport } from './routes/admin.whatsapp-templates'
+import { Route as AdminZohoExportRouteImport } from './routes/admin.zoho-export'
 import { Route as ApiHealthRouteImport } from './routes/api/health'
 import { Route as AppTokenRouteImport } from './routes/app.$token'
 import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
@@ -165,6 +167,7 @@ import { Route as ApiPublicWebhooksPayuRouteImport } from './routes/api/public/w
 import { Route as LovableEmailQueueProcessRouteImport } from './routes/lovable/email/queue/process'
 import { Route as LovableEmailTransactionalPreviewRouteImport } from './routes/lovable/email/transactional/preview'
 import { Route as LovableEmailTransactionalSendRouteImport } from './routes/lovable/email/transactional/send'
+import { Route as ApiPublicTelephonyCallerdeskEventsRouteImport } from './routes/api/public/telephony/callerdesk/events'
 import { Route as ApiPublicTelephonySmartfloDialplanRouteImport } from './routes/api/public/telephony/smartflo/dialplan'
 import { Route as ApiPublicTelephonySmartfloEventsRouteImport } from './routes/api/public/telephony/smartflo/events'
 import { Route as ApiPublicV1ApplicationsSummaryRouteImport } from './routes/api/public/v1/applications/summary'
@@ -414,6 +417,11 @@ const AdminAssignmentHistoryRoute = AdminAssignmentHistoryRouteImport.update({
   path: '/assignment-history',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminAttendanceRoute = AdminAttendanceRouteImport.update({
+  id: '/attendance',
+  path: '/attendance',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminAuditRoute = AdminAuditRouteImport.update({
   id: '/audit',
   path: '/audit',
@@ -617,6 +625,11 @@ const AdminWebsitesRoute = AdminWebsitesRouteImport.update({
 const AdminWhatsappTemplatesRoute = AdminWhatsappTemplatesRouteImport.update({
   id: '/whatsapp-templates',
   path: '/whatsapp-templates',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminZohoExportRoute = AdminZohoExportRouteImport.update({
+  id: '/zoho-export',
+  path: '/zoho-export',
   getParentRoute: () => AdminRoute,
 } as any)
 const ApiHealthRoute = ApiHealthRouteImport.update({
@@ -988,6 +1001,12 @@ const LovableEmailTransactionalSendRoute =
     path: '/lovable/email/transactional/send',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicTelephonyCallerdeskEventsRoute =
+  ApiPublicTelephonyCallerdeskEventsRouteImport.update({
+    id: '/api/public/telephony/callerdesk/events',
+    path: '/api/public/telephony/callerdesk/events',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicTelephonySmartfloDialplanRoute =
   ApiPublicTelephonySmartfloDialplanRouteImport.update({
     id: '/api/public/telephony/smartflo/dialplan',
@@ -1066,6 +1085,7 @@ export interface FileRoutesByFullPath {
   '/admin/activity': typeof AdminActivityRoute
   '/admin/applications': typeof AdminApplicationsRouteWithChildren
   '/admin/assignment-history': typeof AdminAssignmentHistoryRoute
+  '/admin/attendance': typeof AdminAttendanceRoute
   '/admin/audit': typeof AdminAuditRoute
   '/admin/canned-responses': typeof AdminCannedResponsesRoute
   '/admin/certificates': typeof AdminCertificatesRoute
@@ -1107,6 +1127,7 @@ export interface FileRoutesByFullPath {
   '/admin/users': typeof AdminUsersRoute
   '/admin/websites': typeof AdminWebsitesRoute
   '/admin/whatsapp-templates': typeof AdminWhatsappTemplatesRoute
+  '/admin/zoho-export': typeof AdminZohoExportRoute
   '/api/health': typeof ApiHealthRoute
   '/app/$token': typeof AppTokenRoute
   '/auth/callback': typeof AuthCallbackRoute
@@ -1176,6 +1197,7 @@ export interface FileRoutesByFullPath {
   '/lovable/email/transactional/preview': typeof LovableEmailTransactionalPreviewRoute
   '/lovable/email/transactional/send': typeof LovableEmailTransactionalSendRoute
   '/admin/support/tickets/': typeof AdminSupportTicketsIndexRoute
+  '/api/public/telephony/callerdesk/events': typeof ApiPublicTelephonyCallerdeskEventsRoute
   '/api/public/telephony/smartflo/dialplan': typeof ApiPublicTelephonySmartfloDialplanRoute
   '/api/public/telephony/smartflo/events': typeof ApiPublicTelephonySmartfloEventsRoute
   '/api/public/v1/applications/summary': typeof ApiPublicV1ApplicationsSummaryRoute
@@ -1228,6 +1250,7 @@ export interface FileRoutesByTo {
   '/admin/activity': typeof AdminActivityRoute
   '/admin/applications': typeof AdminApplicationsRouteWithChildren
   '/admin/assignment-history': typeof AdminAssignmentHistoryRoute
+  '/admin/attendance': typeof AdminAttendanceRoute
   '/admin/audit': typeof AdminAuditRoute
   '/admin/canned-responses': typeof AdminCannedResponsesRoute
   '/admin/certificates': typeof AdminCertificatesRoute
@@ -1266,6 +1289,7 @@ export interface FileRoutesByTo {
   '/admin/users': typeof AdminUsersRoute
   '/admin/websites': typeof AdminWebsitesRoute
   '/admin/whatsapp-templates': typeof AdminWhatsappTemplatesRoute
+  '/admin/zoho-export': typeof AdminZohoExportRoute
   '/api/health': typeof ApiHealthRoute
   '/app/$token': typeof AppTokenRoute
   '/auth/callback': typeof AuthCallbackRoute
@@ -1334,6 +1358,7 @@ export interface FileRoutesByTo {
   '/lovable/email/transactional/preview': typeof LovableEmailTransactionalPreviewRoute
   '/lovable/email/transactional/send': typeof LovableEmailTransactionalSendRoute
   '/admin/support/tickets': typeof AdminSupportTicketsIndexRoute
+  '/api/public/telephony/callerdesk/events': typeof ApiPublicTelephonyCallerdeskEventsRoute
   '/api/public/telephony/smartflo/dialplan': typeof ApiPublicTelephonySmartfloDialplanRoute
   '/api/public/telephony/smartflo/events': typeof ApiPublicTelephonySmartfloEventsRoute
   '/api/public/v1/applications/summary': typeof ApiPublicV1ApplicationsSummaryRoute
@@ -1388,6 +1413,7 @@ export interface FileRoutesById {
   '/admin/activity': typeof AdminActivityRoute
   '/admin/applications': typeof AdminApplicationsRouteWithChildren
   '/admin/assignment-history': typeof AdminAssignmentHistoryRoute
+  '/admin/attendance': typeof AdminAttendanceRoute
   '/admin/audit': typeof AdminAuditRoute
   '/admin/canned-responses': typeof AdminCannedResponsesRoute
   '/admin/certificates': typeof AdminCertificatesRoute
@@ -1429,6 +1455,7 @@ export interface FileRoutesById {
   '/admin/users': typeof AdminUsersRoute
   '/admin/websites': typeof AdminWebsitesRoute
   '/admin/whatsapp-templates': typeof AdminWhatsappTemplatesRoute
+  '/admin/zoho-export': typeof AdminZohoExportRoute
   '/api/health': typeof ApiHealthRoute
   '/app/$token': typeof AppTokenRoute
   '/auth/callback': typeof AuthCallbackRoute
@@ -1498,6 +1525,7 @@ export interface FileRoutesById {
   '/lovable/email/transactional/preview': typeof LovableEmailTransactionalPreviewRoute
   '/lovable/email/transactional/send': typeof LovableEmailTransactionalSendRoute
   '/admin/support/tickets/': typeof AdminSupportTicketsIndexRoute
+  '/api/public/telephony/callerdesk/events': typeof ApiPublicTelephonyCallerdeskEventsRoute
   '/api/public/telephony/smartflo/dialplan': typeof ApiPublicTelephonySmartfloDialplanRoute
   '/api/public/telephony/smartflo/events': typeof ApiPublicTelephonySmartfloEventsRoute
   '/api/public/v1/applications/summary': typeof ApiPublicV1ApplicationsSummaryRoute
@@ -1553,6 +1581,7 @@ export interface FileRouteTypes {
     | '/admin/activity'
     | '/admin/applications'
     | '/admin/assignment-history'
+    | '/admin/attendance'
     | '/admin/audit'
     | '/admin/canned-responses'
     | '/admin/certificates'
@@ -1594,6 +1623,7 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/admin/websites'
     | '/admin/whatsapp-templates'
+    | '/admin/zoho-export'
     | '/api/health'
     | '/app/$token'
     | '/auth/callback'
@@ -1663,6 +1693,7 @@ export interface FileRouteTypes {
     | '/lovable/email/transactional/preview'
     | '/lovable/email/transactional/send'
     | '/admin/support/tickets/'
+    | '/api/public/telephony/callerdesk/events'
     | '/api/public/telephony/smartflo/dialplan'
     | '/api/public/telephony/smartflo/events'
     | '/api/public/v1/applications/summary'
@@ -1715,6 +1746,7 @@ export interface FileRouteTypes {
     | '/admin/activity'
     | '/admin/applications'
     | '/admin/assignment-history'
+    | '/admin/attendance'
     | '/admin/audit'
     | '/admin/canned-responses'
     | '/admin/certificates'
@@ -1753,6 +1785,7 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/admin/websites'
     | '/admin/whatsapp-templates'
+    | '/admin/zoho-export'
     | '/api/health'
     | '/app/$token'
     | '/auth/callback'
@@ -1821,6 +1854,7 @@ export interface FileRouteTypes {
     | '/lovable/email/transactional/preview'
     | '/lovable/email/transactional/send'
     | '/admin/support/tickets'
+    | '/api/public/telephony/callerdesk/events'
     | '/api/public/telephony/smartflo/dialplan'
     | '/api/public/telephony/smartflo/events'
     | '/api/public/v1/applications/summary'
@@ -1874,6 +1908,7 @@ export interface FileRouteTypes {
     | '/admin/activity'
     | '/admin/applications'
     | '/admin/assignment-history'
+    | '/admin/attendance'
     | '/admin/audit'
     | '/admin/canned-responses'
     | '/admin/certificates'
@@ -1915,6 +1950,7 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/admin/websites'
     | '/admin/whatsapp-templates'
+    | '/admin/zoho-export'
     | '/api/health'
     | '/app/$token'
     | '/auth/callback'
@@ -1984,6 +2020,7 @@ export interface FileRouteTypes {
     | '/lovable/email/transactional/preview'
     | '/lovable/email/transactional/send'
     | '/admin/support/tickets/'
+    | '/api/public/telephony/callerdesk/events'
     | '/api/public/telephony/smartflo/dialplan'
     | '/api/public/telephony/smartflo/events'
     | '/api/public/v1/applications/summary'
@@ -2083,6 +2120,7 @@ export interface RootRouteChildren {
   LovableEmailQueueProcessRoute: typeof LovableEmailQueueProcessRoute
   LovableEmailTransactionalPreviewRoute: typeof LovableEmailTransactionalPreviewRoute
   LovableEmailTransactionalSendRoute: typeof LovableEmailTransactionalSendRoute
+  ApiPublicTelephonyCallerdeskEventsRoute: typeof ApiPublicTelephonyCallerdeskEventsRoute
   ApiPublicTelephonySmartfloDialplanRoute: typeof ApiPublicTelephonySmartfloDialplanRoute
   ApiPublicTelephonySmartfloEventsRoute: typeof ApiPublicTelephonySmartfloEventsRoute
   ApiPublicV1ApplicationsSummaryRoute: typeof ApiPublicV1ApplicationsSummaryRoute
@@ -2421,6 +2459,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminAssignmentHistoryRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/attendance': {
+      id: '/admin/attendance'
+      path: '/attendance'
+      fullPath: '/admin/attendance'
+      preLoaderRoute: typeof AdminAttendanceRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/audit': {
       id: '/admin/audit'
       path: '/audit'
@@ -2706,6 +2751,13 @@ declare module '@tanstack/react-router' {
       path: '/whatsapp-templates'
       fullPath: '/admin/whatsapp-templates'
       preLoaderRoute: typeof AdminWhatsappTemplatesRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/zoho-export': {
+      id: '/admin/zoho-export'
+      path: '/zoho-export'
+      fullPath: '/admin/zoho-export'
+      preLoaderRoute: typeof AdminZohoExportRouteImport
       parentRoute: typeof AdminRoute
     }
     '/api/health': {
@@ -3184,6 +3236,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LovableEmailTransactionalSendRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/telephony/callerdesk/events': {
+      id: '/api/public/telephony/callerdesk/events'
+      path: '/api/public/telephony/callerdesk/events'
+      fullPath: '/api/public/telephony/callerdesk/events'
+      preLoaderRoute: typeof ApiPublicTelephonyCallerdeskEventsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/telephony/smartflo/dialplan': {
       id: '/api/public/telephony/smartflo/dialplan'
       path: '/api/public/telephony/smartflo/dialplan'
@@ -3343,6 +3402,7 @@ interface AdminRouteChildren {
   AdminActivityRoute: typeof AdminActivityRoute
   AdminApplicationsRoute: typeof AdminApplicationsRouteWithChildren
   AdminAssignmentHistoryRoute: typeof AdminAssignmentHistoryRoute
+  AdminAttendanceRoute: typeof AdminAttendanceRoute
   AdminAuditRoute: typeof AdminAuditRoute
   AdminCannedResponsesRoute: typeof AdminCannedResponsesRoute
   AdminCertificatesRoute: typeof AdminCertificatesRoute
@@ -3384,6 +3444,7 @@ interface AdminRouteChildren {
   AdminUsersRoute: typeof AdminUsersRoute
   AdminWebsitesRoute: typeof AdminWebsitesRoute
   AdminWhatsappTemplatesRoute: typeof AdminWhatsappTemplatesRoute
+  AdminZohoExportRoute: typeof AdminZohoExportRoute
   AdminIndexRoute: typeof AdminIndexRoute
   AdminHelpEmailMatrixRoute: typeof AdminHelpEmailMatrixRoute
   AdminSupportTicketsRoute: typeof AdminSupportTicketsRouteWithChildren
@@ -3396,6 +3457,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminActivityRoute: AdminActivityRoute,
   AdminApplicationsRoute: AdminApplicationsRouteWithChildren,
   AdminAssignmentHistoryRoute: AdminAssignmentHistoryRoute,
+  AdminAttendanceRoute: AdminAttendanceRoute,
   AdminAuditRoute: AdminAuditRoute,
   AdminCannedResponsesRoute: AdminCannedResponsesRoute,
   AdminCertificatesRoute: AdminCertificatesRoute,
@@ -3437,6 +3499,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminUsersRoute: AdminUsersRoute,
   AdminWebsitesRoute: AdminWebsitesRoute,
   AdminWhatsappTemplatesRoute: AdminWhatsappTemplatesRoute,
+  AdminZohoExportRoute: AdminZohoExportRoute,
   AdminIndexRoute: AdminIndexRoute,
   AdminHelpEmailMatrixRoute: AdminHelpEmailMatrixRoute,
   AdminSupportTicketsRoute: AdminSupportTicketsRouteWithChildren,
@@ -3542,6 +3605,8 @@ const rootRouteChildren: RootRouteChildren = {
   LovableEmailQueueProcessRoute: LovableEmailQueueProcessRoute,
   LovableEmailTransactionalPreviewRoute: LovableEmailTransactionalPreviewRoute,
   LovableEmailTransactionalSendRoute: LovableEmailTransactionalSendRoute,
+  ApiPublicTelephonyCallerdeskEventsRoute:
+    ApiPublicTelephonyCallerdeskEventsRoute,
   ApiPublicTelephonySmartfloDialplanRoute:
     ApiPublicTelephonySmartfloDialplanRoute,
   ApiPublicTelephonySmartfloEventsRoute: ApiPublicTelephonySmartfloEventsRoute,
