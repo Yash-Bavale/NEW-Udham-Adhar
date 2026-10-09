@@ -979,6 +979,17 @@ export const seedMissingEmailTemplates = createServerFn({ method: "POST" })
     const { BUILTIN_TEMPLATES } = await import("@/lib/emails/emails.server");
     const seeds: Array<{ code: string; name: string; subject: string; body_html: string; variables: string[]; category?: string; flow_id?: string; sr_no?: number; dispatch_mode?: string }> = [
       {
+        code: "R001",
+        name: "R001 – Refund Request Approved",
+        subject: BUILTIN_TEMPLATES.R001?.subject ?? "Refund Request Approved – Order No. {{order_number}}",
+        body_html: BUILTIN_TEMPLATES.R001?.body_html ?? "",
+        category: "Refunds",
+        flow_id: "R001",
+        sr_no: 1,
+        dispatch_mode: "manual",
+        variables: ["order_number", "customer_name", "service_name", "refund_status", "refund_amount", "refund_amount_formatted", "refund_approval_date_and_time", "refund_reference_no", "payment_reference", "customer_email", "customer_mobile", "executive_name"],
+      },
+      {
         code: "R002",
         name: "R002 – Refund Request Not Approved / Rejected",
         subject: BUILTIN_TEMPLATES.R002?.subject ?? "Refund Request Update – Order No. {{order_number}}",

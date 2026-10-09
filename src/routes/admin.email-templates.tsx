@@ -26,8 +26,9 @@ const VARIABLES = [
   "customer_name","order_number","service_name","invoice_number","invoice_url","form_link",
   "payment_reference","payment_date","order_created_at","invoice_date","consultation_at",
   "customer_email","customer_mobile","service_fee","gst_amount","total_amount",
-  "document_checklist","document_name","complaint_number","refund_amount","refund_reason",
-  "refund_gateway_ref","rejection_reason","executive_name","followup_date","authority_name",
+  "document_checklist","document_name","complaint_number","refund_amount","refund_amount_formatted",
+  "refund_status","refund_approval_date_and_time","refund_reference_no","refund_gateway_ref",
+  "rejection_reason","executive_name","followup_date","authority_name",
   "authority_reference","expected_update_date","ticket_number","ticket_subject","employee_reply",
   "employee_remarks","closure_reason","closure_date","reason","subject",
 ];

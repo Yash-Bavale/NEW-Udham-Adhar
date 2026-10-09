@@ -221,7 +221,7 @@ export const ourSideDelay = createServerFn({ method: "POST" })
 async function loadOrderContext(supabase: any, orderId: string) {
   const { data: order, error } = await supabase
     .from("applications")
-    .select("id, lead_id, customer_id, order_status, application_code, service_id, assigned_to, workflow_status, closure_stage")
+    .select("id, lead_id, customer_id, order_status, application_code, service_id, assigned_to, workflow_status, closure_stage, refund_approved_at, refund_approved_by, refund_gateway_ref, refund_processed_at")
     .eq("id", orderId)
     .maybeSingle();
   if (error) throw new Error(error.message);
@@ -883,7 +883,7 @@ export const markRefundProcessed = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await assertFinanceOrAdmin(context.supabase, context.userId);
 
-    const { order, recipientEmail: to, recipientName: name } = await loadOrderContext(context.supabase, data.orderId);
+    const { order, lead, recipientEmail: to, recipientName: name } = await loadOrderContext(context.supabase, data.orderId);
     const updated = await transition(context.supabase, data.orderId, "REFUND_PROCESSED", {
       remarks: `Refund of ₹${data.amount} processed. Ref: ${data.paymentReference}`,
     });
@@ -977,16 +977,56 @@ export const markRefundProcessed = createServerFn({ method: "POST" })
 
     let emailQueued = false;
     if (to) {
+      const approvalDateIso =
+        (order as any).refund_approved_at ||
+        processedAt;
+      const approvalDateFormatted = new Date(approvalDateIso).toLocaleString("en-IN", {
+        timeZone: "Asia/Kolkata",
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: true,
+      });
+
+      const cleanRefundNum = Number(data.amount).toFixed(2);
+      const formattedRefundRupees = `₹${Number(data.amount).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
       emailQueued = await queueTemplateEmail(
         "refund_processed_confirmation",
         to,
         {
           customerName: name,
+          customer_name: name,
           orderNumber: order.application_code || order.id.slice(0, 8),
-          refundAmount: `₹${data.amount.toFixed(2)}`,
+          order_number: order.application_code || order.id.slice(0, 8),
+          serviceName: (order as any).service_name || (lead as any)?.service || "Consultancy Service",
+          service_name: (order as any).service_name || (lead as any)?.service || "Consultancy Service",
+          refundStatus: "Approved",
+          refund_status: "Approved",
+          refundAmount: cleanRefundNum,
+          refund_amount: cleanRefundNum,
+          refundAmountFormatted: formattedRefundRupees,
+          refund_amount_formatted: formattedRefundRupees,
           paymentReference: data.paymentReference,
+          payment_reference: data.paymentReference,
+          refundReferenceNo: data.paymentReference,
+          refund_reference_no: data.paymentReference,
+          refundGatewayRef: data.paymentReference,
+          refund_gateway_ref: data.paymentReference,
+          refundApprovalDate: approvalDateFormatted,
+          refund_approval_date: approvalDateFormatted,
+          refundApprovalDateTime: approvalDateFormatted,
+          refund_approval_date_time: approvalDateFormatted,
+          refundApprovalDateAndTime: approvalDateFormatted,
+          refund_approval_date_and_time: approvalDateFormatted,
+          refundApprovedAt: approvalDateFormatted,
+          refund_approved_at: approvalDateFormatted,
+          gatewayName: resolvedGateway,
+          gateway_name: resolvedGateway,
           processedOn: processedAt.slice(0, 10),
-          fromName: process.env.ZOHO_FROM_NAME || "Udyam Support",
+          fromName: process.env.ZOHO_FROM_NAME || "Business Help Services",
         },
         { applicationId: order.id, leadId: order.lead_id },
       );

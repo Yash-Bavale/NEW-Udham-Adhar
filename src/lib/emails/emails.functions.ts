@@ -194,10 +194,25 @@ export const listEmailTemplates = createServerFn({ method: "GET" })
     if (error) throw new Error(error.message);
 
     const codes = new Set((data ?? []).map((t) => t.code));
-    if (!codes.has("R002") || !codes.has("E011")) {
+    if (!codes.has("R001") || !codes.has("R002") || !codes.has("E011")) {
       try {
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
         const { BUILTIN_TEMPLATES } = await import("./emails.server");
+        if (!codes.has("R001") && BUILTIN_TEMPLATES.R001) {
+          await supabaseAdmin.from("email_templates").upsert({
+            code: "R001",
+            name: "R001 – Refund Request Approved",
+            subject: BUILTIN_TEMPLATES.R001.subject,
+            body_html: BUILTIN_TEMPLATES.R001.body_html,
+            category: "Refunds",
+            flow_id: "R001",
+            sr_no: 1,
+            dispatch_mode: "manual",
+            is_enabled: true,
+            is_system: true,
+            variables: ["order_number", "customer_name", "service_name", "refund_status", "refund_amount", "refund_amount_formatted", "refund_approval_date_and_time", "refund_reference_no", "payment_reference", "customer_email", "customer_mobile", "executive_name"],
+          } as never, { onConflict: "code" });
+        }
         if (!codes.has("R002") && BUILTIN_TEMPLATES.R002) {
           await supabaseAdmin.from("email_templates").upsert({
             code: "R002",
