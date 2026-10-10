@@ -15,8 +15,8 @@ type Props = {
   compact?: boolean;
 };
 
-/** "Call via Smartflo" — rings the logged-in employee's Smartflo phone, then the customer. */
-export function SmartfloCallButton({ mobile, customerId, leadId, applicationId, className, label = "Call customer", compact }: Props) {
+/** CRM click-to-call via CallerDesk — rings your CallerDesk phone first, then the customer. */
+export function CallButton({ mobile, customerId, leadId, applicationId, className, label = "Call customer", compact }: Props) {
   const call = useServerFn(initiateClickToCall);
   const qc = useQueryClient();
   const [busy, setBusy] = useState(false);
@@ -48,7 +48,7 @@ export function SmartfloCallButton({ mobile, customerId, leadId, applicationId, 
       type="button"
       onClick={onClick}
       disabled={busy}
-      title="Rings your phone or browser phone, then connects the customer"
+      title="Rings your CallerDesk phone first, then connects the customer"
       className={
         className ??
         `inline-flex items-center justify-center gap-1.5 rounded-lg bg-emerald-600 px-3 ${compact ? "py-1" : "py-1.5"} text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed transition`

@@ -46,7 +46,7 @@ async function admin() {
 
 const STALE_OUTBOUND_MS = 2 * 60_000;
 
-/** Fallback for missing Smartflo events: outbound calls stuck ringing >2 min become 'no_response'.
+/** Fallback for missing CallerDesk events: outbound calls stuck ringing >2 min become 'no_response'.
  *  Guarded by status/answered_at/ended_at filters so it is idempotent and never overrides real events.
  *  'no_response' is unranked in the webhook, so a late real answered/hangup event still applies. */
 async function expireStaleOutbound() {

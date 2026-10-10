@@ -23,7 +23,7 @@ function LiveCallsPage() {
     <div className="p-6 space-y-4">
       <div>
         <h1 className="text-2xl font-semibold">Live Calls</h1>
-        <p className="text-sm text-muted-foreground">Current Smartflo calls. Supervisor actions will be enabled once Smartflo call control is connected.</p>
+        <p className="text-sm text-muted-foreground">Current CallerDesk calls. Supervisor actions will be enabled once CallerDesk call control is connected.</p>
       </div>
       {error ? <p className="text-sm text-destructive">{(error as Error).message}</p> : null}
       <div className="overflow-x-auto rounded-lg border">
@@ -43,7 +43,7 @@ function LiveCallsPage() {
                   <td className="px-3 py-2 capitalize">{c.status}</td>
                   <td className="px-3 py-2 font-mono">{c.status === "answered" && c.answeredAt ? fmtDuration((now - new Date(c.answeredAt).getTime()) / 1000) : "—"}</td>
                   <td className="px-3 py-2 font-mono text-xs">{c.callId}</td>
-                  <td className="px-3 py-2"><div className="flex gap-1">{ACTIONS.map((a) => <Button key={a} size="sm" variant="outline" disabled title="Not connected to Smartflo yet">{a}</Button>)}</div></td>
+                  <td className="px-3 py-2"><div className="flex gap-1">{ACTIONS.map((a) => <Button key={a} size="sm" variant="outline" disabled title="Not connected to CallerDesk yet">{a}</Button>)}</div></td>
                 </tr>
               ))}
           </tbody>

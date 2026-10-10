@@ -25,7 +25,7 @@ export function useCallTimer(call: Pick<CallView, "answeredAt" | "startedAt" | "
   return (now - new Date(call.answeredAt ?? call.startedAt).getTime()) / 1000;
 }
 
-const NOT_SUPPORTED = "Answer, reject and hang-up happen on your Smartflo phone/app — CRM call control is not connected yet.";
+const NOT_SUPPORTED = "Answer, reject and hang-up happen on your CallerDesk phone — browser call control is not connected yet.";
 
 /** Persistent employee call panel: incoming popup, active call, after-call disposition, availability. */
 export function TelephonyPanel() {
