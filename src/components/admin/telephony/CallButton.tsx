@@ -16,7 +16,7 @@ type Props = {
 };
 
 /** CRM click-to-call via CallerDesk — rings your CallerDesk phone first, then the customer. */
-export function CallButton({ mobile, customerId, leadId, applicationId, className, label = "Call customer", compact }: Props) {
+export function CallButton({ mobile, customerId, leadId, applicationId, className, label = "Phone callback", compact }: Props) {
   const call = useServerFn(initiateClickToCall);
   const qc = useQueryClient();
   const [busy, setBusy] = useState(false);
