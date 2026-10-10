@@ -232,6 +232,13 @@
       "when": 1791351733973,
       "tag": "0032_migration",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1791607033943,
+      "tag": "0033_add_missing_profile_and_sound_columns",
+      "breakpoints": true
     }
   ]
 }
