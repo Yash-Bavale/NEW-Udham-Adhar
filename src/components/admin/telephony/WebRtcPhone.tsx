@@ -4,7 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { Headset, Mic, MicOff, Phone, PhoneOff, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getWebRtcSession, getWebRtcStatus } from "@/lib/telephony/callerdesk-webrtc.functions";
-import type { CallerDeskWebRtcEngine, EngineSnapshot } from "@/lib/telephony/callerdesk-webrtc.client";
+import type { CallerDeskWebRtcEngine, EngineSnapshot } from "@/lib/telephony/callerdesk-webrtc.engine";
 import { fmtDuration } from "./TelephonyPanel";
 
 const LABEL: Record<string, string> = {
@@ -33,7 +33,7 @@ export function WebRtcPhone() {
 
   async function connect() {
     if (!engine.current) {
-      const { CallerDeskWebRtcEngine } = await import("@/lib/telephony/callerdesk-webrtc.client");
+      const { CallerDeskWebRtcEngine } = await import("@/lib/telephony/callerdesk-webrtc.engine");
       engine.current = new CallerDeskWebRtcEngine();
       engine.current.subscribe(setSnap);
     }
