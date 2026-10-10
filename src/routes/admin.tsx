@@ -95,7 +95,6 @@ function AdminLayout() {
       <AdminShell email={email}>
         <Outlet />
         <TelephonyPanel />
-        <WebRtcPhone />
       </AdminShell>
     </FinancialVisibilityProvider>
   );
