@@ -316,8 +316,8 @@ function WorkforcePage() {
                           <div className="font-semibold text-slate-900 flex items-center gap-1.5">
                             <span>{u.full_name || "—"}</span>
                             {u.smartflo_agent_id && (
-                              <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-sky-50 text-sky-700 border border-sky-200" title={`Smartflo Agent ID: ${u.smartflo_agent_id}`}>
-                                Ext {u.smartflo_agent_id}
+                              <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-sky-50 text-sky-700 border border-sky-200" title={`CallerDesk Member ID: ${u.smartflo_agent_id}`}>
+                                CD {u.smartflo_agent_id}
                               </span>
                             )}
                           </div>
@@ -696,8 +696,8 @@ function AddEmployeeModal({ open, onOpenChange, onCreated }: { open: boolean; on
               <Input value={mobile} onChange={(e) => setMobile(e.target.value)} placeholder="+91 9876543210" className="mt-1" />
             </div>
             <div>
-              <Label className="text-xs">Smartflo Agent ID / Ext</Label>
-              <Input value={smartfloAgentId} onChange={(e) => setSmartfloAgentId(e.target.value)} placeholder="e.g. 104 or agent_id" className="mt-1" />
+              <Label className="text-xs">CallerDesk Member ID (optional)</Label>
+              <Input value={smartfloAgentId} onChange={(e) => setSmartfloAgentId(e.target.value)} placeholder="e.g. 122142 (blank = match by mobile)" className="mt-1" />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -793,8 +793,8 @@ function EditEmployeeModal({ row, open, onOpenChange, onSaved }: { row: any; ope
               <Input value={mobile} onChange={(e) => setMobile(e.target.value)} className="mt-1" />
             </div>
             <div>
-              <Label className="text-xs">Smartflo Agent ID / Ext</Label>
-              <Input value={smartfloAgentId} onChange={(e) => setSmartfloAgentId(e.target.value)} placeholder="e.g. 104 or agent_id" className="mt-1" />
+              <Label className="text-xs">CallerDesk Member ID (optional)</Label>
+              <Input value={smartfloAgentId} onChange={(e) => setSmartfloAgentId(e.target.value)} placeholder="e.g. 122142 (blank = match by mobile)" className="mt-1" />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">

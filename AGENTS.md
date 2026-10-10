@@ -7,3 +7,4 @@
 - Keep the first NIC activity in the existing nic_2_digit/nic_4_digit/nic_5_digit form answers and store additional activities in nic_activities in the same submission, so older forms and order views remain compatible.
 - Add NIC activity fields through the form builder as the canonical 2/4/5-digit trio with shared visibility, so the customer form renders one search and activity list while retaining compatible answers.
 - Flatten saved form-builder sections with display-only section headings for customer forms and previews, so section boundaries remain visible without changing submitted answers.
+- CallerDesk is the only telephony provider: outbound calls use click_to_call_v4 with a validated member id (profile mapping, else mobile match) and never fall back, because silent fallbacks hid failed calls. Historical smartflo rows and the legacy profiles.smartflo_agent_id column (now the optional CallerDesk Member ID) are kept for history.

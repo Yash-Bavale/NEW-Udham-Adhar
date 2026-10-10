@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { Phone, Mail, MessageCircle, User2, ExternalLink, Calendar, Tag, MapPin, Languages } from "lucide-react";
 import { formatIST } from "@/lib/datetime";
-import { SmartfloCallButton } from "@/components/admin/telephony/SmartfloCallButton";
+import { CallButton } from "@/components/admin/telephony/CallButton";
 
 interface Props {
   customer: any;
@@ -48,7 +48,7 @@ export function CustomerProfileCard({ customer, lead }: Props) {
             {email && <span className="break-all">{email}</span>}
           </div>
           <div className="flex flex-wrap gap-2 mt-3">
-            <SmartfloCallButton mobile={mobile} customerId={customer?.id ?? null} leadId={lead?.id ?? null} />
+            <CallButton mobile={mobile} customerId={customer?.id ?? null} leadId={lead?.id ?? null} />
             {mobile && (
               <a href={`tel:${mobile}`} className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 transition">
                 <Phone className="size-3.5" /> Call

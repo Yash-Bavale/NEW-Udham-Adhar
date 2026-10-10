@@ -16,7 +16,7 @@ import {
   ExternalLink,
   Layers,
 } from "lucide-react";
-import { SmartfloCallButton } from "@/components/admin/telephony/SmartfloCallButton";
+import { CallButton } from "@/components/admin/telephony/CallButton";
 import { MergeDocumentsDialog } from "@/components/admin/MergeDocumentsDialog";
 import {
   getFormSubmissionForApplication,
@@ -377,7 +377,7 @@ export function FormSubmissionPanel({
                 <span className="text-slate-900 font-bold font-mono">{formatMobile55(lead.mobile)}</span>
               </>
             )}
-            <SmartfloCallButton
+            <CallButton
               mobile={lead?.mobile ?? null}
               customerId={(data as any)?.application?.customer_id ?? null}
               leadId={lead?.id ?? null}
