@@ -7,6 +7,7 @@ import { canDial, nextState, registrationError, type PhoneEvent, type PhoneState
 export type SessionConfig = { wssUrl: string; sipDomain: string; extension: string; password: string; displayName: string };
 export type EngineSnapshot = { state: PhoneState; error: string | null; remoteNumber: string | null; muted: boolean; connectedAt: number | null; direction: "inbound" | "outbound" | null };
 type Listener = (s: EngineSnapshot) => void;
+export type DiagEvent = { event: string; state?: string; sipCode?: number | null; reason?: string | null; number?: string | null; detail?: string | null };
 
 export class CallerDeskWebRtcEngine {
   private snap: EngineSnapshot = { state: "DISCONNECTED", error: null, remoteNumber: null, muted: false, connectedAt: null, direction: null };
@@ -18,6 +19,8 @@ export class CallerDeskWebRtcEngine {
   private audio: HTMLAudioElement | null = null;
   private sip: any = null;
   private domain = "";
+  onLog: ((e: DiagEvent) => void) | null = null;
+  private log(e: DiagEvent) { try { this.onLog?.({ state: this.snap.state, ...e }); } catch { /* ignore */ } }
 
   get snapshot() { return this.snap; }
   subscribe(l: Listener) { this.listeners.add(l); l(this.snap); return () => { this.listeners.delete(l); }; }
@@ -29,6 +32,7 @@ export class CallerDeskWebRtcEngine {
 
   async start(loadConfig: () => Promise<SessionConfig>) {
     this.emit("check", { error: null });
+    this.log({ event: "REGISTER_ATTEMPT" });
     let cfg: SessionConfig;
     try { cfg = await loadConfig(); } catch (err: any) {
       const msg = String(err?.message ?? "Configuration unavailable");
@@ -46,18 +50,20 @@ export class CallerDeskWebRtcEngine {
         transportOptions: { server: cfg.wssUrl, connectionTimeout: 8 }, logLevel: "error",
         delegate: {
           onInvite: (inv: any) => this.onInvite(inv),
-          onDisconnect: () => this.emit("transport_lost", { error: "Connection to CallerDesk lost. Check that FortiClient VPN is connected." }),
+          onDisconnect: (e?: Error) => { this.log({ event: "TRANSPORT_LOST", reason: e?.message ?? null }); this.emit("transport_lost", { error: "Connection to CallerDesk lost. Check that FortiClient VPN is connected." }); },
         },
       });
       await this.ua.start().catch(() => { throw new Error("Cannot reach CallerDesk phone server. Connect FortiClient VPN and retry."); });
       this.registerer = new Registerer(this.ua);
       this.registerer.stateChange.addListener((s: any) => {
-        if (s === RegistererState.Registered) this.emit("registered", { error: null });
+        if (s === RegistererState.Registered) { this.emit("registered", { error: null }); this.log({ event: "REGISTER_SUCCESS" }); }
         else if (s === RegistererState.Unregistered && this.snap.state === "CONNECTING") this.emit("register_failed", { error: "CallerDesk rejected the agent registration." });
       });
-      await this.registerer.register({ requestDelegate: { onReject: (r: any) => this.emit("register_failed", { error: registrationError(r?.message?.statusCode) }) } });
+      await this.registerer.register({ requestDelegate: { onReject: (r: any) => { const c = r?.message?.statusCode; this.log({ event: "REGISTER_FAILED", sipCode: c, reason: r?.message?.reasonPhrase }); this.emit("register_failed", { error: registrationError(c) }); } } });
     } catch (err: any) {
-      this.emit("register_failed", { error: String(err?.message ?? "Registration failed") });
+      const m = String(err?.message ?? "Registration failed");
+      this.log({ event: "REGISTER_FAILED", reason: m });
+      this.emit("register_failed", { error: m });
     }
   }
 
@@ -74,10 +80,12 @@ export class CallerDeskWebRtcEngine {
     const { SessionState } = this.sip;
     this.session = session;
     session.stateChange.addListener((s: any) => {
-      if (s === SessionState.Established) { this.attachAudio(session); this.emit("accepted", { connectedAt: Date.now() }); }
+      if (s === SessionState.Established) { this.log({ event: "CALL_CONNECTED", number: this.snap.remoteNumber }); this.attachAudio(session); this.emit("accepted", { connectedAt: Date.now() }); }
       if (s === SessionState.Terminated) {
         this.releaseMedia(session);
         this.session = null; this.inFlight = false;
+        const wasConnected = this.snap.state === "CONNECTED";
+        this.log({ event: wasConnected ? "CALL_ENDED" : "CALL_NOT_CONNECTED", number: this.snap.remoteNumber, detail: wasConnected && this.snap.connectedAt ? `talk ${Math.round((Date.now() - this.snap.connectedAt) / 1000)}s` : null });
         this.emit(this.snap.state === "CONNECTED" ? "hangup" : "rejected", { muted: false });
       }
     });
@@ -114,13 +122,23 @@ export class CallerDeskWebRtcEngine {
     if (!/^\d{10,13}$/.test(digits)) { this.snap = { ...this.snap, error: "Enter a valid phone number." }; this.listeners.forEach((l) => l(this.snap)); return; }
     if (!canDial(this.snap.state, this.inFlight) || !this.ua) return;
     this.inFlight = true;
-    if (!(await this.mic())) { this.inFlight = false; return; }
+    if (!(await this.mic())) { this.inFlight = false; this.log({ event: "CALL_FAILED", reason: this.snap.error, number: digits }); return; }
     const { Inviter, UserAgent } = this.sip;
     const target = UserAgent.makeURI(`sip:${digits}@${this.domain}`);
     const inviter = new Inviter(this.ua, target, { sessionDescriptionHandlerOptions: { constraints: { audio: true, video: false } } });
     this.wire(inviter);
     this.emit("dial", { remoteNumber: digits, direction: "outbound", error: null, connectedAt: null });
-    await inviter.invite().catch(() => { this.inFlight = false; this.emit("rejected", { error: "Call could not be placed." }); });
+    this.log({ event: "CALL_DIALED", number: digits, detail: `sip:${digits}@${this.domain}` });
+    await inviter.invite({
+      requestDelegate: {
+        onReject: (r: any) => {
+          const c = r?.message?.statusCode; const why = r?.message?.reasonPhrase ?? "";
+          this.log({ event: "CALL_REJECTED", sipCode: c, reason: why, number: digits });
+          this.snap = { ...this.snap, error: `CallerDesk ended the call: ${c ?? "?"} ${why}`.trim() };
+          this.listeners.forEach((l) => l(this.snap));
+        },
+      },
+    }).catch((e: any) => { this.inFlight = false; this.log({ event: "CALL_FAILED", reason: String(e?.message ?? e), number: digits }); this.emit("rejected", { error: "Call could not be placed." }); });
   }
 
   async answer() {
