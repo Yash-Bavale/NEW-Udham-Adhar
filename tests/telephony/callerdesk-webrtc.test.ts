@@ -60,3 +60,21 @@ describe("CallerDesk WebRTC (mocked, no network)", () => {
     expect(out).not.toContain("9767100075");
   });
 });
+
+import { registrationError } from "@/lib/telephony/callerdesk-webrtc.config";
+describe("CallerDesk registration errors", () => {
+  it("bad credentials are reported as a login problem", () => {
+    expect(registrationError(401)).toMatch(/SIP login/);
+    expect(registrationError(403)).toMatch(/SIP login/);
+  });
+  it("unreachable server points to the VPN", () => {
+    expect(registrationError(408)).toMatch(/VPN/);
+    expect(registrationError(503)).toMatch(/VPN/);
+  });
+  it("transport loss while connecting fails instead of showing Ready", () => {
+    expect(nextState("CONNECTING", "transport_lost")).toBe("FAILED");
+  });
+  it("disconnect always returns to Disconnected", () => {
+    expect(nextState("CONNECTED", "disconnect")).toBe("DISCONNECTED");
+  });
+});

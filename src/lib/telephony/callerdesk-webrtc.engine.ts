@@ -2,7 +2,7 @@
  * Browser call engine: SIP over WSS to CallerDesk's Asterisk using SIP.js (loaded lazily, browser only).
  * Holds no CRM/DB logic. Final call status/duration/recording come from CallerDesk webhooks.
  */
-import { canDial, nextState, type PhoneEvent, type PhoneState } from "./callerdesk-webrtc.config";
+import { canDial, nextState, registrationError, type PhoneEvent, type PhoneState } from "./callerdesk-webrtc.config";
 
 export type SessionConfig = { wssUrl: string; sipDomain: string; extension: string; password: string; displayName: string };
 export type EngineSnapshot = { state: PhoneState; error: string | null; remoteNumber: string | null; muted: boolean; connectedAt: number | null; direction: "inbound" | "outbound" | null };
@@ -55,7 +55,7 @@ export class CallerDeskWebRtcEngine {
         if (s === RegistererState.Registered) this.emit("registered", { error: null });
         else if (s === RegistererState.Unregistered && this.snap.state === "CONNECTING") this.emit("register_failed", { error: "CallerDesk rejected the agent registration." });
       });
-      await this.registerer.register({ requestDelegate: { onReject: () => this.emit("register_failed", { error: "CallerDesk rejected the SIP credentials." }) } });
+      await this.registerer.register({ requestDelegate: { onReject: (r: any) => this.emit("register_failed", { error: registrationError(r?.message?.statusCode) }) } });
     } catch (err: any) {
       this.emit("register_failed", { error: String(err?.message ?? "Registration failed") });
     }
@@ -75,8 +75,22 @@ export class CallerDeskWebRtcEngine {
     this.session = session;
     session.stateChange.addListener((s: any) => {
       if (s === SessionState.Established) { this.attachAudio(session); this.emit("accepted", { connectedAt: Date.now() }); }
-      if (s === SessionState.Terminated) { this.session = null; this.inFlight = false; this.emit(this.snap.state === "CONNECTED" ? "hangup" : "rejected", { muted: false }); }
+      if (s === SessionState.Terminated) {
+        this.releaseMedia(session);
+        this.session = null; this.inFlight = false;
+        this.emit(this.snap.state === "CONNECTED" ? "hangup" : "rejected", { muted: false });
+      }
     });
+  }
+
+  /** Stops microphone and remote tracks so no device stays in use after a call. */
+  private releaseMedia(session: any) {
+    const pc: RTCPeerConnection | undefined = session?.sessionDescriptionHandler?.peerConnection;
+    try {
+      pc?.getSenders().forEach((s) => s.track?.stop());
+      pc?.getReceivers().forEach((r) => r.track?.stop());
+    } catch { /* already closed */ }
+    if (this.audio) { this.audio.pause(); this.audio.srcObject = null; }
   }
 
   private attachAudio(session: any) {
@@ -129,7 +143,10 @@ export class CallerDeskWebRtcEngine {
   }
   sendDtmf(tone: string) { if (this.snap.state === "CONNECTED") this.session?.sessionDescriptionHandler?.sendDtmf?.(tone); }
   async stop() {
-    try { await this.registerer?.unregister(); await this.ua?.stop(); } catch { /* ignore */ }
+    try { if (this.session) await this.hangup(); } catch { /* ignore */ }
+    this.releaseMedia(this.session);
+    try { await this.registerer?.unregister(); } catch { /* ignore */ }
+    try { await this.ua?.stop(); } catch { /* ignore */ }
     this.ua = null; this.registerer = null; this.session = null; this.inFlight = false;
     this.emit("disconnect", { error: null, remoteNumber: null, connectedAt: null, muted: false, direction: null });
   }

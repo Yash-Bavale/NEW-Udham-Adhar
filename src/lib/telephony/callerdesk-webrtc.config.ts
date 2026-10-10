@@ -77,3 +77,11 @@ export function nextState(s: PhoneState, e: PhoneEvent): PhoneState {
 export function canDial(s: PhoneState, inFlight: boolean): boolean {
   return !inFlight && (s === "REGISTERED" || s === "ENDED");
 }
+
+/** Safe, actionable message for a rejected SIP REGISTER (no secrets). */
+export function registrationError(code: number | undefined): string {
+  if (code === 401 || code === 403 || code === 407) return "CallerDesk rejected the SIP login. Check the extension and SIP password.";
+  if (code === 404) return "CallerDesk does not recognise this SIP extension or domain.";
+  if (code === 408 || code === 503 || code === 504) return "CallerDesk phone server did not respond. Check FortiClient VPN and retry.";
+  return code ? `CallerDesk refused registration (code ${code}).` : "CallerDesk refused registration.";
+}
