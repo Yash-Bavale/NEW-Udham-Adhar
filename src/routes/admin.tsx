@@ -57,8 +57,7 @@ export const Route = createFileRoute("/admin")({
 
 import { useEmployeePresence } from "@/hooks/useEmployeePresence";
 import { TelephonyPanel } from "@/components/admin/telephony/TelephonyPanel";
-// Browser phone (WebRtcPhone) intentionally not rendered — hidden until the
-// CallerDesk WebRTC/VPN setup is finalised. Re-add when Phase B goes live.
+import { WebRtcPhone } from "@/components/admin/telephony/WebRtcPhone";
 import { FinancialVisibilityProvider } from "@/hooks/useFinancialVisibility";
 
 function AdminLayout() {
@@ -95,6 +94,8 @@ function AdminLayout() {
       <AdminShell email={email}>
         <Outlet />
         <TelephonyPanel />
+        {/* Shows only for the authorised test account (help@businesshelpservices.in); hidden for everyone else. */}
+        <WebRtcPhone />
       </AdminShell>
     </FinancialVisibilityProvider>
   );
