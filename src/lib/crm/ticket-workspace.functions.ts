@@ -60,6 +60,9 @@ export async function syncTicketInboundAttachments(ticketId: string): Promise<an
       emailLogsQuery = emailLogsQuery.eq("application_id", ticket.application_id);
     } else if (ticket.customer_id) {
       emailLogsQuery = emailLogsQuery.eq("customer_id", ticket.customer_id);
+    } else {
+      // Never scan every inbound email in the system for an unlinked ticket.
+      return [];
     }
 
     const { data: matchedEmailLogs } = await emailLogsQuery;
@@ -67,10 +70,12 @@ export async function syncTicketInboundAttachments(ticketId: string): Promise<an
 
     if (emailLogsWithUid.length === 0) return [];
 
-    let folders: Array<{ folderId: string; folderName: string }> = [];
+    let folders: Array<{ folderId: string; folderName: string; isRelevantInbound?: boolean }> = [];
     try {
       const { discoverZohoFolders } = await import("@/lib/mail/zoho-inbox.server");
-      folders = await discoverZohoFolders();
+      const all = (await discoverZohoFolders()) as any[];
+      const relevant = all.filter((f) => f.isRelevantInbound);
+      folders = relevant.length > 0 ? relevant : all;
     } catch (e) {
       console.warn("[syncTicketInboundAttachments] discoverZohoFolders warning:", e);
       return [];
@@ -83,7 +88,7 @@ export async function syncTicketInboundAttachments(ticketId: string): Promise<an
       const zohoUid = em.zoho_mail_uid;
       const matchingReply = (replies ?? []).find(
         (r: any) => r.email_message_id && (r.email_message_id === em.message_id)
-      ) || (replies ?? [])[0];
+      );
       const replyId = matchingReply?.id || null;
 
       for (const folder of folders) {
@@ -561,19 +566,10 @@ export const getTicketWorkspace = createServerFn({ method: "POST" })
       }
     }
 
-    // 9.5. Hydrate ticket reply attachments & resolve signed URLs
-    let attachmentsList: any[] = (rawAttachmentsList as any[]) ?? [];
-
-    if (attachmentsList.length === 0 && allMatchedEmails.some((e: any) => e.zoho_mail_uid)) {
-      try {
-        const synced = await syncTicketInboundAttachments(data.ticketId);
-        if (synced && synced.length > 0) {
-          attachmentsList = synced;
-        }
-      } catch (sErr) {
-        console.warn("[getTicketWorkspace] auto-sync attachments failed:", sErr);
-      }
-    }
+    // 9.5. Hydrate ticket reply attachments & resolve signed URLs.
+    // Mailbox attachment sync is no longer run on page open (it scanned every
+    // Zoho folder per email on each load); it runs via syncTicketAttachmentsFn.
+    const attachmentsList: any[] = (rawAttachmentsList as any[]) ?? [];
 
     const signedUrlMap = new Map<string, string>();
     await Promise.all(
@@ -632,9 +628,7 @@ export const getTicketWorkspace = createServerFn({ method: "POST" })
         }) ?? null;
       }
 
-      const replyAtts = (r.id && replyAttachmentsMap.has(r.id))
-        ? replyAttachmentsMap.get(r.id)!
-        : attachmentsWithUrls;
+      const replyAtts = (r.id && replyAttachmentsMap.get(r.id)) || [];
 
       let resolvedBodyHtml = linkedEmail?.body_html ?? null;
       if (resolvedBodyHtml && attachmentsWithUrls.length > 0) {
