@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { getWebRtcSession, getWebRtcStatus } from "@/lib/telephony/callerdesk-webrtc.functions";
 import type { CallerDeskWebRtcEngine, EngineSnapshot } from "@/lib/telephony/callerdesk-webrtc.engine";
 import { fmtDuration } from "./TelephonyPanel";
+import { logWebRtcEvent } from "@/lib/telephony/webrtc-diag.functions";
+import { WebRtcDiagnostics } from "./WebRtcDiagnostics";
 
 const LABEL: Record<string, string> = {
   DISCONNECTED: "Disconnected", CHECKING_CONFIGURATION: "Checking setup…", SETUP_INCOMPLETE: "Setup incomplete",
@@ -18,6 +20,8 @@ const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "*", "0", "#"];
 export function WebRtcPhone() {
   const fetchStatus = useServerFn(getWebRtcStatus);
   const fetchSession = useServerFn(getWebRtcSession);
+  const logEvent = useServerFn(logWebRtcEvent);
+  const [diag, setDiag] = useState(false);
   const { data: status } = useQuery({ queryKey: ["webrtc-status"], queryFn: () => fetchStatus(), staleTime: 300_000 });
   const engine = useRef<CallerDeskWebRtcEngine | null>(null);
   const [snap, setSnap] = useState<EngineSnapshot | null>(null);
@@ -36,6 +40,7 @@ export function WebRtcPhone() {
       const { CallerDeskWebRtcEngine } = await import("@/lib/telephony/callerdesk-webrtc.engine");
       engine.current = new CallerDeskWebRtcEngine();
       engine.current.subscribe(setSnap);
+      engine.current.onLog = (e) => { void logEvent({ data: e }).catch(() => {}); };
     }
     await engine.current.start(() => fetchSession());
   }
@@ -51,7 +56,7 @@ export function WebRtcPhone() {
           <Headset className="h-3.5 w-3.5" /><span className={`h-2 w-2 rounded-full ${dot}`} />Browser phone: {LABEL[state]}
         </button>
       ) : (
-        <div className="w-[300px] space-y-3 rounded-xl border bg-card p-4 text-card-foreground shadow-2xl">
+        <div className="w-[320px] max-h-[85vh] overflow-auto space-y-3 rounded-xl border bg-card p-4 text-card-foreground shadow-2xl">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-sm font-semibold"><Headset className="h-4 w-4" />Browser phone <span className="rounded bg-muted px-1.5 text-[10px] font-normal">Test</span></div>
             <button aria-label="Hide" onClick={() => setOpen(false)}><X className="h-4 w-4" /></button>
@@ -104,6 +109,8 @@ export function WebRtcPhone() {
               <button className="w-full text-[11px] text-muted-foreground underline" onClick={() => engine.current?.stop()}>Disconnect</button>
             </div>
           ) : null}
+          <button className="w-full text-[11px] underline" onClick={() => setDiag((d) => !d)}>{diag ? "Hide diagnostics" : "Diagnostics & test log"}</button>
+          {diag ? <WebRtcDiagnostics currentStatus={LABEL[state]} currentError={snap?.error ?? null} /> : null}
           <p className="text-[10px] text-muted-foreground">Call history and recordings update from CallerDesk call reports.</p>
         </div>
       )}
