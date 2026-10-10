@@ -168,8 +168,6 @@ import { Route as LovableEmailQueueProcessRouteImport } from './routes/lovable/e
 import { Route as LovableEmailTransactionalPreviewRouteImport } from './routes/lovable/email/transactional/preview'
 import { Route as LovableEmailTransactionalSendRouteImport } from './routes/lovable/email/transactional/send'
 import { Route as ApiPublicTelephonyCallerdeskEventsRouteImport } from './routes/api/public/telephony/callerdesk/events'
-import { Route as ApiPublicTelephonySmartfloDialplanRouteImport } from './routes/api/public/telephony/smartflo/dialplan'
-import { Route as ApiPublicTelephonySmartfloEventsRouteImport } from './routes/api/public/telephony/smartflo/events'
 import { Route as ApiPublicV1ApplicationsSummaryRouteImport } from './routes/api/public/v1/applications/summary'
 import { Route as ApiPublicV1PaymentsInitiateRouteImport } from './routes/api/public/v1/payments/initiate'
 import { Route as ApiPublicV1PaymentsLeadCodeStatusRouteImport } from './routes/api/public/v1/payments/$leadCode.status'
@@ -1007,18 +1005,6 @@ const ApiPublicTelephonyCallerdeskEventsRoute =
     path: '/api/public/telephony/callerdesk/events',
     getParentRoute: () => rootRouteImport,
   } as any)
-const ApiPublicTelephonySmartfloDialplanRoute =
-  ApiPublicTelephonySmartfloDialplanRouteImport.update({
-    id: '/api/public/telephony/smartflo/dialplan',
-    path: '/api/public/telephony/smartflo/dialplan',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiPublicTelephonySmartfloEventsRoute =
-  ApiPublicTelephonySmartfloEventsRouteImport.update({
-    id: '/api/public/telephony/smartflo/events',
-    path: '/api/public/telephony/smartflo/events',
-    getParentRoute: () => rootRouteImport,
-  } as any)
 const ApiPublicV1ApplicationsSummaryRoute =
   ApiPublicV1ApplicationsSummaryRouteImport.update({
     id: '/api/public/v1/applications/summary',
@@ -1198,8 +1184,6 @@ export interface FileRoutesByFullPath {
   '/lovable/email/transactional/send': typeof LovableEmailTransactionalSendRoute
   '/admin/support/tickets/': typeof AdminSupportTicketsIndexRoute
   '/api/public/telephony/callerdesk/events': typeof ApiPublicTelephonyCallerdeskEventsRoute
-  '/api/public/telephony/smartflo/dialplan': typeof ApiPublicTelephonySmartfloDialplanRoute
-  '/api/public/telephony/smartflo/events': typeof ApiPublicTelephonySmartfloEventsRoute
   '/api/public/v1/applications/summary': typeof ApiPublicV1ApplicationsSummaryRoute
   '/api/public/v1/payments/initiate': typeof ApiPublicV1PaymentsInitiateRoute
   '/api/public/v1/payments/$leadCode/status': typeof ApiPublicV1PaymentsLeadCodeStatusRoute
@@ -1359,8 +1343,6 @@ export interface FileRoutesByTo {
   '/lovable/email/transactional/send': typeof LovableEmailTransactionalSendRoute
   '/admin/support/tickets': typeof AdminSupportTicketsIndexRoute
   '/api/public/telephony/callerdesk/events': typeof ApiPublicTelephonyCallerdeskEventsRoute
-  '/api/public/telephony/smartflo/dialplan': typeof ApiPublicTelephonySmartfloDialplanRoute
-  '/api/public/telephony/smartflo/events': typeof ApiPublicTelephonySmartfloEventsRoute
   '/api/public/v1/applications/summary': typeof ApiPublicV1ApplicationsSummaryRoute
   '/api/public/v1/payments/initiate': typeof ApiPublicV1PaymentsInitiateRoute
   '/api/public/v1/payments/$leadCode/status': typeof ApiPublicV1PaymentsLeadCodeStatusRoute
@@ -1526,8 +1508,6 @@ export interface FileRoutesById {
   '/lovable/email/transactional/send': typeof LovableEmailTransactionalSendRoute
   '/admin/support/tickets/': typeof AdminSupportTicketsIndexRoute
   '/api/public/telephony/callerdesk/events': typeof ApiPublicTelephonyCallerdeskEventsRoute
-  '/api/public/telephony/smartflo/dialplan': typeof ApiPublicTelephonySmartfloDialplanRoute
-  '/api/public/telephony/smartflo/events': typeof ApiPublicTelephonySmartfloEventsRoute
   '/api/public/v1/applications/summary': typeof ApiPublicV1ApplicationsSummaryRoute
   '/api/public/v1/payments/initiate': typeof ApiPublicV1PaymentsInitiateRoute
   '/api/public/v1/payments/$leadCode/status': typeof ApiPublicV1PaymentsLeadCodeStatusRoute
@@ -1694,8 +1674,6 @@ export interface FileRouteTypes {
     | '/lovable/email/transactional/send'
     | '/admin/support/tickets/'
     | '/api/public/telephony/callerdesk/events'
-    | '/api/public/telephony/smartflo/dialplan'
-    | '/api/public/telephony/smartflo/events'
     | '/api/public/v1/applications/summary'
     | '/api/public/v1/payments/initiate'
     | '/api/public/v1/payments/$leadCode/status'
@@ -1855,8 +1833,6 @@ export interface FileRouteTypes {
     | '/lovable/email/transactional/send'
     | '/admin/support/tickets'
     | '/api/public/telephony/callerdesk/events'
-    | '/api/public/telephony/smartflo/dialplan'
-    | '/api/public/telephony/smartflo/events'
     | '/api/public/v1/applications/summary'
     | '/api/public/v1/payments/initiate'
     | '/api/public/v1/payments/$leadCode/status'
@@ -2021,8 +1997,6 @@ export interface FileRouteTypes {
     | '/lovable/email/transactional/send'
     | '/admin/support/tickets/'
     | '/api/public/telephony/callerdesk/events'
-    | '/api/public/telephony/smartflo/dialplan'
-    | '/api/public/telephony/smartflo/events'
     | '/api/public/v1/applications/summary'
     | '/api/public/v1/payments/initiate'
     | '/api/public/v1/payments/$leadCode/status'
@@ -2121,8 +2095,6 @@ export interface RootRouteChildren {
   LovableEmailTransactionalPreviewRoute: typeof LovableEmailTransactionalPreviewRoute
   LovableEmailTransactionalSendRoute: typeof LovableEmailTransactionalSendRoute
   ApiPublicTelephonyCallerdeskEventsRoute: typeof ApiPublicTelephonyCallerdeskEventsRoute
-  ApiPublicTelephonySmartfloDialplanRoute: typeof ApiPublicTelephonySmartfloDialplanRoute
-  ApiPublicTelephonySmartfloEventsRoute: typeof ApiPublicTelephonySmartfloEventsRoute
   ApiPublicV1ApplicationsSummaryRoute: typeof ApiPublicV1ApplicationsSummaryRoute
   ApiPublicV1PaymentsInitiateRoute: typeof ApiPublicV1PaymentsInitiateRoute
   ApiPublicV1PaymentsLeadCodeStatusRoute: typeof ApiPublicV1PaymentsLeadCodeStatusRoute
@@ -3243,20 +3215,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicTelephonyCallerdeskEventsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/telephony/smartflo/dialplan': {
-      id: '/api/public/telephony/smartflo/dialplan'
-      path: '/api/public/telephony/smartflo/dialplan'
-      fullPath: '/api/public/telephony/smartflo/dialplan'
-      preLoaderRoute: typeof ApiPublicTelephonySmartfloDialplanRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/public/telephony/smartflo/events': {
-      id: '/api/public/telephony/smartflo/events'
-      path: '/api/public/telephony/smartflo/events'
-      fullPath: '/api/public/telephony/smartflo/events'
-      preLoaderRoute: typeof ApiPublicTelephonySmartfloEventsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/api/public/v1/applications/summary': {
       id: '/api/public/v1/applications/summary'
       path: '/api/public/v1/applications/summary'
@@ -3607,9 +3565,6 @@ const rootRouteChildren: RootRouteChildren = {
   LovableEmailTransactionalSendRoute: LovableEmailTransactionalSendRoute,
   ApiPublicTelephonyCallerdeskEventsRoute:
     ApiPublicTelephonyCallerdeskEventsRoute,
-  ApiPublicTelephonySmartfloDialplanRoute:
-    ApiPublicTelephonySmartfloDialplanRoute,
-  ApiPublicTelephonySmartfloEventsRoute: ApiPublicTelephonySmartfloEventsRoute,
   ApiPublicV1ApplicationsSummaryRoute: ApiPublicV1ApplicationsSummaryRoute,
   ApiPublicV1PaymentsInitiateRoute: ApiPublicV1PaymentsInitiateRoute,
   ApiPublicV1PaymentsLeadCodeStatusRoute:
