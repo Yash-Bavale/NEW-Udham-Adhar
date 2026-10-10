@@ -425,7 +425,7 @@ function TicketWorkspace() {
         const hasAttachmentMention = /attach|document|proof|pdf|file/i.test(text);
         const replyAtts = (r.attachments && r.attachments.length > 0)
           ? r.attachments
-          : allTicketAtts.filter((a: any) => !a.ticket_reply_id || a.ticket_reply_id === r.id);
+          : allTicketAtts.filter((a: any) => a.ticket_reply_id === r.id);
         out.push({
           kind: "inbound",
           id: `ri-${r.id}`,
@@ -477,7 +477,7 @@ function TicketWorkspace() {
             subject: em.subject ?? null,
             body_html: em.body_html ?? null,
             body_text: text,
-            attachments: allTicketAtts.length > 0 ? allTicketAtts : (hasAttachmentMention && docs.length > 0 ? docs : undefined),
+            attachments: hasAttachmentMention && docs.length > 0 ? docs : undefined,
           });
         } else {
           out.push({

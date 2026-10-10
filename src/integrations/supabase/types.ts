@@ -100,23 +100,71 @@ export type Database = {
       }
       app_settings: {
         Row: {
+          alert_sound_enabled: boolean | null
+          alert_sound_tone: string | null
+          alert_sound_volume: number | null
+          custom_audio_name: string | null
+          custom_audio_url: string | null
           customer_delay_autoclose_minutes: number
+          desktop_notifications: boolean | null
           email_provider: string
           id: number
+          leads_custom_name: string | null
+          leads_custom_url: string | null
+          leads_ringtone: string | null
+          leads_sound_enabled: boolean | null
+          leads_toast_enabled: boolean | null
+          orders_custom_name: string | null
+          orders_custom_url: string | null
+          orders_ringtone: string | null
+          orders_sound_enabled: boolean | null
+          orders_toast_enabled: boolean | null
           updated_at: string
           updated_by: string | null
         }
         Insert: {
+          alert_sound_enabled?: boolean | null
+          alert_sound_tone?: string | null
+          alert_sound_volume?: number | null
+          custom_audio_name?: string | null
+          custom_audio_url?: string | null
           customer_delay_autoclose_minutes?: number
+          desktop_notifications?: boolean | null
           email_provider?: string
           id?: number
+          leads_custom_name?: string | null
+          leads_custom_url?: string | null
+          leads_ringtone?: string | null
+          leads_sound_enabled?: boolean | null
+          leads_toast_enabled?: boolean | null
+          orders_custom_name?: string | null
+          orders_custom_url?: string | null
+          orders_ringtone?: string | null
+          orders_sound_enabled?: boolean | null
+          orders_toast_enabled?: boolean | null
           updated_at?: string
           updated_by?: string | null
         }
         Update: {
+          alert_sound_enabled?: boolean | null
+          alert_sound_tone?: string | null
+          alert_sound_volume?: number | null
+          custom_audio_name?: string | null
+          custom_audio_url?: string | null
           customer_delay_autoclose_minutes?: number
+          desktop_notifications?: boolean | null
           email_provider?: string
           id?: number
+          leads_custom_name?: string | null
+          leads_custom_url?: string | null
+          leads_ringtone?: string | null
+          leads_sound_enabled?: boolean | null
+          leads_toast_enabled?: boolean | null
+          orders_custom_name?: string | null
+          orders_custom_url?: string | null
+          orders_ringtone?: string | null
+          orders_sound_enabled?: boolean | null
+          orders_toast_enabled?: boolean | null
           updated_at?: string
           updated_by?: string | null
         }
@@ -3505,46 +3553,67 @@ export type Database = {
       }
       profiles: {
         Row: {
+          archived_at: string | null
+          auto_assign_enabled: boolean
+          avatar_url: string | null
           created_at: string
           department: string | null
           display_name: string | null
           email: string | null
           employee_code: string | null
+          employment_status: string
           full_name: string | null
           id: string
           is_active: boolean
           joining_date: string | null
+          max_workload: number
           mobile: string | null
           smartflo_agent_id: string | null
+          terminated_at: string | null
           updated_at: string
+          work_schedule: Json | null
         }
         Insert: {
+          archived_at?: string | null
+          auto_assign_enabled?: boolean
+          avatar_url?: string | null
           created_at?: string
           department?: string | null
           display_name?: string | null
           email?: string | null
           employee_code?: string | null
+          employment_status?: string
           full_name?: string | null
           id: string
           is_active?: boolean
           joining_date?: string | null
+          max_workload?: number
           mobile?: string | null
           smartflo_agent_id?: string | null
+          terminated_at?: string | null
           updated_at?: string
+          work_schedule?: Json | null
         }
         Update: {
+          archived_at?: string | null
+          auto_assign_enabled?: boolean
+          avatar_url?: string | null
           created_at?: string
           department?: string | null
           display_name?: string | null
           email?: string | null
           employee_code?: string | null
+          employment_status?: string
           full_name?: string | null
           id?: string
           is_active?: boolean
           joining_date?: string | null
+          max_workload?: number
           mobile?: string | null
           smartflo_agent_id?: string | null
+          terminated_at?: string | null
           updated_at?: string
+          work_schedule?: Json | null
         }
         Relationships: []
       }
