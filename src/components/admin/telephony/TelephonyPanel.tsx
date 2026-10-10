@@ -68,12 +68,12 @@ export function TelephonyPanel() {
   }
 
   if (!active && (!pending || !open)) {
-    const offline = typeof navigator !== "undefined" && !navigator.onLine;
+    // Idle badge hidden until browser calling is finalised — only the
+    // pending "Log last call" affordance still shows when relevant.
+    if (!pending) return null;
     return (
       <div className="fixed bottom-4 right-4 z-40 flex items-center gap-2 rounded-full border bg-card px-3 py-1 text-xs shadow">
-        <span className={`h-2 w-2 rounded-full ${offline ? "bg-muted-foreground" : "bg-primary"}`} />
-        Phone: {offline ? "Offline" : "Available"}
-        {pending ? <button className="underline" onClick={() => setOpen(true)}>Log last call</button> : null}
+        <button className="underline" onClick={() => setOpen(true)}>Log last call</button>
       </div>
     );
   }
