@@ -42,14 +42,6 @@ function useBrandedHtml(html: string) {
   return out;
 }
 
-function LegalFooter() {
-  const brand = useOptionalBrand();
-  return (
-    <p className="mt-6 border-t border-border pt-4 text-xs italic text-muted-foreground">
-      {brand?.legalFooterLine || LEGAL_FOOTER_LINE}
-    </p>
-  );
-}
 
 
 /** Standard inner-page container with a title band matching the homepage cards. */
