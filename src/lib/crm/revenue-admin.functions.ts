@@ -867,3 +867,120 @@ export const exportRevenueTransactions = createServerFn({ method: "POST" })
       count: rows?.length ?? 0,
     };
   });
+
+// ── Day-wise Revenue Summary Export ────────────────────────────────────────
+const DayWiseSchema = z.object({
+  preset: z.enum(["today", "yesterday", "7d", "30d", "this_week", "last_week", "this_month", "last_month", "this_fy", "custom"]).default("today"),
+  fromIso: z.string().optional(),
+  toIso: z.string().optional(),
+});
+
+export const exportDayWiseRevenue = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => DayWiseSchema.parse(i ?? {}))
+  .handler(async ({ data, context }) => {
+    await assertRole(context.supabase, FINANCE_ROLES);
+    const admin = await getAdmin();
+    const r = resolveRangeDates(data.preset, data.fromIso, data.toIso);
+
+    const payments = await fetchAllPaged<PayRow>(() =>
+      admin
+        .from("payments")
+        .select("id, amount, base_amount, gst_amount, gateway_name, status, payment_date, created_at")
+        .or(`and(payment_date.gte.${r.startIso},payment_date.lte.${r.endIso}),and(payment_date.is.null,created_at.gte.${r.startIso},created_at.lte.${r.endIso})`)
+        .order("created_at", { ascending: true }),
+    );
+    const refunds = await fetchAllPaged<RefundRow>(() =>
+      admin
+        .from("refund_requests")
+        .select("id, refund_amount, status, created_at")
+        .eq("status", "approved")
+        .gte("created_at", r.startIso)
+        .lte("created_at", r.endIso)
+        .order("created_at", { ascending: true }),
+    );
+
+    const key = (d: Date) => d.toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+    const GWS = ["PAYU", "CASHFREE", "CCAVENUE", "RAZORPAY", "PHONEPE"];
+    type Day = { date: string; paid: number; gross: number; base: number; gst: number; refundCount: number; refunded: number; attempts: number; failed: number; gw: Record<string, number> };
+    const days = new Map<string, Day>();
+    const blank = (k: string): Day => ({ date: k, paid: 0, gross: 0, base: 0, gst: 0, refundCount: 0, refunded: 0, attempts: 0, failed: 0, gw: Object.fromEntries([...GWS, "OTHER"].map((g) => [g, 0])) });
+    const msDay = 86400000;
+    for (let t = new Date(r.startIso).getTime(); t <= new Date(r.endIso).getTime(); t += msDay) {
+      const k = key(new Date(t));
+      if (!days.has(k)) days.set(k, blank(k));
+    }
+    const endK = key(new Date(r.endIso));
+    if (!days.has(endK)) days.set(endK, blank(endK));
+    const get = (k: string) => { let d = days.get(k); if (!d) { d = blank(k); days.set(k, d); } return d; };
+
+    for (const p of payments) {
+      const d = get(key(new Date(p.payment_date ?? p.created_at)));
+      d.attempts += 1;
+      if (p.status === "failed" || p.status === "attempted") d.failed += 1;
+      if (p.status === "paid") {
+        const amt = Number(p.amount ?? 0);
+        d.paid += 1;
+        d.gross += amt;
+        d.base += Number(p.base_amount ?? 0);
+        d.gst += Number(p.gst_amount ?? 0);
+        const g = (p.gateway_name ?? "").toUpperCase();
+        d.gw[GWS.includes(g) ? g : "OTHER"] += amt;
+      }
+    }
+    for (const rf of refunds) {
+      const d = get(key(new Date(rf.created_at)));
+      d.refundCount += 1;
+      d.refunded += Number(rf.refund_amount ?? 0);
+    }
+
+    const sorted = Array.from(days.values()).sort((a, b) => a.date.localeCompare(b.date));
+    const r2 = (n: number) => Math.round(n * 100) / 100;
+    const fmtDate = (k: string) => { const [y, m, dd] = k.split("-"); return `${dd}-${m}-${y}`; };
+    const dow = (k: string) => new Date(`${k}T12:00:00Z`).toLocaleDateString("en-IN", { weekday: "short", timeZone: "UTC" });
+    const headers = ["Date", "Day", "Paid Orders", "Gross Revenue (₹)", "Base Revenue Excl. Tax (₹)", "GST (₹)", "Refunds", "Refunded Amount (₹)", "Net Revenue (₹)", "Avg Order Value (₹)", ...GWS.map((g) => `${g} (₹)`), "Other Gateway (₹)", "Payment Attempts", "Failed Attempts", "Success Rate (%)"];
+    const toRow = (d: Day, label: string, dayName: string) => [
+      label, dayName, d.paid, r2(d.gross), r2(d.base), r2(d.gst), d.refundCount, r2(d.refunded),
+      r2(Math.max(0, d.gross - d.refunded)), d.paid ? r2(d.gross / d.paid) : 0,
+      ...GWS.map((g) => r2(d.gw[g])), r2(d.gw.OTHER), d.attempts, d.failed,
+      d.attempts ? r2((d.paid / d.attempts) * 100) : 0,
+    ];
+    const total = blank("TOTAL");
+    for (const d of sorted) {
+      total.paid += d.paid; total.gross += d.gross; total.base += d.base; total.gst += d.gst;
+      total.refundCount += d.refundCount; total.refunded += d.refunded; total.attempts += d.attempts; total.failed += d.failed;
+      for (const g of Object.keys(total.gw)) total.gw[g] += d.gw[g];
+    }
+    const rows = [...sorted.map((d) => toRow(d, fmtDate(d.date), dow(d.date))), toRow(total, "TOTAL", "")];
+
+    const csvEscape = (v: unknown) => { const s = v == null ? "" : String(v); return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+    const csv = "\uFEFF" + [headers, ...rows].map((row) => row.map(csvEscape).join(",")).join("\n");
+    const esc = (v: unknown) => String(v ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    const cell = (v: unknown, bold = false) => typeof v === "number"
+      ? `<Cell ss:StyleID="${bold ? "TotNum" : "Num"}"><Data ss:Type="Number">${v}</Data></Cell>`
+      : `<Cell${bold ? ' ss:StyleID="Tot"' : ""}><Data ss:Type="String">${esc(v)}</Data></Cell>`;
+    const excelXml = `<?xml version="1.0"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
+ <Styles>
+  <Style ss:ID="Header"><Font ss:Bold="1" ss:Color="#FFFFFF"/><Interior ss:Color="#0F172A" ss:Pattern="Solid"/></Style>
+  <Style ss:ID="Num"><NumberFormat ss:Format="#,##0.00"/></Style>
+  <Style ss:ID="Tot"><Font ss:Bold="1"/></Style>
+  <Style ss:ID="TotNum"><Font ss:Bold="1"/><NumberFormat ss:Format="#,##0.00"/></Style>
+ </Styles>
+ <Worksheet ss:Name="Day-wise Revenue"><Table>
+<Row>${headers.map((h) => `<Cell ss:StyleID="Header"><Data ss:Type="String">${esc(h)}</Data></Cell>`).join("")}</Row>
+${rows.map((row, i) => `<Row>${row.map((v) => cell(v, i === rows.length - 1)).join("")}</Row>`).join("\n")}
+</Table></Worksheet></Workbook>`;
+
+    await writeAudit({
+      supabase: context.supabase,
+      entityType: "payment",
+      entityId: `${sorted.length} days`,
+      action: "revenue.export_daywise",
+      newValue: { preset: data.preset, from: r.startIso, to: r.endIso, days: sorted.length },
+      actorId: context.userId,
+    });
+
+    return { csv, excelXml, days: sorted.length };
+  });
