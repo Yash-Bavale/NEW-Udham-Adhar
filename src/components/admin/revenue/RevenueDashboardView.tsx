@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { formatIST } from "@/lib/datetime";
 import {
-  getRevenueOverview, exportRevenueTransactions, type RevenueRangePreset, type RevenueGateway, type RevenueService, type RevenueTrendPoint
+  getRevenueOverview, exportRevenueTransactions, exportDayWiseRevenue, type RevenueRangePreset, type RevenueGateway, type RevenueService, type RevenueTrendPoint
 } from "@/lib/crm/revenue-admin.functions";
 import { PaymentsTransactionLedger } from "./PaymentsTransactionLedger";
 import { RevenueExportModal } from "./RevenueExportModal";
@@ -144,6 +144,30 @@ export function RevenueDashboardView() {
     }
   };
 
+  const [dayExporting, setDayExporting] = useState<"csv" | "excel" | null>(null);
+  const dayWiseFn = useServerFn(exportDayWiseRevenue);
+  const handleDayWiseExport = async (format: "csv" | "excel") => {
+    setDayExporting(format);
+    try {
+      const res = await dayWiseFn({ data: { preset, fromIso, toIso } });
+      const content = format === "excel" ? res.excelXml : res.csv;
+      const blob = new Blob([content], { type: format === "excel" ? "application/vnd.ms-excel;charset=utf-8" : "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `daywise_revenue_${preset}_${new Date().toISOString().slice(0, 10)}.${format === "excel" ? "xls" : "csv"}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success(`Exported ${res.days} day(s) of revenue`);
+    } catch (e: any) {
+      toast.error(e?.message || "Day-wise export failed");
+    } finally {
+      setDayExporting(null);
+    }
+  };
+
   const donutData = gateways.map((g) => ({
     name: g.name,
     value: g.grossRevenue,
@@ -217,6 +241,26 @@ export function RevenueDashboardView() {
             >
               <Download className="size-4 text-emerald-600" /> Export
             </button>
+
+            <div className="flex items-center rounded-xl border border-slate-200 bg-white shadow-xs text-xs font-semibold overflow-hidden">
+              <span className="flex items-center gap-1.5 px-3 py-2 text-slate-700 border-r border-slate-200">
+                <Calendar className="size-4 text-emerald-600" /> Day-wise
+              </span>
+              <button
+                onClick={() => handleDayWiseExport("csv")}
+                disabled={!!dayExporting}
+                className="px-2.5 py-2 text-slate-700 hover:bg-slate-50 disabled:opacity-50 cursor-pointer"
+              >
+                {dayExporting === "csv" ? "…" : "CSV"}
+              </button>
+              <button
+                onClick={() => handleDayWiseExport("excel")}
+                disabled={!!dayExporting}
+                className="px-2.5 py-2 text-slate-700 hover:bg-slate-50 border-l border-slate-200 disabled:opacity-50 cursor-pointer"
+              >
+                {dayExporting === "excel" ? "…" : "Excel"}
+              </button>
+            </div>
 
             <button
               onClick={handleManualRefresh}
