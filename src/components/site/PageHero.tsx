@@ -70,7 +70,7 @@ export function PageHero({
         </div>
         <div className={proseClasses}>
           {children}
-          {legal ? <LegalFooter /> : null}
+
         </div>
       </div>
     </section>
@@ -149,7 +149,7 @@ export function WpPage({
           <div className={proseClasses}>
             <div dangerouslySetInnerHTML={{ __html: branded }} />
 
-            {legal ? <LegalFooter /> : null}
+
           </div>
         </div>
       </section>
