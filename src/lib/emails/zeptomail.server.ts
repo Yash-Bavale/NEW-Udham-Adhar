@@ -46,7 +46,7 @@ function generateMessageId(user: string): string {
 export async function sendViaZepto(input: ZeptoSendInput): Promise<ZeptoSendResult> {
   try {
     const fromEmail = zeptoFromEmail();
-    const fromName = (input.fromName || process.env.ZOHO_FROM_NAME || "Udyam Registration Consultancy & Assistance Services").trim();
+    const fromName = (input.fromName || process.env.ZOHO_FROM_NAME || "Business Help Services").trim();
     const messageId = angleWrap(input.messageId || generateMessageId(fromEmail));
 
     // Threading + trace headers preserved so inbound reply matching keeps working.

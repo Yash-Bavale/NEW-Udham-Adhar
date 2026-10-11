@@ -95,7 +95,7 @@ export const Route = createFileRoute("/")({
       | undefined;
     const cms = ld?.cms;
     const baseUrl = ld?.baseUrl || "https://udyamadhar.in";
-    const orgName = ld?.legalEntity || "Udyam Registration Consultancy & Assistance Services";
+    const orgName = ld?.legalEntity || "Business Help Services";
     const title = cms?.metaTitle || HOMEPAGE_TITLE;
     const desc = cms?.metaDescription || HOMEPAGE_DESC;
     const faqList = ld?.faqs ?? [];
