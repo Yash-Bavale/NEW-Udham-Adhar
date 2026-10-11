@@ -202,7 +202,7 @@ export async function sendViaZoho(input: ZohoSendInput): Promise<ZohoSendResult>
   try {
     const accountId = await resolveAccountId();
     const fromEmail = zohoFromEmail();
-    const fromName = (input.fromName || process.env.ZOHO_FROM_NAME || "Udyam Registration Consultancy & Assistance Services").trim();
+    const fromName = (input.fromName || process.env.ZOHO_FROM_NAME || "Business Help Services").trim();
     const messageId = angleWrap(input.messageId || generateMessageId(fromEmail));
     const threadHeaders: Record<string, string> = { "Message-ID": messageId };
     if (input.inReplyTo) threadHeaders["In-Reply-To"] = angleWrap(input.inReplyTo);
@@ -277,7 +277,7 @@ export function zohoSenderInfo() {
     host: mailHost(),
     port: 443,
     user: zohoFromEmail(),
-    fromName: process.env.ZOHO_FROM_NAME || "Udyam Registration Consultancy & Assistance Services",
+    fromName: process.env.ZOHO_FROM_NAME || "Business Help Services",
   };
 }
 

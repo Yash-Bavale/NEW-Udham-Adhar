@@ -1236,7 +1236,7 @@ async function sendQueueRow(row: QueueRow) {
   }
 
   const attempt = (row.attempts ?? 0) + 1;
-  const fromName = settings.from_name || process.env.ZOHO_FROM_NAME || "Udyam Registration Consultancy & Assistance Services";
+  const fromName = settings.from_name || process.env.ZOHO_FROM_NAME || "Business Help Services";
   let smtpResponse: string | null = null;
   let lastError: string | null = null;
   let ok = false;
