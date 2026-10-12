@@ -1300,7 +1300,8 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         if (is_reopened) {
           hot_started_at = (a as any).reopened_at || a.updated_at || a.created_at;
         } else if (cb) {
-          hot_started_at = cb.created_at || (cb.fires_at ? new Date(cb.fires_at).toISOString() : null) || a.updated_at || a.created_at;
+          // A scheduled callback becomes HOT when it fires (due time), not when it was scheduled.
+          hot_started_at = (cb.fires_at ? new Date(cb.fires_at).toISOString() : null) || cb.created_at || a.updated_at || a.created_at;
         } else {
           hot_started_at = a.updated_at || a.created_at;
         }
