@@ -762,7 +762,9 @@ const groups = useMemo(() => {
         ? (r.completed_at || r.created_at)
         : bucket === "closed"
           ? (r.closed_at || r.created_at)
-          : r.created_at;
+          : bucket === "pending"
+            ? (r.latest_action_at || r.created_at)
+            : r.created_at;
     const key = istDateKey(rawKey) || "Unknown";
     const arr = g.get(key) ?? [];
     arr.push(r);
@@ -1800,7 +1802,9 @@ function OrderCardMobile({
     ? (order.completed_at || order.created_at)
     : isClosedView
       ? (order.closed_at || order.created_at)
-      : order.created_at;
+      : bucket === "pending"
+        ? (order.latest_action_at || order.created_at)
+        : order.created_at;
 
   const stageToneMap: Record<string, string> = {
     emerald: "bg-emerald-50 text-emerald-700 border-emerald-200",
