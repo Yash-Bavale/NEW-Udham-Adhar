@@ -894,17 +894,19 @@ export function CustomerJourneyMap(p: Props) {
                   VIEW {historyCount > 0 ? `(${historyCount})` : ""}
                 </button>
 
-                {/* Primary Action 1: Call / Action Completed */}
-                <button
-                  type="button"
-                  onClick={() => mutCompleteCallback.mutate()}
-                  disabled={mutCompleteCallback.isPending}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3.5 py-1.5 text-xs font-bold text-white hover:bg-emerald-700 transition cursor-pointer shadow-xs disabled:opacity-50"
-                  title={isTicketSourceHot ? "Mark ticket email action completed & remove Hot Order" : "Mark scheduled callback completed & remove Hot Order"}
-                >
-                  {mutCompleteCallback.isPending ? <Loader2 className="size-3.5 animate-spin" /> : <CheckCircle2 className="size-3.5" />}
-                  {isTicketSourceHot ? "Action Completed" : "Call Completed"}
-                </button>
+                {/* Primary Action 1: Ticket Action Completed (callback "Call Completed" button removed — not used) */}
+                {isTicketSourceHot && (
+                  <button
+                    type="button"
+                    onClick={() => mutCompleteCallback.mutate()}
+                    disabled={mutCompleteCallback.isPending}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3.5 py-1.5 text-xs font-bold text-white hover:bg-emerald-700 transition cursor-pointer shadow-xs disabled:opacity-50"
+                    title="Mark ticket email action completed & remove Hot Order"
+                  >
+                    {mutCompleteCallback.isPending ? <Loader2 className="size-3.5 animate-spin" /> : <CheckCircle2 className="size-3.5" />}
+                    Action Completed
+                  </button>
+                )}
 
                 {/* Primary Action 2: Reschedule */}
                 <button
