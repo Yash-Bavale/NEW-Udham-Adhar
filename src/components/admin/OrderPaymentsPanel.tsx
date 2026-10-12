@@ -157,13 +157,16 @@ export function OrderPaymentsPanel({ payments }: { payments: any[] }) {
           <tbody>
             {paidPayments.map((p) => {
               const amt = Number(p.amount || 0);
-              const isRefund = !!p.parent_payment_id || amt < 0;
+              // Refund rows are always negative-amount children. A positive paid
+              // child (parent_payment_id set) is a service-change top-up.
+              const isRefund = amt < 0;
+              const isTopUp = !isRefund && !!p.parent_payment_id;
               const isPaid = String(p.status).toLowerCase() === "paid" && !isRefund;
               return (
                 <tr key={p.id} className={`border-t ${isRefund ? "bg-rose-50/50" : ""}`}>
                   <td className="py-1.5 text-slate-600">{fmtDate(p.payment_date ?? p.created_at)}</td>
                   <td className={`font-medium ${isRefund ? "text-rose-700" : "text-slate-800"}`}>
-                    {isRefund ? "Refund · " : ""}Rs. {Math.abs(amt).toLocaleString("en-IN")}
+                    {isRefund ? "Refund · " : isTopUp ? "Top-up · " : ""}Rs. {Math.abs(amt).toLocaleString("en-IN")}
                   </td>
                   <td className="text-slate-600 capitalize">{p.gateway_name ?? "—"}</td>
                   <td className="font-mono text-[10px]">{p.invoice_number ?? "—"}</td>
