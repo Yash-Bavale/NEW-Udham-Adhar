@@ -86,6 +86,8 @@ export class CallerDeskWebRtcEngine {
   private wire(session: any) {
     const { SessionState } = this.sip;
     this.session = session;
+    // Hook the peer connection as soon as SIP.js creates it, so early remote tracks are caught.
+    session.delegate = { ...(session.delegate ?? {}), onSessionDescriptionHandler: () => this.watchPeer(session) };
     session.stateChange.addListener((s: any) => {
       if (s === SessionState.Established) { this.log({ event: "CALL_CONNECTED", number: this.snap.remoteNumber }); this.attachAudio(session); this.emit("accepted", { connectedAt: Date.now() }); }
       if (s === SessionState.Establishing) this.watchPeer(session);
