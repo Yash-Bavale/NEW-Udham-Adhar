@@ -9,6 +9,13 @@ export type EngineSnapshot = { state: PhoneState; error: string | null; remoteNu
 type Listener = (s: EngineSnapshot) => void;
 export type DiagEvent = { event: string; state?: string; sipCode?: number | null; reason?: string | null; number?: string | null; detail?: string | null };
 
+/** User-facing message for a failed/dropped ICE (media) path. */
+export function iceError(state: string): string | null {
+  if (state === "failed") return "Call audio path failed (no media). Check FortiClient VPN and retry.";
+  if (state === "disconnected") return "Call audio path interrupted. Check FortiClient VPN.";
+  return null;
+}
+
 export class CallerDeskWebRtcEngine {
   private snap: EngineSnapshot = { state: "DISCONNECTED", error: null, remoteNumber: null, muted: false, connectedAt: null, direction: null };
   private listeners = new Set<Listener>();
@@ -79,8 +86,11 @@ export class CallerDeskWebRtcEngine {
   private wire(session: any) {
     const { SessionState } = this.sip;
     this.session = session;
+    // Hook the peer connection as soon as SIP.js creates it, so early remote tracks are caught.
+    session.delegate = { ...(session.delegate ?? {}), onSessionDescriptionHandler: () => this.watchPeer(session) };
     session.stateChange.addListener((s: any) => {
       if (s === SessionState.Established) { this.log({ event: "CALL_CONNECTED", number: this.snap.remoteNumber }); this.attachAudio(session); this.emit("accepted", { connectedAt: Date.now() }); }
+      if (s === SessionState.Establishing) this.watchPeer(session);
       if (s === SessionState.Terminated) {
         this.releaseMedia(session);
         this.session = null; this.inFlight = false;
@@ -98,16 +108,58 @@ export class CallerDeskWebRtcEngine {
       pc?.getSenders().forEach((s) => s.track?.stop());
       pc?.getReceivers().forEach((r) => r.track?.stop());
     } catch { /* already closed */ }
+    this.remote?.getTracks().forEach((t) => t.stop());
+    this.remote = null;
     if (this.audio) { this.audio.pause(); this.audio.srcObject = null; }
   }
 
-  private attachAudio(session: any) {
-    const pc: RTCPeerConnection | undefined = session.sessionDescriptionHandler?.peerConnection;
-    if (!pc) return;
-    const stream = new MediaStream();
-    pc.getReceivers().forEach((r) => r.track && stream.addTrack(r.track));
+  private remote: MediaStream | null = null;
+  private watched = new WeakSet<object>();
+
+  /** Hooks ontrack + ICE state on the call's peer connection (idempotent). */
+  private watchPeer(session: any) {
+    const pc: RTCPeerConnection | undefined = session?.sessionDescriptionHandler?.peerConnection;
+    if (!pc || this.watched.has(pc)) return;
+    this.watched.add(pc);
+    pc.addEventListener("track", (ev: RTCTrackEvent) => { if (ev.track.kind === "audio") this.addRemoteTrack(ev.track); });
+    pc.addEventListener("iceconnectionstatechange", () => {
+      const st = pc.iceConnectionState;
+      this.log({ event: "ICE_STATE", detail: st, number: this.snap.remoteNumber });
+      if (st === "failed" || st === "disconnected") {
+        this.snap = { ...this.snap, error: iceError(st) };
+        this.listeners.forEach((l) => l(this.snap));
+      } else if ((st === "connected" || st === "completed") && this.snap.error && /audio path/i.test(this.snap.error)) {
+        this.snap = { ...this.snap, error: null };
+        this.listeners.forEach((l) => l(this.snap));
+      }
+    });
+  }
+
+  private addRemoteTrack(track: MediaStreamTrack) {
+    this.remote ??= new MediaStream();
+    if (!this.remote.getTracks().some((t) => t.id === track.id)) this.remote.addTrack(track);
     this.audio ??= new Audio();
-    this.audio.srcObject = stream; void this.audio.play().catch(() => {});
+    if (this.audio.srcObject !== this.remote) this.audio.srcObject = this.remote;
+    void this.playAudio();
+  }
+
+  private async playAudio() {
+    if (!this.audio) return;
+    try { await this.audio.play(); }
+    catch (e: any) {
+      if (e?.name === "AbortError") return; // superseded by a newer play()
+      this.log({ event: "AUDIO_PLAYBACK_FAILED", reason: e?.name ?? "unknown" });
+      this.snap = { ...this.snap, error: "Browser blocked call audio. Click anywhere on the page, then check your headset/speaker." };
+      this.listeners.forEach((l) => l(this.snap));
+    }
+  }
+
+  private attachAudio(session: any) {
+    this.watchPeer(session);
+    const pc: RTCPeerConnection | undefined = session.sessionDescriptionHandler?.peerConnection;
+    if (!pc) { this.log({ event: "MEDIA_MISSING", reason: "no peer connection" }); return; }
+    pc.getReceivers().forEach((r) => r.track?.kind === "audio" && this.addRemoteTrack(r.track));
+    if (!this.remote?.getAudioTracks().length) this.log({ event: "MEDIA_PENDING", reason: "no remote audio track yet" });
   }
 
   private onInvite(inv: any) {

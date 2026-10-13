@@ -95,3 +95,25 @@ export function mapCallerDeskStatus(i: Record<string, unknown>): "ringing" | "an
   if (/^answer/.test(st) || talk > 0) return "ended";
   return "missed";
 }
+
+/** CallerDesk IST timestamp ("YYYY-MM-DD HH:MM:SS") → ISO, or null. */
+export const callerDeskTs = (v: string | null) => { if (!v) return null; const d = new Date(v.replace(/n(?=\d{2}:)/, " ").replace(" ", "T") + "+05:30"); return isNaN(d.getTime()) ? null : d.toISOString(); };
+
+/**
+ * Fields a late Call Report may add to an already-final call: only values that are missing
+ * on the row (or a real EndTime that differs). Never changes status or call associations.
+ * Empty result = true duplicate.
+ */
+export function reportEnrichment(existing: Record<string, any>, i: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  const rec = pick(i, "CallRecordingUrl");
+  if (rec && /^https?:\/\//.test(rec) && !existing.recording_url) out.recording_url = rec;
+  const d = Number(pick(i, "TalkDuration") ?? pick(i, "CallDuration") ?? NaN);
+  if (Number.isFinite(d) && existing.duration_seconds == null) out.duration_seconds = Math.round(d);
+  const end = callerDeskTs(pick(i, "EndTime"));
+  if (end && (!existing.ended_at || new Date(existing.ended_at).getTime() !== new Date(end).getTime())) out.ended_at = end;
+  const picked = callerDeskTs(pick(i, "LegB_Picked_time"));
+  if (picked && !existing.answered_at) out.answered_at = picked;
+  const st = pick(i, "Status"); if (st && !existing.hangup_cause) out.hangup_cause = st;
+  return out;
+}

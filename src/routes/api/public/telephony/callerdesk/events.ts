@@ -48,7 +48,14 @@ async function handle(request: Request): Promise<Response> {
       ({ data: existing } = await db.from("telephony_calls").select("*").eq("provider", "callerdesk")
         .or(`ref_id.eq.${campid},call_id.eq.${campid}`).order("started_at", { ascending: false }).limit(1).maybeSingle());
     }
-    if (existing && (RANK[existing.status] ?? -1) >= RANK[status]) return json({ ok: true, duplicate: true });
+    if (existing && (RANK[existing.status] ?? -1) >= RANK[status]) {
+      // A late final Call Report may still carry recording/duration/end time for an ended call.
+      const enrich = (status === "ended" || status === "missed") ? cd.reportEnrichment(existing, input) : {};
+      if (!Object.keys(enrich).length) return json({ ok: true, duplicate: true });
+      const { error } = await db.from("telephony_calls").update({ ...enrich, updated_at: new Date().toISOString() }).eq("id", existing.id);
+      if (error) throw error;
+      return json({ ok: true, enriched: Object.keys(enrich) });
+    }
 
     const now = new Date().toISOString();
     const row: Record<string, unknown> = { status, last_event: status, updated_at: now };
