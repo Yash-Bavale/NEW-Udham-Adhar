@@ -16,6 +16,32 @@ export function iceError(state: string): string | null {
   return null;
 }
 
+/** Safe SDP summary: audio direction + codec names only (no IPs, ICE creds or fingerprints). */
+export function summarizeSdp(sdp: string | undefined | null): string {
+  if (!sdp) return "none";
+  const audio = sdp.split(/\r?\n(?=m=)/).find((b) => b.startsWith("m=audio"));
+  if (!audio) return "no audio m-line";
+  const dir = audio.match(/^a=(sendrecv|sendonly|recvonly|inactive)/m)?.[1] ?? "sendrecv(default)";
+  const port = audio.match(/^m=audio (\d+)/)?.[1];
+  const codecs = [...audio.matchAll(/^a=rtpmap:\d+ ([\w-]+)\//gm)].map((m) => m[1]).filter((c) => !/telephone-event/i.test(c)).slice(0, 4);
+  return `dir=${dir} port0=${port === "0"} codecs=${codecs.join(",")}`;
+}
+
+/** Safe getStats summary: RTP audio counters and selected pair candidate types (no addresses). */
+export function summarizeStats(reports: Iterable<any>): string {
+  const all = [...reports]; const byId = new Map(all.map((r) => [r.id, r]));
+  const inb = all.find((r) => r.type === "inbound-rtp" && (r.kind ?? r.mediaType) === "audio");
+  const out = all.find((r) => r.type === "outbound-rtp" && (r.kind ?? r.mediaType) === "audio");
+  const tr = all.find((r) => r.type === "transport");
+  const pair = byId.get(tr?.selectedCandidatePairId) ?? all.find((r) => r.type === "candidate-pair" && (r.selected || r.nominated) && r.state === "succeeded");
+  const lc = pair && byId.get(pair.localCandidateId); const rc = pair && byId.get(pair.remoteCandidateId);
+  return [
+    `in: pkts=${inb?.packetsReceived ?? "-"} bytes=${inb?.bytesReceived ?? "-"} lost=${inb?.packetsLost ?? "-"} jitter=${inb?.jitter ?? "-"} level=${inb?.audioLevel ?? "-"}`,
+    `out: pkts=${out?.packetsSent ?? "-"} bytes=${out?.bytesSent ?? "-"}`,
+    `pair: ${pair ? `${lc?.candidateType ?? "?"}/${lc?.protocol ?? "?"}->${rc?.candidateType ?? "?"} rtt=${pair.currentRoundTripTime ?? "-"}` : "none"}`,
+  ].join(" | ");
+}
+
 export class CallerDeskWebRtcEngine {
   private snap: EngineSnapshot = { state: "DISCONNECTED", error: null, remoteNumber: null, muted: false, connectedAt: null, direction: null };
   private listeners = new Set<Listener>();
@@ -89,9 +115,10 @@ export class CallerDeskWebRtcEngine {
     // Hook the peer connection as soon as SIP.js creates it, so early remote tracks are caught.
     session.delegate = { ...(session.delegate ?? {}), onSessionDescriptionHandler: () => this.watchPeer(session) };
     session.stateChange.addListener((s: any) => {
-      if (s === SessionState.Established) { this.log({ event: "CALL_CONNECTED", number: this.snap.remoteNumber }); this.attachAudio(session); this.emit("accepted", { connectedAt: Date.now() }); }
+      if (s === SessionState.Established) { this.log({ event: "CALL_CONNECTED", number: this.snap.remoteNumber }); this.attachAudio(session); this.emit("accepted", { connectedAt: Date.now() }); this.startMediaProbe(session); }
       if (s === SessionState.Establishing) this.watchPeer(session);
       if (s === SessionState.Terminated) {
+        void this.stopMediaProbe(session);
         this.releaseMedia(session);
         this.session = null; this.inFlight = false;
         const wasConnected = this.snap.state === "CONNECTED";
@@ -113,6 +140,34 @@ export class CallerDeskWebRtcEngine {
     if (this.audio) { this.audio.pause(); this.audio.srcObject = null; }
   }
 
+  private probe: ReturnType<typeof setInterval> | null = null;
+
+  /** Logs SDP direction, PC states, track and audio element state, then RTP stats every 4s (first 20s). */
+  private startMediaProbe(session: any) {
+    const pc: RTCPeerConnection | undefined = session?.sessionDescriptionHandler?.peerConnection;
+    if (!pc) return;
+    this.log({ event: "MEDIA_SDP", detail: `local ${summarizeSdp(pc.localDescription?.sdp)} ; remote ${summarizeSdp(pc.remoteDescription?.sdp)}`.slice(0, 1000) });
+    let n = 0;
+    const tick = async () => {
+      n++;
+      const recv = pc.getReceivers().filter((r) => r.track?.kind === "audio").map((r) => `${r.track.readyState}/muted=${r.track.muted}/enabled=${r.track.enabled}`).join(",") || "none";
+      const a = this.audio;
+      const el = a ? `src=${!!a.srcObject} tracks=${(a.srcObject as MediaStream | null)?.getAudioTracks().length ?? 0} paused=${a.paused} muted=${a.muted} vol=${a.volume}` : "no element";
+      let st = "stats n/a"; try { st = summarizeStats((await pc.getStats()).values()); } catch { /* closed */ }
+      this.log({ event: "MEDIA_PROBE", detail: `#${n} conn=${pc.connectionState} ice=${pc.iceConnectionState} track=${recv} audio[${el}] ${st}`.slice(0, 1000) });
+      if (n >= 5 && this.probe) { clearInterval(this.probe); this.probe = null; }
+    };
+    if (this.probe) clearInterval(this.probe);
+    void tick(); this.probe = setInterval(() => void tick(), 4000);
+  }
+
+  private async stopMediaProbe(session: any) {
+    if (this.probe) { clearInterval(this.probe); this.probe = null; }
+    const pc: RTCPeerConnection | undefined = session?.sessionDescriptionHandler?.peerConnection;
+    if (!pc || this.snap.state !== "CONNECTED") return;
+    try { this.log({ event: "MEDIA_FINAL", detail: summarizeStats((await pc.getStats()).values()).slice(0, 1000) }); } catch { /* closed */ }
+  }
+
   private remote: MediaStream | null = null;
   private watched = new WeakSet<object>();
 
@@ -121,7 +176,11 @@ export class CallerDeskWebRtcEngine {
     const pc: RTCPeerConnection | undefined = session?.sessionDescriptionHandler?.peerConnection;
     if (!pc || this.watched.has(pc)) return;
     this.watched.add(pc);
-    pc.addEventListener("track", (ev: RTCTrackEvent) => { if (ev.track.kind === "audio") this.addRemoteTrack(ev.track); });
+    pc.addEventListener("track", (ev: RTCTrackEvent) => {
+      this.log({ event: "REMOTE_TRACK", detail: `kind=${ev.track.kind} state=${ev.track.readyState} muted=${ev.track.muted} streams=${ev.streams?.length ?? 0}` });
+      if (ev.track.kind === "audio") this.addRemoteTrack(ev.track);
+    });
+    pc.addEventListener("connectionstatechange", () => this.log({ event: "PC_STATE", detail: pc.connectionState }));
     pc.addEventListener("iceconnectionstatechange", () => {
       const st = pc.iceConnectionState;
       this.log({ event: "ICE_STATE", detail: st, number: this.snap.remoteNumber });
@@ -145,7 +204,7 @@ export class CallerDeskWebRtcEngine {
 
   private async playAudio() {
     if (!this.audio) return;
-    try { await this.audio.play(); }
+    try { await this.audio.play(); this.log({ event: "AUDIO_PLAYING", detail: `muted=${this.audio.muted} vol=${this.audio.volume}` }); }
     catch (e: any) {
       if (e?.name === "AbortError") return; // superseded by a newer play()
       this.log({ event: "AUDIO_PLAYBACK_FAILED", reason: e?.name ?? "unknown" });

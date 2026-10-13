@@ -70,3 +70,28 @@ describe("engine media handling", () => {
     expect(logs[0].event).toBe("AUDIO_PLAYBACK_FAILED");
   });
 });
+
+import { summarizeSdp, summarizeStats } from "@/lib/telephony/callerdesk-webrtc.engine";
+describe("safe media diagnostics", () => {
+  const SDP = "v=0\r\nc=IN IP4 10.1.2.3\r\nm=audio 4000 UDP/TLS/RTP/SAVPF 0 101\r\na=rtpmap:0 PCMU/8000\r\na=rtpmap:101 telephone-event/8000\r\na=ice-pwd:SECRET\r\na=recvonly\r\n";
+  it("reports audio direction and codecs without IPs or ICE secrets", () => {
+    const out = summarizeSdp(SDP);
+    expect(out).toContain("dir=recvonly");
+    expect(out).toContain("codecs=PCMU");
+    expect(out).not.toMatch(/10\.1\.2\.3|SECRET/);
+  });
+  it("summarises inbound/outbound RTP and selected pair without addresses", () => {
+    const out = summarizeStats([
+      { id: "i", type: "inbound-rtp", kind: "audio", packetsReceived: 0, bytesReceived: 0, packetsLost: 0, jitter: 0 },
+      { id: "o", type: "outbound-rtp", kind: "audio", packetsSent: 250, bytesSent: 40000 },
+      { id: "t", type: "transport", selectedCandidatePairId: "p" },
+      { id: "p", type: "candidate-pair", localCandidateId: "l", remoteCandidateId: "r", currentRoundTripTime: 0.05 },
+      { id: "l", type: "local-candidate", candidateType: "host", protocol: "udp", address: "10.0.0.9" },
+      { id: "r", type: "remote-candidate", candidateType: "host", address: "1.2.3.4" },
+    ]);
+    expect(out).toContain("in: pkts=0");
+    expect(out).toContain("out: pkts=250");
+    expect(out).toContain("host/udp->host");
+    expect(out).not.toMatch(/10\.0\.0\.9|1\.2\.3\.4/);
+  });
+});
