@@ -177,7 +177,7 @@ export class CallerDeskWebRtcEngine {
     if (!pc || this.watched.has(pc)) return;
     this.watched.add(pc);
     pc.addEventListener("track", (ev: RTCTrackEvent) => {
-      this.log({ event: "REMOTE_TRACK", detail: `kind=${ev.track.kind} state=${ev.track.readyState} muted=${ev.track.muted} streams=${ev.streams.length}` });
+      this.log({ event: "REMOTE_TRACK", detail: `kind=${ev.track.kind} state=${ev.track.readyState} muted=${ev.track.muted} streams=${ev.streams?.length ?? 0}` });
       if (ev.track.kind === "audio") this.addRemoteTrack(ev.track);
     });
     pc.addEventListener("connectionstatechange", () => this.log({ event: "PC_STATE", detail: pc.connectionState }));
