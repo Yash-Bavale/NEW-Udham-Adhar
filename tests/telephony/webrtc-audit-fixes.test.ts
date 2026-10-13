@@ -45,10 +45,10 @@ describe("engine media handling", () => {
     const track = { id: "t1", kind: "audio", stop } as any;
     class MS { t: any[] = []; addTrack(x: any) { this.t.push(x); } getTracks() { return this.t; } getAudioTracks() { return this.t; } }
     const audio = { srcObject: null as any, play: vi.fn(async () => {}), pause: vi.fn() };
-    vi.stubGlobal("MediaStream", MS); vi.stubGlobal("Audio", vi.fn(() => audio));
+    vi.stubGlobal("MediaStream", MS);
     const handlers: Record<string, Function> = {};
     const pc = { addEventListener: (n: string, f: Function) => { handlers[n] = f; }, getReceivers: () => [], getSenders: () => [], iceConnectionState: "new" };
-    const eng: any = new CallerDeskWebRtcEngine();
+    const eng: any = new CallerDeskWebRtcEngine(); eng.audio = audio;
     const session = { sessionDescriptionHandler: { peerConnection: pc } };
     eng.watchPeer(session); eng.watchPeer(session); // idempotent
     handlers.track({ track });
