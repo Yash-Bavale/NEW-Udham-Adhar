@@ -4,9 +4,18 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 const DIAG_TYPE = "webrtc_diag";
 
+/** Diagnostics are limited to the admin and super_admin roles (checked server-side via has_role). */
+export const DIAG_ROLES = ["super_admin", "admin"] as const;
+export async function isDiagAdmin(ctx: { supabase: any; userId: string }): Promise<boolean> {
+  for (const r of DIAG_ROLES) {
+    const { data } = await ctx.supabase.rpc("has_role", { _user_id: ctx.userId, _role: r });
+    if (data === true) return true;
+  }
+  return false;
+}
+
 async function requireSuperAdmin(ctx: { supabase: any; userId: string }) {
-  const { data } = await ctx.supabase.rpc("has_role", { _user_id: ctx.userId, _role: "super_admin" });
-  if (!data) throw new Error("Only super admins can use browser phone diagnostics.");
+  if (!(await isDiagAdmin(ctx))) throw new Error("Only admins can use browser phone diagnostics.");
 }
 
 const EventSchema = z.object({
