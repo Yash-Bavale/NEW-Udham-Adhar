@@ -34,12 +34,16 @@ export const logWebRtcEvent = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await requireSuperAdmin(context as any);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    await supabaseAdmin.from("activity_logs").insert({
+    const { redact } = await import("./callerdesk-webrtc.config");
+    const secrets = [process.env["CALLERDESK_SIP_PASSWORD"], process.env["CALLERDESK_AUTHCODE"], process.env["CALLERDESK_WEBHOOK_TOKEN"]];
+    const safe = { ...data, reason: data.reason ? redact(data.reason, secrets) : data.reason, detail: data.detail ? redact(data.detail, secrets) : data.detail, number: data.number ? redact(data.number, secrets) : data.number };
+    const { error } = await supabaseAdmin.from("activity_logs").insert({
       activity_type: DIAG_TYPE,
-      activity_description: `${data.event}${data.sipCode ? ` (${data.sipCode})` : ""}${data.reason ? `: ${data.reason}` : ""}`.slice(0, 500),
+      activity_description: `${safe.event}${safe.sipCode ? ` (${safe.sipCode})` : ""}${safe.reason ? `: ${safe.reason}` : ""}`.slice(0, 500),
       user_id: context.userId,
-      metadata: { ...data, userAgent: undefined },
+      metadata: { ...safe, userAgent: undefined },
     });
+    if (error) throw new Error("Browser phone test log could not be saved.");
     return { ok: true };
   });
 
