@@ -429,6 +429,29 @@ export function WorkspaceShell(p: Props) {
               </TooltipTrigger>
               <TooltipContent>{govtPortalUrl ? "Open the government portal for this service in a new tab" : "No government portal URL configured for this service"}</TooltipContent>
             </Tooltip>
+            {isAdmin && cLeadCode && cLeadCode !== "—" && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const origin = typeof window !== "undefined" ? window.location.origin : "https://udyamadhar.in";
+                      const link = `${origin}/onboarding/${encodeURIComponent(cLeadCode)}`;
+                      try {
+                        await navigator.clipboard.writeText(link);
+                        toast.success(`Form link copied for ${cLeadCode}!`);
+                      } catch {
+                        toast.error("Failed to copy form link");
+                      }
+                    }}
+                    className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition-colors cursor-pointer"
+                  >
+                    <Copy className="w-3.5 h-3.5 text-indigo-600" /> Copy Form Link
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>Copy customer form link ({cLeadCode}) to clipboard</TooltipContent>
+              </Tooltip>
+            )}
             {hasServiceChanged && cLeadCode && cLeadCode !== "—" && (
               <Tooltip>
                 <TooltipTrigger asChild>

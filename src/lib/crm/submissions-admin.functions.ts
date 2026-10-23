@@ -282,6 +282,9 @@ export const getFormSubmissionForApplication = createServerFn({ method: "GET" })
       }));
     }
 
+    const roleList = (roles ?? []).map((r: any) => r.role);
+    const isSuperAdmin = roleList.includes("super_admin") || roleList.includes("admin");
+
     return {
       application: app,
       lead: lead ?? null,
@@ -291,6 +294,7 @@ export const getFormSubmissionForApplication = createServerFn({ method: "GET" })
       requiredDocs,
       serviceCode,
       activeSchema,
+      isSuperAdmin,
     };
   });
 
@@ -361,6 +365,9 @@ export const getFormSubmissionForLead = createServerFn({ method: "GET" })
       }));
     }
 
+    const roleList = (roles ?? []).map((r: any) => r.role);
+    const isSuperAdmin = roleList.includes("super_admin") || roleList.includes("admin");
+
     return {
       lead,
       service: service ?? null,
@@ -368,6 +375,7 @@ export const getFormSubmissionForLead = createServerFn({ method: "GET" })
       documents: docs ?? [],
       requiredDocs,
       serviceCode,
+      isSuperAdmin,
     };
   });
 

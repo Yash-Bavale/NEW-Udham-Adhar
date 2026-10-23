@@ -31,6 +31,7 @@ import { formatIST, formatDateDMY } from "@/lib/datetime";
 import { useRealtimeTable } from "@/hooks/useRealtimeTable";
 import { formatMobile55 } from "@/lib/utils";
 import { useRole } from "@/hooks/useRole";
+import { usePermissions } from "@/hooks/usePermissions";
 
 // Sensitive numbers (Aadhaar, bank account) are shown in full to staff —
 // masking was removed per business decision so operations can verify values.
@@ -229,7 +230,7 @@ export function FormSubmissionPanel({
 }) {
   const qc = useQueryClient();
   const role = useRole();
-  const isSuperAdmin = role.has("super_admin") || role.has("superadmin");
+  const userPerms = usePermissions();
   const getFn = useServerFn(getFormSubmissionForApplication);
   const resendFn = useServerFn(resendFormLink);
   const urlFn = useServerFn(getDocumentSignedUrl);
@@ -241,6 +242,12 @@ export function FormSubmissionPanel({
     queryKey: ["admin.formSubmission", applicationId],
     queryFn: () => getFn({ data: { applicationId } }),
   });
+
+  const isSuperAdmin =
+    Boolean((data as any)?.isSuperAdmin) ||
+    Boolean((data as any)?.isAdmin) ||
+    role.hasAny(["super_admin", "admin", "superadmin", "super"]) ||
+    Boolean(userPerms.perms?.isAdmin);
 
   // Live-refresh whenever the customer's auto-save writes to the draft, or
   // uploads/removes a document for this application. Keeps the panel in sync
