@@ -65,3 +65,57 @@ export const endWebRtcCall = createServerFn({ method: "POST" })
       .eq("id", data.callRowId).eq("employee_id", context.userId).in("status", ["ringing", "answered"]);
     return { ok: true };
   });
+
+/** Identifies an incoming caller for the ringing screen. Staff only; bounded, minimal fields. */
+export const lookupIncomingCaller = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({ number: z.string().max(40) }).parse(d))
+  .handler(async ({ context, data }) => {
+    const { data: staff } = await context.supabase.rpc("has_any_staff_role", { _user_id: context.userId });
+    if (!staff) throw new Error("Forbidden");
+    const { lookupCaller } = await import("./phone.server");
+    return lookupCaller(data.number);
+  });
+
+/**
+ * Records an inbound browser call once per SIP session (idempotent on the client key).
+ * Linking is optional: the employee-selected order is stored only if it truly belongs to this caller.
+ */
+export const recordInboundWebRtcCall = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({
+    key: z.string().uuid(), number: z.string().max(40), applicationId: z.string().uuid().nullable(),
+  }).parse(d))
+  .handler(async ({ context, data }) => {
+    const { accessFor, loadAccount } = await import("./callerdesk-webrtc.server");
+    if (!accessFor(context.userId, await loadAccount(context.userId)).canRegister) throw new Error("Browser calling is not available for your account.");
+    const { normalizeIndianMobile, lookupCaller } = await import("./phone.server");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const db = supabaseAdmin as any;
+    const callId = `webrtc:in:${data.key}`;
+    const { data: found } = await db.from("telephony_calls").select("id, employee_id").eq("call_id", callId).maybeSingle();
+    const mobile = normalizeIndianMobile(data.number);
+    const link: Record<string, unknown> = {};
+    if (mobile) {
+      try {
+        const r = await lookupCaller(mobile);
+        const chosen = data.applicationId ? r.orders.find((o) => o.id === data.applicationId) : r.orders.length === 1 ? r.orders[0] : null;
+        if (chosen) link.application_id = chosen.id;
+        if (r.lead) link.lead_id = r.lead.id;
+      } catch { /* best effort */ }
+    }
+    if (found) {
+      if (found.employee_id !== context.userId) throw new Error("Forbidden");
+      if (Object.keys(link).length) await db.from("telephony_calls").update({ ...link, updated_at: new Date().toISOString() }).eq("id", found.id);
+      return { callRowId: found.id as string };
+    }
+    const row = {
+      provider: "callerdesk", direction: "inbound", status: "ringing", last_event: "browser_ringing", call_id: callId,
+      employee_id: context.userId, caller_number: mobile ?? data.number.replace(/\D/g, ""), started_at: new Date().toISOString(), ...link,
+    };
+    const { data: saved, error } = await db.from("telephony_calls").upsert(row, { onConflict: "call_id", ignoreDuplicates: true }).select("id").maybeSingle();
+    if (error) throw new Error("Could not record this call.");
+    if (saved) return { callRowId: saved.id as string };
+    const { data: again } = await db.from("telephony_calls").select("id").eq("call_id", callId).single();
+    return { callRowId: again.id as string };
+  });
