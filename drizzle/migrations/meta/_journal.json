@@ -246,6 +246,13 @@
       "when": 1792731506457,
       "tag": "0034_callerdesk_ivr_drafts",
       "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1792740650329,
+      "tag": "0035_employee_telephony_accounts",
+      "breakpoints": true
     }
   ]
 }
