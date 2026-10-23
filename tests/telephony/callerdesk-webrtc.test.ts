@@ -9,19 +9,19 @@ describe("CallerDesk WebRTC (mocked, no network)", () => {
     expect(missingConfig({})).toHaveLength(7);
   });
   it("blocks registration while config is missing even for Sid", () => {
-    expect(webRtcAccess({ userId: SID, memberId: null, enabledFlag: "true", env: {} }).canRegister).toBe(false);
+    expect(webRtcAccess({ userId: SID, account: null, enabledFlag: "true", env: {} }).canRegister).toBe(false);
   });
   it("blocks registration when the feature flag is off", () => {
-    expect(webRtcAccess({ userId: SID, memberId: null, enabledFlag: undefined, env: full }).canRegister).toBe(false);
+    expect(webRtcAccess({ userId: SID, account: null, enabledFlag: undefined, env: full }).canRegister).toBe(false);
   });
   it("denies other employees even with full config", () => {
-    const a = webRtcAccess({ userId: "00000000-0000-0000-0000-000000000000", memberId: "999", enabledFlag: "true", env: full });
+    const a = webRtcAccess({ userId: "00000000-0000-0000-0000-000000000000", account: null, enabledFlag: "true", env: full });
     expect(a.authorized).toBe(false);
     expect(a.canRegister).toBe(false);
   });
   it("does not release Sid's SIP credentials to another user sharing his member mapping", () => {
-    expect(webRtcAccess({ userId: "other", memberId: "122354", enabledFlag: "true", env: full }).canRegister).toBe(false);
-    expect(webRtcAccess({ userId: SID, memberId: "122354", enabledFlag: "true", env: full }).canRegister).toBe(true);
+    expect(webRtcAccess({ userId: "other", account: null, enabledFlag: "true", env: full }).canRegister).toBe(false);
+    expect(webRtcAccess({ userId: SID, account: null, enabledFlag: "true", env: full }).canRegister).toBe(true);
   });
   it("rejects invalid endpoints", () => {
     expect(buildWssUrl("bad host", "4443", "/ws")).toBeNull();
