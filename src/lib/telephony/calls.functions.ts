@@ -135,33 +135,32 @@ export const callHistoryInput = z.object({
 }).refine((v) => v.from <= v.to, { message: "Start date must be on or before end date" })
   .refine((v) => (Date.parse(v.to) - Date.parse(v.from)) / 86_400_000 <= 92, { message: "Date range can be at most 92 days" });
 
-/** Admin / Super Admin: all historical calls (any status, any provider), newest first, paginated. Read-only. */
+/** Admin / Super Admin only. Read-only; any status or provider, newest first, paginated. */
+export async function queryCallHistory(sb: any, adminDb: any, userId: string, data: z.infer<typeof callHistoryInput>) {
+  const [{ data: a }, { data: s }] = await Promise.all([
+    sb.rpc("has_role", { _user_id: userId, _role: "admin" }),
+    sb.rpc("has_role", { _user_id: userId, _role: "super_admin" }),
+  ]);
+  if (!a && !s) throw new Error("Unauthorized");
+  const { fromIso, toIso } = istDayRange(data.from, data.to);
+  const offset = data.page * CALL_HISTORY_PAGE_SIZE;
+  let q = sb.from("telephony_calls").select("*", { count: "exact" }).gte("started_at", fromIso).lt("started_at", toIso);
+  if (data.direction !== "all") q = q.eq("direction", data.direction);
+  if (data.status !== "all") q = q.eq("status", data.status);
+  const { data: rows, count, error } = await q.order("started_at", { ascending: false }).range(offset, offset + CALL_HISTORY_PAGE_SIZE - 1);
+  if (error) throw new Error(error.message);
+  const views = await enrich(adminDb, rows ?? []);
+  const byId = new Map((rows ?? []).map((r: any) => [r.id, r]));
+  const items: CallHistoryRow[] = views.map((v) => {
+    const r: any = byId.get(v.id);
+    return { ...v, provider: r.provider, calledNumber: r.called_number ?? null,
+      recordingUrl: typeof r.recording_url === "string" && /^https?:\/\//.test(r.recording_url) ? r.recording_url : null,
+      hangupCause: r.hangup_cause ?? null };
+  });
+  return { items, total: count ?? 0, page: data.page, pageSize: CALL_HISTORY_PAGE_SIZE };
+}
+
 export const listCallHistory = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => callHistoryInput.parse(i))
-  .handler(async ({ data, context }) => {
-    const sb = context.supabase as any;
-    const [{ data: a }, { data: s }] = await Promise.all([
-      sb.rpc("has_role", { _user_id: context.userId, _role: "admin" }),
-      sb.rpc("has_role", { _user_id: context.userId, _role: "super_admin" }),
-    ]);
-    if (!a && !s) throw new Error("Unauthorized");
-    const { fromIso, toIso } = istDayRange(data.from, data.to);
-    const offset = data.page * CALL_HISTORY_PAGE_SIZE;
-    let q = sb.from("telephony_calls").select("*", { count: "exact" })
-      .gte("started_at", fromIso).lt("started_at", toIso);
-    if (data.direction !== "all") q = q.eq("direction", data.direction);
-    if (data.status !== "all") q = q.eq("status", data.status);
-    const { data: rows, count, error } = await q.order("started_at", { ascending: false })
-      .range(offset, offset + CALL_HISTORY_PAGE_SIZE - 1);
-    if (error) throw new Error(error.message);
-    const views = await enrich(await admin(), rows ?? []);
-    const byId = new Map((rows ?? []).map((r: any) => [r.id, r]));
-    const items: CallHistoryRow[] = views.map((v) => {
-      const r: any = byId.get(v.id);
-      return { ...v, provider: r.provider, calledNumber: r.called_number ?? null,
-        recordingUrl: typeof r.recording_url === "string" && /^https?:\/\//.test(r.recording_url) ? r.recording_url : null,
-        hangupCause: r.hangup_cause ?? null };
-    });
-    return { items, total: count ?? 0, page: data.page, pageSize: CALL_HISTORY_PAGE_SIZE };
-  });
+  .handler(async ({ data, context }) => queryCallHistory(context.supabase, await admin(), context.userId, data));

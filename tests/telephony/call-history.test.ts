@@ -25,16 +25,7 @@ function query() {
   return q;
 }
 const sb = { rpc: async (_: string, a: any) => ({ data: state.roles[a._role] }), from: () => query() };
-vi.mock("@/integrations/supabase/auth-middleware", () => ({ requireSupabaseAuth: {} }));
-vi.mock("@/integrations/supabase/client.server", () => ({ supabaseAdmin: { from: () => query() } }));
-vi.mock("@tanstack/react-start", () => ({
-  createServerFn: () => {
-    let v: any; const b: any = { middleware: () => b, inputValidator: (f: any) => { v = f; return b; },
-      handler: (h: any) => (arg: any) => h({ data: v ? v(arg.data) : undefined, context: { supabase: sb, userId: "u1" } }) };
-    return b;
-  },
-}));
-
+const adminDb = { from: () => query() };
 const mod = await import("@/lib/telephony/calls.functions");
 const base = { from: "2026-10-01", to: "2026-10-07", direction: "all", status: "all", page: 0 };
 
@@ -42,7 +33,7 @@ describe("call history", () => {
   beforeEach(() => { state.roles = { admin: false, super_admin: false }; state.calls = []; state.rows = []; state.count = 0; });
 
   it("rejects non-admin staff", async () => {
-    await expect((mod.listCallHistory as any)({ data: base })).rejects.toThrow("Unauthorized");
+    await expect(mod.queryCallHistory(sb, adminDb, "u1", mod.callHistoryInput.parse(base)).rejects.toThrow("Unauthorized");
   });
   it("uses IST day boundaries", () => {
     expect(mod.istDayRange("2026-10-23", "2026-10-23")).toEqual({ fromIso: "2026-10-22T18:30:00.000Z", toIso: "2026-10-23T18:30:00.000Z" });
@@ -53,7 +44,7 @@ describe("call history", () => {
   });
   it("applies direction and status filters and paginates 25 per page", async () => {
     state.roles.admin = true; state.count = 60;
-    const r = await (mod.listCallHistory as any)({ data: { ...base, direction: "inbound", status: "missed", page: 2 } });
+    const r = await mod.queryCallHistory(sb, adminDb, "u1", mod.callHistoryInput.parse({ ...base, direction: "inbound", status: "missed", page: 2 } });
     expect(state.calls).toContainEqual(["eq", "direction", "inbound"]);
     expect(state.calls).toContainEqual(["eq", "status", "missed"]);
     expect(state.calls).toContainEqual(["range", 50, 74]);
@@ -61,7 +52,7 @@ describe("call history", () => {
   });
   it("does not filter by status when 'all' so finished calls stay visible", async () => {
     state.roles.super_admin = true;
-    await (mod.listCallHistory as any)({ data: base });
+    await mod.queryCallHistory(sb, adminDb, "u1", mod.callHistoryInput.parse(base });
     expect(state.calls.some((c: any[]) => c[0] === "eq" || c[0] === "in")).toBe(false);
   });
   it("only exposes http(s) recording links", async () => {
@@ -70,7 +61,7 @@ describe("call history", () => {
       { id: "a", call_id: "1", provider: "callerdesk", direction: "inbound", status: "ended", started_at: "2026-10-02T00:00:00Z", recording_url: "https://r/x.mp3" },
       { id: "b", call_id: "2", provider: "smartflo", direction: "outbound", status: "missed", started_at: "2026-10-02T00:00:00Z", recording_url: "javascript:alert(1)" },
     ];
-    const r = await (mod.listCallHistory as any)({ data: base });
+    const r = await mod.queryCallHistory(sb, adminDb, "u1", mod.callHistoryInput.parse(base });
     expect(r.items.map((i: any) => i.recordingUrl)).toEqual(["https://r/x.mp3", null]);
   });
 });
