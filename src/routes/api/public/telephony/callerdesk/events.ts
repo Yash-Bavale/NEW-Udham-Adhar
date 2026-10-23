@@ -60,6 +60,16 @@ async function handle(request: Request): Promise<Response> {
         existing = cd.pickWebRtcCandidate(cands ?? []);
       }
     }
+    if (!existing && direction === "inbound") {
+      // Browser-answered inbound calls are recorded by the answering employee; adopt only an unambiguous single match.
+      const customer = normalizeIndianMobile(pick(input, "SourceNumber"));
+      if (customer) {
+        const since = new Date(Date.now() - cd.WEBRTC_MATCH_WINDOW_MS).toISOString();
+        const { data: cands } = await db.from("telephony_calls").select("*").eq("provider", "callerdesk").eq("direction", "inbound")
+          .like("call_id", "webrtc:in:%").is("provider_uuid", null).eq("caller_number", customer).gte("started_at", since).limit(3);
+        existing = cd.pickWebRtcCandidate(cands ?? []);
+      }
+    }
     if (!existing && !direction) return json({ ok: false, error: "unknown_direction" }, 400);
     if (existing && (RANK[existing.status] ?? -1) >= RANK[status]) {
       // A late final Call Report may still carry recording/duration/end time for an ended call.
