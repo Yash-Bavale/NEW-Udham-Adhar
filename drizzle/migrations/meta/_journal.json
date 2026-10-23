@@ -239,6 +239,13 @@
       "when": 1791607033943,
       "tag": "0033_add_missing_profile_and_sound_columns",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1792731506457,
+      "tag": "0034_callerdesk_ivr_drafts",
+      "breakpoints": true
     }
   ]
 }

@@ -13,8 +13,8 @@ export const WEBRTC_CONFIG_NAMES = [
   "CALLERDESK_DISPLAY_NAME",
 ] as const;
 
-/** Proof of concept is limited to Sid (CallerDesk member 122142). */
-export const WEBRTC_TEST_MEMBER_ID = "122142";
+/** Proof of concept is limited to the existing authorised CRM test user. */
+export const WEBRTC_TEST_MEMBER_ID = "122354";
 export const WEBRTC_TEST_USER_IDS = ["58ae8526-a228-4085-8978-308ec9eee4d6"] as const;
 
 export type Env = Record<string, string | undefined>;
@@ -33,7 +33,8 @@ export function buildWssUrl(host: string, port: string, path: string): string | 
 
 /** Live registration only when explicitly enabled, the caller is the test agent, and config is complete. */
 export function webRtcAccess(input: { userId: string; memberId: string | null; enabledFlag: string | undefined; env: Env }) {
-  const authorized = (WEBRTC_TEST_USER_IDS as readonly string[]).includes(input.userId) || input.memberId === WEBRTC_TEST_MEMBER_ID;
+  // A profile member mapping is editable and must not grant access to shared SIP credentials.
+  const authorized = (WEBRTC_TEST_USER_IDS as readonly string[]).includes(input.userId);
   const missing = missingConfig(input.env);
   const enabled = (input.enabledFlag ?? "").trim().toLowerCase() === "true";
   return { authorized, missing, enabled, canRegister: authorized && enabled && missing.length === 0 };
@@ -60,7 +61,7 @@ const T: Partial<Record<PhoneState, Partial<Record<PhoneEvent, PhoneState>>>> = 
   SETUP_INCOMPLETE: { check: "CHECKING_CONFIGURATION" },
   CHECKING_CONFIGURATION: { config_missing: "SETUP_INCOMPLETE", config_ok: "CONNECTING", register_failed: "FAILED" },
   CONNECTING: { registered: "REGISTERED", register_failed: "FAILED", transport_lost: "FAILED" },
-  RECONNECTING: { registered: "REGISTERED", register_failed: "FAILED" },
+  RECONNECTING: { check: "CHECKING_CONFIGURATION", registered: "REGISTERED", register_failed: "FAILED" },
   REGISTERED: { dial: "CALLING", incoming: "RINGING", transport_lost: "RECONNECTING" },
   CALLING: { accepted: "CONNECTED", rejected: "ENDED", hangup: "ENDED", transport_lost: "ENDED" },
   RINGING: { accepted: "CONNECTED", rejected: "ENDED", hangup: "ENDED", transport_lost: "ENDED" },

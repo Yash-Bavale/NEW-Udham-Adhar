@@ -25,13 +25,15 @@ export function accessFor(userId: string, memberId: string | null, env: Env = re
  */
 export function sessionCredentials(env: Env) {
   if (missingConfig(env).length) return null;
-  const wssUrl = buildWssUrl(env.CALLERDESK_ASTERISK_HOST!, env.CALLERDESK_WS_PORT!, env.CALLERDESK_WS_PATH!);
+  const { CALLERDESK_ASTERISK_HOST: host, CALLERDESK_WS_PORT: port, CALLERDESK_WS_PATH: path, CALLERDESK_SIP_DOMAIN: domain, CALLERDESK_SIP_EXTENSION: extension, CALLERDESK_SIP_PASSWORD: password, CALLERDESK_DISPLAY_NAME: displayName } = env;
+  if (!host || !port || !path || !domain || !extension || !password || !displayName) return null;
+  const wssUrl = buildWssUrl(host, port, path);
   if (!wssUrl) return null;
   return {
     wssUrl,
-    sipDomain: env.CALLERDESK_SIP_DOMAIN!.trim(),
-    extension: env.CALLERDESK_SIP_EXTENSION!.trim(),
-    password: env.CALLERDESK_SIP_PASSWORD!,
-    displayName: env.CALLERDESK_DISPLAY_NAME!.trim(),
+    sipDomain: domain.trim(),
+    extension: extension.trim(),
+    password,
+    displayName: displayName.trim(),
   };
 }
