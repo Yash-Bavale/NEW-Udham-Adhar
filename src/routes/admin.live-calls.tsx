@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { listLiveCalls } from "@/lib/telephony/calls.functions";
 import { fmtDuration } from "@/components/admin/telephony/TelephonyPanel";
 import { IvrSettings } from "@/components/admin/telephony/IvrSettings";
+import { TelephonyAccounts } from "@/components/admin/telephony/TelephonyAccounts";
 
 export const Route = createFileRoute("/admin/live-calls")({
   head: () => ({ meta: [{ title: "Live Calls & IVR — BHS CRM" }, { name: "description", content: "CallerDesk live calls and administrator IVR planning for Business Help Services." }, { property: "og:title", content: "Live Calls & IVR — BHS CRM" }, { property: "og:description", content: "CallerDesk call monitoring and securely saved IVR drafts." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }, { name: "robots", content: "noindex,nofollow" }] }),
@@ -50,6 +51,7 @@ function LiveCallsPage() {
           </tbody>
         </table>
       </div>
+      <TelephonyAccounts />
       <IvrSettings />
     </div>
   );
