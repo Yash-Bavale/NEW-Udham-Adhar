@@ -4,6 +4,9 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { requireTelephonyAdmin } from "./ivr.config";
 import { LEGACY_ENV_USER_IDS } from "./callerdesk-webrtc.config";
 
+export type TelephonyAccountDto = { employeeId: string; status: "unprovisioned" | "active" | "disabled"; memberId: string | null; sipUsername: string | null; displayName: string | null; hasPassword: boolean; source: string; verifiedAt: string | null; updatedAt: string };
+export type StaffDto = { id: string; name: string; email: string | null };
+
 const admin = async () => (await import("@/integrations/supabase/client.server")).supabaseAdmin as any;
 
 /** Account metadata only — never ciphertext or passwords. */
@@ -15,7 +18,7 @@ export const listTelephonyAccounts = createServerFn({ method: "GET" }).middlewar
     db.from("profiles").select("id, full_name, email").eq("is_active", true).order("full_name"),
   ]);
   if (error) throw new Error("Could not load browser phone accounts.");
-  return {
+  const result: { accounts: TelephonyAccountDto[]; staff: StaffDto[]; legacyEmployeeIds: string[] } = {
     accounts: (rows ?? []).map((r: any) => ({
       employeeId: r.employee_id, status: r.status, memberId: r.member_id, sipUsername: r.sip_username, displayName: r.display_name,
       hasPassword: !!r.sip_password_ciphertext, source: r.source, verifiedAt: r.verified_at, updatedAt: r.updated_at,
@@ -23,6 +26,7 @@ export const listTelephonyAccounts = createServerFn({ method: "GET" }).middlewar
     staff: (staff ?? []).map((p: any) => ({ id: p.id, name: p.full_name || p.email || "Employee", email: p.email })),
     legacyEmployeeIds: [...LEGACY_ENV_USER_IDS],
   };
+  return result;
 });
 
 const SaveSchema = z.object({
