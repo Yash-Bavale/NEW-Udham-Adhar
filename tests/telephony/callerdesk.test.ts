@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
 import {
-  parseMemberList, resolveMemberId, campaignId, callSid, mapCallerDeskStatus, verifyCallerDesk, callerDeskClickToCall,
+  parseMemberList, resolveMemberId, campaignId, callSid, mapCallerDeskStatus, verifyCallerDesk, callerDeskClickToCall, callerDeskDirection, reportEnrichment,
 } from "@/lib/telephony/callerdesk.server";
 
 const LIVE = { type: "success", getmember: [{ member_id: "122142", member_num: "09561396866", member_name: "Sid" }] };
@@ -55,6 +55,16 @@ describe("CallerDesk webhook parsing", () => {
     expect(campaignId({ [k]: "56431323" })).toBe("56431323");
   });
   it("reads CallSid", () => { expect(callSid({ CallSid: "abc" })).toBe("abc"); });
+  it("does not treat NOANSWER as a live answered event", () => { expect(mapCallerDeskStatus({ Status: "NOANSWER" })).toBe("ringing"); });
+  it("requires explicit known inbound or outbound direction", () => {
+    expect(callerDeskDirection({ Direction: "IBD" })).toBe("inbound");
+    expect(callerDeskDirection({ Direction: "OBD" })).toBe("outbound");
+    expect(callerDeskDirection({ Direction: "unknown" })).toBeNull();
+  });
+  it("does not persist negative or invalid call duration", () => {
+    expect(reportEnrichment({}, { TalkDuration: "-1" })).not.toHaveProperty("duration_seconds");
+    expect(reportEnrichment({}, { TalkDuration: "invalid" })).not.toHaveProperty("duration_seconds");
+  });
   it("live payload is ringing, answered report is ended, unanswered report is missed", () => {
     expect(mapCallerDeskStatus({ Status: "Ringing" })).toBe("ringing");
     expect(mapCallerDeskStatus({ Status: "ANSWER", EndTime: "2026-10-10 11:00:00", TalkDuration: "30" })).toBe("ended");

@@ -17,10 +17,10 @@ describe("webhook Call Report enrichment", () => {
     const row = { status: "ended", recording_url: "https://rec.example/a.mp3", duration_seconds: 42, ended_at: "2026-10-13T05:30:00.000Z", answered_at: "x", hangup_cause: "ANSWER" };
     expect(reportEnrichment(row, REPORT)).toEqual({});
   });
-  it("never overwrites an existing recording or duration", () => {
+  it("preserves recording but replaces total call duration with actual talk duration", () => {
     const e = reportEnrichment({ recording_url: "https://old", duration_seconds: 10, ended_at: null }, REPORT);
     expect(e.recording_url).toBeUndefined();
-    expect(e.duration_seconds).toBeUndefined();
+    expect(e.duration_seconds).toBe(42);
   });
   it("ignores non-http recording urls", () => {
     expect(reportEnrichment({}, { CallRecordingUrl: "javascript:x" }).recording_url).toBeUndefined();
@@ -68,6 +68,38 @@ describe("engine media handling", () => {
     await eng.playAudio();
     expect(eng.snapshot.error).toMatch(/blocked call audio/);
     expect(logs[0].event).toBe("AUDIO_PLAYBACK_FAILED");
+  });
+  it("retries playback through a user action and clears only the playback error", async () => {
+    const eng: any = new CallerDeskWebRtcEngine();
+    eng.audio = { play: vi.fn().mockRejectedValueOnce(Object.assign(new Error("blocked"), { name: "NotAllowedError" })).mockResolvedValueOnce(undefined), muted: false, volume: 1 };
+    await eng.resumeAudio();
+    expect(eng.snapshot.error).toMatch(/blocked call audio/);
+    await eng.resumeAudio();
+    expect(eng.snapshot.error).toBeNull();
+    expect(eng.audio.play).toHaveBeenCalledTimes(2);
+  });
+  it("answers, rejects, hangs up, mutes and sends DTMF through the existing session", async () => {
+    const eng: any = new CallerDeskWebRtcEngine(); eng.mic = vi.fn(async () => true);
+    const track = { enabled: true };
+    const sendDtmf = vi.fn();
+    eng.sip = { SessionState: { Established: "established" } };
+    const session = { state: "established", accept: vi.fn(async () => {}), reject: vi.fn(async () => {}), bye: vi.fn(async () => {}), sessionDescriptionHandler: { sendDtmf, peerConnection: { getSenders: () => [{ track }] } } };
+    eng.session = session; eng.snap.state = "RINGING";
+    await eng.answer(); expect(session.accept).toHaveBeenCalledTimes(1);
+    await eng.reject(); expect(session.reject).toHaveBeenCalledTimes(1);
+    eng.snap.state = "CONNECTED";
+    eng.setMuted(true); expect(track.enabled).toBe(false);
+    eng.setMuted(false); expect(track.enabled).toBe(true);
+    eng.sendDtmf("1"); expect(sendDtmf).toHaveBeenCalledWith("1");
+    await eng.hangup(); expect(session.bye).toHaveBeenCalledTimes(1);
+  });
+  it("cleans up an earlier transport before a failed reconnect", async () => {
+    const eng: any = new CallerDeskWebRtcEngine();
+    const stop = vi.fn(async () => {}); eng.ua = { stop };
+    await eng.start(async () => { throw new Error("configuration unavailable"); });
+    expect(stop).toHaveBeenCalledTimes(1);
+    expect(eng.snapshot.state).toBe("FAILED");
+    expect(eng.starting).toBe(false);
   });
 });
 

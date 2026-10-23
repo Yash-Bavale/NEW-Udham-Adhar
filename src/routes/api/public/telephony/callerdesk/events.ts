@@ -25,6 +25,7 @@ async function handle(request: Request): Promise<Response> {
       const parsed = ct.includes("json") ? (raw ? JSON.parse(raw) : {}) : Object.fromEntries(new URLSearchParams(raw));
       if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return json({ ok: false, error: "malformed_payload" }, 400);
       input = { ...input, ...parsed };
+      delete input.token;
     }
   } catch {
     return json({ ok: false, error: "malformed_payload" }, 400);
@@ -36,7 +37,8 @@ async function handle(request: Request): Promise<Response> {
     const sid = cd.callSid(input);
     const campid = cd.campaignId(input);
     if (!sid && !campid) return json({ ok: false, error: "missing_call_id" }, 400);
-    const outbound = /OBD|OUT/.test(String(pick(input, "Direction") ?? "").toUpperCase());
+    const direction = cd.callerDeskDirection(input);
+    const outbound = direction === "outbound";
     const status = cd.mapCallerDeskStatus(input);
     console.log(JSON.stringify({ event: "callerdesk_call_event", status, outbound, has_sid: !!sid, has_camp: !!campid, fields: Object.keys(input).sort() }));
 
@@ -48,6 +50,7 @@ async function handle(request: Request): Promise<Response> {
       ({ data: existing } = await db.from("telephony_calls").select("*").eq("provider", "callerdesk")
         .or(`ref_id.eq.${campid},call_id.eq.${campid}`).order("started_at", { ascending: false }).limit(1).maybeSingle());
     }
+    if (!existing && !direction) return json({ ok: false, error: "unknown_direction" }, 400);
     if (existing && (RANK[existing.status] ?? -1) >= RANK[status]) {
       // A late final Call Report may still carry recording/duration/end time for an ended call.
       const enrich = (status === "ended" || status === "missed") ? cd.reportEnrichment(existing, input) : {};
@@ -69,7 +72,7 @@ async function handle(request: Request): Promise<Response> {
       const customerRaw = outbound ? pick(input, "DestinationNumber", "DialWhomNumber") : pick(input, "SourceNumber");
       const mobile = normalizeIndianMobile(customerRaw);
       Object.assign(row, {
-        provider: "callerdesk", direction: outbound ? "outbound" : "inbound", ref_id: campid,
+         provider: "callerdesk", direction, ref_id: campid,
         caller_number: outbound ? pick(input, "SourceNumber") : (mobile ?? customerRaw),
         called_number: outbound ? (mobile ?? customerRaw) : pick(input, "DestinationNumber"),
         started_at: ts(pick(input, "StartTime")) ?? now,
@@ -78,26 +81,26 @@ async function handle(request: Request): Promise<Response> {
       if (mobile) {
         try {
           const m = await dbLookup(mobile);
-          Object.assign(row, { customer_id: m.customerId, lead_id: m.leadId, application_id: m.applicationId, employee_id: m.employeeId });
+          Object.assign(row, { customer_id: m.customerId, lead_id: m.leadId, application_id: m.applicationId });
+          // An order owner is not evidence of who answered an inbound call.
+          if (outbound) row.employee_id = m.employeeId;
         } catch { /* best-effort match */ }
       }
     }
     // Inbound: the answering agent becomes the employee when their number matches a staff mobile.
     const agent = normalizeIndianMobile(pick(input, "DialWhomNumber"));
-    if (agent && !outbound) {
+    if (agent && (existing?.direction ?? direction) === "inbound") {
       row.agent_id = agent;
       const { data: p } = await db.from("profiles").select("id").ilike("mobile", `%${agent}`).limit(1).maybeSingle();
       if (p?.id) row.employee_id = p.id;
     }
     if ((status === "answered" || status === "ended") && !existing?.answered_at) {
-      row.answered_at = ts(pick(input, "LegB_Picked_time")) ?? now;
+      const answeredAt = ts(pick(input, "LegB_Picked_time"));
+      if (answeredAt || status === "answered") row.answered_at = answeredAt ?? now;
     }
     if (status === "ended" || status === "missed") {
-      row.ended_at = ts(pick(input, "EndTime")) ?? now;
-      const st = pick(input, "Status"); if (st) row.hangup_cause = st;
-      const rec = pick(input, "CallRecordingUrl"); if (rec && /^https?:\/\//.test(rec)) row.recording_url = rec;
-      const d = Number(pick(input, "TalkDuration") ?? pick(input, "CallDuration") ?? NaN);
-      if (Number.isFinite(d)) row.duration_seconds = Math.round(d);
+      Object.assign(row, cd.reportEnrichment(existing ?? {}, input));
+      if (!row.ended_at && !existing?.ended_at) row.ended_at = now;
     }
     const { error } = existing
       ? await db.from("telephony_calls").update(row).eq("id", existing.id)
