@@ -96,10 +96,13 @@ export function mapCallerDeskStatus(i: Record<string, unknown>): "ringing" | "an
   return "missed";
 }
 
+/** CallerDesk report labels: IVR = customer called the DID, WEBOBD = web/click-to-call outbound. Unknown → null. */
+const OUTBOUND_LABELS = new Set(["OBD", "OUT", "OUTBOUND", "WEBOBD"]);
+const INBOUND_LABELS = new Set(["IBD", "IN", "INBOUND", "IVR"]);
 export function callerDeskDirection(i: Record<string, unknown>): "inbound" | "outbound" | null {
-  const direction = String(pick(i, "Direction") ?? "").trim().toUpperCase();
-  if (/^(OBD|OUT|OUTBOUND)$/.test(direction)) return "outbound";
-  if (/^(IBD|IN|INBOUND)$/.test(direction)) return "inbound";
+  const direction = String(pick(i, "Direction") ?? "").replace(/\s+/g, "").toUpperCase();
+  if (OUTBOUND_LABELS.has(direction)) return "outbound";
+  if (INBOUND_LABELS.has(direction)) return "inbound";
   return null;
 }
 
