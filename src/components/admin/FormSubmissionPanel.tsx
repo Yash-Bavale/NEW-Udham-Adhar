@@ -6,6 +6,7 @@ import {
   CheckCircle2,
   XCircle,
   Copy,
+  Check,
   Mail,
   Eye,
   Download,
@@ -29,6 +30,7 @@ import { Button } from "@/components/ui/button";
 import { formatIST, formatDateDMY } from "@/lib/datetime";
 import { useRealtimeTable } from "@/hooks/useRealtimeTable";
 import { formatMobile55 } from "@/lib/utils";
+import { useRole } from "@/hooks/useRole";
 
 // Sensitive numbers (Aadhaar, bank account) are shown in full to staff —
 // masking was removed per business decision so operations can verify values.
@@ -226,10 +228,13 @@ export function FormSubmissionPanel({
   orderId?: string;
 }) {
   const qc = useQueryClient();
+  const role = useRole();
+  const isSuperAdmin = role.has("super_admin") || role.has("superadmin");
   const getFn = useServerFn(getFormSubmissionForApplication);
   const resendFn = useServerFn(resendFormLink);
   const urlFn = useServerFn(getDocumentSignedUrl);
   const [resending, setResending] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
   const [mergeOpen, setMergeOpen] = useState(false);
 
   const { data, isLoading } = useQuery({
@@ -248,6 +253,38 @@ export function FormSubmissionPanel({
   useRealtimeTable("documents", invalidate, {
     filter: `application_id=eq.${applicationId}`,
   });
+
+  const handleCopyFormLink = async () => {
+    const leadCode = data?.lead?.lead_code;
+    if (!leadCode) {
+      toast.error("Form link not available (missing lead code)");
+      return;
+    }
+    const origin =
+      typeof window !== "undefined" && window.location.origin
+        ? window.location.origin
+        : "https://udyamadhar.in";
+    const formLink = `${origin}/onboarding/${encodeURIComponent(leadCode)}`;
+    try {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(formLink);
+      } else {
+        const textarea = document.createElement("textarea");
+        textarea.value = formLink;
+        textarea.style.position = "fixed";
+        textarea.style.opacity = "0";
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textarea);
+      }
+      setCopiedLink(true);
+      toast.success("Form link copied to clipboard");
+      setTimeout(() => setCopiedLink(false), 2000);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed to copy form link");
+    }
+  };
 
   const handleResend = async () => {
     if (!data?.lead?.id) return;
@@ -387,6 +424,23 @@ export function FormSubmissionPanel({
             />
           </div>
           <div className="flex items-center gap-2 flex-wrap">
+            {lead?.id && isSuperAdmin && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleCopyFormLink}
+                className="h-8 text-xs font-medium border-slate-200 text-slate-700 hover:bg-slate-50"
+                title="Copy customer onboarding form link"
+              >
+                {copiedLink ? (
+                  <Check className="size-3.5 mr-1.5 text-emerald-600" />
+                ) : (
+                  <Copy className="size-3.5 mr-1.5" />
+                )}
+                {copiedLink ? "Copied Form Link" : "Copy Form Link"}
+              </Button>
+            )}
+
             {lead?.id && (
               <Button
                 size="sm"
