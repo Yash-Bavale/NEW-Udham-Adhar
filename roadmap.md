@@ -1,5 +1,8 @@
 # Roadmap
 
+- [ ] Audit existing CallerDesk API, IVR, browser media, webhooks and deployment; implement safe confirmed gaps
+- [ ] Verify real IVR routing and two-way browser audio — blocked until provider settings and authorised VPN workstation tests
+
 - [x] Match Complete Service reference colors, sizing, upload and send states; verify on the order screen (live delivery intentionally not exercised)
 
 - [x] Match the Complete Service dialog to the supplied UI while preserving real upload and sending states (destructive live send intentionally not exercised)
