@@ -19,8 +19,9 @@ describe("CallerDesk WebRTC (mocked, no network)", () => {
     expect(a.authorized).toBe(false);
     expect(a.canRegister).toBe(false);
   });
-  it("allows member 122142 with full config and flag", () => {
-    expect(webRtcAccess({ userId: "other", memberId: "122142", enabledFlag: "true", env: full }).canRegister).toBe(true);
+  it("does not release Sid's SIP credentials to another user sharing his member mapping", () => {
+    expect(webRtcAccess({ userId: "other", memberId: "122354", enabledFlag: "true", env: full }).canRegister).toBe(false);
+    expect(webRtcAccess({ userId: SID, memberId: "122354", enabledFlag: "true", env: full }).canRegister).toBe(true);
   });
   it("rejects invalid endpoints", () => {
     expect(buildWssUrl("bad host", "4443", "/ws")).toBeNull();

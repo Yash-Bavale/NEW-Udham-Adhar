@@ -43,6 +43,7 @@ export function WebRtcDiagnostics({ currentStatus, currentError }: { currentStat
           <li key={r.id} className="rounded bg-muted/50 px-1.5 py-1">
             <span className="text-muted-foreground">{new Date(r.created_at).toLocaleTimeString()}</span> {r.activity_description}
             {r.metadata?.number ? <span className="font-mono"> · {r.metadata.number}</span> : null}
+            {r.metadata?.detail ? <div className="break-words text-muted-foreground">{r.metadata.detail}</div> : null}
           </li>
         ))}
         {log.data && !log.data.length ? <li className="text-muted-foreground">No attempts logged yet.</li> : null}

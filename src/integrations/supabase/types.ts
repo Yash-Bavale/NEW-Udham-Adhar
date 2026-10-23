@@ -749,6 +749,41 @@ export type Database = {
         }
         Relationships: []
       }
+      callerdesk_ivr_settings: {
+        Row: {
+          config: Json
+          id: string
+          revision: number
+          sync_status: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          config?: Json
+          id?: string
+          revision?: number
+          sync_status?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          config?: Json
+          id?: string
+          revision?: number
+          sync_status?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "callerdesk_ivr_settings_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       canned_responses: {
         Row: {
           body: string

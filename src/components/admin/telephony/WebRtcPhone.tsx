@@ -71,9 +71,10 @@ export function WebRtcPhone() {
           ) : null}
           {snap?.error ? <p className="text-xs text-destructive">{snap.error}</p> : null}
 
-          {status.canRegister && (state === "DISCONNECTED" || state === "FAILED") ? (
+          {status.canRegister && (state === "DISCONNECTED" || state === "FAILED" || state === "RECONNECTING") ? (
             <Button size="sm" className="w-full" onClick={connect}>Connect (FortiClient VPN must be on)</Button>
           ) : null}
+          {snap?.error?.startsWith("Browser blocked call audio") ? <Button size="sm" variant="outline" className="w-full" onClick={() => engine.current?.resumeAudio()}>Enable call audio</Button> : null}
 
           {state === "RINGING" ? (
             <div className="space-y-2">

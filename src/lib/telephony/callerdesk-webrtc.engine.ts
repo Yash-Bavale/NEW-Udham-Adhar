@@ -52,6 +52,7 @@ export class CallerDeskWebRtcEngine {
   private audio: HTMLAudioElement | null = null;
   private sip: any = null;
   private domain = "";
+  private starting = false;
   onLog: ((e: DiagEvent) => void) | null = null;
   private log(e: DiagEvent) { try { this.onLog?.({ state: this.snap.state, ...e }); } catch { /* ignore */ } }
 
@@ -64,6 +65,10 @@ export class CallerDeskWebRtcEngine {
   }
 
   async start(loadConfig: () => Promise<SessionConfig>) {
+    if (this.starting || this.session || this.snap.state === "REGISTERED") return;
+    this.starting = true;
+    try {
+    await this.stop();
     this.emit("check", { error: null });
     this.log({ event: "REGISTER_ATTEMPT" });
     let cfg: SessionConfig;
@@ -95,9 +100,12 @@ export class CallerDeskWebRtcEngine {
       await this.registerer.register({ requestDelegate: { onReject: (r: any) => { const c = r?.message?.statusCode; this.log({ event: "REGISTER_FAILED", sipCode: c, reason: r?.message?.reasonPhrase }); this.emit("register_failed", { error: registrationError(c) }); } } });
     } catch (err: any) {
       const m = String(err?.message ?? "Registration failed");
+      await this.stop();
+      this.emit("check"); this.emit("config_ok");
       this.log({ event: "REGISTER_FAILED", reason: m });
       this.emit("register_failed", { error: m });
     }
+    } finally { this.starting = false; }
   }
 
   private async mic(): Promise<boolean> {
@@ -204,14 +212,20 @@ export class CallerDeskWebRtcEngine {
 
   private async playAudio() {
     if (!this.audio) return;
-    try { await this.audio.play(); this.log({ event: "AUDIO_PLAYING", detail: `muted=${this.audio.muted} vol=${this.audio.volume}` }); }
+    try {
+      await this.audio.play(); this.log({ event: "AUDIO_PLAYING", detail: `muted=${this.audio.muted} vol=${this.audio.volume}` });
+      if (this.snap.error?.startsWith("Browser blocked call audio")) { this.snap = { ...this.snap, error: null }; this.listeners.forEach((l) => l(this.snap)); }
+    }
     catch (e: any) {
       if (e?.name === "AbortError") return; // superseded by a newer play()
       this.log({ event: "AUDIO_PLAYBACK_FAILED", reason: e?.name ?? "unknown" });
-      this.snap = { ...this.snap, error: "Browser blocked call audio. Click anywhere on the page, then check your headset/speaker." };
+      this.snap = { ...this.snap, error: "Browser blocked call audio. Press Enable call audio, then check your headset/speaker." };
       this.listeners.forEach((l) => l(this.snap));
     }
   }
+
+  /** Must be called from a user click to recover blocked browser playback. */
+  async resumeAudio() { await this.playAudio(); }
 
   private attachAudio(session: any) {
     this.watchPeer(session);
@@ -222,10 +236,11 @@ export class CallerDeskWebRtcEngine {
   }
 
   private onInvite(inv: any) {
-    if (this.session) { void inv.reject({ statusCode: 486 }); return; }
+    if (this.session) { this.log({ event: "INBOUND_BUSY", sipCode: 486 }); void inv.reject({ statusCode: 486 }); return; }
     const from = inv.remoteIdentity?.uri?.user ?? null;
     this.wire(inv);
     this.emit("incoming", { remoteNumber: from, direction: "inbound", error: null, connectedAt: null });
+    this.log({ event: "INBOUND_RINGING" });
   }
 
   async dial(number: string) {
@@ -255,9 +270,10 @@ export class CallerDeskWebRtcEngine {
   async answer() {
     if (this.snap.state !== "RINGING" || !this.session) return;
     if (!(await this.mic())) return;
-    await this.session.accept({ sessionDescriptionHandlerOptions: { constraints: { audio: true, video: false } } });
+    try { this.log({ event: "INBOUND_ANSWER" }); await this.session.accept({ sessionDescriptionHandlerOptions: { constraints: { audio: true, video: false } } }); }
+    catch { this.snap = { ...this.snap, error: "Could not answer the call. Retry or reject the incoming call." }; this.listeners.forEach((l) => l(this.snap)); this.log({ event: "ANSWER_FAILED" }); }
   }
-  async reject() { if (this.snap.state === "RINGING" && this.session) await this.session.reject(); }
+  async reject() { if (this.snap.state === "RINGING" && this.session) { this.log({ event: "INBOUND_REJECT" }); await this.session.reject(); } }
   async hangup() {
     const s = this.session; if (!s) return;
     const { SessionState } = this.sip;
@@ -272,6 +288,7 @@ export class CallerDeskWebRtcEngine {
   }
   sendDtmf(tone: string) { if (this.snap.state === "CONNECTED") this.session?.sessionDescriptionHandler?.sendDtmf?.(tone); }
   async stop() {
+    if (this.probe) { clearInterval(this.probe); this.probe = null; }
     try { if (this.session) await this.hangup(); } catch { /* ignore */ }
     this.releaseMedia(this.session);
     try { await this.registerer?.unregister(); } catch { /* ignore */ }

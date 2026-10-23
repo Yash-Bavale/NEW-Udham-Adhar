@@ -91,9 +91,16 @@ export function mapCallerDeskStatus(i: Record<string, unknown>): "ringing" | "an
   const final = !!pick(i, "EndTime", "CallDuration", "TalkDuration", "CallRecordingUrl");
   const st = String(pick(i, "Status") ?? "").toLowerCase();
   const talk = Number(pick(i, "TalkDuration") ?? 0);
-  if (!final) return /answer|engaged|connected/.test(st) ? "answered" : "ringing";
+  if (!final) return /^(answer(?:ed)?|engaged|connected)$/.test(st) ? "answered" : "ringing";
   if (/^answer/.test(st) || talk > 0) return "ended";
   return "missed";
+}
+
+export function callerDeskDirection(i: Record<string, unknown>): "inbound" | "outbound" | null {
+  const direction = String(pick(i, "Direction") ?? "").trim().toUpperCase();
+  if (/^(OBD|OUT|OUTBOUND)$/.test(direction)) return "outbound";
+  if (/^(IBD|IN|INBOUND)$/.test(direction)) return "inbound";
+  return null;
 }
 
 /** CallerDesk IST timestamp ("YYYY-MM-DD HH:MM:SS") → ISO, or null. */
@@ -108,8 +115,11 @@ export function reportEnrichment(existing: Record<string, any>, i: Record<string
   const out: Record<string, unknown> = {};
   const rec = pick(i, "CallRecordingUrl");
   if (rec && /^https?:\/\//.test(rec) && !existing.recording_url) out.recording_url = rec;
-  const d = Number(pick(i, "TalkDuration") ?? pick(i, "CallDuration") ?? NaN);
-  if (Number.isFinite(d) && existing.duration_seconds == null) out.duration_seconds = Math.round(d);
+  const talk = Number(pick(i, "TalkDuration") ?? NaN);
+  const duration = Number(pick(i, "CallDuration") ?? NaN);
+  // TalkDuration is authoritative. A prior CallDuration may include ringing/IVR time.
+  const d = Number.isFinite(talk) ? talk : duration;
+  if (Number.isFinite(d) && d >= 0 && (existing.duration_seconds == null || (Number.isFinite(talk) && existing.duration_seconds !== Math.round(d)))) out.duration_seconds = Math.round(d);
   const end = callerDeskTs(pick(i, "EndTime"));
   if (end && (!existing.ended_at || new Date(existing.ended_at).getTime() !== new Date(end).getTime())) out.ended_at = end;
   const picked = callerDeskTs(pick(i, "LegB_Picked_time"));
