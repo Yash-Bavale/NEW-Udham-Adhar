@@ -105,6 +105,9 @@ export function WebRtcPhone() {
               </div>
             </div>
           ) : null}
+          {snap?.direction === "inbound" && (state === "RINGING" || state === "CONNECTED") ? (
+            <CallerCard loading={caller.loading} error={caller.error} data={caller.data} selected={selectedOrder} onSelect={selectOrder} />
+          ) : null}
 
           {state === "CALLING" || state === "CONNECTED" ? (
             <div className="space-y-2">
