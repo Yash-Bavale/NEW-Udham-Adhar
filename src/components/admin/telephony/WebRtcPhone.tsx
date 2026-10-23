@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Headset, Mic, MicOff, Phone, PhoneOff, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { getWebRtcSession, getWebRtcStatus } from "@/lib/telephony/callerdesk-webrtc.functions";
+import { endWebRtcCall, getWebRtcSession, getWebRtcStatus, initiateWebRtcCall } from "@/lib/telephony/callerdesk-webrtc.functions";
 import type { CallerDeskWebRtcEngine, EngineSnapshot } from "@/lib/telephony/callerdesk-webrtc.engine";
 import { fmtDuration } from "./TelephonyPanel";
 import { logWebRtcEvent } from "@/lib/telephony/webrtc-diag.functions";
@@ -16,11 +16,14 @@ const LABEL: Record<string, string> = {
 };
 const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "*", "0", "#"];
 
-/** Browser phone (CallerDesk WebRTC). Rendered only for the authorised test agent. */
+/** Browser phone (CallerDesk WebRTC). Rendered only for employees with a browser phone account. */
 export function WebRtcPhone() {
   const fetchStatus = useServerFn(getWebRtcStatus);
   const fetchSession = useServerFn(getWebRtcSession);
   const logEvent = useServerFn(logWebRtcEvent);
+  const startCall = useServerFn(initiateWebRtcCall);
+  const finishCall = useServerFn(endWebRtcCall);
+  const callRow = useRef<{ id: string; answeredAt: number | null } | null>(null);
   const [diag, setDiag] = useState(false);
   const { data: status } = useQuery({ queryKey: ["webrtc-status"], queryFn: () => fetchStatus(), staleTime: 300_000 });
   const engine = useRef<CallerDeskWebRtcEngine | null>(null);
@@ -32,6 +35,23 @@ export function WebRtcPhone() {
   useEffect(() => { if (snap?.state !== "CONNECTED") return; const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, [snap?.state]);
   useEffect(() => () => { void engine.current?.stop(); }, []);
   useEffect(() => { if (snap?.state === "RINGING") setOpen(true); }, [snap?.state]);
+  // Close the pre-recorded browser call row when the SIP session ends (the provider report may enrich it later).
+  useEffect(() => {
+    const c = callRow.current; if (!c) return;
+    if (snap?.state === "CONNECTED" && snap.connectedAt) c.answeredAt = snap.connectedAt;
+    if (snap?.state === "ENDED" || snap?.state === "FAILED" || snap?.state === "DISCONNECTED" || snap?.state === "REGISTERED") {
+      callRow.current = null;
+      void finishCall({ data: { callRowId: c.id, answeredAt: c.answeredAt } }).catch(() => {});
+    }
+  }, [snap?.state, snap?.connectedAt]);
+
+  async function dial() {
+    const digits = num.replace(/\D/g, "");
+    if (!/^\d{10,13}$/.test(digits)) { void engine.current?.dial(num); return; }
+    try { const r = await startCall({ data: { number: digits } }); callRow.current = { id: r.callRowId, answeredAt: null }; }
+    catch { /* calling still works; the provider report will create the record */ }
+    await engine.current?.dial(num);
+  }
 
   if (!status?.authorized) return null;
 
@@ -58,14 +78,14 @@ export function WebRtcPhone() {
       ) : (
         <div className="w-[320px] max-h-[85vh] overflow-auto space-y-3 rounded-xl border bg-card p-4 text-card-foreground shadow-2xl">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-sm font-semibold"><Headset className="h-4 w-4" />Browser phone <span className="rounded bg-muted px-1.5 text-[10px] font-normal">Test</span></div>
+            <div className="flex items-center gap-2 text-sm font-semibold"><Headset className="h-4 w-4" />Browser phone </div>
             <button aria-label="Hide" onClick={() => setOpen(false)}><X className="h-4 w-4" /></button>
           </div>
           <div className="flex items-center gap-2 text-xs"><span className={`h-2 w-2 rounded-full ${dot}`} />{LABEL[state]}</div>
 
           {!status.canRegister && !snap ? (
             <p className="text-xs text-muted-foreground">
-              WebRTC setup incomplete — waiting for CallerDesk VPN and agent SIP credentials.
+              {status.message}
               {status.missing.length ? ` Missing: ${status.missing.join(", ")}.` : ""}{!status.enabled ? " Browser calling is switched off." : ""}
             </p>
           ) : null}
@@ -106,7 +126,7 @@ export function WebRtcPhone() {
               <input className="w-full rounded-md border bg-background px-2 py-1.5 font-mono text-sm" inputMode="tel" placeholder="Number to call" value={num} onChange={(e) => setNum(e.target.value.replace(/[^\d+]/g, ""))} />
               <div className="grid grid-cols-3 gap-1">{KEYS.slice(0, 11).map((k) => <Button key={k} size="sm" variant="outline" onClick={() => setNum((n) => n + k)}>{k}</Button>)}
                 <Button size="sm" variant="outline" onClick={() => setNum((n) => n.slice(0, -1))}>⌫</Button></div>
-              <Button size="sm" className="w-full" onClick={() => engine.current?.dial(num)}><Phone className="h-4 w-4" />Call from browser</Button>
+              <Button size="sm" className="w-full" onClick={() => void dial()}><Phone className="h-4 w-4" />Call from browser</Button>
               <button className="w-full text-[11px] text-muted-foreground underline" onClick={() => engine.current?.stop()}>Disconnect</button>
             </div>
           ) : null}

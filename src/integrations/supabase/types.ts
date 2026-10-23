@@ -2128,6 +2128,68 @@ export type Database = {
           },
         ]
       }
+      employee_telephony_accounts: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          display_name: string | null
+          employee_id: string
+          id: string
+          key_version: number
+          member_id: string | null
+          provider: string
+          sip_password_ciphertext: string | null
+          sip_username: string | null
+          source: string
+          status: string
+          updated_at: string
+          updated_by: string | null
+          verified_at: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          display_name?: string | null
+          employee_id: string
+          id?: string
+          key_version?: number
+          member_id?: string | null
+          provider?: string
+          sip_password_ciphertext?: string | null
+          sip_username?: string | null
+          source?: string
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+          verified_at?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          display_name?: string | null
+          employee_id?: string
+          id?: string
+          key_version?: number
+          member_id?: string | null
+          provider?: string
+          sip_password_ciphertext?: string | null
+          sip_username?: string | null
+          source?: string
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+          verified_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_telephony_accounts_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       follow_ups: {
         Row: {
           application_id: string | null

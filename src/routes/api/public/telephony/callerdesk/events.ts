@@ -50,10 +50,25 @@ async function handle(request: Request): Promise<Response> {
       ({ data: existing } = await db.from("telephony_calls").select("*").eq("provider", "callerdesk")
         .or(`ref_id.eq.${campid},call_id.eq.${campid}`).order("started_at", { ascending: false }).limit(1).maybeSingle());
     }
+    if (!existing && direction === "outbound") {
+      // Browser (WebRTC) calls are pre-recorded by the dialing employee; adopt that row when exactly one matches.
+      const customer = normalizeIndianMobile(pick(input, "DestinationNumber", "DialWhomNumber"));
+      if (customer) {
+        const since = new Date(Date.now() - cd.WEBRTC_MATCH_WINDOW_MS).toISOString();
+        const { data: cands } = await db.from("telephony_calls").select("*").eq("provider", "callerdesk")
+          .like("call_id", "webrtc:%").is("provider_uuid", null).eq("called_number", customer).gte("started_at", since).limit(3);
+        existing = cd.pickWebRtcCandidate(cands ?? []);
+      }
+    }
     if (!existing && !direction) return json({ ok: false, error: "unknown_direction" }, 400);
     if (existing && (RANK[existing.status] ?? -1) >= RANK[status]) {
       // A late final Call Report may still carry recording/duration/end time for an ended call.
-      const enrich = (status === "ended" || status === "missed") ? cd.reportEnrichment(existing, input) : {};
+      const enrich: Record<string, unknown> = (status === "ended" || status === "missed") ? cd.reportEnrichment(existing, input) : {};
+      if (sid && String(existing.call_id).startsWith("webrtc:") && !existing.provider_uuid) {
+        enrich.provider_uuid = sid;
+        const { data: clash } = await db.from("telephony_calls").select("id").eq("call_id", sid).maybeSingle();
+        if (!clash) enrich.call_id = sid;
+      }
       if (!Object.keys(enrich).length) return json({ ok: true, duplicate: true });
       const { error } = await db.from("telephony_calls").update({ ...enrich, updated_at: new Date().toISOString() }).eq("id", existing.id);
       if (error) throw error;

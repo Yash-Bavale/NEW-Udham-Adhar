@@ -1,32 +1,67 @@
 import { createServerFn } from "@tanstack/react-start";
+import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { ACCESS_MESSAGE, type AccessReason } from "./callerdesk-webrtc.config";
 
-async function memberIdOf(ctx: { supabase: any; userId: string }): Promise<string | null> {
-  const { data } = await ctx.supabase.from("profiles").select("smartflo_agent_id").eq("id", ctx.userId).maybeSingle();
-  const v = typeof data?.smartflo_agent_id === "string" ? data.smartflo_agent_id.trim() : "";
-  return /^\d+$/.test(v) ? v : null;
-}
-
-/** Safe status for the phone panel: names of missing settings only, never values. */
+/** Safe status for the phone panel: reason + names of missing settings only, never values. */
 export const getWebRtcStatus = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { accessFor } = await import("./callerdesk-webrtc.server");
-    const a = accessFor(context.userId, await memberIdOf(context as any));
+    const { accessFor, loadAccount } = await import("./callerdesk-webrtc.server");
+    const a = accessFor(context.userId, await loadAccount(context.userId));
     if (!a.authorized) return { authorized: false as const };
-    return { authorized: true as const, enabled: a.enabled, missing: a.missing, canRegister: a.canRegister };
+    return { authorized: true as const, enabled: a.enabled, missing: a.missing, canRegister: a.canRegister, reason: a.reason, message: ACCESS_MESSAGE[a.reason] };
   });
 
-/** Per-agent SIP session config, released only to the authorised test agent with the flag on. */
+/** The signed-in employee's own SIP session. Identity comes only from verified auth context. */
 export const getWebRtcSession = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { accessFor, readEnv, sessionCredentials } = await import("./callerdesk-webrtc.server");
-    const env = readEnv();
-    const a = accessFor(context.userId, await memberIdOf(context as any), env);
-    if (!a.authorized) throw new Error("Browser calling is not enabled for your account.");
-    if (!a.canRegister) throw new Error("WebRTC setup incomplete — waiting for CallerDesk VPN and agent SIP credentials.");
-    const creds = sessionCredentials(env);
-    if (!creds) throw new Error("CallerDesk WebRTC settings are invalid. Check host, port and path.");
-    return creds;
+    const { loadAccount, readEnv, resolveSession } = await import("./callerdesk-webrtc.server");
+    try {
+      return await resolveSession(context.userId, await loadAccount(context.userId), readEnv());
+    } catch (e) {
+      const r = (e as Error).message as AccessReason;
+      throw new Error(ACCESS_MESSAGE[r] ?? "Browser phone credentials could not be loaded. Ask an admin to re-save your SIP login.");
+    }
+  });
+
+/** Creates the pending call row before dialing, so the dialing employee owns the call record. */
+export const initiateWebRtcCall = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({ number: z.string().regex(/^\+?\d{10,13}$/) }).parse(d))
+  .handler(async ({ context, data }) => {
+    const { accessFor, loadAccount } = await import("./callerdesk-webrtc.server");
+    if (!accessFor(context.userId, await loadAccount(context.userId)).canRegister) throw new Error("Browser calling is not available for your account.");
+    const { normalizeIndianMobile, dbLookup } = await import("./phone.server");
+    const mobile = normalizeIndianMobile(data.number);
+    const row: Record<string, unknown> = {
+      provider: "callerdesk", direction: "outbound", status: "ringing", last_event: "browser_dial",
+      call_id: `webrtc:${crypto.randomUUID()}`, employee_id: context.userId,
+      called_number: mobile ?? data.number.replace(/\D/g, ""), started_at: new Date().toISOString(),
+    };
+    if (mobile) {
+      try { const m = await dbLookup(mobile); Object.assign(row, { customer_id: m.customerId, lead_id: m.leadId, application_id: m.applicationId }); } catch { /* best effort */ }
+    }
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: saved, error } = await (supabaseAdmin as any).from("telephony_calls").insert(row).select("id").single();
+    if (error) throw new Error("Could not record this call. Please retry.");
+    return { callRowId: saved.id as string };
+  });
+
+/** Marks the caller's own browser call finished. Webhook reports may still enrich it later. */
+export const endWebRtcCall = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({ callRowId: z.string().uuid(), answeredAt: z.number().int().positive().nullable() }).parse(d))
+  .handler(async ({ context, data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const now = new Date();
+    const patch: Record<string, unknown> = { status: data.answeredAt ? "ended" : "missed", last_event: "browser_ended", ended_at: now.toISOString(), updated_at: now.toISOString() };
+    if (data.answeredAt) {
+      patch.answered_at = new Date(data.answeredAt).toISOString();
+      patch.duration_seconds = Math.max(0, Math.round((now.getTime() - data.answeredAt) / 1000));
+    }
+    await (supabaseAdmin as any).from("telephony_calls").update(patch)
+      .eq("id", data.callRowId).eq("employee_id", context.userId).in("status", ["ringing", "answered"]);
+    return { ok: true };
   });
