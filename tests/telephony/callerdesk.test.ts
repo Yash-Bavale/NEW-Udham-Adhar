@@ -76,3 +76,53 @@ describe("CallerDesk webhook parsing", () => {
     expect(verifyCallerDesk(new Request("https://x/e?token=right-token"))).toBe(true);
   });
 });
+
+describe("CallerDesk webhook auth diagnostics", () => {
+  afterEach(() => { vi.unstubAllEnvs(); vi.restoreAllMocks(); });
+  const logs = () => {
+    const spy = vi.spyOn(console, "log").mockImplementation(() => {});
+    return () => spy.mock.calls.map((c) => String(c[0]));
+  };
+  it("missing token: rejected, logs no-token from none", () => {
+    vi.stubEnv("CALLERDESK_WEBHOOK_TOKEN", "right-token");
+    const get = logs();
+    expect(verifyCallerDesk(new Request("https://x/e?SourceNumber=9876543210"))).toBe(false);
+    const e = JSON.parse(get()[0]);
+    expect(e).toEqual({ event: "callerdesk_auth_failure", token_supplied: false, received_length: 0, expected_length: 11, source: "none" });
+  });
+  it("incorrect token: rejected, logs lengths only, never value/URL/phone", () => {
+    vi.stubEnv("CALLERDESK_WEBHOOK_TOKEN", "right-token");
+    const get = logs();
+    expect(verifyCallerDesk(new Request("https://x/e?token=wrong&SourceNumber=9876543210"))).toBe(false);
+    const line = get()[0];
+    expect(JSON.parse(line)).toMatchObject({ token_supplied: true, received_length: 5, expected_length: 11, source: "query" });
+    expect(line).not.toContain("wrong");
+    expect(line).not.toContain("right-token");
+    expect(line).not.toContain("9876543210");
+    expect(line).not.toContain("https://");
+  });
+  it("header token is reported as header", () => {
+    vi.stubEnv("CALLERDESK_WEBHOOK_TOKEN", "right-token");
+    const get = logs();
+    expect(verifyCallerDesk(new Request("https://x/e", { headers: { "x-callerdesk-token": "bad" } }))).toBe(false);
+    expect(JSON.parse(get()[0]).source).toBe("header");
+  });
+  it("whitespace-padded token is rejected (no trimming)", () => {
+    vi.stubEnv("CALLERDESK_WEBHOOK_TOKEN", "right-token");
+    const get = logs();
+    expect(verifyCallerDesk(new Request("https://x/e?token=%20right-token%20"))).toBe(false);
+    expect(JSON.parse(get()[0]).received_length).toBe(13);
+  });
+  it("valid token: accepted with no failure log", () => {
+    vi.stubEnv("CALLERDESK_WEBHOOK_TOKEN", "right-token");
+    const get = logs();
+    expect(verifyCallerDesk(new Request("https://x/e?token=right-token"))).toBe(true);
+    expect(get()).toEqual([]);
+  });
+  it("unconfigured secret: rejected with null expected length", () => {
+    vi.stubEnv("CALLERDESK_WEBHOOK_TOKEN", "");
+    const get = logs();
+    expect(verifyCallerDesk(new Request("https://x/e?token=abc"))).toBe(false);
+    expect(JSON.parse(get()[0]).expected_length).toBeNull();
+  });
+});

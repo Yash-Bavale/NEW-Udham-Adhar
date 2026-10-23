@@ -8,11 +8,24 @@ const BASE = "https://app.callerdesk.io/api";
 
 export function verifyCallerDesk(request: Request): boolean {
   const secret = process.env["CALLERDESK_WEBHOOK_TOKEN"];
-  if (!secret) return false;
-  const given = new URL(request.url).searchParams.get("token") || request.headers.get("x-callerdesk-token") || "";
+  const queryToken = new URL(request.url).searchParams.get("token");
+  const headerToken = request.headers.get("x-callerdesk-token");
+  const source = queryToken ? "query" : headerToken ? "header" : "none";
+  const given = queryToken || headerToken || "";
   const a = Buffer.from(given);
-  const b = Buffer.from(secret);
-  return a.length === b.length && timingSafeEqual(a, b);
+  const b = Buffer.from(secret ?? "");
+  const ok = !!secret && a.length === b.length && timingSafeEqual(a, b);
+  if (!ok) {
+    // Lengths and source only — never the token, URL, or caller details.
+    console.log(JSON.stringify({
+      event: "callerdesk_auth_failure",
+      token_supplied: given.length > 0,
+      received_length: a.length,
+      expected_length: secret ? b.length : null,
+      source,
+    }));
+  }
+  return ok;
 }
 
 export type CallerDeskMember = { memberId: string; mobile10: string };
