@@ -1,13 +1,54 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
+import { Link } from "@tanstack/react-router";
 import { Headset, Mic, MicOff, Phone, PhoneOff, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { endWebRtcCall, getWebRtcSession, getWebRtcStatus, initiateWebRtcCall } from "@/lib/telephony/callerdesk-webrtc.functions";
+import { endWebRtcCall, getWebRtcSession, getWebRtcStatus, initiateWebRtcCall, lookupIncomingCaller, recordInboundWebRtcCall } from "@/lib/telephony/callerdesk-webrtc.functions";
 import type { CallerDeskWebRtcEngine, EngineSnapshot } from "@/lib/telephony/callerdesk-webrtc.engine";
 import { fmtDuration } from "./TelephonyPanel";
 import { logWebRtcEvent } from "@/lib/telephony/webrtc-diag.functions";
 import { WebRtcDiagnostics } from "./WebRtcDiagnostics";
+
+type CallerLookup = Awaited<ReturnType<typeof lookupIncomingCaller>>;
+
+function CallerCard({ loading, error, data, selected, onSelect }: { loading: boolean; error: boolean; data: CallerLookup | null; selected: string | null; onSelect: (id: string) => void }) {
+  if (loading) return <p className="animate-pulse rounded-md border px-2 py-1.5 text-xs text-muted-foreground">Looking up caller…</p>;
+  if (error) return <p className="rounded-md border px-2 py-1.5 text-xs text-muted-foreground">Caller lookup failed — the call is unaffected.</p>;
+  if (!data) return null;
+  if (data.kind === "invalid" || data.kind === "unknown") return <p className="rounded-md border px-2 py-1.5 text-xs">Unknown caller{data.number ? ` · ${data.number}` : ""}</p>;
+  const order = data.orders.find((o) => o.id === selected) ?? null;
+  const active = data.orders.filter((o) => o.active), closed = data.orders.filter((o) => !o.active);
+  const pill = (o: CallerLookup["orders"][number]) => (
+    <button key={o.id} onClick={() => onSelect(o.id)} className={`rounded-full border px-2 py-0.5 font-mono text-[11px] ${o.id === selected ? "border-primary bg-primary text-primary-foreground" : o.active ? "" : "text-muted-foreground"}`}>{o.code ?? "Order"}</button>
+  );
+  return (
+    <div className="space-y-1.5 rounded-md border p-2 text-xs">
+      <div className="flex justify-between"><span className="font-semibold">{data.customerName ?? "Customer"}</span><span className="font-mono">{data.number}</span></div>
+      {data.orders.length > 1 ? (
+        <div className="space-y-1">
+          {active.length ? <div className="flex flex-wrap gap-1">{active.map(pill)}</div> : null}
+          {closed.length ? <div className="flex flex-wrap items-center gap-1"><span className="text-[10px] text-muted-foreground">Closed:</span>{closed.map(pill)}</div> : null}
+          {!order ? <p className="text-[11px] text-muted-foreground">{data.orders.length} orders found — pick the one this call is about.</p> : null}
+        </div>
+      ) : null}
+      {order ? (
+        <div className="space-y-0.5">
+          <div><span className="font-mono">{order.code}</span>{!order.active ? <span className="ml-1 text-muted-foreground">(closed)</span> : null}</div>
+          <div>{order.service ?? "—"} · {order.status.replace(/_/g, " ").toLowerCase()}</div>
+          <div className="text-muted-foreground">Assigned: {order.assignee ?? "Unassigned"}</div>
+          <Link to="/admin/orders/$orderId" params={{ orderId: order.id }} target="_blank" className="text-primary underline">Open order</Link>
+        </div>
+      ) : !data.orders.length && data.lead ? (
+        <div className="space-y-0.5">
+          <div>Lead <span className="font-mono">{data.lead.code ?? ""}</span> · {data.lead.name}</div>
+          <div>{data.lead.service ?? "—"} · {data.lead.status.replace(/_/g, " ")}</div>
+          <div className="text-muted-foreground">Assigned: {data.lead.assignee ?? "Unassigned"}</div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
 const LABEL: Record<string, string> = {
   DISCONNECTED: "Disconnected", CHECKING_CONFIGURATION: "Checking setup…", SETUP_INCOMPLETE: "Setup incomplete",
@@ -23,6 +64,8 @@ export function WebRtcPhone() {
   const logEvent = useServerFn(logWebRtcEvent);
   const startCall = useServerFn(initiateWebRtcCall);
   const finishCall = useServerFn(endWebRtcCall);
+  const lookup = useServerFn(lookupIncomingCaller);
+  const recordInbound = useServerFn(recordInboundWebRtcCall);
   const callRow = useRef<{ id: string; answeredAt: number | null } | null>(null);
   const [diag, setDiag] = useState(false);
   const { data: status } = useQuery({ queryKey: ["webrtc-status"], queryFn: () => fetchStatus(), staleTime: 300_000 });
@@ -44,6 +87,31 @@ export function WebRtcPhone() {
       void finishCall({ data: { callRowId: c.id, answeredAt: c.answeredAt } }).catch(() => {});
     }
   }, [snap?.state, snap?.connectedAt]);
+
+  // Incoming caller identification + inbound call record. Runs in the background: never delays ringing or Answer/Reject.
+  const inboundKey = useRef<string | null>(null);
+  const [caller, setCaller] = useState<{ loading: boolean; error: boolean; data: CallerLookup | null }>({ loading: false, error: false, data: null });
+  const [selectedOrder, setSelectedOrder] = useState<string | null>(null);
+  useEffect(() => {
+    if (snap?.state !== "RINGING" || snap.direction !== "inbound" || inboundKey.current) return;
+    const key = crypto.randomUUID(); inboundKey.current = key;
+    const number = snap.remoteNumber ?? "";
+    setSelectedOrder(null); setCaller({ loading: true, error: false, data: null });
+    lookup({ data: { number } })
+      .then((d) => { if (inboundKey.current !== key) return; setCaller({ loading: false, error: false, data: d }); if (d.orders.length === 1) setSelectedOrder(d.orders[0].id); })
+      .catch(() => { if (inboundKey.current === key) setCaller({ loading: false, error: true, data: null }); });
+    recordInbound({ data: { key, number, applicationId: null } })
+      .then((r) => { if (inboundKey.current === key && !callRow.current) callRow.current = { id: r.callRowId, answeredAt: null }; })
+      .catch(() => { /* the call still works; the provider report creates the record */ });
+  }, [snap?.state, snap?.direction, snap?.remoteNumber]);
+  useEffect(() => {
+    if (snap?.state === "ENDED" || snap?.state === "FAILED" || snap?.state === "DISCONNECTED" || snap?.state === "REGISTERED") inboundKey.current = null;
+  }, [snap?.state]);
+  function selectOrder(id: string) {
+    setSelectedOrder(id);
+    const key = inboundKey.current;
+    if (key) void recordInbound({ data: { key, number: snap?.remoteNumber ?? "", applicationId: id } }).catch(() => {});
+  }
 
   async function dial() {
     const digits = num.replace(/\D/g, "");
