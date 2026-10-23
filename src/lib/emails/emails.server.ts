@@ -501,6 +501,9 @@ export async function enqueueEmailInternal(input: {
     // Unique index caught a simultaneous duplicate enqueue — treat as skipped.
     if ((error as { code?: string }).code === "23505") {
       console.warn(`[emails] duplicate suppressed (db): ${templateCode} -> ${row.to_email}`);
+      if (input.requireImmediateSuccess) {
+        throw new Error("Email was blocked as a duplicate — it was NOT sent to the customer.");
+      }
       return { queueId: null, scheduled: false, sent: false, skipped: true } as const;
     }
     throw new Error(error.message);

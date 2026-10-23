@@ -138,7 +138,7 @@ export function computeOrderStage(
   // S09/S10 near-terminals
   if (fs === "application_approved") return "certificate_ready";
   if (fs === "application_rejected" || fs === "certificate_rejected") return "submitted_to_govt";
-  if (application.certificate_uploaded_at) return "certificate_ready";
+  if (fs === "certificate_ready" || fs === "certificate_uploaded") return "certificate_ready";
 
   // S07 Government Processing (and legacy govt-side stages)
   if (fs === "government_processing" || fs === "application_submitted" || fs === "under_processing" || fs === "awaiting_govt") return "submitted_to_govt";
