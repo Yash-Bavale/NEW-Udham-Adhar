@@ -127,3 +127,15 @@ export function reportEnrichment(existing: Record<string, any>, i: Record<string
   const st = pick(i, "Status"); if (st && !existing.hangup_cause) out.hangup_cause = st;
   return out;
 }
+
+/** How long after a browser dial a provider report may still be matched to it. */
+export const WEBRTC_MATCH_WINDOW_MS = 15 * 60_000;
+
+/**
+ * Picks the pre-recorded browser call a provider event belongs to. Only an unambiguous single
+ * candidate is adopted; with 0 or 2+ candidates the webhook keeps its normal behaviour.
+ */
+export function pickWebRtcCandidate<T extends { call_id?: string | null; provider_uuid?: string | null }>(rows: T[]): T | null {
+  const c = rows.filter((r) => String(r.call_id ?? "").startsWith("webrtc:") && !r.provider_uuid);
+  return c.length === 1 ? c[0] : null;
+}
