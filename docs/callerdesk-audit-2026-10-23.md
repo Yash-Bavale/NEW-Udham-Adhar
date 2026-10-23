@@ -77,3 +77,12 @@ Use the authorized Help account, connected FortiClient VPN and a headset; refres
 ## Still not complete
 
 No live activation, two-way audio confirmation, inbound routing execution, provider synchronization, IVR event ingestion or concurrent webhook transaction guarantee. No second phone system or infrastructure introduced.
+
+## Actual verification results
+
+- `bunx vitest run tests/telephony`: 4 files, **55 tests passed**.
+- `bunx vitest run`: 15 files, **190 tests passed**. Existing diagnostic tests printed customer data into the sandbox log; that data is not included in this report or chat.
+- Latest harness build entry: **build OK** (23 October 05:02:33 UTC). Separate TypeScript checks were not manually run; the harness controls app compilation.
+- Authenticated browser at `/admin/live-calls`: IVR fields rendered; **Check API returned “CallerDesk reports that this API account is inactive.”** This corroborates the sandbox request in the running preview environment, but still does not verify published credentials.
+- Saved the initial **disabled, empty draft only**, then reloaded it through the UI. Database readback: revision 1, `sync_status=not_applied`. No live routing changed. Screenshot visually confirmed fields and states; **zero browser page errors**.
+- Remaining production activation and VPN/two-way audio checks require the provider and an approved real workstation call; these were not attempted.

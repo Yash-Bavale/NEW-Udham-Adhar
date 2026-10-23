@@ -1,6 +1,7 @@
 # Roadmap
 
-- [ ] Audit existing CallerDesk API, IVR, browser media, webhooks and deployment; implement safe confirmed gaps
+- [x] Audit existing CallerDesk API, IVR, browser media, webhooks and deployment; implement safe confirmed gaps (190 tests pass; authorised draft save/read verified)
+- [ ] Apply IVR settings to CallerDesk — blocked: verified provider configuration API and approved real routing settings required
 - [ ] Verify real IVR routing and two-way browser audio — blocked until provider settings and authorised VPN workstation tests
 
 - [x] Match Complete Service reference colors, sizing, upload and send states; verify on the order screen (live delivery intentionally not exercised)
