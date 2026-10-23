@@ -33,7 +33,7 @@ describe("call history", () => {
   beforeEach(() => { state.roles = { admin: false, super_admin: false }; state.calls = []; state.rows = []; state.count = 0; });
 
   it("rejects non-admin staff", async () => {
-    await expect(mod.queryCallHistory(sb, adminDb, "u1", mod.callHistoryInput.parse(base)).rejects.toThrow("Unauthorized");
+    await expect(mod.queryCallHistory(sb, adminDb, "u1", mod.callHistoryInput.parse(base))).rejects.toThrow("Unauthorized");
   });
   it("uses IST day boundaries", () => {
     expect(mod.istDayRange("2026-10-23", "2026-10-23")).toEqual({ fromIso: "2026-10-22T18:30:00.000Z", toIso: "2026-10-23T18:30:00.000Z" });
