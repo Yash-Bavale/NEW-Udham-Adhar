@@ -1,3 +1,4 @@
+import { isVisibleService } from "@/lib/crm/visible-services";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -179,7 +180,7 @@ function LeadsPage() {
 
   const groupedServices = useMemo(() => {
     const raw = (servicesData?.rows ?? []) as any[];
-    const activeOnly = raw.filter((s) => s.is_active !== false && s.website?.domain !== "gstcertificate.in");
+    const activeOnly = raw.filter((s) => isVisibleService(s));
     const map = new Map<string, { websiteName: string; domain: string; services: any[] }>();
 
     for (const s of activeOnly) {
@@ -593,7 +594,7 @@ function LeadsPage() {
           >
             <option value="">All active services</option>
             {groupedServices.map((g) => (
-              <optgroup key={g.id} label={`🌐 ${g.websiteName}${g.domain ? ` (${g.domain})` : ''}`}>
+              <optgroup key={g.id} label="Udyam Aadhar Services">
                 {g.services.map((s: any) => (
                   <option key={s.id} value={s.service_name}>
                     {s.service_name}
@@ -1003,7 +1004,7 @@ function AddLeadDialog({
   // Filter services by selected website; show all if no website selected
   const filteredServices = useMemo(() => {
     const rows = ((servicesData?.rows ?? []) as any[]).filter(
-      (s: any) => s.is_active !== false && s.website?.domain !== "gstcertificate.in"
+      (s: any) => isVisibleService(s)
     );
     if (!form.website_id) return rows;
     return rows.filter((s: any) => s.website_id === form.website_id);
@@ -1170,7 +1171,7 @@ function AddLeadDialog({
             >
               <option value="">All websites…</option>
               {websites.map((w: any) => (
-                <option key={w.id} value={w.id}>{w.name} — {w.domain}</option>
+                <option key={w.id} value={w.id}>{w.name}</option>
               ))}
             </select>
           </Row>
