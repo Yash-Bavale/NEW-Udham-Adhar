@@ -2084,7 +2084,7 @@ export const getOrderDetailV2 = createServerFn({ method: "POST" })
     if (error || !app) throw new Error("Order not found");
 
     // Core Data: Load essential display & workflow data concurrently in parallel
-    const [leadRes, custRes, svcRes, paysRes, docsRes, statusEventsRes, staffRes, refundRes, schedRes, appEvRes] = await Promise.all([
+    const [leadRes, custRes, svcRes, paysRes, docsRes, statusEventsRes, staffRes, refundRes, schedRes, appEvRes, userRolesRes] = await Promise.all([
       app.lead_id
         ? admin.from("leads").select("id, lead_code, name, email, mobile, total_amount, base_amount, gst_amount, lead_status_v2, status, lead_source, service, language, state").eq("id", app.lead_id).maybeSingle()
         : Promise.resolve({ data: null }),
@@ -2140,6 +2140,10 @@ export const getOrderDetailV2 = createServerFn({ method: "POST" })
         .in("event_type", ["hot_priority_escalated", "order_reopened", "status_change"])
         .order("created_at", { ascending: false })
         .limit(10),
+      admin
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", context.userId),
     ]);
 
     const refundReq = (refundRes as any)?.data;
@@ -2280,6 +2284,9 @@ export const getOrderDetailV2 = createServerFn({ method: "POST" })
         }
       : null;
 
+    const userRoleList = ((userRolesRes as any)?.data ?? []).map((r: any) => r.role);
+    const isSuperAdmin = userRoleList.includes("super_admin") || userRoleList.includes("admin");
+
     return {
       application: app,
       lead,
@@ -2294,6 +2301,7 @@ export const getOrderDetailV2 = createServerFn({ method: "POST" })
       workflowStages,
       stageMeta,
       ticketEscalation,
+      isSuperAdmin,
       // Backward compatibility fields initialized empty, populated on-demand
       events: [],
       emailLogs: [],
