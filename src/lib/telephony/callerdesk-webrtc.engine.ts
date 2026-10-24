@@ -51,6 +51,23 @@ export function callerFromInvite(inv: any): string | null {
     ?? digits(inv?.remoteIdentity?.uri?.user) ?? digits(inv?.remoteIdentity?.displayName) ?? null;
 }
 
+/**
+ * TEMPORARY inbound diagnostics: sanitized one-line summary of a raw SIP frame.
+ * Only method / status code / CSeq method are kept — no URIs, numbers, tags, SDP or auth headers.
+ */
+export function summarizeSipFrame(raw: string): { kind: "request" | "response"; method: string; code: number | null; cseq: string | null } | null {
+  if (typeof raw !== "string") return null;
+  const first = raw.split(/\r?\n/, 1)[0]?.trim() ?? "";
+  if (!first) return null;
+  const cseq = raw.match(/^CSeq:\s*\d+\s+([A-Z]+)/im)?.[1] ?? null;
+  const resp = first.match(/^SIP\/2\.0\s+(\d{3})/);
+  if (resp) return { kind: "response", method: cseq ?? "?", code: Number(resp[1]), cseq };
+  const req = first.match(/^([A-Z]+)\s+\S+\s+SIP\/2\.0$/);
+  if (req) return { kind: "request", method: req[1], code: null, cseq };
+  return null;
+}
+
+
 export class CallerDeskWebRtcEngine {
   private snap: EngineSnapshot = { state: "DISCONNECTED", error: null, remoteNumber: null, muted: false, connectedAt: null, direction: null, held: false, ringMuted: false, ringingSince: null };
   private listeners = new Set<Listener>();
@@ -118,6 +135,7 @@ export class CallerDeskWebRtcEngine {
         },
       });
       await this.ua.start().catch(() => { throw new Error("Cannot reach CallerDesk phone server. Connect FortiClient VPN and retry."); });
+      this.tapTransport();
       this.registerer = new Registerer(this.ua);
       this.registerer.stateChange.addListener((s: any) => {
         if (s === RegistererState.Registered) { this.emit("registered", { error: null }); this.log({ event: "REGISTER_SUCCESS" }); }
@@ -132,6 +150,32 @@ export class CallerDeskWebRtcEngine {
       this.emit("register_failed", { error: m });
     }
     } finally { this.starting = false; }
+  }
+
+  /** TEMPORARY inbound diagnostics: logs SIP frames as method + status only (OPTIONS keep-alives sampled). */
+  private optionsSeen = 0;
+  private tapTransport() {
+    const t: any = this.ua?.transport;
+    if (!t || t.__bhsTapped) return;
+    t.__bhsTapped = true;
+    const describe = (f: NonNullable<ReturnType<typeof summarizeSipFrame>>) => f.kind === "request" ? `request ${f.method}` : `response ${f.code} to ${f.method}`;
+    const origOnMessage = t.onMessage;
+    t.onMessage = (raw: string) => {
+      try {
+        const f = summarizeSipFrame(raw);
+        if (f) {
+          if (f.method === "OPTIONS" && f.kind === "request") { this.optionsSeen++; if (this.optionsSeen % 20 === 1) this.log({ event: "SIP_IN", detail: `OPTIONS keep-alive (seen ${this.optionsSeen})` }); }
+          else this.log({ event: "SIP_IN", sipCode: f.code, detail: describe(f) });
+        }
+      } catch { /* diagnostics must never break signalling */ }
+      return origOnMessage?.call(t, raw);
+    };
+    const origSend = t.send.bind(t);
+    t.send = (raw: string) => {
+      try { const f = summarizeSipFrame(raw); if (f && f.method !== "OPTIONS") this.log({ event: "SIP_OUT", sipCode: f.code, detail: describe(f) }); } catch { /* ignore */ }
+      return origSend(raw);
+    };
+    this.log({ event: "SIP_TAP_ACTIVE" });
   }
 
   private retries = 0;
