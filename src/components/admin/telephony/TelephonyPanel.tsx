@@ -2,11 +2,12 @@ import { useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Phone, PhoneOff, PhoneIncoming, User, FileText, X } from "lucide-react";
+import { PhoneIncoming, User, FileText, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { getMyCallState, saveCallDisposition, DISPOSITIONS, type CallView } from "@/lib/telephony/calls.functions";
 import { toast } from "sonner";
+import { OUTCOMES_NEEDING_FOLLOW_UP } from "@/lib/telephony/wrapup";
 
 export function fmtDuration(sec: number) {
   const s = Math.max(0, Math.floor(sec));
@@ -25,7 +26,7 @@ export function useCallTimer(call: Pick<CallView, "answeredAt" | "startedAt" | "
   return (now - new Date(call.answeredAt ?? call.startedAt).getTime()) / 1000;
 }
 
-const NOT_SUPPORTED = "Answer, reject and hang-up happen on your CallerDesk phone — browser call control is not connected yet.";
+const NOT_SUPPORTED = "This call is on your CallerDesk phone. Answer, reject and hang up there; browser calls are controlled from the Browser phone.";
 
 /** Persistent employee call panel: incoming popup, active call, after-call disposition, availability. */
 export function TelephonyPanel() {
@@ -36,6 +37,8 @@ export function TelephonyPanel() {
   const [open, setOpen] = useState(true);
   const [disp, setDisp] = useState<string>("");
   const [notes, setNotes] = useState("");
+  const [nextAction, setNextAction] = useState("");
+  const [followUp, setFollowUp] = useState("");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => { void supabase.auth.getUser().then(({ data }) => setUid(data.user?.id ?? null)); }, []);
@@ -60,11 +63,11 @@ export function TelephonyPanel() {
     if (!pending || !disp) return;
     setSaving(true);
     try {
-      await save({ data: { id: pending.id, disposition: disp as any, notes } });
-      setDisp(""); setNotes("");
-      toast.success("Call outcome saved");
+      const r = await save({ data: { id: pending.id, disposition: disp as any, notes, nextAction: nextAction || undefined, followUpAt: followUp ? new Date(followUp).toISOString() : null } });
+      setDisp(""); setNotes(""); setNextAction(""); setFollowUp("");
+      toast.success(r.followUpCreated ? "Call outcome saved and follow-up scheduled" : "Call outcome saved");
       qc.invalidateQueries({ queryKey: ["my-call-state"] });
-    } catch (e: any) { toast.error(e?.message ?? "Could not save"); } finally { setSaving(false); }
+    } catch (e: any) { toast.error((e?.message ?? "Could not save") + " — your notes are kept, press Save again."); } finally { setSaving(false); }
   }
 
   if (!active && (!pending || !open)) {
@@ -97,8 +100,6 @@ export function TelephonyPanel() {
             <dt className="text-muted-foreground">Status</dt><dd className="capitalize">{active.status}</dd>
           </dl>
           <div className="grid grid-cols-2 gap-2">
-            <Button size="sm" disabled title={NOT_SUPPORTED}><Phone className="h-4 w-4" />Answer</Button>
-            <Button size="sm" variant="destructive" disabled title={NOT_SUPPORTED}><PhoneOff className="h-4 w-4" />{active.status === "ringing" ? "Reject" : "End Call"}</Button>
             {active.customerId ? (
               <Button size="sm" variant="outline" asChild><Link to="/admin/customers/$customerId" params={{ customerId: active.customerId }}><User className="h-4 w-4" />Open Customer</Link></Button>
             ) : <Button size="sm" variant="outline" disabled><User className="h-4 w-4" />Open Customer</Button>}
@@ -121,7 +122,10 @@ export function TelephonyPanel() {
             ))}
           </div>
           <textarea className="w-full rounded-md border bg-background p-2 text-sm" rows={2} placeholder="Notes (optional)" value={notes} onChange={(e) => setNotes(e.target.value)} />
-          <Button className="w-full" size="sm" disabled={!disp || saving} onClick={submit}>{saving ? "Saving…" : "Save outcome"}</Button>
+          <input className="w-full rounded-md border bg-background px-2 py-1.5 text-sm" placeholder="Next action (optional)" maxLength={300} value={nextAction} onChange={(e) => setNextAction(e.target.value)} />
+          <label className="block text-xs">Follow-up {OUTCOMES_NEEDING_FOLLOW_UP.has(disp) ? "(required)" : "(optional)"}
+            <input type="datetime-local" className="mt-1 w-full rounded-md border bg-background px-2 py-1.5 text-sm" value={followUp} onChange={(e) => setFollowUp(e.target.value)} /></label>
+          <Button className="w-full" size="sm" disabled={!disp || saving || (OUTCOMES_NEEDING_FOLLOW_UP.has(disp) && !followUp)} onClick={submit}>{saving ? "Saving…" : "Save outcome"}</Button>
         </div>
       ) : null}
     </div>

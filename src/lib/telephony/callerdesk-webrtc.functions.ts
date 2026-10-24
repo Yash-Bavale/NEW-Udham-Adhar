@@ -29,19 +29,32 @@ export const getWebRtcSession = createServerFn({ method: "POST" })
 /** Creates the pending call row before dialing, so the dialing employee owns the call record. */
 export const initiateWebRtcCall = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: unknown) => z.object({ number: z.string().regex(/^\+?\d{10,13}$/) }).parse(d))
+  .inputValidator((d: unknown) => z.object({
+    number: z.string().regex(/^\+?\d{8,15}$/),
+    customerId: z.string().uuid().nullable().optional(),
+    leadId: z.string().uuid().nullable().optional(),
+    applicationId: z.string().uuid().nullable().optional(),
+  }).parse(d))
   .handler(async ({ context, data }) => {
     const { accessFor, loadAccount } = await import("./callerdesk-webrtc.server");
     if (!accessFor(context.userId, await loadAccount(context.userId)).canRegister) throw new Error("Browser calling is not available for your account.");
-    const { normalizeIndianMobile, dbLookup } = await import("./phone.server");
+    const { normalizeIndianMobile, lookupCaller } = await import("./phone.server");
     const mobile = normalizeIndianMobile(data.number);
     const row: Record<string, unknown> = {
       provider: "callerdesk", direction: "outbound", status: "ringing", last_event: "browser_dial",
       call_id: `webrtc:${crypto.randomUUID()}`, employee_id: context.userId,
       called_number: mobile ?? data.number.replace(/\D/g, ""), started_at: new Date().toISOString(),
     };
-    if (mobile) {
-      try { const m = await dbLookup(mobile); Object.assign(row, { customer_id: m.customerId, lead_id: m.leadId, application_id: m.applicationId }); } catch { /* best effort */ }
+    if (data.customerId || data.leadId || data.applicationId) {
+      // Started from a CRM record: link exactly that record.
+      Object.assign(row, { customer_id: data.customerId ?? null, lead_id: data.leadId ?? null, application_id: data.applicationId ?? null });
+    } else if (mobile) {
+      // Dialled by hand: link only when the number matches a single order/lead, never an arbitrary one.
+      try {
+        const m = await lookupCaller(mobile);
+        if (m.orders.length === 1) row.application_id = m.orders[0].id;
+        else if (!m.orders.length && m.lead) row.lead_id = m.lead.id;
+      } catch { /* best effort */ }
     }
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: saved, error } = await (supabaseAdmin as any).from("telephony_calls").insert(row).select("id").single();
