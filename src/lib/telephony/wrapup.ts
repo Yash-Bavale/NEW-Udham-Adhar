@@ -29,12 +29,13 @@ export type WrapUpInput = z.infer<typeof wrapUpInput>;
 export function cleanDialInput(raw: string): string {
   const t = raw.trim();
   const plus = t.startsWith("+");
-  const digits = t.replace(/\D/g, "");
-  return (plus ? "+" : "") + digits.slice(0, 15);
+  const body = t.replace(/[^\d*#]/g, "");
+  return (plus ? "+" : "") + body.slice(0, 15);
 }
 
 /** Digits sent to CallerDesk: +91XXXXXXXXXX / 91XXXXXXXXXX / 0XXXXXXXXXX → 10-digit Indian mobile; other international kept as digits. */
 export function dialTarget(raw: string): string | null {
+  if (/[*#]/.test(raw)) return null;
   const d = raw.replace(/\D/g, "");
   if (/^[6-9]\d{9}$/.test(d)) return d;
   if (/^0[6-9]\d{9}$/.test(d)) return d.slice(1);
