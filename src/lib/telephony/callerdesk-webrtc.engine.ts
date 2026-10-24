@@ -87,6 +87,9 @@ export class CallerDeskWebRtcEngine {
       if (!uri) throw new Error("Invalid SIP extension or domain.");
       this.ua = new UserAgent({
         uri, displayName: cfg.displayName, authorizationUsername: cfg.extension, authorizationPassword: cfg.password,
+        // Register the Contact under the extension (SIP.js otherwise uses a random user part), and
+        // deliver INVITEs to onInvite immediately; we send 180 Ringing ourselves.
+        contactName: cfg.extension, sendInitialProvisionalResponse: false,
         transportOptions: { server: cfg.wssUrl, connectionTimeout: 8 }, logLevel: "error",
         delegate: {
           onInvite: (inv: any) => this.onInvite(inv),
@@ -313,12 +316,21 @@ export class CallerDeskWebRtcEngine {
   }
 
   private onInvite(inv: any) {
-    if (this.session) { this.log({ event: "INBOUND_BUSY", sipCode: 486 }); void inv.reject({ statusCode: 486 }); return; }
-    const from = inv.remoteIdentity?.uri?.user ?? null;
+    this.log({ event: "INBOUND_INVITE_RECEIVED" });
+    if (this.session) {
+      if (this.session === inv) return; // duplicate delivery of the same INVITE
+      this.log({ event: "INBOUND_BUSY", sipCode: 486 }); void inv.reject({ statusCode: 486 }).catch(() => {}); return;
+    }
+    const from = callerFromInvite(inv);
+    this.log({ event: "INBOUND_CALLER", detail: from ? "number extracted" : "no number" });
     this.wire(inv);
+    inv.delegate = { ...(inv.delegate ?? {}), onCancel: () => this.log({ event: "INBOUND_CANCELLED" }) };
     this.emit("incoming", { remoteNumber: from, direction: "inbound", error: null, connectedAt: null, ringingSince: Date.now() });
+    if (this.snap.state !== "RINGING") { this.log({ event: "INBOUND_STATE_MISMATCH", detail: this.snap.state }); return; }
     this.startRing();
     this.log({ event: "INBOUND_RINGING" });
+    Promise.resolve().then(() => inv.progress?.()).then(() => this.log({ event: "INBOUND_PROGRESS_SENT" }))
+      .catch((e: any) => this.log({ event: "INBOUND_PROGRESS_FAILED", reason: String(e?.message ?? e) }));
   }
 
   async dial(number: string) {
@@ -346,12 +358,16 @@ export class CallerDeskWebRtcEngine {
   }
 
   async answer() {
-    if (this.snap.state !== "RINGING" || !this.session) return;
-    this.stopRing();
-    if (!(await this.mic())) return;
-    try { this.log({ event: "INBOUND_ANSWER" }); await this.session.accept({ sessionDescriptionHandlerOptions: { constraints: { audio: true, video: false } } }); }
-    catch { this.snap = { ...this.snap, error: "Could not answer the call. Retry or reject the incoming call." }; this.listeners.forEach((l) => l(this.snap)); this.log({ event: "ANSWER_FAILED" }); }
+    if (this.snap.state !== "RINGING" || !this.session || this.answering) return;
+    this.answering = true; this.stopRing();
+    try { this.log({ event: "INBOUND_ANSWER" }); await this.session.accept({ sessionDescriptionHandlerOptions: { constraints: { audio: true, video: false } } }); this.log({ event: "INBOUND_ACCEPTED" }); }
+    catch (e: any) {
+      const denied = e?.name === "NotAllowedError" || /permission/i.test(String(e?.message));
+      this.snap = { ...this.snap, error: denied ? "Microphone permission denied. Allow microphone access in the browser." : "Could not answer the call. Retry or reject the incoming call." };
+      this.listeners.forEach((l) => l(this.snap)); this.log({ event: "ANSWER_FAILED", reason: e?.name ?? null });
+    } finally { this.answering = false; }
   }
+  private answering = false;
   async reject() {
     if (this.snap.state !== "RINGING" || !this.session) return;
     this.stopRing(); this.log({ event: "INBOUND_REJECT" });
