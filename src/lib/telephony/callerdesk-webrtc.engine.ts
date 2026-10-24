@@ -5,7 +5,7 @@
 import { canDial, nextState, registrationError, type PhoneEvent, type PhoneState } from "./callerdesk-webrtc.config";
 
 export type SessionConfig = { wssUrl: string; sipDomain: string; extension: string; password: string; displayName: string };
-export type EngineSnapshot = { state: PhoneState; error: string | null; remoteNumber: string | null; muted: boolean; connectedAt: number | null; direction: "inbound" | "outbound" | null };
+export type EngineSnapshot = { state: PhoneState; error: string | null; remoteNumber: string | null; muted: boolean; connectedAt: number | null; direction: "inbound" | "outbound" | null; held: boolean; ringMuted: boolean; ringingSince: number | null };
 type Listener = (s: EngineSnapshot) => void;
 export type DiagEvent = { event: string; state?: string; sipCode?: number | null; reason?: string | null; number?: string | null; detail?: string | null };
 
@@ -43,7 +43,7 @@ export function summarizeStats(reports: Iterable<any>): string {
 }
 
 export class CallerDeskWebRtcEngine {
-  private snap: EngineSnapshot = { state: "DISCONNECTED", error: null, remoteNumber: null, muted: false, connectedAt: null, direction: null };
+  private snap: EngineSnapshot = { state: "DISCONNECTED", error: null, remoteNumber: null, muted: false, connectedAt: null, direction: null, held: false, ringMuted: false, ringingSince: null };
   private listeners = new Set<Listener>();
   private ua: any = null;
   private registerer: any = null;
@@ -61,6 +61,8 @@ export class CallerDeskWebRtcEngine {
 
   private emit(e: PhoneEvent, patch: Partial<EngineSnapshot> = {}) {
     this.snap = { ...this.snap, ...patch, state: nextState(this.snap.state, e) };
+    if (this.snap.state !== "RINGING") { this.stopRing(); if (this.snap.ringingSince) this.snap = { ...this.snap, ringingSince: null }; }
+    if (this.snap.state !== "CONNECTED" && this.snap.held) this.snap = { ...this.snap, held: false };
     this.listeners.forEach((l) => l(this.snap));
   }
 
@@ -88,7 +90,13 @@ export class CallerDeskWebRtcEngine {
         transportOptions: { server: cfg.wssUrl, connectionTimeout: 8 }, logLevel: "error",
         delegate: {
           onInvite: (inv: any) => this.onInvite(inv),
-          onDisconnect: (e?: Error) => { this.log({ event: "TRANSPORT_LOST", reason: e?.message ?? null }); this.emit("transport_lost", { error: "Connection to CallerDesk lost. Check that FortiClient VPN is connected." }); },
+          onDisconnect: (e?: Error) => {
+            this.log({ event: "TRANSPORT_LOST", reason: e?.message ?? null });
+            const wasReady = this.snap.state === "REGISTERED";
+            this.emit("transport_lost", { error: "Connection to CallerDesk lost. Check that FortiClient VPN is connected." });
+            if (wasReady && e) this.scheduleReconnect();
+          },
+          onConnect: () => { this.retries = 0; },
         },
       });
       await this.ua.start().catch(() => { throw new Error("Cannot reach CallerDesk phone server. Connect FortiClient VPN and retry."); });
@@ -106,6 +114,75 @@ export class CallerDeskWebRtcEngine {
       this.emit("register_failed", { error: m });
     }
     } finally { this.starting = false; }
+  }
+
+  private retries = 0;
+  private retryTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Controlled reconnect: at most 3 attempts (5s, 15s, 45s), then the employee must press Connect. */
+  private scheduleReconnect() {
+    if (this.retryTimer || this.retries >= 3 || !this.ua) return;
+    const delay = 5000 * 3 ** this.retries; this.retries++;
+    this.log({ event: "RECONNECT_SCHEDULED", detail: `attempt ${this.retries} in ${delay / 1000}s` });
+    this.retryTimer = setTimeout(async () => {
+      this.retryTimer = null;
+      if (!this.ua || this.snap.state !== "RECONNECTING") return;
+      try { await this.ua.reconnect(); await this.registerer?.register(); }
+      catch { if (this.retries < 3) this.scheduleReconnect(); else this.emit("register_failed", { error: "Could not reconnect to CallerDesk. Check FortiClient VPN, then press Connect." }); }
+    }, delay);
+  }
+  /** Re-registers after the browser regains network, only if we were waiting to reconnect. */
+  onNetworkOnline() { if (this.snap.state === "RECONNECTING") { this.retries = 0; if (this.retryTimer) { clearTimeout(this.retryTimer); this.retryTimer = null; } this.scheduleReconnect(); } }
+
+  // Ringtone generated with Web Audio (no audio file). Stops whenever the phone leaves RINGING.
+  private ringCtx: AudioContext | null = null;
+  private ringTimer: ReturnType<typeof setInterval> | null = null;
+  private startRing() {
+    if (this.ringTimer || this.snap.ringMuted) return;
+    try {
+      const Ctx = (window as any).AudioContext ?? (window as any).webkitAudioContext; if (!Ctx) return;
+      this.ringCtx ??= new Ctx();
+      const ctx = this.ringCtx!; void ctx.resume?.();
+      const burst = () => {
+        const t = ctx.currentTime;
+        for (const off of [0, 0.4]) {
+          const o = ctx.createOscillator(), g = ctx.createGain();
+          o.frequency.value = 440; const o2 = ctx.createOscillator(); o2.frequency.value = 480;
+          g.gain.setValueAtTime(0.0001, t + off); g.gain.exponentialRampToValueAtTime(0.15, t + off + 0.02); g.gain.setValueAtTime(0.15, t + off + 0.35); g.gain.exponentialRampToValueAtTime(0.0001, t + off + 0.38);
+          o.connect(g); o2.connect(g); g.connect(ctx.destination);
+          o.start(t + off); o2.start(t + off); o.stop(t + off + 0.4); o2.stop(t + off + 0.4);
+        }
+      };
+      burst(); this.ringTimer = setInterval(burst, 3000);
+    } catch { /* ringtone is optional */ }
+  }
+  private stopRing() { if (this.ringTimer) { clearInterval(this.ringTimer); this.ringTimer = null; } }
+  setRingMuted(m: boolean) { this.snap = { ...this.snap, ringMuted: m }; if (m) this.stopRing(); else if (this.snap.state === "RINGING") this.startRing(); this.listeners.forEach((l) => l(this.snap)); }
+
+  /** Hold/resume via SIP re-INVITE (sendonly). Works only if CallerDesk's Asterisk accepts re-INVITE; failure is reported, never faked. */
+  async setHeld(held: boolean) {
+    const s = this.session; if (!s || this.snap.state !== "CONNECTED" || held === this.snap.held) return;
+    try {
+      s.sessionDescriptionHandlerOptionsReInvite = { hold: held };
+      await new Promise<void>((resolve, reject) => {
+        s.invite({ requestDelegate: { onAccept: () => resolve(), onReject: (r: any) => reject(new Error(String(r?.message?.statusCode ?? "rejected"))) } }).catch(reject);
+      });
+      this.log({ event: held ? "CALL_HOLD" : "CALL_RESUME" });
+      this.snap = { ...this.snap, held, error: null };
+    } catch (e: any) {
+      this.log({ event: "HOLD_FAILED", reason: String(e?.message ?? e) });
+      this.snap = { ...this.snap, error: held ? "CallerDesk did not accept hold for this call." : "Could not resume the call." };
+    }
+    this.listeners.forEach((l) => l(this.snap));
+  }
+
+  /** Speaker/headset output. Supported only where the browser implements setSinkId (Chrome/Edge). */
+  static outputSelectionSupported() { return typeof HTMLMediaElement !== "undefined" && "setSinkId" in HTMLMediaElement.prototype; }
+  private sinkId = "";
+  async setOutputDevice(id: string) {
+    this.sinkId = id;
+    this.audio ??= new Audio();
+    try { await (this.audio as any).setSinkId?.(id); this.log({ event: "OUTPUT_DEVICE_SET" }); }
+    catch { this.snap = { ...this.snap, error: "Could not switch to that speaker." }; this.listeners.forEach((l) => l(this.snap)); }
   }
 
   private async mic(): Promise<boolean> {
@@ -205,7 +282,7 @@ export class CallerDeskWebRtcEngine {
   private addRemoteTrack(track: MediaStreamTrack) {
     this.remote ??= new MediaStream();
     if (!this.remote.getTracks().some((t) => t.id === track.id)) this.remote.addTrack(track);
-    this.audio ??= new Audio();
+    if (!this.audio) { this.audio = new Audio(); if (this.sinkId) void (this.audio as any).setSinkId?.(this.sinkId).catch(() => {}); }
     if (this.audio.srcObject !== this.remote) this.audio.srcObject = this.remote;
     void this.playAudio();
   }
@@ -239,7 +316,8 @@ export class CallerDeskWebRtcEngine {
     if (this.session) { this.log({ event: "INBOUND_BUSY", sipCode: 486 }); void inv.reject({ statusCode: 486 }); return; }
     const from = inv.remoteIdentity?.uri?.user ?? null;
     this.wire(inv);
-    this.emit("incoming", { remoteNumber: from, direction: "inbound", error: null, connectedAt: null });
+    this.emit("incoming", { remoteNumber: from, direction: "inbound", error: null, connectedAt: null, ringingSince: Date.now() });
+    this.startRing();
     this.log({ event: "INBOUND_RINGING" });
   }
 
@@ -269,11 +347,16 @@ export class CallerDeskWebRtcEngine {
 
   async answer() {
     if (this.snap.state !== "RINGING" || !this.session) return;
+    this.stopRing();
     if (!(await this.mic())) return;
     try { this.log({ event: "INBOUND_ANSWER" }); await this.session.accept({ sessionDescriptionHandlerOptions: { constraints: { audio: true, video: false } } }); }
     catch { this.snap = { ...this.snap, error: "Could not answer the call. Retry or reject the incoming call." }; this.listeners.forEach((l) => l(this.snap)); this.log({ event: "ANSWER_FAILED" }); }
   }
-  async reject() { if (this.snap.state === "RINGING" && this.session) { this.log({ event: "INBOUND_REJECT" }); await this.session.reject(); } }
+  async reject() {
+    if (this.snap.state !== "RINGING" || !this.session) return;
+    this.stopRing(); this.log({ event: "INBOUND_REJECT" });
+    try { await this.session.reject(); } catch { /* caller already cancelled; Terminated cleans up */ }
+  }
   async hangup() {
     const s = this.session; if (!s) return;
     const { SessionState } = this.sip;
@@ -288,12 +371,14 @@ export class CallerDeskWebRtcEngine {
   }
   sendDtmf(tone: string) { if (this.snap.state === "CONNECTED") this.session?.sessionDescriptionHandler?.sendDtmf?.(tone); }
   async stop() {
+    this.stopRing();
+    if (this.retryTimer) { clearTimeout(this.retryTimer); this.retryTimer = null; } this.retries = 0;
     if (this.probe) { clearInterval(this.probe); this.probe = null; }
     try { if (this.session) await this.hangup(); } catch { /* ignore */ }
     this.releaseMedia(this.session);
     try { await this.registerer?.unregister(); } catch { /* ignore */ }
     try { await this.ua?.stop(); } catch { /* ignore */ }
     this.ua = null; this.registerer = null; this.session = null; this.inFlight = false;
-    this.emit("disconnect", { error: null, remoteNumber: null, connectedAt: null, muted: false, direction: null });
+    this.emit("disconnect", { error: null, remoteNumber: null, connectedAt: null, muted: false, direction: null, held: false, ringingSince: null });
   }
 }
