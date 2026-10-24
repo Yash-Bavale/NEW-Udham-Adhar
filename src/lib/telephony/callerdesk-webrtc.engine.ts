@@ -135,6 +135,7 @@ export class CallerDeskWebRtcEngine {
         },
       });
       await this.ua.start().catch(() => { throw new Error("Cannot reach CallerDesk phone server. Connect FortiClient VPN and retry."); });
+      this.tapTransport();
       this.registerer = new Registerer(this.ua);
       this.registerer.stateChange.addListener((s: any) => {
         if (s === RegistererState.Registered) { this.emit("registered", { error: null }); this.log({ event: "REGISTER_SUCCESS" }); }
