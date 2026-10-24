@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Link } from "@tanstack/react-router";
-import { Headset, Mic, MicOff, Phone, PhoneOff, X } from "lucide-react";
+import { Bell, BellOff, Delete, Grid3x3, Headset, Mic, MicOff, Pause, Phone, PhoneIncoming, PhoneOff, Play, Volume2, X } from "lucide-react";
+import { browserPhone, type DialRequest } from "@/lib/telephony/browser-phone-bus";
+import { cleanDialInput, dialTarget } from "@/lib/telephony/wrapup";
 import { Button } from "@/components/ui/button";
 import { endWebRtcCall, getWebRtcSession, getWebRtcStatus, initiateWebRtcCall, lookupIncomingCaller, recordInboundWebRtcCall } from "@/lib/telephony/callerdesk-webrtc.functions";
 import type { CallerDeskWebRtcEngine, EngineSnapshot } from "@/lib/telephony/callerdesk-webrtc.engine";
@@ -16,7 +19,12 @@ function CallerCard({ loading, error, data, selected, onSelect }: { loading: boo
   if (loading) return <p className="animate-pulse rounded-md border px-2 py-1.5 text-xs text-muted-foreground">Looking up caller…</p>;
   if (error) return <p className="rounded-md border px-2 py-1.5 text-xs text-muted-foreground">Caller lookup failed — the call is unaffected.</p>;
   if (!data) return null;
-  if (data.kind === "invalid" || data.kind === "unknown") return <p className="rounded-md border px-2 py-1.5 text-xs">Unknown caller{data.number ? ` · ${data.number}` : ""}</p>;
+  if (data.kind === "invalid" || data.kind === "unknown") return (
+    <div className="rounded-md border px-2 py-1.5 text-xs">
+      <p>Unknown caller{data.number ? ` · ${data.number}` : ""}</p>
+      <Link to="/admin/leads" target="_blank" className="text-primary underline">Create a lead in Leads</Link>
+    </div>
+  );
   const order = data.orders.find((o) => o.id === selected) ?? null;
   const active = data.orders.filter((o) => o.active), closed = data.orders.filter((o) => !o.active);
   const pill = (o: CallerLookup["orders"][number]) => (
@@ -53,11 +61,11 @@ function CallerCard({ loading, error, data, selected, onSelect }: { loading: boo
 const LABEL: Record<string, string> = {
   DISCONNECTED: "Disconnected", CHECKING_CONFIGURATION: "Checking setup…", SETUP_INCOMPLETE: "Setup incomplete",
   CONNECTING: "Connecting…", REGISTERED: "Ready", RECONNECTING: "Reconnecting…", CALLING: "Calling…",
-  RINGING: "Incoming call", CONNECTED: "Connected", ENDED: "Call ended", FAILED: "Failed",
+  RINGING: "Incoming call", CONNECTED: "Connected", ENDED: "Call ended", FAILED: "Not connected",
 };
 const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "*", "0", "#"];
 
-/** Browser phone (CallerDesk WebRTC). Rendered only for employees with a browser phone account. */
+/** Browser phone (CallerDesk WebRTC). Mounted once in the admin layout so it survives navigation. */
 export function WebRtcPhone() {
   const fetchStatus = useServerFn(getWebRtcStatus);
   const fetchSession = useServerFn(getWebRtcSession);
@@ -73,11 +81,31 @@ export function WebRtcPhone() {
   const [snap, setSnap] = useState<EngineSnapshot | null>(null);
   const [open, setOpen] = useState(false);
   const [num, setNum] = useState("");
+  const [link, setLink] = useState<Omit<DialRequest, "number"> | null>(null);
+  const [keypad, setKeypad] = useState(false);
+  const [dtmf, setDtmf] = useState("");
+  const [outputs, setOutputs] = useState<MediaDeviceInfo[]>([]);
+  const [output, setOutput] = useState("");
   const [now, setNow] = useState(Date.now());
+  const dialing = useRef(false);
 
-  useEffect(() => { if (snap?.state !== "CONNECTED") return; const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, [snap?.state]);
-  useEffect(() => () => { void engine.current?.stop(); }, []);
-  useEffect(() => { if (snap?.state === "RINGING") setOpen(true); }, [snap?.state]);
+  const state = snap?.state ?? (status?.canRegister ? "DISCONNECTED" : "SETUP_INCOMPLETE");
+  const ready = state === "REGISTERED" || state === "ENDED";
+
+  useEffect(() => { if (state !== "CONNECTED" && state !== "RINGING") return; const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, [state]);
+  useEffect(() => () => { browserPhone.setReady(false); browserPhone.register(null); void engine.current?.stop(); }, []);
+  useEffect(() => { if (state === "RINGING" || state === "CALLING") setOpen(true); if (state !== "CONNECTED") { setKeypad(false); setDtmf(""); } }, [state]);
+  useEffect(() => { browserPhone.setReady(ready); }, [ready]);
+  useEffect(() => {
+    const on = () => engine.current?.onNetworkOnline();
+    window.addEventListener("online", on); return () => window.removeEventListener("online", on);
+  }, []);
+  // Warn before a refresh/close drops a live call.
+  useEffect(() => {
+    if (state !== "CONNECTED" && state !== "CALLING" && state !== "RINGING") return;
+    const h = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ""; };
+    window.addEventListener("beforeunload", h); return () => window.removeEventListener("beforeunload", h);
+  }, [state]);
   // Close the pre-recorded browser call row when the SIP session ends (the provider report may enrich it later).
   useEffect(() => {
     const c = callRow.current; if (!c) return;
@@ -113,13 +141,31 @@ export function WebRtcPhone() {
     if (key) void recordInbound({ data: { key, number: snap?.remoteNumber ?? "", applicationId: id } }).catch(() => {});
   }
 
-  async function dial() {
-    const digits = num.replace(/\D/g, "");
-    if (!/^\d{10,13}$/.test(digits)) { void engine.current?.dial(num); return; }
-    try { const r = await startCall({ data: { number: digits } }); callRow.current = { id: r.callRowId, answeredAt: null }; }
-    catch { /* calling still works; the provider report will create the record */ }
-    await engine.current?.dial(num);
+  async function dial(raw = num, ctx = link) {
+    if (dialing.current) return; // duplicate-click guard
+    const target = dialTarget(raw);
+    if (!target) { toast.error("Enter a valid phone number (10-digit mobile, STD landline or +country number)."); return; }
+    dialing.current = true;
+    try {
+      try { const r = await startCall({ data: { number: target, customerId: ctx?.customerId ?? null, leadId: ctx?.leadId ?? null, applicationId: ctx?.applicationId ?? null } }); callRow.current = { id: r.callRowId, answeredAt: null }; }
+      catch (e: any) { if (/not available/i.test(String(e?.message))) { toast.error(e.message); return; } /* recording failed; the provider report will create the record */ }
+      await engine.current?.dial(target);
+    } finally { dialing.current = false; }
   }
+
+  // Click-to-call from CRM records routes through this single phone.
+  useEffect(() => {
+    browserPhone.register((r) => {
+      setOpen(true); setNum(cleanDialInput(r.number)); setLink({ customerId: r.customerId, leadId: r.leadId, applicationId: r.applicationId });
+      void dial(r.number, { customerId: r.customerId, leadId: r.leadId, applicationId: r.applicationId });
+    });
+    return () => browserPhone.register(null);
+  });
+
+  async function loadOutputs() {
+    try { const all = await navigator.mediaDevices.enumerateDevices(); setOutputs(all.filter((d) => d.kind === "audiooutput")); } catch { setOutputs([]); }
+  }
+  useEffect(() => { if (state === "CONNECTED") void loadOutputs(); }, [state]);
 
   if (!status?.authorized) return null;
 
@@ -133,79 +179,115 @@ export function WebRtcPhone() {
     await engine.current.start(() => fetchSession());
   }
 
-  const state = snap?.state ?? (status.canRegister ? "DISCONNECTED" : "SETUP_INCOMPLETE");
-  const ready = state === "REGISTERED" || state === "ENDED";
   const dot = state === "REGISTERED" || state === "CONNECTED" ? "bg-primary" : state === "FAILED" ? "bg-destructive" : "bg-muted-foreground";
+  const canPickOutput = typeof HTMLMediaElement !== "undefined" && "setSinkId" in HTMLMediaElement.prototype && outputs.length > 1;
+  const inCall = state === "CALLING" || state === "CONNECTED";
+  const talk = snap?.connectedAt ? fmtDuration((now - snap.connectedAt) / 1000) : "00:00";
+  const ringFor = snap?.ringingSince ? fmtDuration((now - snap.ringingSince) / 1000) : "00:00";
 
   return (
-    <div className="fixed bottom-14 right-4 z-40">
-      {!open ? (
-        <button onClick={() => setOpen(true)} className="flex items-center gap-2 rounded-full border bg-card px-3 py-1 text-xs shadow">
-          <Headset className="h-3.5 w-3.5" /><span className={`h-2 w-2 rounded-full ${dot}`} />Browser phone: {LABEL[state]}
-        </button>
-      ) : (
-        <div className="w-[320px] max-h-[85vh] overflow-auto space-y-3 rounded-xl border bg-card p-4 text-card-foreground shadow-2xl">
+    <>
+      {state === "RINGING" ? (
+        <div role="alertdialog" aria-label="Incoming call" className="fixed inset-x-0 top-4 z-[60] mx-auto w-[min(420px,calc(100vw-2rem))] space-y-3 rounded-2xl border-2 border-primary bg-card p-5 text-card-foreground shadow-2xl">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-sm font-semibold"><Headset className="h-4 w-4" />Browser phone </div>
-            <button aria-label="Hide" onClick={() => setOpen(false)}><X className="h-4 w-4" /></button>
+            <div className="flex items-center gap-2 font-semibold"><PhoneIncoming className="h-5 w-5 text-primary" />Incoming call</div>
+            <span className="font-mono text-xs text-muted-foreground">Ringing {ringFor}</span>
           </div>
-          <div className="flex items-center gap-2 text-xs"><span className={`h-2 w-2 rounded-full ${dot}`} />{LABEL[state]}</div>
-
-          {!status.canRegister && !snap ? (
-            <p className="text-xs text-muted-foreground">
-              {status.message}
-              {status.missing.length ? ` Missing: ${status.missing.join(", ")}.` : ""}{!status.enabled ? " Browser calling is switched off." : ""}
-            </p>
-          ) : null}
+          <p className="font-mono text-2xl">{snap?.remoteNumber ?? "Unknown number"}</p>
+          <CallerCard loading={caller.loading} error={caller.error} data={caller.data} selected={selectedOrder} onSelect={selectOrder} />
           {snap?.error ? <p className="text-xs text-destructive">{snap.error}</p> : null}
-
-          {status.canRegister && (state === "DISCONNECTED" || state === "FAILED" || state === "RECONNECTING") ? (
-            <Button size="sm" className="w-full" onClick={connect}>Connect (FortiClient VPN must be on)</Button>
-          ) : null}
-          {snap?.error?.startsWith("Browser blocked call audio") ? <Button size="sm" variant="outline" className="w-full" onClick={() => engine.current?.resumeAudio()}>Enable call audio</Button> : null}
-
-          {state === "RINGING" ? (
-            <div className="space-y-2">
-              <p className="text-sm">Incoming: <span className="font-mono">{snap?.remoteNumber ?? "Unknown"}</span></p>
-              <div className="grid grid-cols-2 gap-2">
-                <Button size="sm" onClick={() => engine.current?.answer()}><Phone className="h-4 w-4" />Answer</Button>
-                <Button size="sm" variant="destructive" onClick={() => engine.current?.reject()}><PhoneOff className="h-4 w-4" />Reject</Button>
-              </div>
-            </div>
-          ) : null}
-          {snap?.direction === "inbound" && (state === "RINGING" || state === "CONNECTED") ? (
-            <CallerCard loading={caller.loading} error={caller.error} data={caller.data} selected={selectedOrder} onSelect={selectOrder} />
-          ) : null}
-
-          {state === "CALLING" || state === "CONNECTED" ? (
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm"><span className="font-mono">{snap?.remoteNumber}</span><span className="font-mono">{state === "CONNECTED" && snap?.connectedAt ? fmtDuration((now - snap.connectedAt) / 1000) : "Ringing…"}</span></div>
-              {state === "CONNECTED" ? (
-                <div className="grid grid-cols-3 gap-1">{KEYS.map((k) => <Button key={k} size="sm" variant="outline" onClick={() => engine.current?.sendDtmf(k)}>{k}</Button>)}</div>
-              ) : null}
-              <div className="grid grid-cols-2 gap-2">
-                <Button size="sm" variant="outline" disabled={state !== "CONNECTED"} onClick={() => engine.current?.setMuted(!snap?.muted)}>
-                  {snap?.muted ? <><MicOff className="h-4 w-4" />Unmute</> : <><Mic className="h-4 w-4" />Mute</>}
-                </Button>
-                <Button size="sm" variant="destructive" onClick={() => engine.current?.hangup()}><PhoneOff className="h-4 w-4" />Hang up</Button>
-              </div>
-            </div>
-          ) : null}
-
-          {ready ? (
-            <div className="space-y-2">
-              <input className="w-full rounded-md border bg-background px-2 py-1.5 font-mono text-sm" inputMode="tel" placeholder="Number to call" value={num} onChange={(e) => setNum(e.target.value.replace(/[^\d+]/g, ""))} />
-              <div className="grid grid-cols-3 gap-1">{KEYS.slice(0, 11).map((k) => <Button key={k} size="sm" variant="outline" onClick={() => setNum((n) => n + k)}>{k}</Button>)}
-                <Button size="sm" variant="outline" onClick={() => setNum((n) => n.slice(0, -1))}>⌫</Button></div>
-              <Button size="sm" className="w-full" onClick={() => void dial()}><Phone className="h-4 w-4" />Call from browser</Button>
-              <button className="w-full text-[11px] text-muted-foreground underline" onClick={() => engine.current?.stop()}>Disconnect</button>
-            </div>
-          ) : null}
-          <button className="w-full text-[11px] underline" onClick={() => setDiag((d) => !d)}>{diag ? "Hide diagnostics" : "Diagnostics & test log"}</button>
-          {diag ? <WebRtcDiagnostics currentStatus={LABEL[state]} currentError={snap?.error ?? null} /> : null}
-          <p className="text-[10px] text-muted-foreground">Call history and recordings update from CallerDesk call reports.</p>
+          <div className="grid grid-cols-2 gap-2">
+            <Button autoFocus onClick={() => engine.current?.answer()}><Phone className="h-4 w-4" />Accept</Button>
+            <Button variant="destructive" onClick={() => engine.current?.reject()}><PhoneOff className="h-4 w-4" />Reject</Button>
+          </div>
+          <button className="flex items-center gap-1 text-xs text-muted-foreground underline" onClick={() => engine.current?.setRingMuted(!snap?.ringMuted)}>
+            {snap?.ringMuted ? <><Bell className="h-3.5 w-3.5" />Turn ringtone on</> : <><BellOff className="h-3.5 w-3.5" />Silence ringtone</>}
+          </button>
         </div>
-      )}
-    </div>
+      ) : null}
+
+      <div className="fixed bottom-14 right-4 z-40">
+        {!open ? (
+          <button onClick={() => setOpen(true)} className="flex items-center gap-2 rounded-full border bg-card px-3 py-1 text-xs shadow">
+            <Headset className="h-3.5 w-3.5" /><span className={`h-2 w-2 rounded-full ${dot}`} />Browser phone: {snap?.held ? "On hold" : LABEL[state]}{state === "CONNECTED" ? ` · ${talk}` : ""}
+          </button>
+        ) : (
+          <div className="w-[320px] max-h-[85vh] overflow-auto space-y-3 rounded-xl border bg-card p-4 text-card-foreground shadow-2xl">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-sm font-semibold"><Headset className="h-4 w-4" />Browser phone</div>
+              <button aria-label="Hide phone" onClick={() => setOpen(false)}><X className="h-4 w-4" /></button>
+            </div>
+            <div className="flex items-center gap-2 text-xs" aria-live="polite"><span className={`h-2 w-2 rounded-full ${dot}`} />{snap?.held ? "On hold" : LABEL[state]}{snap?.muted ? " · muted" : ""}</div>
+
+            {!status.canRegister && !snap ? (
+              <p className="text-xs text-muted-foreground">
+                {status.message}
+                {status.missing.length ? ` Missing: ${status.missing.join(", ")}.` : ""}{!status.enabled ? " Browser calling is switched off." : ""}
+              </p>
+            ) : null}
+            {snap?.error ? <p className="text-xs text-destructive">{snap.error}</p> : null}
+
+            {status.canRegister && (state === "DISCONNECTED" || state === "FAILED" || state === "RECONNECTING") ? (
+              <Button size="sm" className="w-full" onClick={connect}>{state === "RECONNECTING" ? "Reconnect now" : "Connect"} (FortiClient VPN must be on)</Button>
+            ) : null}
+            {snap?.error?.startsWith("Browser blocked call audio") ? <Button size="sm" variant="outline" className="w-full" onClick={() => engine.current?.resumeAudio()}>Enable call audio</Button> : null}
+
+            {snap?.direction === "inbound" && state === "CONNECTED" ? (
+              <CallerCard loading={caller.loading} error={caller.error} data={caller.data} selected={selectedOrder} onSelect={selectOrder} />
+            ) : null}
+
+            {inCall ? (
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm"><span className="font-mono">{snap?.remoteNumber}</span><span className="font-mono">{state === "CONNECTED" ? talk : "Ringing…"}</span></div>
+                {state === "CONNECTED" ? (
+                  <div className="grid grid-cols-3 gap-1">
+                    <Button size="sm" variant={snap?.muted ? "default" : "outline"} aria-pressed={!!snap?.muted} onClick={() => engine.current?.setMuted(!snap?.muted)}>
+                      {snap?.muted ? <><MicOff className="h-4 w-4" />Unmute</> : <><Mic className="h-4 w-4" />Mute</>}
+                    </Button>
+                    <Button size="sm" variant={snap?.held ? "default" : "outline"} aria-pressed={!!snap?.held} onClick={() => engine.current?.setHeld(!snap?.held)}>
+                      {snap?.held ? <><Play className="h-4 w-4" />Resume</> : <><Pause className="h-4 w-4" />Hold</>}
+                    </Button>
+                    <Button size="sm" variant={keypad ? "default" : "outline"} aria-pressed={keypad} onClick={() => setKeypad((k) => !k)}><Grid3x3 className="h-4 w-4" />Keypad</Button>
+                  </div>
+                ) : null}
+                {state === "CONNECTED" && keypad ? (
+                  <div className="space-y-1">
+                    <p className="min-h-5 text-center font-mono text-sm">{dtmf}</p>
+                    <div className="grid grid-cols-3 gap-1">{KEYS.map((k) => <Button key={k} size="sm" variant="outline" onClick={() => { engine.current?.sendDtmf(k); setDtmf((d) => (d + k).slice(-20)); }}>{k}</Button>)}</div>
+                  </div>
+                ) : null}
+                {state === "CONNECTED" && canPickOutput ? (
+                  <label className="flex items-center gap-2 text-xs"><Volume2 className="h-3.5 w-3.5" />
+                    <select className="h-8 flex-1 rounded-md border bg-background px-1 text-xs" value={output} onChange={(e) => { setOutput(e.target.value); void engine.current?.setOutputDevice(e.target.value); }}>
+                      {outputs.map((d, i) => <option key={d.deviceId || i} value={d.deviceId}>{d.label || `Speaker ${i + 1}`}</option>)}
+                    </select></label>
+                ) : null}
+                <Button size="sm" variant="destructive" className="w-full" onClick={() => engine.current?.hangup()}><PhoneOff className="h-4 w-4" />{state === "CALLING" ? "Cancel call" : "End call"}</Button>
+              </div>
+            ) : null}
+
+            {ready ? (
+              <div className="space-y-2">
+                <div className="flex gap-1">
+                  <input aria-label="Number to call" className="w-full rounded-md border bg-background px-2 py-1.5 font-mono text-sm" inputMode="tel" placeholder="Number to call" value={num}
+                    onChange={(e) => { setNum(cleanDialInput(e.target.value)); setLink(null); }}
+                    onPaste={(e) => { e.preventDefault(); setNum(cleanDialInput(e.clipboardData.getData("text"))); setLink(null); }}
+                    onKeyDown={(e) => { if (e.key === "Enter") void dial(); }} />
+                  <Button size="sm" variant="ghost" aria-label="Delete last digit" onClick={() => setNum((n) => n.slice(0, -1))}><Delete className="h-4 w-4" /></Button>
+                </div>
+                <div className="grid grid-cols-3 gap-1">{KEYS.map((k) => <Button key={k} size="sm" variant="outline" onClick={() => setNum((n) => cleanDialInput(n + k))}>{k}</Button>)}</div>
+                <Button size="sm" className="w-full" disabled={!num} onClick={() => void dial()}><Phone className="h-4 w-4" />Call</Button>
+                <div className="flex justify-between text-[11px]">
+                  <Link to="/admin/live-calls" className="underline">Recent calls</Link>
+                  <button className="text-muted-foreground underline" onClick={() => engine.current?.stop()}>Disconnect</button>
+                </div>
+              </div>
+            ) : null}
+            <button className="w-full text-[11px] underline" onClick={() => setDiag((d) => !d)}>{diag ? "Hide diagnostics" : "Diagnostics & test log"}</button>
+            {diag ? <WebRtcDiagnostics currentStatus={LABEL[state]} currentError={snap?.error ?? null} /> : null}
+          </div>
+        )}
+      </div>
+    </>
   );
 }
