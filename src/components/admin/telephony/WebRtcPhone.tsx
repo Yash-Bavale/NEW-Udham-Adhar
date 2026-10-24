@@ -96,6 +96,7 @@ export function WebRtcPhone() {
   useEffect(() => () => { browserPhone.setReady(false); browserPhone.register(null); void engine.current?.stop(); }, []);
   useEffect(() => { if (state === "RINGING" || state === "CALLING") setOpen(true); if (state !== "CONNECTED") { setKeypad(false); setDtmf(""); } }, [state]);
   useEffect(() => { browserPhone.setReady(ready); }, [ready]);
+  useEffect(() => { if (snap?.notice) toast.info(snap.notice); }, [snap?.notice]);
   useEffect(() => {
     const on = () => engine.current?.onNetworkOnline();
     window.addEventListener("online", on); return () => window.removeEventListener("online", on);

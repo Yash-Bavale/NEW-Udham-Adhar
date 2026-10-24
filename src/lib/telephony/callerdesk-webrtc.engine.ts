@@ -5,7 +5,7 @@
 import { canDial, nextState, registrationError, type PhoneEvent, type PhoneState } from "./callerdesk-webrtc.config";
 
 export type SessionConfig = { wssUrl: string; sipDomain: string; extension: string; password: string; displayName: string };
-export type EngineSnapshot = { state: PhoneState; error: string | null; remoteNumber: string | null; muted: boolean; connectedAt: number | null; direction: "inbound" | "outbound" | null; held: boolean; ringMuted: boolean; ringingSince: number | null };
+export type EngineSnapshot = { state: PhoneState; error: string | null; remoteNumber: string | null; muted: boolean; connectedAt: number | null; direction: "inbound" | "outbound" | null; held: boolean; ringMuted: boolean; ringingSince: number | null; notice?: string | null };
 type Listener = (s: EngineSnapshot) => void;
 export type DiagEvent = { event: string; state?: string; sipCode?: number | null; reason?: string | null; number?: string | null; detail?: string | null };
 
@@ -49,6 +49,12 @@ export function callerFromInvite(inv: any): string | null {
   const fromHdr = (h: string | null) => { const m = h?.match(/sip:([^@;>]+)/i); return m ? digits(m[1]) : null; };
   return fromHdr(hdr("P-Asserted-Identity")) ?? fromHdr(hdr("Remote-Party-ID"))
     ?? digits(inv?.remoteIdentity?.uri?.user) ?? digits(inv?.remoteIdentity?.displayName) ?? null;
+}
+
+/** True when the registrar's 200 OK lists more than one distinct device (Contact) for the extension. */
+export function hasDuplicateRegistration(contacts: string[]): boolean {
+  const uris = new Set((contacts ?? []).flatMap((h) => String(h).split(/,(?=\s*<)/)).map((c) => c.match(/<([^>]+)>/)?.[1] ?? c.trim()).filter(Boolean));
+  return uris.size > 1;
 }
 
 /**
@@ -136,12 +142,16 @@ export class CallerDeskWebRtcEngine {
       });
       await this.ua.start().catch(() => { throw new Error("Cannot reach CallerDesk phone server. Connect FortiClient VPN and retry."); });
       this.tapTransport();
+      this.claimTab(cfg.extension);
       this.registerer = new Registerer(this.ua);
       this.registerer.stateChange.addListener((s: any) => {
         if (s === RegistererState.Registered) { this.emit("registered", { error: null }); this.log({ event: "REGISTER_SUCCESS" }); }
         else if (s === RegistererState.Unregistered && this.snap.state === "CONNECTING") this.emit("register_failed", { error: "CallerDesk rejected the agent registration." });
       });
-      await this.registerer.register({ requestDelegate: { onReject: (r: any) => { const c = r?.message?.statusCode; this.log({ event: "REGISTER_FAILED", sipCode: c, reason: r?.message?.reasonPhrase }); this.emit("register_failed", { error: registrationError(c) }); } } });
+      await this.registerer.register({ requestDelegate: {
+        onAccept: (r: any) => this.enforceSingleDevice(r),
+        onReject: (r: any) => { const c = r?.message?.statusCode; this.log({ event: "REGISTER_FAILED", sipCode: c, reason: r?.message?.reasonPhrase }); this.emit("register_failed", { error: registrationError(c) }); },
+      } });
     } catch (err: any) {
       const m = String(err?.message ?? "Registration failed");
       await this.stop();
@@ -150,6 +160,50 @@ export class CallerDeskWebRtcEngine {
       this.emit("register_failed", { error: m });
     }
     } finally { this.starting = false; }
+  }
+
+  /**
+   * Single-device rule: when CallerDesk reports more than one device signed in to this extension,
+   * remove every sign-in (Contact: *) and sign this browser back in, so calls ring only here.
+   * Limited to once per minute so two fighting devices cannot loop forever.
+   */
+  private lastPurge = 0;
+  private async enforceSingleDevice(resp: any) {
+    try {
+      const contacts: string[] = resp?.message?.getHeaders?.("contact") ?? [];
+      if (!hasDuplicateRegistration(contacts)) return;
+      if (Date.now() - this.lastPurge < 60_000) { this.log({ event: "DUPLICATE_REGISTRATION", detail: `${contacts.length} devices, purge skipped (cooldown)` }); return; }
+      this.lastPurge = Date.now();
+      this.log({ event: "DUPLICATE_REGISTRATION", detail: `${contacts.length} devices on extension, removing others` });
+      await new Promise<void>((resolve) => {
+        this.registerer?.unregister({ all: true, requestDelegate: { onAccept: () => resolve(), onReject: () => resolve() } }).catch(() => resolve());
+        setTimeout(resolve, 5000);
+      });
+      await this.registerer?.register({ requestDelegate: {
+        onAccept: (r: any) => { const n = (r?.message?.getHeaders?.("contact") ?? []).length; this.log({ event: "DUPLICATE_CLEARED", detail: `${n} device(s) now signed in` }); },
+      } });
+      this.snap = { ...this.snap, error: null, notice: "Another device was signed in to your phone line and has been disconnected." } as EngineSnapshot;
+      this.listeners.forEach((l) => l(this.snap));
+    } catch (e: any) { this.log({ event: "DUPLICATE_PURGE_FAILED", reason: String(e?.message ?? e).slice(0, 200) }); }
+  }
+
+  /** Only one CRM tab per extension: a newly connecting tab tells older tabs to sign out. */
+  private tabChannel: BroadcastChannel | null = null;
+  private tabId = Math.random().toString(36).slice(2);
+  private claimTab(extension: string) {
+    try {
+      if (typeof BroadcastChannel === "undefined") return;
+      this.tabChannel?.close();
+      const ch = new BroadcastChannel(`bhs-phone-${extension}`);
+      ch.onmessage = (ev) => {
+        if (ev.data?.type !== "takeover" || ev.data.tab === this.tabId) return;
+        if (this.session) return; // never drop a live call
+        this.log({ event: "TAB_TAKEOVER", detail: "phone moved to another CRM tab" });
+        void this.stop().then(() => this.emit("register_failed", { error: "Your phone is now active in another CRM tab." }));
+      };
+      ch.postMessage({ type: "takeover", tab: this.tabId });
+      this.tabChannel = ch;
+    } catch { /* optional */ }
   }
 
   /** TEMPORARY inbound diagnostics: logs SIP frames as method + status only (OPTIONS keep-alives sampled). */
