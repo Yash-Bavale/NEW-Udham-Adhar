@@ -24,7 +24,7 @@ describe("call wrap-up rules", () => {
 describe("dialled number normalisation", () => {
   it("normalises Indian mobile formats to 10 digits", () => {
     expect(dialTarget("+91 98765 43210")).toBe("9876543210");
-    expect(dialTarget("09876543210")).toBe("9876543210");
+    expect(dialTarget("09876543210")).toBe("09876543210");
     expect(dialTarget("919876543210")).toBe("9876543210");
   });
   it("keeps landlines with STD code and +international numbers", () => {

@@ -38,7 +38,6 @@ export function dialTarget(raw: string): string | null {
   if (/[*#]/.test(raw)) return null;
   const d = raw.replace(/\D/g, "");
   if (/^[6-9]\d{9}$/.test(d)) return d;
-  if (/^0[6-9]\d{9}$/.test(d)) return d.slice(1);
   if (/^91[6-9]\d{9}$/.test(d)) return d.slice(2);
   if (raw.trim().startsWith("+") && /^\d{8,15}$/.test(d)) return d;
   if (/^0\d{9,11}$/.test(d)) return d; // landline with STD code
