@@ -1,3 +1,4 @@
+import { isVisibleService } from "@/lib/crm/visible-services";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -64,7 +65,7 @@ function SelectServiceStep({ leadId, leadCode }: Props) {
           (s: any) =>
             s.is_active &&
             s.service_name !== "Expert Consultation" &&
-            s.website?.domain !== GST_DOMAIN
+            isVisibleService(s)
         )
         .sort((a: any, b: any) => (a.sort_order ?? 0) - (b.sort_order ?? 0)),
     [data],

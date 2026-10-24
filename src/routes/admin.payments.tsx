@@ -155,7 +155,7 @@ function PaymentsPage() {
             className="rounded border px-2 py-1.5 text-sm max-w-[220px]">
             <option value="">All active services</option>
             {groupedServices.map((g) => (
-              <optgroup key={g.id} label={`🌐 ${g.websiteName}${g.domain ? ` (${g.domain})` : ''}`}>
+              <optgroup key={g.id} label="Udyam Aadhar Services">
                 {g.services.map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.service_name}

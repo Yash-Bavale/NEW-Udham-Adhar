@@ -1,3 +1,4 @@
+import { isVisibleService } from "@/lib/crm/visible-services";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -53,7 +54,7 @@ export function ChangeServiceDialog({
   const GST_DOMAIN = "gstcertificate.in";
   const activeServices = (servicesData?.rows ?? []).filter(
     (s: ServiceRow & { website?: { domain?: string } }) =>
-      s.is_active !== false && s.website?.domain !== GST_DOMAIN
+      isVisibleService(s)
   );
 
   const selectedService = activeServices.find((s: ServiceRow) => s.id === selectedServiceId);
