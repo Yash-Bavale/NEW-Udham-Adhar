@@ -76,7 +76,7 @@ export const getMyCallState = createServerFn({ method: "GET" })
     const views = await enrich(await admin(), rows ?? []);
     return {
       active: views.find((v) => (v.status === "ringing" || v.status === "answered") && !isStaleOutbound(v)) ?? null,
-      pendingDisposition: views.find((v) => v.status === "ended" && !v.disposition) ?? null,
+      pendingDisposition: views.find((v) => (v.status === "ended" || (v.status === "missed" && v.direction === "outbound")) && !v.disposition) ?? null,
     };
   });
 

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Phone, PhoneOff, PhoneIncoming, User, FileText, X } from "lucide-react";
+import { PhoneIncoming, User, FileText, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { getMyCallState, saveCallDisposition, DISPOSITIONS, type CallView } from "@/lib/telephony/calls.functions";
