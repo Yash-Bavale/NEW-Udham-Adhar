@@ -79,20 +79,43 @@ export const getMyCallState = createServerFn({ method: "GET" })
     };
   });
 
-export const DISPOSITIONS = ["Customer Query", "Follow-up Required", "Payment Related", "Documents Required", "Technical Issue", "Completed", "Other"] as const;
+export const DISPOSITIONS = CALL_OUTCOMES;
 
+/** Saves the post-call wrap-up on the employee's own call (RLS read check), and creates a CRM follow-up when requested. */
 export const saveCallDisposition = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) => z.object({ id: z.string().uuid(), disposition: z.enum(DISPOSITIONS), notes: z.string().max(2000).optional() }).parse(i))
+  .inputValidator((i: unknown) => wrapUpInput.parse(i))
   .handler(async ({ data, context }) => {
-    const { data: own } = await (context.supabase as any).from("telephony_calls").select("id").eq("id", data.id).maybeSingle();
+    const { data: own } = await (context.supabase as any).from("telephony_calls")
+      .select("id, employee_id, customer_id, lead_id, application_id, follow_up_id").eq("id", data.id).maybeSingle();
     if (!own) throw new Error("Call not found");
-    const { error } = await (await admin()).from("telephony_calls").update({
+    const db = await admin();
+    const applicationId = data.applicationId ?? own.application_id ?? null;
+    let leadId = own.lead_id ?? null, customerId = own.customer_id ?? null;
+    if (applicationId && (!leadId || !customerId)) {
+      const { data: app } = await db.from("applications").select("lead_id, customer_id").eq("id", applicationId).maybeSingle();
+      leadId ??= app?.lead_id ?? null; customerId ??= app?.customer_id ?? null;
+    }
+    let followUpId: string | null = own.follow_up_id ?? null;
+    if (data.followUpAt && !followUpId && (leadId || customerId || applicationId)) {
+      const { data: fu, error: fuErr } = await db.from("follow_ups").insert({
+        lead_id: leadId, customer_id: customerId, application_id: applicationId,
+        scheduled_at: new Date(data.followUpAt).toISOString(), reason: "call_back",
+        reason_note: (data.nextAction || data.notes || data.disposition).slice(0, 500),
+        assigned_to: own.employee_id ?? context.userId, created_by: context.userId,
+      }).select("id").single();
+      if (fuErr) throw new Error("Could not create the follow-up: " + fuErr.message);
+      followUpId = fu.id;
+      if (leadId) await db.from("leads").update({ next_followup_at: new Date(data.followUpAt).toISOString(), followup_note: data.nextAction || data.disposition }).eq("id", leadId);
+    }
+    const { error } = await db.from("telephony_calls").update({
       disposition: data.disposition, disposition_notes: data.notes || null,
       disposition_by: context.userId, disposition_at: new Date().toISOString(),
+      next_action: data.nextAction || null, follow_up_at: data.followUpAt ?? null, follow_up_id: followUpId,
+      application_id: applicationId, lead_id: leadId, customer_id: customerId,
     }).eq("id", data.id);
     if (error) throw new Error(error.message);
-    return { ok: true };
+    return { ok: true, followUpCreated: !!followUpId && !own.follow_up_id };
   });
 
 /** Admin / Super Admin: all live calls (RLS limits non-admins to their own). */
