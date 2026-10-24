@@ -191,11 +191,15 @@ export async function queryCallHistory(sb: any, adminDb: any, userId: string, da
       hangupCause: r.hangup_cause ?? null, notes: r.disposition_notes ?? null,
       nextAction: r.next_action ?? null, followUpAt: r.follow_up_at ?? null };
   });
-  const { data: staff } = await adminDb.from("telephony_calls").select("employee_id").not("employee_id", "is", null)
-    .gte("started_at", fromIso).lt("started_at", toIso).limit(1000);
-  const empIds = Array.from(new Set((staff ?? []).map((r: any) => r.employee_id)));
-  const { data: emps } = empIds.length ? await adminDb.from("profiles").select("id, full_name, display_name, email").in("id", empIds) : { data: [] };
-  const employees = (emps ?? []).map((e: any) => ({ id: e.id, name: e.full_name || e.display_name || e.email?.split("@")[0] || "Employee" }));
+  // Employee filter options; best effort so a failure never hides the call list.
+  let employees: { id: string; name: string }[] = [];
+  try {
+    const { data: staff } = await adminDb.from("telephony_calls").select("employee_id").not("employee_id", "is", null)
+      .gte("started_at", fromIso).lt("started_at", toIso).limit(1000);
+    const empIds = Array.from(new Set((staff ?? []).map((r: any) => r.employee_id)));
+    const { data: emps } = empIds.length ? await adminDb.from("profiles").select("id, full_name, display_name, email").in("id", empIds) : { data: [] };
+    employees = (emps ?? []).map((e: any) => ({ id: e.id, name: e.full_name || e.display_name || e.email?.split("@")[0] || "Employee" }));
+  } catch { employees = []; }
   return { items, total: count ?? 0, page: data.page, pageSize: CALL_HISTORY_PAGE_SIZE, employees, outcomes: CALL_OUTCOMES };
 }
 
