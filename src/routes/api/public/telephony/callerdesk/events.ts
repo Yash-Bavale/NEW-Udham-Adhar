@@ -38,6 +38,7 @@ async function handle(request: Request): Promise<Response> {
     const campid = cd.campaignId(input);
     if (!sid && !campid) return json({ ok: false, error: "missing_call_id" }, 400);
     const direction = cd.callerDeskDirection(input);
+    console.log(JSON.stringify({ event: "callerdesk_event_type", type: String(cd.pick(input, "type", "Type") ?? "none").slice(0, 20) }));
     const outbound = direction === "outbound";
     const status = cd.mapCallerDeskStatus(input);
     console.log(JSON.stringify({ event: "callerdesk_call_event", status, outbound, has_sid: !!sid, has_camp: !!campid, fields: Object.keys(input).sort() }));
@@ -114,10 +115,20 @@ async function handle(request: Request): Promise<Response> {
     }
     // Inbound: the answering agent becomes the employee when their number matches a staff mobile.
     const agent = normalizeIndianMobile(pick(input, "DialWhomNumber"));
-    if (agent && (existing?.direction ?? direction) === "inbound") {
-      row.agent_id = agent;
-      const { data: p } = await db.from("profiles").select("id").ilike("mobile", `%${agent}`).limit(1).maybeSingle();
-      if (p?.id) row.employee_id = p.id;
+    const agentEmail = pick(input, "agent_email", "AgentEmail")?.trim().toLowerCase() ?? null;
+    if ((existing?.direction ?? direction) === "inbound") {
+      let pid: string | null = null;
+      if (agent) {
+        row.agent_id = agent;
+        const { data: p } = await db.from("profiles").select("id").ilike("mobile", `%${agent}`).limit(1).maybeSingle();
+        pid = p?.id ?? null;
+      }
+      if (!pid && agentEmail && /^[^\s@]+@[^\s@]+$/.test(agentEmail)) {
+        const { data: p } = await db.from("profiles").select("id").eq("email", agentEmail).limit(2);
+        if (p?.length === 1) pid = p[0].id;
+      }
+      if (pid) row.employee_id = pid;
+      console.log(JSON.stringify({ event: "callerdesk_agent_match", by: pid ? (agent && !agentEmail ? "mobile" : "mobile_or_email") : "none", has_agent_email: !!agentEmail }));
     }
     if ((status === "answered" || status === "ended") && !existing?.answered_at) {
       const answeredAt = ts(pick(input, "LegB_Picked_time"));
