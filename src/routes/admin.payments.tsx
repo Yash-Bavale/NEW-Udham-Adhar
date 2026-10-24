@@ -1,3 +1,4 @@
+import { isVisibleService } from "@/lib/crm/visible-services";
 import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -96,7 +97,7 @@ function PaymentsPage() {
 
   const groupedServices = useMemo(() => {
     const raw = (meta.data?.services ?? []) as any[];
-    const activeOnly = raw.filter((s) => s.is_active !== false);
+    const activeOnly = raw.filter((s) => isVisibleService(s));
     const map = new Map<string, { websiteName: string; domain: string; services: any[] }>();
 
     for (const s of activeOnly) {
