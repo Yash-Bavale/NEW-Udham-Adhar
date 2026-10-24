@@ -152,6 +152,32 @@ export class CallerDeskWebRtcEngine {
     } finally { this.starting = false; }
   }
 
+  /** TEMPORARY inbound diagnostics: logs SIP frames as method + status only (OPTIONS keep-alives sampled). */
+  private optionsSeen = 0;
+  private tapTransport() {
+    const t: any = this.ua?.transport;
+    if (!t || t.__bhsTapped) return;
+    t.__bhsTapped = true;
+    const describe = (f: NonNullable<ReturnType<typeof summarizeSipFrame>>) => f.kind === "request" ? `request ${f.method}` : `response ${f.code} to ${f.method}`;
+    const origOnMessage = t.onMessage;
+    t.onMessage = (raw: string) => {
+      try {
+        const f = summarizeSipFrame(raw);
+        if (f) {
+          if (f.method === "OPTIONS" && f.kind === "request") { this.optionsSeen++; if (this.optionsSeen % 20 === 1) this.log({ event: "SIP_IN", detail: `OPTIONS keep-alive (seen ${this.optionsSeen})` }); }
+          else this.log({ event: "SIP_IN", sipCode: f.code, detail: describe(f) });
+        }
+      } catch { /* diagnostics must never break signalling */ }
+      return origOnMessage?.call(t, raw);
+    };
+    const origSend = t.send.bind(t);
+    t.send = (raw: string) => {
+      try { const f = summarizeSipFrame(raw); if (f && f.method !== "OPTIONS") this.log({ event: "SIP_OUT", sipCode: f.code, detail: describe(f) }); } catch { /* ignore */ }
+      return origSend(raw);
+    };
+    this.log({ event: "SIP_TAP_ACTIVE" });
+  }
+
   private retries = 0;
   private retryTimer: ReturnType<typeof setTimeout> | null = null;
   /** Controlled reconnect: at most 3 attempts (5s, 15s, 45s), then the employee must press Connect. */
