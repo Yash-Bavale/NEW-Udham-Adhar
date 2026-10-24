@@ -253,6 +253,13 @@
       "when": 1792740650329,
       "tag": "0035_employee_telephony_accounts",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1792816473690,
+      "tag": "0036_telephony_wrapup_fields",
+      "breakpoints": true
     }
   ]
 }
