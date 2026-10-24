@@ -5,7 +5,7 @@
 import { canDial, nextState, registrationError, type PhoneEvent, type PhoneState } from "./callerdesk-webrtc.config";
 
 export type SessionConfig = { wssUrl: string; sipDomain: string; extension: string; password: string; displayName: string };
-export type EngineSnapshot = { state: PhoneState; error: string | null; remoteNumber: string | null; muted: boolean; connectedAt: number | null; direction: "inbound" | "outbound" | null; held: boolean; ringMuted: boolean; ringingSince: number | null };
+export type EngineSnapshot = { state: PhoneState; error: string | null; remoteNumber: string | null; muted: boolean; connectedAt: number | null; direction: "inbound" | "outbound" | null; held: boolean; ringMuted: boolean; ringingSince: number | null; notice?: string | null };
 type Listener = (s: EngineSnapshot) => void;
 export type DiagEvent = { event: string; state?: string; sipCode?: number | null; reason?: string | null; number?: string | null; detail?: string | null };
 
