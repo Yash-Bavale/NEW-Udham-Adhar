@@ -51,6 +51,23 @@ export function callerFromInvite(inv: any): string | null {
     ?? digits(inv?.remoteIdentity?.uri?.user) ?? digits(inv?.remoteIdentity?.displayName) ?? null;
 }
 
+/**
+ * TEMPORARY inbound diagnostics: sanitized one-line summary of a raw SIP frame.
+ * Only method / status code / CSeq method are kept — no URIs, numbers, tags, SDP or auth headers.
+ */
+export function summarizeSipFrame(raw: string): { kind: "request" | "response"; method: string; code: number | null; cseq: string | null } | null {
+  if (typeof raw !== "string") return null;
+  const first = raw.split(/\r?\n/, 1)[0]?.trim() ?? "";
+  if (!first) return null;
+  const cseq = raw.match(/^CSeq:\s*\d+\s+([A-Z]+)/im)?.[1] ?? null;
+  const resp = first.match(/^SIP\/2\.0\s+(\d{3})/);
+  if (resp) return { kind: "response", method: cseq ?? "?", code: Number(resp[1]), cseq };
+  const req = first.match(/^([A-Z]+)\s+\S+\s+SIP\/2\.0$/);
+  if (req) return { kind: "request", method: req[1], code: null, cseq };
+  return null;
+}
+
+
 export class CallerDeskWebRtcEngine {
   private snap: EngineSnapshot = { state: "DISCONNECTED", error: null, remoteNumber: null, muted: false, connectedAt: null, direction: null, held: false, ringMuted: false, ringingSince: null };
   private listeners = new Set<Listener>();
