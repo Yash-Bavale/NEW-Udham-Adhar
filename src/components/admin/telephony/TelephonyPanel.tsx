@@ -26,7 +26,7 @@ export function useCallTimer(call: Pick<CallView, "answeredAt" | "startedAt" | "
   return (now - new Date(call.answeredAt ?? call.startedAt).getTime()) / 1000;
 }
 
-const NOT_SUPPORTED = "This call is on your CallerDesk phone. Answer, reject and hang up there; browser calls are controlled from the Browser phone.";
+const NOT_SUPPORTED = "CallerDesk sent this call to your mobile/CallerDesk phone, not to the browser phone, so it can't be answered here. Answer it on that phone. To answer inside the CRM, CallerDesk must route the number to your browser phone login (SIP extension) — then an Accept/Reject window appears at the top of the screen.";
 
 /** Persistent employee call panel: incoming popup, active call, after-call disposition, availability. */
 export function TelephonyPanel() {
@@ -85,27 +85,27 @@ export function TelephonyPanel() {
     <div className="fixed bottom-4 right-4 z-50 w-[340px] rounded-xl border bg-card text-card-foreground shadow-2xl">
       {active ? (
         <div className="p-4 space-y-3">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 font-semibold">
               <PhoneIncoming className={`h-4 w-4 ${active.status === "ringing" ? "animate-pulse text-primary" : "text-primary"}`} />
-              {active.status === "ringing" ? (active.direction === "outbound" ? "Outgoing call" : "Incoming call") : "Active call"}<span className="rounded-full bg-primary/10 px-2 text-[11px] text-primary">On Call</span>
+              {active.status === "ringing" ? (active.direction === "outbound" ? "Outgoing call" : "Incoming call") : "Active call"}
+              <span className="rounded-full bg-primary/10 px-2 text-[11px] text-primary">{active.status === "ringing" ? (active.direction === "outbound" ? "Dialling" : "Ringing on CallerDesk phone") : "On Call"}</span>
             </div>
-            <span className="font-mono text-sm">{active.status === "answered" ? fmtDuration(secs) : active.direction === "outbound" ? "Calling customer…" : "Ringing…"}</span>
+            <span className="font-mono text-sm">{active.status === "answered" ? fmtDuration(secs) : active.direction === "outbound" ? "Calling…" : "Ringing…"}</span>
           </div>
           <dl className="grid grid-cols-[90px_1fr] gap-y-1 text-sm">
             <dt className="text-muted-foreground">Caller</dt><dd className="font-mono">{active.callerNumber ?? "Unknown"}</dd>
             <dt className="text-muted-foreground">Name</dt><dd>{active.contactName ?? "Not matched"}</dd>
             <dt className="text-muted-foreground">Order</dt><dd>{active.orderCode ? `${active.orderCode}${active.serviceName ? ` · ${active.serviceName}` : ""}` : "—"}</dd>
             <dt className="text-muted-foreground">Assigned</dt><dd>{active.employeeName ?? "—"}</dd>
-            <dt className="text-muted-foreground">Status</dt><dd className="capitalize">{active.status}</dd>
           </dl>
           <div className="grid grid-cols-2 gap-2">
             {active.customerId ? (
-              <Button size="sm" variant="outline" asChild><Link to="/admin/customers/$customerId" params={{ customerId: active.customerId }}><User className="h-4 w-4" />Open Customer</Link></Button>
-            ) : <Button size="sm" variant="outline" disabled><User className="h-4 w-4" />Open Customer</Button>}
+              <Button size="sm" variant="outline" asChild><Link to="/admin/customers/$customerId" params={{ customerId: active.customerId }} target="_blank"><User className="h-4 w-4" />Open Customer</Link></Button>
+            ) : <Button size="sm" variant="outline" disabled title="No customer matched"><User className="h-4 w-4" />Open Customer</Button>}
             {active.applicationId ? (
-              <Button size="sm" variant="outline" asChild><Link to="/admin/applications/$applicationId" params={{ applicationId: active.applicationId }}><FileText className="h-4 w-4" />Open Order</Link></Button>
-            ) : <Button size="sm" variant="outline" disabled><FileText className="h-4 w-4" />Open Order</Button>}
+              <Button size="sm" variant="outline" asChild><Link to="/admin/orders/$orderId" params={{ orderId: active.applicationId }} target="_blank"><FileText className="h-4 w-4" />Open Order</Link></Button>
+            ) : <Button size="sm" variant="outline" disabled title="No order matched"><FileText className="h-4 w-4" />Open Order</Button>}
           </div>
           <p className="text-[11px] text-muted-foreground">{NOT_SUPPORTED}</p>
         </div>
