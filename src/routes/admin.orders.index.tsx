@@ -372,6 +372,8 @@ function OrdersListPage() {
   const role = useRole();
   const userPerms = usePermissions();
   const isAdmin = role.hasAny(["admin", "super_admin"]) || Boolean(userPerms.perms?.isAdmin);
+  const isManager = role.has("manager");
+  const isPrivileged = isAdmin || isManager;
 
   const hideMoney = role.hideMoney();
   const navigate = useNavigate();
@@ -406,7 +408,7 @@ function OrdersListPage() {
   const [stageFilter, setStageFilter] = useState<string>(savedState?.stageFilter ?? "all");
   const [dateFrom, setDateFrom] = useState<string>(savedState?.dateFrom ?? todayKey);
   const [dateTo, setDateTo] = useState<string>(savedState?.dateTo ?? todayKey);
-  const [bucket, setBucket] = useState<Bucket>(savedState?.bucket ?? (isAdmin ? "all" : "needs_action"));
+  const [bucket, setBucket] = useState<Bucket>(savedState?.bucket ?? (isPrivileged ? "all" : "needs_action"));
   const [pendingAge, setPendingAge] = useState<PendingAge>(savedState?.pendingAge ?? "any");
   const [customDays, setCustomDays] = useState<string>(savedState?.customDays ?? "");
   const [sortField, setSortField] = useState<"created_at" | "stage" | "stage_journey">(savedState?.sortField ?? "created_at");
@@ -789,7 +791,7 @@ const hotRows = useMemo(() => {
     (dateFrom !== "" && dateFrom !== todayKey) ||
     (dateTo !== "" && dateTo !== todayKey) ||
     pendingAge !== "any" ||
-    bucket !== (isAdmin ? "all" : "needs_action");
+    bucket !== (isPrivileged ? "all" : "needs_action");
 
   const resetFilters = () => {
     setFulfillmentStatus("all");
@@ -803,7 +805,7 @@ const hotRows = useMemo(() => {
     setCustomDays("");
     setSortField("created_at");
     setSortOrder("desc");
-    setBucket(isAdmin ? "all" : "needs_action");
+    setBucket(isPrivileged ? "all" : "needs_action");
     setPage(1);
   };
 
@@ -811,7 +813,7 @@ const hotRows = useMemo(() => {
     const handleReset = () => resetFilters();
     window.addEventListener("reset-orders-filters", handleReset);
     return () => window.removeEventListener("reset-orders-filters", handleReset);
-  }, [isAdmin]);
+  }, [isPrivileged]);
 
   const handleSortToggle = (field: "created_at" | "stage") => {
     if (sortField === field) {
@@ -1152,11 +1154,11 @@ return (
     {/* KPI Cards Row */}
     <div className={cn(
       "grid gap-2 w-full",
-      isAdmin
+      isPrivileged
         ? "grid-cols-2 sm:grid-cols-3 md:grid-cols-6 lg:grid-cols-11"
         : "grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-10"
     )}>
-      {(isAdmin ? BUCKET_CARDS : BUCKET_CARDS.filter((b) => !b.adminOnly)).map((b) => {
+      {(isPrivileged ? BUCKET_CARDS : BUCKET_CARDS.filter((b) => !b.adminOnly)).map((b) => {
         const active = bucket === b.id;
         const countVal = Number((counts as any)[b.id] ?? 0);
         const IconComponent = b.icon;
@@ -1479,7 +1481,23 @@ return (
             {isLoading && (
               <tr><td colSpan={colCount} className="px-4 py-12 text-center text-slate-500">Loading orders…</td></tr>
             )}
-            {!isLoading && rows.length === 0 && (
+            {!isLoading && isManager && !isAdmin && (
+              <tr>
+                <td colSpan={colCount} className="px-6 py-14 text-center">
+                  <div className="max-w-md mx-auto space-y-3">
+                    <div className="inline-flex items-center justify-center size-12 rounded-full bg-indigo-50 text-indigo-600">
+                      <LayoutGrid className="size-6" />
+                    </div>
+                    <div className="text-sm font-semibold text-slate-900">Manager Aggregate Dashboard</div>
+                    <p className="text-xs text-slate-500 leading-relaxed">
+                      Viewing workforce aggregate metrics and counts for the selected date range and assignee filters.
+                      Individual order records are not displayed on this dashboard. Use Global Search to search for and open any order.
+                    </p>
+                  </div>
+                </td>
+              </tr>
+            )}
+            {!isLoading && !(isManager && !isAdmin) && rows.length === 0 && (
               <tr><td colSpan={colCount} className="px-4 py-12 text-center text-slate-500">No orders in this view.</td></tr>
             )}
             {!isLoading && bucket === "hot_orders" &&
@@ -1581,7 +1599,18 @@ return (
           Loading orders…
         </div>
       )}
-      {!isLoading && rows.length === 0 && (
+      {!isLoading && isManager && !isAdmin && (
+        <div className="p-8 text-center bg-white rounded-xl border border-slate-200 space-y-2">
+          <div className="inline-flex items-center justify-center size-10 rounded-full bg-indigo-50 text-indigo-600">
+            <LayoutGrid className="size-5" />
+          </div>
+          <div className="text-sm font-semibold text-slate-900">Manager Aggregate Dashboard</div>
+          <p className="text-xs text-slate-500 max-w-sm mx-auto">
+            Viewing workforce aggregate metrics. Use Global Search to search for and open any order.
+          </p>
+        </div>
+      )}
+      {!isLoading && !(isManager && !isAdmin) && rows.length === 0 && (
         <div className="p-8 text-center text-sm text-slate-500 bg-white rounded-xl border border-slate-200">
           No orders match the selected filters.
         </div>
@@ -1679,7 +1708,7 @@ return (
     </div>
 
     {/* Pagination bar (Bottom) */}
-    {total > pageSize && (
+    {total > pageSize && !(isManager && !isAdmin) && (
       <div className="flex items-center justify-between px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-xs text-slate-600 shadow-xs mt-2">
         <div>
           Page {page} of {Math.max(1, Math.ceil(total / pageSize))} · {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, total)} of {total.toLocaleString("en-IN")}

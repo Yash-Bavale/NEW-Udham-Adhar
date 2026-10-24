@@ -1,9 +1,9 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
-import { MessageSquare, StickyNote } from "lucide-react";
+import { MessageSquare, StickyNote, ShieldAlert, ArrowLeft } from "lucide-react";
 
 import { getOrderDetailV2, updateOrderAssignee, addOrderNoteV2 } from "@/lib/crm/orders-v2.functions";
 import { listStaff } from "@/lib/crm/leads-admin.functions";
@@ -28,9 +28,10 @@ function OrderDetailPage() {
   const staffFn = useServerFn(listStaff);
   const assignFn = useServerFn(updateOrderAssignee);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error } = useQuery({
     queryKey: ["admin.order", orderId],
     queryFn: () => detailFn({ data: { orderId } }),
+    retry: false,
   });
   const { data: staffData } = useQuery({
     queryKey: ["admin.staff"],
@@ -47,7 +48,25 @@ function OrderDetailPage() {
       </div>
     );
   }
-  if (!data) return null;
+
+  if (isError || !data) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[50vh] p-8 text-center bg-white rounded-2xl border border-slate-200 mt-6 shadow-xs">
+        <div className="p-4 bg-rose-50 text-rose-600 rounded-full mb-4">
+          <ShieldAlert className="size-10" />
+        </div>
+        <h2 className="text-xl font-bold text-slate-900 mb-2">Access Denied</h2>
+        <p className="text-sm text-slate-500 max-w-md mb-6 leading-relaxed">
+          {(error as any)?.message || "You do not have permission to view this order. Employees can only view orders assigned to them."}
+        </p>
+        <Link to="/admin/orders">
+          <Button variant="outline" className="gap-2">
+            <ArrowLeft className="size-4" /> Return to Orders
+          </Button>
+        </Link>
+      </div>
+    );
+  }
 
   const { application, lead, paymentSuccessfulAt, stageMeta } = data as any;
   const stage: OrderStage = computeOrderStage({ ...(lead ?? {}), payment_successful_at: paymentSuccessfulAt }, application);

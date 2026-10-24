@@ -25,6 +25,9 @@ export const customerSideDelay = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((raw: unknown) => CustomerSideDelayInput.parse(raw))
   .handler(async ({ data, context }) => {
+    const { assertCanAccessOrder } = await import("@/lib/crm/order-auth.server");
+    await assertCanAccessOrder({ orderId: data.orderId, userId: context.userId });
+
     // 1. Transition (RLS/security-definer enforces map)
     const { data: updated, error: tErr } = await context.supabase.rpc("transition_order_status", {
       _order_id: data.orderId,
@@ -155,6 +158,9 @@ export const ourSideDelay = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((raw: unknown) => OurSideDelayInput.parse(raw))
   .handler(async ({ data, context }) => {
+    const { assertCanAccessOrder } = await import("@/lib/crm/order-auth.server");
+    await assertCanAccessOrder({ orderId: data.orderId, userId: context.userId });
+
     const { data: updated, error: tErr } = await context.supabase.rpc("transition_order_status", {
       _order_id: data.orderId,
       _new_status: "OUR_SIDE_DELAY",
@@ -219,6 +225,12 @@ export const ourSideDelay = createServerFn({ method: "POST" })
 // ─────────────────────── Shared helper: fetch order + customer ───────────────────────
 
 async function loadOrderContext(supabase: any, orderId: string) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (user) {
+    const { assertCanAccessOrder } = await import("@/lib/crm/order-auth.server");
+    await assertCanAccessOrder({ orderId, userId: user.id });
+  }
+
   const { data: order, error } = await supabase
     .from("applications")
     .select("id, lead_id, customer_id, order_status, application_code, service_id, assigned_to, workflow_status, closure_stage, refund_approved_at, refund_approved_by, refund_gateway_ref, refund_processed_at")
@@ -309,6 +321,12 @@ async function transition(
   newStatus: string,
   extras: { reasonId?: string | null; remarks?: string | null; force?: boolean; employeeId?: string; actionType?: string } = {},
 ) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (user) {
+    const { assertCanAccessOrder } = await import("@/lib/crm/order-auth.server");
+    await assertCanAccessOrder({ orderId, userId: user.id });
+  }
+
   const { data, error } = await supabase.rpc("transition_order_status", {
     _order_id: orderId,
     _new_status: newStatus,

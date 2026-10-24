@@ -83,8 +83,9 @@ export const scheduleOrderCallback = createServerFn({ method: "POST" })
       .parse(i),
   )
   .handler(async ({ data, context }) => {
-    await assertStaff(context.supabase, context.userId);
     const admin = await getAdmin();
+    const { assertCanAccessOrder } = await import("@/lib/crm/order-auth.server");
+    await assertCanAccessOrder({ orderId: data.orderId, userId: context.userId, admin });
     const staff = await getStaff(context.userId);
 
     // 1. Duplicate & Idempotency Protection: Check if request was already processed
@@ -317,8 +318,9 @@ export const cancelOrderCallback = createServerFn({ method: "POST" })
       .parse(i),
   )
   .handler(async ({ data, context }) => {
-    await assertStaff(context.supabase, context.userId);
     const admin = await getAdmin();
+    const { assertCanAccessOrder } = await import("@/lib/crm/order-auth.server");
+    await assertCanAccessOrder({ orderId: data.orderId, userId: context.userId, admin });
     const staff = await getStaff(context.userId);
     const now = new Date().toISOString();
 
@@ -413,8 +415,9 @@ export const completeOrderCallback = createServerFn({ method: "POST" })
       .parse(i),
   )
   .handler(async ({ data, context }) => {
-    await assertStaff(context.supabase, context.userId);
     const admin = await getAdmin();
+    const { assertCanAccessOrder } = await import("@/lib/crm/order-auth.server");
+    await assertCanAccessOrder({ orderId: data.orderId, userId: context.userId, admin });
     const staff = await getStaff(context.userId);
     const now = new Date();
     const nowIso = now.toISOString();
@@ -821,8 +824,9 @@ export const getActiveOrderCallback = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => z.object({ orderId: z.string().uuid() }).parse(i))
   .handler(async ({ data, context }) => {
-    await assertStaff(context.supabase);
     const admin = await getAdmin();
+    const { assertCanAccessOrder } = await import("@/lib/crm/order-auth.server");
+    await assertCanAccessOrder({ orderId: data.orderId, userId: context.userId, admin });
 
     const [{ data: row, error }, { data: app }] = await Promise.all([
       admin
@@ -915,8 +919,9 @@ export const getOrderCallbackHistory = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => z.object({ orderId: z.string().uuid() }).parse(i))
   .handler(async ({ data, context }) => {
-    await assertStaff(context.supabase);
     const admin = await getAdmin();
+    const { assertCanAccessOrder } = await import("@/lib/crm/order-auth.server");
+    await assertCanAccessOrder({ orderId: data.orderId, userId: context.userId, admin });
 
     try {
       const [{ data: historyRows }, { data: appEvents }, { data: schedulers }] = await Promise.all([

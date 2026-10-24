@@ -811,7 +811,9 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await assertStaff(context.supabase, context.userId);
     const admin = await getAdmin();
-    const isAdmin = await isUserAdmin(context.supabase, context.userId);
+    const { getStaffRoleInfo } = await import("@/lib/crm/order-auth.server");
+    const staffInfo = await getStaffRoleInfo(admin, context.userId);
+    const { isAdmin, isManager } = staffInfo;
     const perm = await getUserModulePermission(context.supabase, context.userId, "orders");
 
     if (!perm.canView) {
@@ -865,7 +867,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       if (data.serviceId && data.serviceId !== "all" && data.serviceId.trim() !== "") {
         query = query.eq("service_id", data.serviceId);
       }
-      if (!isAdmin) {
+      if (!isAdmin && !isManager) {
         query = query.eq("assigned_to", context.userId);
       } else if (data.assignedTo && data.assignedTo !== "all" && data.assignedTo.trim() !== "") {
         if (data.assignedTo === "unassigned") {
@@ -2055,7 +2057,9 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
     const maxPage = Math.max(1, Math.ceil(total / data.pageSize));
     const page = Math.min(Math.max(1, data.page), maxPage);
     const start = (page - 1) * data.pageSize;
-    const rows = filtered.slice(start, start + data.pageSize);
+    // Security / Phase 2: For Managers, the dashboard endpoint returns aggregate counts only.
+    // Individual order records are withheld from the dashboard payload.
+    const rows = (isManager && !isAdmin) ? [] : filtered.slice(start, start + data.pageSize);
 
     return {
       rows,
@@ -2073,8 +2077,9 @@ export const getOrderDetailV2 = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => z.object({ orderId: z.string().uuid() }).parse(i))
   .handler(async ({ data, context }) => {
-    await assertStaff(context.supabase);
     const admin = await getAdmin();
+    const { assertCanAccessOrder } = await import("@/lib/crm/order-auth.server");
+    await assertCanAccessOrder({ orderId: data.orderId, userId: context.userId, admin });
 
     const { data: app, error } = await admin
       .from("applications")
@@ -2316,8 +2321,9 @@ export const getOrderTimelineEvents = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => z.object({ orderId: z.string().uuid() }).parse(i))
   .handler(async ({ data, context }) => {
-    await assertStaff(context.supabase);
     const admin = await getAdmin();
+    const { assertCanAccessOrder } = await import("@/lib/crm/order-auth.server");
+    await assertCanAccessOrder({ orderId: data.orderId, userId: context.userId, admin });
 
     const [eventsRes, emailLogRows, templateRows] = await Promise.all([
       admin
@@ -2351,8 +2357,9 @@ export const getOrderTickets = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => z.object({ orderId: z.string().uuid(), customerId: z.string().uuid().nullable().optional() }).parse(i))
   .handler(async ({ data, context }) => {
-    await assertStaff(context.supabase);
     const admin = await getAdmin();
+    const { assertCanAccessOrder } = await import("@/lib/crm/order-auth.server");
+    await assertCanAccessOrder({ orderId: data.orderId, userId: context.userId, admin });
 
     const [orderTicketsRes, customerTicketsRes] = await Promise.all([
       admin
@@ -2386,7 +2393,12 @@ export const updateOrderAssignee = createServerFn({ method: "POST" })
     z.object({ orderId: z.string().uuid(), assignedTo: z.string().uuid().nullable() }).parse(i),
   )
   .handler(async ({ data, context }) => {
-    await assertStaff(context.supabase, context.userId);
+    const admin = await getAdmin();
+    const { getStaffRoleInfo } = await import("@/lib/crm/order-auth.server");
+    const roleInfo = await getStaffRoleInfo(admin, context.userId);
+    if (!roleInfo.isAdmin && !roleInfo.isManager) {
+      throw new Error("Forbidden: Only Admin and Manager can reassign orders");
+    }
     const { assignOrderCanonical } = await import("./assignment-engine.server");
 
     const res = await assignOrderCanonical({
@@ -2429,8 +2441,9 @@ export const updateFulfillmentStatus = createServerFn({ method: "POST" })
       .parse(i),
   )
   .handler(async ({ data, context }) => {
-    await assertStaff(context.supabase);
     const admin = await getAdmin();
+    const { assertCanAccessOrder } = await import("@/lib/crm/order-auth.server");
+    await assertCanAccessOrder({ orderId: data.orderId, userId: context.userId, admin });
 
     const { data: app } = await admin
       .from("applications")
@@ -2795,8 +2808,9 @@ export const resendOrderCertificate = createServerFn({ method: "POST" })
     z.object({ orderId: z.string().uuid() }).parse(i),
   )
   .handler(async ({ data, context }) => {
-    await assertStaff(context.supabase);
     const admin = await getAdmin();
+    const { assertCanAccessOrder } = await import("@/lib/crm/order-auth.server");
+    await assertCanAccessOrder({ orderId: data.orderId, userId: context.userId, admin });
 
     const { data: cert, error: certErr } = await admin
       .from("certificates")
@@ -3064,11 +3078,13 @@ export const requestOrderDocumentUpload = createServerFn({ method: "POST" })
       .parse(i),
   )
   .handler(async ({ data, context }) => {
-    await assertStaff(context.supabase);
+    const admin = await getAdmin();
+    const { assertCanAccessOrder } = await import("@/lib/crm/order-auth.server");
+    await assertCanAccessOrder({ orderId: data.orderId, userId: context.userId, admin });
+
     if (!ALLOWED_MIME.includes(data.mimeType.toLowerCase())) {
       throw new Error("Unsupported file type. Use PDF, JPG, PNG or WEBP.");
     }
-    const admin = await getAdmin();
     const ext = (data.fileName.split(".").pop() || "bin").toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 6) || "bin";
     const safe = data.docType.replace(/[^a-z0-9_-]/gi, "_").slice(0, 40);
     const path = `orders/${data.orderId}/${safe}-${Date.now()}.${ext}`;
@@ -3092,8 +3108,10 @@ export const confirmOrderDocumentUpload = createServerFn({ method: "POST" })
       .parse(i),
   )
   .handler(async ({ data, context }) => {
-    await assertStaff(context.supabase);
     const admin = await getAdmin();
+    const { assertCanAccessOrder } = await import("@/lib/crm/order-auth.server");
+    await assertCanAccessOrder({ orderId: data.orderId, userId: context.userId, admin });
+
     const { data: app } = await admin
       .from("applications")
       .select("lead_id")
@@ -3135,13 +3153,31 @@ export const getOrderDocumentSignedUrl = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => z.object({ path: z.string().min(1) }).parse(i))
   .handler(async ({ data, context }) => {
-    await assertStaff(context.supabase, context.userId);
     const admin = await getAdmin();
+    const { getStaffRoleInfo, assertCanAccessOrder } = await import("@/lib/crm/order-auth.server");
+    const roleInfo = await getStaffRoleInfo(admin, context.userId);
+    if (!roleInfo.isStaff) throw new Error("Forbidden: Staff access required");
+
     // Normalise legacy paths: full storage URLs or "documents/..." prefixes.
     let path = data.path.trim();
     const m = path.match(/\/object\/(?:public|sign|authenticated)\/documents\/([^?]+)/);
     if (m) path = decodeURIComponent(m[1]);
     path = path.replace(/^\/+/, "").replace(/^documents\//, "");
+
+    // If regular employee, verify that the document belongs to an application assigned to this user
+    if (!roleInfo.isAdmin && !roleInfo.isManager) {
+      const { data: docRow } = await admin
+        .from("documents")
+        .select("application_id")
+        .or(`file_path.eq.${path},file_path.ilike.%${path}%`)
+        .limit(1)
+        .maybeSingle();
+
+      if (docRow?.application_id) {
+        await assertCanAccessOrder({ orderId: docRow.application_id, userId: context.userId, admin });
+      }
+    }
+
     try {
       const { data: signed, error } = await admin.storage.from("documents").createSignedUrl(path, 600);
       if (error || !signed?.signedUrl) {
@@ -3161,8 +3197,10 @@ export const addOrderNoteV2 = createServerFn({ method: "POST" })
     z.object({ orderId: z.string().uuid(), note: z.string().trim().min(1).max(2000) }).parse(i),
   )
   .handler(async ({ data, context }) => {
-    await assertStaff(context.supabase);
     const admin = await getAdmin();
+    const { assertCanAccessOrder } = await import("@/lib/crm/order-auth.server");
+    await assertCanAccessOrder({ orderId: data.orderId, userId: context.userId, admin });
+
     const { data: app } = await admin
       .from("applications")
       .select("lead_id, customer_id")
@@ -3209,6 +3247,9 @@ export const changeOrderService = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => ChangeServiceInput.parse(i))
   .handler(async ({ data, context }) => {
     const admin = await getAdmin();
+    const { assertCanAccessOrder } = await import("@/lib/crm/order-auth.server");
+    await assertCanAccessOrder({ orderId: data.orderId, userId: context.userId, admin });
+
     const isAdmin = await isUserAdmin(context.supabase, context.userId);
     if (!isAdmin) {
       const { data: roleRows } = await context.supabase
@@ -3486,8 +3527,11 @@ export const changeOrderService = createServerFn({ method: "POST" })
 export const resendServiceChangeEmail = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => z.object({ orderId: z.string().uuid() }).parse(d))
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
     const admin = await getAdmin();
+    const { assertCanAccessOrder } = await import("@/lib/crm/order-auth.server");
+    await assertCanAccessOrder({ orderId: data.orderId, userId: context.userId, admin });
+
     const { data: app } = await admin
       .from("applications")
       .select("id, lead_id, customer_id, service_id")

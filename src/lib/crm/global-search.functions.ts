@@ -38,17 +38,19 @@ export const globalSearch = createServerFn({ method: "POST" })
       .map((t) => t.trim())
       .filter((t) => t.length >= 2);
 
-    const [leadsPerm, ordersPerm, invoicesPerm, complaintsPerm, supportPerm, { data: roles }] = await Promise.all([
+    const { getStaffRoleInfo } = await import("@/lib/crm/order-auth.server");
+    const [leadsPerm, ordersPerm, invoicesPerm, complaintsPerm, supportPerm, staffInfo] = await Promise.all([
       getUserModulePermission(admin, userId, "leads"),
       getUserModulePermission(admin, userId, "orders"),
       getUserModulePermission(admin, userId, "invoices"),
       getUserModulePermission(admin, userId, "complaints"),
       getUserModulePermission(admin, userId, "support"),
-      admin.from("user_roles").select("role").eq("user_id", userId),
+      getStaffRoleInfo(admin, userId),
     ]);
 
-    const roleList = (roles ?? []).map((r: { role: string }) => r.role);
-    const isAdmin = roleList.some((r: string) => r === "admin" || r === "super_admin");
+    const { isAdmin, isManager } = staffInfo;
+    const canSearchAllOrders = isAdmin || isManager;
+    const canSearchAllLeads = isAdmin || isManager || Boolean(leadsPerm.scopeAll);
 
     // Build search filters for multi-token / natural language queries
     const leadFilter = tokens.length > 1
@@ -64,7 +66,7 @@ export const globalSearch = createServerFn({ method: "POST" })
       .select("id, lead_code, name, email, mobile, service, status, lead_status_v2, notes, created_at, customer_id, assigned_to")
       .or(leadFilter)
       .limit(30);
-    if (!isAdmin && !leadsPerm.scopeAll) {
+    if (!canSearchAllLeads) {
       leadQuery = leadQuery.eq("assigned_to", userId);
     }
 
@@ -74,7 +76,7 @@ export const globalSearch = createServerFn({ method: "POST" })
       .ilike("application_code", like)
       .eq("is_deleted", false)
       .limit(30);
-    if (!isAdmin && !ordersPerm.scopeAll) {
+    if (!canSearchAllOrders) {
       appByCodeQuery = appByCodeQuery.eq("assigned_to", userId);
     }
 
@@ -93,9 +95,9 @@ export const globalSearch = createServerFn({ method: "POST" })
             .limit(5)
         : Promise.resolve({ data: [] }),
       admin.from("certificates")
-        .select("id, certificate_number, file_name, created_at")
+        .select("id, application_id, certificate_number, file_name, created_at")
         .or(`certificate_number.ilike.${like},file_name.ilike.${like}`)
-        .limit(5),
+        .limit(10),
       complaintsPerm.canView
         ? admin.from("complaints")
             .select("id, complaint_number, status, severity, category, description, created_at")
@@ -134,7 +136,7 @@ export const globalSearch = createServerFn({ method: "POST" })
         .order("created_at", { ascending: false })
         .limit(30);
 
-      if (!isAdmin && !ordersPerm.scopeAll) {
+      if (!canSearchAllOrders) {
         qLead = qLead.eq("assigned_to", userId);
         qCust = qCust.eq("assigned_to", userId);
       }
@@ -200,6 +202,11 @@ export const globalSearch = createServerFn({ method: "POST" })
 
     // 1. ORDERS / APPLICATIONS
     allApps.forEach((r: any) => {
+      // Security guard: Ensure unauthorized orders are never exposed to employees
+      if (!canSearchAllOrders && r.assigned_to !== userId) {
+        return;
+      }
+
       const lead = r.lead_id ? leadMap.get(r.lead_id) : null;
       const cust = r.customer_id ? custMap.get(r.customer_id) : (lead?.customer_id ? custMap.get(lead.customer_id) : null);
       const customerName = lead?.name || cust?.name || "Order";
