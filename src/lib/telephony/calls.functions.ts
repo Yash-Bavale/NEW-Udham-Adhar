@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { CALL_OUTCOMES, wrapUpInput } from "./wrapup";
 
 export type CallView = {
   id: string; callId: string; direction: string; status: string;
@@ -137,6 +138,7 @@ export const listLiveCalls = createServerFn({ method: "GET" })
 
 export type CallHistoryRow = CallView & {
   provider: string; calledNumber: string | null; recordingUrl: string | null; hangupCause: string | null;
+  notes: string | null; nextAction: string | null; followUpAt: string | null;
 };
 
 export const CALL_HISTORY_PAGE_SIZE = 25;
@@ -155,6 +157,9 @@ export const callHistoryInput = z.object({
   direction: z.enum(["all", "inbound", "outbound"]).default("all"),
   status: z.enum(["all", "answered", "ended", "missed", "no_response", "ringing"]).default("all"),
   page: z.number().int().min(0).max(10_000).default(0),
+  number: z.string().max(20).optional(),
+  employeeId: z.string().uuid().nullable().optional(),
+  disposition: z.string().max(60).optional(),
 }).refine((v) => v.from <= v.to, { message: "Start date must be on or before end date" })
   .refine((v) => (Date.parse(v.to) - Date.parse(v.from)) / 86_400_000 <= 92, { message: "Date range can be at most 92 days" });
 
@@ -170,6 +175,11 @@ export async function queryCallHistory(sb: any, adminDb: any, userId: string, da
   let q = sb.from("telephony_calls").select("*", { count: "exact" }).gte("started_at", fromIso).lt("started_at", toIso);
   if (data.direction !== "all") q = q.eq("direction", data.direction);
   if (data.status !== "all") q = q.eq("status", data.status);
+  const digits = (data.number ?? "").replace(/\D/g, "").slice(-10);
+  if (digits.length >= 4) q = q.or(`caller_number.like.%${digits}%,called_number.like.%${digits}%`);
+  if (data.employeeId) q = q.eq("employee_id", data.employeeId);
+  if (data.disposition === "none") q = q.is("disposition", null);
+  else if (data.disposition) q = q.eq("disposition", data.disposition);
   const { data: rows, count, error } = await q.order("started_at", { ascending: false }).range(offset, offset + CALL_HISTORY_PAGE_SIZE - 1);
   if (error) throw new Error(error.message);
   const views = await enrich(adminDb, rows ?? []);
@@ -178,9 +188,15 @@ export async function queryCallHistory(sb: any, adminDb: any, userId: string, da
     const r: any = byId.get(v.id);
     return { ...v, provider: r.provider, calledNumber: r.called_number ?? null,
       recordingUrl: typeof r.recording_url === "string" && /^https?:\/\//.test(r.recording_url) ? r.recording_url : null,
-      hangupCause: r.hangup_cause ?? null };
+      hangupCause: r.hangup_cause ?? null, notes: r.disposition_notes ?? null,
+      nextAction: r.next_action ?? null, followUpAt: r.follow_up_at ?? null };
   });
-  return { items, total: count ?? 0, page: data.page, pageSize: CALL_HISTORY_PAGE_SIZE };
+  const { data: staff } = await adminDb.from("telephony_calls").select("employee_id").not("employee_id", "is", null)
+    .gte("started_at", fromIso).lt("started_at", toIso).limit(1000);
+  const empIds = Array.from(new Set((staff ?? []).map((r: any) => r.employee_id)));
+  const { data: emps } = empIds.length ? await adminDb.from("profiles").select("id, full_name, display_name, email").in("id", empIds) : { data: [] };
+  const employees = (emps ?? []).map((e: any) => ({ id: e.id, name: e.full_name || e.display_name || e.email?.split("@")[0] || "Employee" }));
+  return { items, total: count ?? 0, page: data.page, pageSize: CALL_HISTORY_PAGE_SIZE, employees, outcomes: CALL_OUTCOMES };
 }
 
 export const listCallHistory = createServerFn({ method: "GET" })
