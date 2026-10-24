@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { PhoneIncoming, User, FileText, X } from "lucide-react";
+import { PhoneIncoming, User, FileText, X, Phone, PhoneOff } from "lucide-react";
+import { browserPhone } from "@/lib/telephony/browser-phone-bus";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { getMyCallState, saveCallDisposition, DISPOSITIONS, type CallView } from "@/lib/telephony/calls.functions";
@@ -107,7 +108,14 @@ export function TelephonyPanel() {
               <Button size="sm" variant="outline" asChild><Link to="/admin/orders/$orderId" params={{ orderId: active.applicationId }} target="_blank"><FileText className="h-4 w-4" />Open Order</Link></Button>
             ) : <Button size="sm" variant="outline" disabled title="No order matched"><FileText className="h-4 w-4" />Open Order</Button>}
           </div>
-          {active.callId?.startsWith("webrtc:") ? null : <p className="text-[11px] text-muted-foreground">{NOT_SUPPORTED}</p>}
+          {active.direction !== "outbound" && active.status === "ringing" ? (
+            <div className="grid grid-cols-2 gap-2">
+              <Button size="sm" onClick={() => { if (!browserPhone.answer()) toast.error(NOT_SUPPORTED); }}><Phone className="h-4 w-4" />Pick Call</Button>
+              <Button size="sm" variant="destructive" onClick={() => { if (!browserPhone.reject()) toast.error(NOT_SUPPORTED); }}><PhoneOff className="h-4 w-4" />Reject</Button>
+            </div>
+          ) : active.status === "answered" ? (
+            <Button size="sm" variant="destructive" className="w-full" onClick={() => { if (!browserPhone.hangup()) toast.error("This call is not on the browser phone — end it on the phone that answered it."); }}><PhoneOff className="h-4 w-4" />End Call</Button>
+          ) : null}
         </div>
       ) : pending && open ? (
         <div className="p-4 space-y-3">
