@@ -42,6 +42,15 @@ export function summarizeStats(reports: Iterable<any>): string {
   ].join(" | ");
 }
 
+/** Caller number from an incoming INVITE: P-Asserted-Identity, Remote-Party-ID, From user, then display name. */
+export function callerFromInvite(inv: any): string | null {
+  const digits = (v: unknown) => { const d = String(v ?? "").replace(/[^\d+]/g, ""); return /\d{5,}/.test(d) ? d : null; };
+  const hdr = (n: string) => { try { return inv?.request?.getHeader?.(n) ?? null; } catch { return null; } };
+  const fromHdr = (h: string | null) => { const m = h?.match(/sip:([^@;>]+)/i); return m ? digits(m[1]) : null; };
+  return fromHdr(hdr("P-Asserted-Identity")) ?? fromHdr(hdr("Remote-Party-ID"))
+    ?? digits(inv?.remoteIdentity?.uri?.user) ?? digits(inv?.remoteIdentity?.displayName) ?? null;
+}
+
 export class CallerDeskWebRtcEngine {
   private snap: EngineSnapshot = { state: "DISCONNECTED", error: null, remoteNumber: null, muted: false, connectedAt: null, direction: null, held: false, ringMuted: false, ringingSince: null };
   private listeners = new Set<Listener>();
@@ -59,10 +68,16 @@ export class CallerDeskWebRtcEngine {
   get snapshot() { return this.snap; }
   subscribe(l: Listener) { this.listeners.add(l); l(this.snap); return () => { this.listeners.delete(l); }; }
 
+  private endTimer: ReturnType<typeof setTimeout> | null = null;
   private emit(e: PhoneEvent, patch: Partial<EngineSnapshot> = {}) {
+    const prev = this.snap.state;
     this.snap = { ...this.snap, ...patch, state: nextState(this.snap.state, e) };
     if (this.snap.state !== "RINGING") { this.stopRing(); if (this.snap.ringingSince) this.snap = { ...this.snap, ringingSince: null }; }
     if (this.snap.state !== "CONNECTED" && this.snap.held) this.snap = { ...this.snap, held: false };
+    if (prev !== this.snap.state) this.log({ event: "STATE_CHANGED", detail: `${prev}->${this.snap.state}` });
+    if (this.endTimer) { clearTimeout(this.endTimer); this.endTimer = null; }
+    // Return to Ready after a call ends so a stale "Call ended" never blocks the next incoming call view.
+    if (this.snap.state === "ENDED") this.endTimer = setTimeout(() => { this.endTimer = null; if (this.snap.state === "ENDED" && !this.session) this.emit("reset"); }, 4000);
     this.listeners.forEach((l) => l(this.snap));
   }
 
@@ -87,6 +102,9 @@ export class CallerDeskWebRtcEngine {
       if (!uri) throw new Error("Invalid SIP extension or domain.");
       this.ua = new UserAgent({
         uri, displayName: cfg.displayName, authorizationUsername: cfg.extension, authorizationPassword: cfg.password,
+        // Register the Contact under the extension (SIP.js otherwise uses a random user part), and
+        // deliver INVITEs to onInvite immediately; we send 180 Ringing ourselves.
+        contactName: cfg.extension, sendInitialProvisionalResponse: false,
         transportOptions: { server: cfg.wssUrl, connectionTimeout: 8 }, logLevel: "error",
         delegate: {
           onInvite: (inv: any) => this.onInvite(inv),
@@ -313,12 +331,21 @@ export class CallerDeskWebRtcEngine {
   }
 
   private onInvite(inv: any) {
-    if (this.session) { this.log({ event: "INBOUND_BUSY", sipCode: 486 }); void inv.reject({ statusCode: 486 }); return; }
-    const from = inv.remoteIdentity?.uri?.user ?? null;
+    this.log({ event: "INBOUND_INVITE_RECEIVED" });
+    if (this.session) {
+      if (this.session === inv) return; // duplicate delivery of the same INVITE
+      this.log({ event: "INBOUND_BUSY", sipCode: 486 }); void inv.reject({ statusCode: 486 }).catch(() => {}); return;
+    }
+    const from = callerFromInvite(inv);
+    this.log({ event: "INBOUND_CALLER", detail: from ? "number extracted" : "no number" });
     this.wire(inv);
+    inv.delegate = { ...(inv.delegate ?? {}), onCancel: () => this.log({ event: "INBOUND_CANCELLED" }) };
     this.emit("incoming", { remoteNumber: from, direction: "inbound", error: null, connectedAt: null, ringingSince: Date.now() });
+    if (this.snap.state !== "RINGING") { this.log({ event: "INBOUND_STATE_MISMATCH", detail: this.snap.state }); return; }
     this.startRing();
     this.log({ event: "INBOUND_RINGING" });
+    Promise.resolve().then(() => inv.progress?.()).then(() => this.log({ event: "INBOUND_PROGRESS_SENT" }))
+      .catch((e: any) => this.log({ event: "INBOUND_PROGRESS_FAILED", reason: String(e?.message ?? e) }));
   }
 
   async dial(number: string) {
@@ -346,12 +373,16 @@ export class CallerDeskWebRtcEngine {
   }
 
   async answer() {
-    if (this.snap.state !== "RINGING" || !this.session) return;
-    this.stopRing();
-    if (!(await this.mic())) return;
-    try { this.log({ event: "INBOUND_ANSWER" }); await this.session.accept({ sessionDescriptionHandlerOptions: { constraints: { audio: true, video: false } } }); }
-    catch { this.snap = { ...this.snap, error: "Could not answer the call. Retry or reject the incoming call." }; this.listeners.forEach((l) => l(this.snap)); this.log({ event: "ANSWER_FAILED" }); }
+    if (this.snap.state !== "RINGING" || !this.session || this.answering) return;
+    this.answering = true; this.stopRing();
+    try { this.log({ event: "INBOUND_ANSWER" }); await this.session.accept({ sessionDescriptionHandlerOptions: { constraints: { audio: true, video: false } } }); this.log({ event: "INBOUND_ACCEPTED" }); }
+    catch (e: any) {
+      const denied = e?.name === "NotAllowedError" || /permission/i.test(String(e?.message));
+      this.snap = { ...this.snap, error: denied ? "Microphone permission denied. Allow microphone access in the browser." : "Could not answer the call. Retry or reject the incoming call." };
+      this.listeners.forEach((l) => l(this.snap)); this.log({ event: "ANSWER_FAILED", reason: e?.name ?? null });
+    } finally { this.answering = false; }
   }
+  private answering = false;
   async reject() {
     if (this.snap.state !== "RINGING" || !this.session) return;
     this.stopRing(); this.log({ event: "INBOUND_REJECT" });

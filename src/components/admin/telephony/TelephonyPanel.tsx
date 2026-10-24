@@ -107,7 +107,7 @@ export function TelephonyPanel() {
               <Button size="sm" variant="outline" asChild><Link to="/admin/orders/$orderId" params={{ orderId: active.applicationId }} target="_blank"><FileText className="h-4 w-4" />Open Order</Link></Button>
             ) : <Button size="sm" variant="outline" disabled title="No order matched"><FileText className="h-4 w-4" />Open Order</Button>}
           </div>
-          <p className="text-[11px] text-muted-foreground">{NOT_SUPPORTED}</p>
+          {active.callId?.startsWith("webrtc:") ? null : <p className="text-[11px] text-muted-foreground">{NOT_SUPPORTED}</p>}
         </div>
       ) : pending && open ? (
         <div className="p-4 space-y-3">
