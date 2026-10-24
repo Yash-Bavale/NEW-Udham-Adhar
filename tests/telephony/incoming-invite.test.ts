@@ -14,3 +14,16 @@ describe("incoming INVITE", () => {
   });
   it("outbound still dials from Ready", () => expect(nextState("REGISTERED", "dial")).toBe("CALLING"));
 });
+
+import { summarizeSipFrame } from "@/lib/telephony/callerdesk-webrtc.engine";
+describe("summarizeSipFrame (sanitized SIP diagnostics)", () => {
+  it("summarizes an INVITE without URI or numbers", () => {
+    const f = summarizeSipFrame("INVITE sip:09561396866@app.callerdesk.io SIP/2.0\r\nCSeq: 1 INVITE\r\nAuthorization: Digest secret\r\n");
+    expect(f).toEqual({ kind: "request", method: "INVITE", code: null, cseq: "INVITE" });
+    expect(JSON.stringify(f)).not.toContain("0956");
+  });
+  it("summarizes a REGISTER response", () => {
+    expect(summarizeSipFrame("SIP/2.0 401 Unauthorized\r\nCSeq: 2 REGISTER\r\n")).toEqual({ kind: "response", method: "REGISTER", code: 401, cseq: "REGISTER" });
+  });
+  it("ignores keep-alive CRLF", () => { expect(summarizeSipFrame("\r\n\r\n")).toBeNull(); });
+});
