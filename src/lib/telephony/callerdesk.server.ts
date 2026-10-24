@@ -101,10 +101,12 @@ export const callSid = (i: Record<string, unknown>) => pick(i, "CallSid", "calls
 
 /** Final report has EndTime/CallDuration; live payload does not. */
 export function mapCallerDeskStatus(i: Record<string, unknown>): "ringing" | "answered" | "ended" | "missed" {
-  const final = !!pick(i, "EndTime", "CallDuration", "TalkDuration", "CallRecordingUrl");
+  const type = String(pick(i, "type", "Type") ?? "").toLowerCase();
+  const final = type === "call_report" || (type !== "live_call" && !!pick(i, "EndTime", "CallDuration", "TalkDuration", "CallRecordingUrl"));
   const st = String(pick(i, "Status") ?? "").toLowerCase();
   const talk = Number(pick(i, "TalkDuration") ?? 0);
-  if (!final) return /^(answer(?:ed)?|engaged|connected)$/.test(st) ? "answered" : "ringing";
+  // Live Call "Picked" = agent answered (CallerDesk live_call payload).
+  if (!final) return /^(answer(?:ed)?|engaged|connected|picked)$/.test(st) ? "answered" : "ringing";
   if (/^answer/.test(st) || talk > 0) return "ended";
   return "missed";
 }
