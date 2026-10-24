@@ -36,9 +36,9 @@ export async function getStaffRoleInfo(
     .eq("user_id", userId);
 
   const roles = (data ?? []).map((r: any) => String(r.role));
-  const isAdmin = roles.some((r) => r === "admin" || r === "super_admin");
+  const isAdmin = roles.some((r: string) => r === "admin" || r === "super_admin");
   const isManager = roles.includes("manager");
-  const isStaff = roles.some((r) => ALLOWED_STAFF_ROLES.includes(r));
+  const isStaff = roles.some((r: string) => ALLOWED_STAFF_ROLES.includes(r));
 
   return { roles, isAdmin, isManager, isStaff };
 }

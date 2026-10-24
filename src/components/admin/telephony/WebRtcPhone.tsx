@@ -162,6 +162,18 @@ export function WebRtcPhone() {
     return () => browserPhone.register(null);
   });
 
+  // Let the incoming-call popup pick up / reject / end the call through this same phone.
+  const stateRef = useRef(state); stateRef.current = state;
+  useEffect(() => {
+    browserPhone.setControls({
+      answer: () => { void engine.current?.answer(); },
+      reject: () => { void engine.current?.reject(); },
+      hangup: () => { void engine.current?.hangup(); },
+      state: () => stateRef.current,
+    });
+    return () => browserPhone.setControls(null);
+  }, []);
+
   async function loadOutputs() {
     try { const all = await navigator.mediaDevices.enumerateDevices(); setOutputs(all.filter((d) => d.kind === "audiooutput")); } catch { setOutputs([]); }
   }
