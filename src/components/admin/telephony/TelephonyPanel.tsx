@@ -27,7 +27,7 @@ export function useCallTimer(call: Pick<CallView, "answeredAt" | "startedAt" | "
   return (now - new Date(call.answeredAt ?? call.startedAt).getTime()) / 1000;
 }
 
-const NOT_SUPPORTED = "CallerDesk sent this call to your mobile/CallerDesk phone, not to the browser phone, so it can't be answered here. Answer it on that phone. To answer inside the CRM, CallerDesk must route the number to your browser phone login (SIP extension) — then an Accept/Reject window appears at the top of the screen.";
+const NOT_SUPPORTED = "This call has not reached the browser phone yet. Make sure the browser phone shows Ready (FortiClient on, CallerDesk website closed) — otherwise answer it on the CallerDesk phone.";
 
 /** Persistent employee call panel: incoming popup, active call, after-call disposition, availability. */
 export function TelephonyPanel() {
@@ -90,7 +90,7 @@ export function TelephonyPanel() {
             <div className="flex items-center gap-2 font-semibold">
               <PhoneIncoming className={`h-4 w-4 ${active.status === "ringing" ? "animate-pulse text-primary" : "text-primary"}`} />
               {active.status === "ringing" ? (active.direction === "outbound" ? "Outgoing call" : "Incoming call") : "Active call"}
-              <span className="rounded-full bg-primary/10 px-2 text-[11px] text-primary">{active.status === "ringing" ? (active.direction === "outbound" ? "Dialling" : "Ringing on CallerDesk phone") : "On Call"}</span>
+              <span className="rounded-full bg-primary/10 px-2 text-[11px] text-primary">{active.status === "ringing" ? (active.direction === "outbound" ? "Dialling" : "Ringing") : "On Call"}</span>
             </div>
             <span className="font-mono text-sm">{active.status === "answered" ? fmtDuration(secs) : active.direction === "outbound" ? "Calling…" : "Ringing…"}</span>
           </div>
