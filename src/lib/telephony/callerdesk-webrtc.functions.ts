@@ -51,10 +51,9 @@ export const initiateWebRtcCall = createServerFn({ method: "POST" })
     } else if (mobile) {
       // Dialled by hand: link only when the number matches a single order/lead, never an arbitrary one.
       try {
-        const m: any = await lookupCaller(mobile);
-        if (m?.orders?.length === 1) Object.assign(row, { customer_id: m.customerId ?? null, application_id: m.orders[0].id });
-        else if (!m?.orders?.length && m?.lead) Object.assign(row, { lead_id: m.lead.id ?? null, customer_id: m.customerId ?? null });
-        else if (m?.customerId) row.customer_id = m.customerId;
+        const m = await lookupCaller(mobile);
+        if (m.orders.length === 1) row.application_id = m.orders[0].id;
+        else if (!m.orders.length && m.lead) row.lead_id = m.lead.id;
       } catch { /* best effort */ }
     }
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
