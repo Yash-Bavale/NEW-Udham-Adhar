@@ -148,11 +148,13 @@ function WorkforcePage() {
   const canSee = role.access("employees") !== "none";
   const isSuper = role.has("super_admin");
 
-  const refreshAll = () => {
-    qc.invalidateQueries({ queryKey: ["admin.workforce.users"] });
-    qc.invalidateQueries({ queryKey: ["admin.workforce.metrics"] });
-    qc.invalidateQueries({ queryKey: ["admin.employees"] });
-    qc.invalidateQueries({ queryKey: ["admin.assignment.metrics"] });
+  const refreshAll = async () => {
+    await Promise.all([
+      qc.invalidateQueries({ queryKey: ["admin.workforce.users"] }),
+      qc.invalidateQueries({ queryKey: ["admin.workforce.metrics"] }),
+      qc.invalidateQueries({ queryKey: ["admin.employees"] }),
+      qc.invalidateQueries({ queryKey: ["admin.assignment.metrics"] }),
+    ]);
   };
 
   if (!role.loading && !canSee) {
@@ -507,7 +509,7 @@ function WorkforcePage() {
                                     data: { user_id: u.id, status: "ACTIVE", reason: "Restored from archive by Admin" },
                                   });
                                   toast.success(`Restored ${u.full_name || u.email} to Active Workforce`);
-                                  refreshAll();
+                                  await refreshAll();
                                 } catch (e) {
                                   toast.error((e as Error).message);
                                 }

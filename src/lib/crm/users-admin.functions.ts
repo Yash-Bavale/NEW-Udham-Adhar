@@ -186,8 +186,14 @@ export const listStaffUsers = createServerFn({ method: "GET" })
         avgTurnaroundHours: null,
       };
 
-      const employmentStatus: EmploymentStatus =
+      let employmentStatus: EmploymentStatus =
         p?.employment_status ?? (p?.is_active === false ? "INACTIVE" : "ACTIVE");
+
+      // Auto-heal inconsistent state: if is_active is true, employment_status cannot remain ARCHIVED or INACTIVE
+      if (p?.is_active === true && (employmentStatus === "ARCHIVED" || employmentStatus === "INACTIVE")) {
+        employmentStatus = "ACTIVE";
+        adminAny.from("profiles").update({ employment_status: "ACTIVE", archived_at: null }).eq("id", uid).then();
+      }
 
       const isActive = p?.is_active !== false && employmentStatus === "ACTIVE";
       const isInPool = pool?.is_active ?? false;
@@ -449,18 +455,88 @@ export const setEmploymentStatus = createServerFn({ method: "POST" })
     const admin = await getAdmin();
 
     const isNowActive = data.status === "ACTIVE";
+    const nowIso = new Date().toISOString();
 
-    // Update profile is_active
-    await admin.from("profiles").update({ is_active: isNowActive }).eq("id", data.user_id);
+    // 1. Update profile is_active, employment_status, and lifecycle timestamps
+    const profilePatch: Record<string, any> = {
+      is_active: isNowActive,
+      employment_status: data.status,
+    };
 
-    // Sync auth ban
-    await admin.auth.admin.updateUserById(data.user_id, {
-      ban_duration: isNowActive ? "none" : "876000h",
-    } as never);
+    if (isNowActive) {
+      profilePatch.archived_at = null;
+      profilePatch.terminated_at = null;
+    } else if (data.status === "ARCHIVED") {
+      profilePatch.archived_at = nowIso;
+    } else if (data.status === "TERMINATED") {
+      profilePatch.terminated_at = nowIso;
+    }
 
-    // Sync assignment_pool table
-    if (!isNowActive) {
-      await admin.from("assignment_pool").update({ is_active: false }).eq("user_id", data.user_id);
+    try {
+      const { error: pErr } = await (admin.from("profiles") as any)
+        .update(profilePatch)
+        .eq("id", data.user_id);
+      if (pErr) {
+        console.warn("[setEmploymentStatus] Full profile update warning, falling back to basic:", pErr.message);
+        await admin.from("profiles").update({ is_active: isNowActive, employment_status: data.status } as any).eq("id", data.user_id);
+      }
+    } catch (err) {
+      console.warn("[setEmploymentStatus] Profile update exception, falling back:", err);
+      await admin.from("profiles").update({ is_active: isNowActive }).eq("id", data.user_id);
+    }
+
+    // 2. Sync auth ban (unban when active, ban when inactive/archived/terminated)
+    try {
+      await admin.auth.admin.updateUserById(data.user_id, {
+        ban_duration: isNowActive ? "none" : "876000h",
+      } as never);
+    } catch (authErr) {
+      console.warn("[setEmploymentStatus] Auth updateUserById notice:", authErr);
+    }
+
+    // 3. Sync assignment_pool and user_roles
+    if (isNowActive) {
+      // Ensure restored employee has an assignment_pool row
+      try {
+        const { data: existingPool } = await admin
+          .from("assignment_pool")
+          .select("id")
+          .eq("user_id", data.user_id)
+          .maybeSingle();
+
+        if (!existingPool) {
+          await admin.from("assignment_pool").insert({
+            user_id: data.user_id,
+            is_active: false,
+          } as any);
+        }
+      } catch (poolErr) {
+        console.warn("[setEmploymentStatus] assignment_pool ensure notice:", poolErr);
+      }
+
+      // Ensure employee has a role in user_roles so they appear in staff directories
+      try {
+        const { data: userRoles } = await admin
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", data.user_id);
+
+        if (!userRoles || userRoles.length === 0) {
+          await admin.from("user_roles").insert({
+            user_id: data.user_id,
+            role: "executive" as Role,
+          });
+        }
+      } catch (rErr) {
+        console.warn("[setEmploymentStatus] user_roles ensure notice:", rErr);
+      }
+    } else {
+      // Sync assignment_pool table when deactivated
+      try {
+        await admin.from("assignment_pool").update({ is_active: false }).eq("user_id", data.user_id);
+      } catch (poolErr) {
+        console.warn("[setEmploymentStatus] assignment_pool disable notice:", poolErr);
+      }
 
       // Automatically redistribute open action orders
       try {
