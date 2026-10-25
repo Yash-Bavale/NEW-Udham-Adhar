@@ -2137,7 +2137,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         teamBreakdownMap.set(uid, {
           employeeId: uid,
           name,
-          email: p.email,
+          email: p.email ?? undefined,
           needsAction: 0,
           latestActionAt: lastAct ?? undefined,
           hotOrders: 0,
