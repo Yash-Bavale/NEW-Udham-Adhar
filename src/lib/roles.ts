@@ -69,14 +69,7 @@ export const ACCESS_MATRIX: Record<Role, Partial<Record<Module, Access>>> = {
   super_admin: fullAll(),
   admin: fullAll(),
   manager: onlyModules({
-    dashboard: "full",
-    leads: "full",
     orders: "full",
-    customers: "full",
-    complaints: "full",
-    tickets: "full",
-    tasks: "full",
-    reports: "read",
   }),
   executive: onlyModules({
     orders: "full",
@@ -110,7 +103,7 @@ export function bestAccess(roles: string[], module: Module): Access {
 }
 
 export function canApproveRefund(roles: string[]): boolean {
-  return roles.some((r) => r === "super_admin" || r === "admin" || r === "manager");
+  return roles.some((r) => r === "super_admin" || r === "admin");
 }
 
 export function canSeeModule(roles: string[], module: Module): boolean {

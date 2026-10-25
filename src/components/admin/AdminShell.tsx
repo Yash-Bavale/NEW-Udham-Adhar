@@ -50,9 +50,9 @@ type NavItem = {
 type NavGroup = { id: string; label: string; items: NavItem[] };
 
 const ALL_STAFF_ROLES = ["admin", "super_admin", "manager", "operations", "executive", "support", "finance", "accounts"];
-const FINANCE_ROLES = ["admin", "super_admin", "finance", "accounts", "manager"];
-const SUPPORT_ROLES = ["admin", "super_admin", "manager", "support"];
-const ADMIN_ROLES = ["admin", "super_admin", "manager"];
+const FINANCE_ROLES = ["admin", "super_admin", "finance", "accounts"];
+const SUPPORT_ROLES = ["admin", "super_admin", "support"];
+const ADMIN_ROLES = ["admin", "super_admin"];
 
 const NAV: NavGroup[] = [
   {
@@ -157,7 +157,7 @@ function Shell({ children, email }: { children: ReactNode; email?: string }) {
 
   const isPendingAuth = role.loading && userPerms.isLoading;
   const isSuperAdmin = role.has("super_admin") || role.has("super");
-  const isAdminUser = isSuperAdmin || role.has("admin") || role.has("manager") || Boolean(userPerms.perms?.isAdmin);
+  const isAdminUser = isSuperAdmin || role.has("admin") || Boolean(userPerms.perms?.isAdmin);
 
   const visibleNav: NavGroup[] = NAV
     .map((g) => ({

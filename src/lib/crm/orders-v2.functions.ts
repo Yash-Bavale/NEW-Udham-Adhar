@@ -867,7 +867,8 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       if (data.serviceId && data.serviceId !== "all" && data.serviceId.trim() !== "") {
         query = query.eq("service_id", data.serviceId);
       }
-      if (!isAdmin && !isManager) {
+      const hasSearch = Boolean(data.search && data.search.trim());
+      if (!isAdmin && (!isManager || !hasSearch)) {
         query = query.eq("assigned_to", context.userId);
       } else if (data.assignedTo && data.assignedTo !== "all" && data.assignedTo.trim() !== "") {
         if (data.assignedTo === "unassigned") {

@@ -183,4 +183,31 @@ describe("CRM Role-Based Order Permissions & Authorization", () => {
       ).rejects.toThrow("Order not found");
     });
   });
+
+  describe("6. Manager Module Access vs Employee", () => {
+    it("Manager has orders: full, but no other modules (same as employee/executive)", async () => {
+      const { ACCESS_MATRIX, canSeeModule, canApproveRefund } = await import("@/lib/roles");
+      expect(canSeeModule(["manager"], "orders")).toBe(true);
+      expect(canSeeModule(["executive"], "orders")).toBe(true);
+
+      // Manager must NOT see other modules
+      expect(canSeeModule(["manager"], "dashboard")).toBe(false);
+      expect(canSeeModule(["manager"], "leads")).toBe(false);
+      expect(canSeeModule(["manager"], "customers")).toBe(false);
+      expect(canSeeModule(["manager"], "employees")).toBe(false);
+      expect(canSeeModule(["manager"], "reports")).toBe(false);
+      expect(canSeeModule(["manager"], "invoices")).toBe(false);
+      expect(canSeeModule(["manager"], "payments")).toBe(false);
+      expect(canSeeModule(["manager"], "tickets")).toBe(false);
+      expect(canSeeModule(["manager"], "complaints")).toBe(false);
+      expect(canSeeModule(["manager"], "tasks")).toBe(false);
+
+      // Manager cannot approve refunds (admin only)
+      expect(canApproveRefund(["manager"])).toBe(false);
+      expect(canApproveRefund(["executive"])).toBe(false);
+      expect(canApproveRefund(["admin"])).toBe(true);
+      expect(canApproveRefund(["super_admin"])).toBe(true);
+    });
+  });
 });
+
