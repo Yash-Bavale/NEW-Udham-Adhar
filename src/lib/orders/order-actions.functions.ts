@@ -909,7 +909,34 @@ export const markRefundProcessed = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const processedAt = data.processedOn ?? new Date().toISOString();
 
-    // 1. Find original successful payment
+    // 1. Check existing refund status & existing negative payments for idempotency
+    const [{ data: existingReq }, { data: existingRefundPayments }] = await Promise.all([
+      supabaseAdmin
+        .from("refund_requests")
+        .select("id, status, processed_at, refund_amount")
+        .eq("application_id", data.orderId)
+        .maybeSingle(),
+      supabaseAdmin
+        .from("payments")
+        .select("id, amount, status, gateway_name, transaction_id, created_at")
+        .eq("application_id", data.orderId)
+        .lt("amount", 0)
+        .order("created_at", { ascending: true }),
+    ]);
+
+    const alreadyProcessed = Boolean(
+      (order as any).refund_processed_at ||
+      existingReq?.processed_at ||
+      (existingRefundPayments && existingRefundPayments.length > 0)
+    );
+
+    // If multiple duplicate negative refund payments were created by rapid repeated clicks, clean up extra rows:
+    if (existingRefundPayments && existingRefundPayments.length > 1) {
+      const excessIds = existingRefundPayments.slice(1).map((p) => p.id);
+      await supabaseAdmin.from("payments").delete().in("id", excessIds);
+    }
+
+    // 2. Find original successful payment
     const { data: origPayment } = await supabaseAdmin
       .from("payments")
       .select("id, amount, currency, gateway_name, customer_id, lead_id")
@@ -922,24 +949,26 @@ export const markRefundProcessed = createServerFn({ method: "POST" })
     const resolvedGateway = data.gatewayName || origPayment?.gateway_name || "manual";
     const refundAmountNeg = -Math.abs(Number(data.amount));
 
-    // 2. Insert minus revenue entry into payments table
-    await supabaseAdmin.from("payments").insert({
-      lead_id: order.lead_id ?? origPayment?.lead_id ?? null,
-      application_id: data.orderId,
-      customer_id: origPayment?.customer_id ?? order.customer_id ?? null,
-      parent_payment_id: origPayment?.id ?? null,
-      amount: refundAmountNeg,
-      base_amount: refundAmountNeg,
-      gst_amount: 0,
-      currency: origPayment?.currency ?? "INR",
-      status: "refunded",
-      gateway_name: resolvedGateway,
-      transaction_id: data.paymentReference,
-      refund_reason: "refund_processed",
-      payment_date: processedAt,
-    } as never);
+    // 3. Insert minus revenue entry into payments table ONLY if not already present
+    if (!existingRefundPayments || existingRefundPayments.length === 0) {
+      await supabaseAdmin.from("payments").insert({
+        lead_id: order.lead_id ?? origPayment?.lead_id ?? null,
+        application_id: data.orderId,
+        customer_id: origPayment?.customer_id ?? order.customer_id ?? null,
+        parent_payment_id: origPayment?.id ?? null,
+        amount: refundAmountNeg,
+        base_amount: refundAmountNeg,
+        gst_amount: 0,
+        currency: origPayment?.currency ?? "INR",
+        status: "refunded",
+        gateway_name: resolvedGateway,
+        transaction_id: data.paymentReference,
+        refund_reason: "refund_processed",
+        payment_date: processedAt,
+      } as never);
+    }
 
-    // 3. Flip original payment status to refunded
+    // 4. Flip original payment status to refunded
     if (origPayment?.id) {
       await supabaseAdmin
         .from("payments")
@@ -947,21 +976,35 @@ export const markRefundProcessed = createServerFn({ method: "POST" })
         .eq("id", origPayment.id);
     }
 
-    // 4. Update refund_requests row status to processed
-    await supabaseAdmin
+    // 5. Update refund_requests row status to processed (with graceful fallback for enum compatibility)
+    const rrPayload: Record<string, any> = {
+      status: "processed",
+      admin_notes: `PROCESSED @ ${processedAt} | Ref: ${data.paymentReference} | Amount: ₹${data.amount}`,
+      refund_amount: data.amount,
+      gateway_ref: data.paymentReference,
+      gateway_name: resolvedGateway,
+      processed_at: processedAt,
+      processed_by: context.userId,
+    };
+
+    let { error: rrError } = await supabaseAdmin
       .from("refund_requests")
-      .update({
-        status: "processed",
-        admin_notes: `PROCESSED @ ${processedAt} | Ref: ${data.paymentReference} | Amount: ₹${data.amount}`,
-        refund_amount: data.amount,
-        gateway_ref: data.paymentReference,
-        gateway_name: resolvedGateway,
-        processed_at: processedAt,
-        processed_by: context.userId,
-      } as never)
+      .update(rrPayload as never)
       .eq("application_id", data.orderId);
 
-    // 5. Stamp applications table
+    if (rrError && rrError.message?.toLowerCase().includes("enum")) {
+      delete rrPayload.status;
+      const retryRes = await supabaseAdmin
+        .from("refund_requests")
+        .update(rrPayload as never)
+        .eq("application_id", data.orderId);
+      rrError = retryRes.error;
+    }
+    if (rrError) {
+      console.error("[markRefundProcessed] refund_requests update warning:", rrError);
+    }
+
+    // 6. Stamp applications table
     await supabaseAdmin
       .from("applications")
       .update({
@@ -970,12 +1013,15 @@ export const markRefundProcessed = createServerFn({ method: "POST" })
       } as never)
       .eq("id", data.orderId);
 
-    await writeRefundEvent(data.orderId, "processed", context.userId, {
-      note: `Ref ${data.paymentReference}`,
-      meta: { amount: data.amount, gateway_ref: data.paymentReference, gateway_name: resolvedGateway },
-    });
+    // 7. Write refund event only if not already processed
+    if (!alreadyProcessed) {
+      await writeRefundEvent(data.orderId, "processed", context.userId, {
+        note: `Ref ${data.paymentReference}`,
+        meta: { amount: data.amount, gateway_ref: data.paymentReference, gateway_name: resolvedGateway },
+      });
+    }
 
-    // 6. Transition lead status to refunded
+    // 8. Transition lead status to refunded
     if (order.lead_id) {
       try {
         const { transitionLeadStatus } = await import("@/lib/crm/lead-status.functions");
@@ -985,7 +1031,7 @@ export const markRefundProcessed = createServerFn({ method: "POST" })
       }
     }
 
-    // 7. Invalidate revenue cache so revenue sheets & dashboards reflect minus entry instantly
+    // 9. Invalidate revenue cache so revenue sheets & dashboards reflect minus entry instantly
     try {
       const { invalidateRevenueCache } = await import("@/lib/crm/revenue-admin.functions");
       invalidateRevenueCache();
@@ -994,7 +1040,7 @@ export const markRefundProcessed = createServerFn({ method: "POST" })
     }
 
     let emailQueued = false;
-    if (to) {
+    if (to && !alreadyProcessed) {
       const approvalDateIso =
         (order as any).refund_approved_at ||
         processedAt;

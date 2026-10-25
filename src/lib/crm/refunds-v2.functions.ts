@@ -28,7 +28,8 @@ export const refundStats = createServerFn({ method: "GET" })
       created_at: string | null;
     }>;
     const num = (v: number | string | null | undefined) => (v == null ? 0 : Number(v) || 0);
-    const byStatus = (s: string) => all.filter((r) => (r.status ?? "pending") === s);
+    const isProc = (r: (typeof all)[number]) => Boolean(r.processed_at || r.status === "processed");
+    const byStatus = (s: string) => all.filter((r) => !isProc(r) && (r.status ?? "pending") === s);
     const sum = (arr: typeof all) => arr.reduce((a, r) => a + num(r.refund_amount), 0);
     const now = Date.now();
     const dayMs = 24 * 60 * 60 * 1000;
@@ -40,7 +41,7 @@ export const refundStats = createServerFn({ method: "GET" })
         escalated: byStatus("escalated").length,
         approved: byStatus("approved").length,
         rejected: byStatus("rejected").length,
-        processed: all.filter((r) => !!r.processed_at).length,
+        processed: all.filter(isProc).length,
       },
       amounts: {
         pending: sum(byStatus("pending")),
@@ -48,13 +49,14 @@ export const refundStats = createServerFn({ method: "GET" })
         processedThisMonth: all
           .filter(
             (r) =>
+              isProc(r) &&
               r.processed_at &&
               new Date(r.processed_at).getMonth() === new Date().getMonth() &&
               new Date(r.processed_at).getFullYear() === new Date().getFullYear(),
           )
           .reduce((a, r) => a + num(r.refund_amount), 0),
         totalProcessed: all
-          .filter((r) => !!r.processed_at)
+          .filter(isProc)
           .reduce((a, r) => a + num(r.refund_amount), 0),
       },
       agingPending: {
@@ -87,12 +89,14 @@ export const listRefundsAdvanced = createServerFn({ method: "POST" })
     let q = admin
       .from("refund_requests")
       .select(
-        "id, application_id, lead_id, reason, refund_amount, refund_mode, deduction_amount, deduction_reason, gateway_ref, gateway_name, status, admin_notes, customer_notes, created_at, decided_at, processed_at, info_needed_note, escalation_note, application:applications(id, application_code, order_status, service_id), lead:leads(id, name, email, mobile, service, lead_code)",
+        "id, application_id, lead_id, reason, refund_amount, refund_mode, deduction_amount, deduction_reason, gateway_ref, gateway_name, status, admin_notes, customer_notes, created_at, decided_at, processed_at, info_needed_note, escalation_note, application:applications(id, application_code, order_status, service_id, refund_processed_at), lead:leads(id, name, email, mobile, service, lead_code)",
       )
       .order("created_at", { ascending: false })
       .limit(data.limit);
     if (data.status === "processed") {
-      q = q.not("processed_at", "is", null);
+      q = q.or("processed_at.not.is.null,status.eq.processed");
+    } else if (data.status === "approved") {
+      q = q.eq("status", "approved").is("processed_at", null);
     } else if (data.status !== "all") {
       q = q.eq("status", data.status);
     }
@@ -123,14 +127,14 @@ export const getRefundDetail = createServerFn({ method: "POST" })
     const { data: req, error } = await admin
       .from("refund_requests")
       .select(
-        "*, application:applications(id, application_code, order_status, fulfillment_status, service_id, customer_id), lead:leads(id, name, email, mobile, service, state, lead_code, base_amount, gst_amount, total_amount)",
+        "*, application:applications(id, application_code, order_status, fulfillment_status, service_id, customer_id, refund_processed_at, refund_gateway_ref), lead:leads(id, name, email, mobile, service, state, lead_code, base_amount, gst_amount, total_amount)",
       )
       .eq("id", data.id)
       .maybeSingle();
     if (error) throw new Error(error.message);
     if (!req) throw new Error("Refund request not found");
     const appId = (req as any).application_id as string;
-    const [{ data: payments }, { data: events }, { data: customer }] = await Promise.all([
+    const [{ data: rawPayments }, { data: events }, { data: customer }] = await Promise.all([
       admin
         .from("payments")
         .select("id, amount, currency, status, gateway_name, transaction_id, payment_date, parent_payment_id, refund_reason, created_at")
@@ -149,9 +153,38 @@ export const getRefundDetail = createServerFn({ method: "POST" })
             .maybeSingle()
         : Promise.resolve({ data: null }),
     ]);
+
+    // Self-healing: if application has refund_processed_at but refund_requests row has null processed_at
+    if (!req.processed_at && (req as any).application?.refund_processed_at) {
+      const pAt = (req as any).application.refund_processed_at;
+      req.processed_at = pAt;
+      if (!req.gateway_ref && (req as any).application.refund_gateway_ref) {
+        req.gateway_ref = (req as any).application.refund_gateway_ref;
+      }
+      admin
+        .from("refund_requests")
+        .update({
+          processed_at: pAt,
+          gateway_ref: req.gateway_ref ?? (req as any).application?.refund_gateway_ref,
+        } as never)
+        .eq("id", req.id)
+        .then(() => {});
+    }
+
+    // Deduplicate negative payments if multiple identical negative rows were inserted
+    const payments = rawPayments ?? [];
+    const negPayments = payments.filter((p) => Number(p.amount) < 0);
+    let cleanedPayments = payments;
+    if (negPayments.length > 1) {
+      const dupNegIds = negPayments.slice(1).map((p) => p.id);
+      cleanedPayments = payments.filter((p) => !dupNegIds.includes(p.id));
+      // Delete superfluous duplicates from DB
+      admin.from("payments").delete().in("id", dupNegIds).then(() => {});
+    }
+
     return {
       request: req,
-      payments: payments ?? [],
+      payments: cleanedPayments,
       events: events ?? [],
       customer: customer ?? null,
     };

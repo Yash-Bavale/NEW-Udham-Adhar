@@ -289,10 +289,10 @@ function RefundsPage() {
               <div className="col-span-1">
                 <span
                   className={`rounded-full border px-2 py-0.5 text-[10px] capitalize ${
-                    TONE[r.processed_at ? "processed" : r.status ?? "pending"]
+                    TONE[r.processed_at || r.status === "processed" || r.application?.refund_processed_at ? "processed" : r.status ?? "pending"]
                   }`}
                 >
-                  {r.processed_at ? "Processed" : (r.status ?? "pending").replace("_", " ")}
+                  {r.processed_at || r.status === "processed" || r.application?.refund_processed_at ? "Processed" : (r.status ?? "pending").replace("_", " ")}
                 </span>
               </div>
               <div className="col-span-1 text-right">
@@ -395,15 +395,19 @@ function RefundDetailDrawer({
   const lead = req?.lead;
 
   const paidAmount = payments
-    .filter((p) => p.status === "paid" && Number(p.amount) > 0)
+    .filter((p) => Number(p.amount) > 0 && p.status !== "failed" && p.status !== "cancelled")
     .reduce((a, p) => a + Number(p.amount), 0);
   const alreadyRefunded = payments
-    .filter((p) => p.status === "refunded" || Number(p.amount) < 0)
+    .filter((p) => Number(p.amount) < 0)
     .reduce((a, p) => a + Math.abs(Number(p.amount)), 0);
   const refundable = Math.max(0, paidAmount - alreadyRefunded);
 
   const activeStatus = (req?.status ?? "pending") as string;
-  const isProcessed = !!req?.processed_at;
+  const isProcessed = Boolean(
+    req?.processed_at ||
+    req?.status === "processed" ||
+    order?.refund_processed_at
+  );
 
   const [amount, setAmount] = useState<string>("");
   const [mode, setMode] = useState<"full" | "partial">("full");
@@ -750,7 +754,7 @@ function RefundDetailDrawer({
                   </div>
                 )}
 
-                {activeStatus === "approved" && (
+                {activeStatus === "approved" && !isProcessed && (
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                     <div>
                       <label className="text-[10px] text-muted-foreground uppercase">Payout amount (₹)</label>
@@ -839,7 +843,7 @@ function RefundDetailDrawer({
                     </>
                   )}
 
-                  {activeStatus === "approved" && (
+                  {activeStatus === "approved" && !isProcessed && (
                     <button
                       onClick={() => process.mutate()}
                       disabled={busy || !paymentRef.trim() || !amount || Number(amount) <= 0}
