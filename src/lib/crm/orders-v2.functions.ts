@@ -1561,6 +1561,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         action_type: string;
         title: string;
         staff_name: string;
+        actor_id?: string | null;
         created_at: string;
         note?: string | null;
       }> = [];
@@ -1609,6 +1610,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
             action_type: l.action_type || "ACTION",
             title,
             staff_name: staffName,
+            actor_id: l.employee_id ?? null,
             created_at: l.created_at,
             note: l.note || l.remarks || null,
           });
@@ -1635,6 +1637,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
               action_type: "ORDER_COMPLETED",
               title: "Order Completed",
               staff_name: staffName,
+              actor_id: c.uploaded_by ?? null,
               created_at: ts,
               note: c.certificate_number ? `Certificate delivered (Cert #${c.certificate_number})` : "Order fulfilled and certificate delivered",
             });
@@ -1662,6 +1665,10 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
             }
           }
 
+          // Reopen / ticket hot-priority triggers mean work is needed, not work done.
+          const schedReason = String(parsedRemarks?.reason || s.reason || "").toLowerCase();
+          if (schedReason === "order_reopened" || schedReason === "ticket_hot_priority" || schedReason === "reopened") continue;
+
           let title = "Workflow Scheduler";
           if (st.includes("customer_delay") || st.includes("customer_side")) {
             title = "Customer Delay Added";
@@ -1687,6 +1694,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
               action_type: s.scheduler_type || "SCHEDULER",
               title,
               staff_name: staffName!,
+              actor_id: s.created_by ?? null,
               created_at: s.created_at,
               note,
             });
@@ -1717,6 +1725,10 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
           et === "payment_received" ||
           et === "assignee_updated" ||
           et === "order_reopened" ||
+          et === "hot_priority_escalated" ||
+          nv === "order_reopened" ||
+          nv === "reopened" ||
+          note.includes("reopened") ||
           et === "followup_email_sent" ||
           et === "email_sent" ||
           et === "email_failed" ||
@@ -1758,6 +1770,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
               action_type: ev.event_type || "EVENT",
               title,
               staff_name: staffName!,
+              actor_id: ev.created_by ?? null,
               created_at: ev.created_at,
               note: ev.note || ev.new_value || null,
             });
@@ -1825,6 +1838,8 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         in_range_callback_scheduled: inRangeCallbackScheduled,
         in_range_action_taken: inRangeActionTaken,
         latest_action_at: actionHistoryList[0]?.created_at ?? null,
+        // Who actually did each action — workforce credit is per actor, never the assignee.
+        action_actors: actionHistoryList.map((x) => ({ actor_id: x.actor_id ?? null, created_at: x.created_at })),
         action_count: actionCount,
         // Customer submitted the form after a delay; stays in Need Action until staff act on it.
         customer_resumed_pending: (() => {
