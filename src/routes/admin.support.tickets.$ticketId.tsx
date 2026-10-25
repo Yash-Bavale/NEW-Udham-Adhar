@@ -12,8 +12,15 @@ import {
   MapPin, ShieldAlert, FileText, ChevronLeft, ChevronRight, Plus, Download,
   Bold, Italic, Underline, Strikethrough, List, ListOrdered, Quote,
   AlignLeft, AlignCenter, AlignRight, Image as ImageIcon, Search, Tag,
-  ChevronRight as ChevronRightIcon, RefreshCw, Flame, Reply, XCircle, ZoomIn
+  ChevronRight as ChevronRightIcon, RefreshCw, Flame, Reply, XCircle, ZoomIn,
+  Star, Folder, FolderPlus
 } from "lucide-react";
+import {
+  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator
+} from "@/components/ui/dropdown-menu";
+import {
+  listSupportFolders, toggleTicketStar, moveTicketsToFolder, removeTicketsFromFolder
+} from "@/lib/crm/support-folders.functions";
 import { getTicketWorkspace, linkTicketToApplication, unlinkTicketFromApplication, syncTicketAttachmentsFn } from "@/lib/crm/ticket-workspace.functions";
 import { computeOrderStage, STAGE_META, STAGE_BADGE_CLASS, type OrderStage } from "@/lib/crm/computeOrderStage";
 import {
@@ -205,6 +212,11 @@ function TicketWorkspace() {
   const closeRefund = useServerFn(closeTicketRefundR002);
   const syncAttachmentsFn = useServerFn(syncTicketAttachmentsFn);
 
+  const foldersFn = useServerFn(listSupportFolders);
+  const toggleStarFn = useServerFn(toggleTicketStar);
+  const moveTicketsFn = useServerFn(moveTicketsToFolder);
+  const removeTicketsFn = useServerFn(removeTicketsFromFolder);
+
   const doSyncAttachments = useMutation({
     mutationFn: () => syncAttachmentsFn({ data: { ticketId } }),
     onSuccess: (newAtts) => {
@@ -222,6 +234,42 @@ function TicketWorkspace() {
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["support-workspace", ticketId],
     queryFn: () => loadFn({ data: { ticketId } }),
+  });
+
+  const { data: foldersData, refetch: refetchFolders } = useQuery({
+    queryKey: ["support-ticket-folders"],
+    queryFn: () => foldersFn(),
+  });
+  const folders = foldersData?.folders ?? [];
+
+  const toggleStarMutation = useMutation({
+    mutationFn: (isStarred: boolean) => toggleStarFn({ data: { ticketId, isStarred } }),
+    onSuccess: (res) => {
+      invalidate();
+      refetchFolders();
+      toast.success(res.isStarred ? "Ticket starred" : "Ticket unstarred");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const moveToFolderMutation = useMutation({
+    mutationFn: (folderId: string) => moveTicketsFn({ data: { ticketIds: [ticketId], folderId } }),
+    onSuccess: () => {
+      invalidate();
+      refetchFolders();
+      toast.success("Ticket moved to folder");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const removeFromFolderMutation = useMutation({
+    mutationFn: () => removeTicketsFn({ data: { ticketIds: [ticketId] } }),
+    onSuccess: () => {
+      invalidate();
+      refetchFolders();
+      toast.success("Ticket removed from folder");
+    },
+    onError: (e: Error) => toast.error(e.message),
   });
 
   const { data: cannedList } = useQuery({
@@ -898,12 +946,76 @@ function TicketWorkspace() {
             </button>
           </div>
 
-          {/* Row 1: Ticket Number + NEW Badge (Left) & Quick Action Buttons (Right) */}
+          {/* Row 1: Star + Ticket Number + Folder Badge + NEW Badge (Left) & Quick Action Buttons (Right) */}
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <div className="flex items-center gap-2 min-w-0">
+              {/* Star toggle */}
+              <button
+                type="button"
+                onClick={() => toggleStarMutation.mutate(!ticket.is_starred)}
+                disabled={toggleStarMutation.isPending}
+                className="p-1 rounded-md text-slate-300 hover:text-amber-500 hover:bg-slate-100 transition-colors"
+                title={ticket.is_starred ? "Unstar ticket" : "Star ticket"}
+              >
+                <Star
+                  className={`size-5 transition-transform hover:scale-110 ${
+                    ticket.is_starred ? "fill-amber-400 text-amber-500" : "text-slate-300 hover:text-amber-400"
+                  }`}
+                />
+              </button>
+
               <h1 className="text-base sm:text-lg font-bold tracking-tight text-slate-900 font-mono shrink-0">
                 {ticket.ticket_number}
               </h1>
+
+              {/* Folder Selector Dropdown */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-slate-200 bg-slate-50 hover:bg-slate-100 text-xs font-semibold text-slate-700 transition-colors cursor-pointer"
+                    title="Organise in folder"
+                  >
+                    <Folder className="size-3.5 text-indigo-600" />
+                    <span>{ticket.folder_name ? ticket.folder_name : "Move to folder…"}</span>
+                    <ChevronDown className="size-3 text-slate-400" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-52">
+                  <div className="px-2 py-1 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                    Folders
+                  </div>
+                  {folders.length === 0 ? (
+                    <div className="px-2 py-2 text-xs text-slate-400 italic">No folders created yet</div>
+                  ) : (
+                    folders.map((f: any) => (
+                      <DropdownMenuItem
+                        key={f.id}
+                        onClick={() => moveToFolderMutation.mutate(f.id)}
+                        className="text-xs cursor-pointer flex items-center justify-between"
+                      >
+                        <span className="flex items-center gap-2 truncate">
+                          <Folder className="size-3.5 text-indigo-600" />
+                          <span className="truncate">{f.name}</span>
+                        </span>
+                        {ticket.folder_id === f.id && <Check className="size-3.5 text-emerald-600" />}
+                      </DropdownMenuItem>
+                    ))
+                  )}
+                  {ticket.folder_id && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        onClick={() => removeFromFolderMutation.mutate()}
+                        className="text-xs text-rose-600 cursor-pointer"
+                      >
+                        <X className="size-3.5 mr-2" /> Remove from folder
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+
               {ticket.is_new && (
                 <span className="px-2 py-0.5 rounded text-[10px] font-extrabold uppercase tracking-wide bg-[#e11d48] text-white shrink-0 shadow-2xs">
                   NEW

@@ -70,6 +70,8 @@ export const listTickets = createServerFn({ method: "POST" })
         scope: z.enum(["mine", "all"]).default("all"),
         sort: z.enum(["newest", "oldest", "updated", "last_activity", "highest_priority", "unassigned"]).default("last_activity"),
         unassignedOnly: z.boolean().default(false),
+        isStarred: z.boolean().optional(),
+        folderId: z.string().uuid().optional(),
       })
       .parse(i ?? {})
   )
@@ -82,6 +84,24 @@ export const listTickets = createServerFn({ method: "POST" })
     const nowUtc = Date.now();
     const istNow = new Date(nowUtc + istOffset);
     const todayStartUtc = new Date(Date.UTC(istNow.getUTCFullYear(), istNow.getUTCMonth(), istNow.getUTCDate(), 0, 0, 0) - istOffset).toISOString();
+
+    // Filter by starred if requested
+    let filterTicketIds: string[] | null = null;
+    if (data.isStarred) {
+      const { getUserStarredTicketIds } = await import("@/lib/crm/support-folders.functions");
+      const starredIds = await getUserStarredTicketIds(context.userId);
+      filterTicketIds = starredIds;
+      if (filterTicketIds.length === 0) {
+        return { tickets: [], total: 0, page: data.page, pageSize: data.pageSize };
+      }
+    } else if (data.folderId) {
+      const { getFolderTicketIds } = await import("@/lib/crm/support-folders.functions");
+      const fIds = await getFolderTicketIds(data.folderId, context.userId);
+      filterTicketIds = fIds;
+      if (filterTicketIds.length === 0) {
+        return { tickets: [], total: 0, page: data.page, pageSize: data.pageSize };
+      }
+    }
 
     // Filter by bucket if specified
     let bucketTicketIds: string[] | null = null;
@@ -117,6 +137,9 @@ export const listTickets = createServerFn({ method: "POST" })
         { count: "exact" }
       );
 
+    if (filterTicketIds && filterTicketIds.length > 0) {
+      q = q.in("id", filterTicketIds);
+    }
     if (bucketTicketIds && bucketTicketIds.length > 0) {
       q = q.in("id", bucketTicketIds);
     }
@@ -293,6 +316,10 @@ export const listTickets = createServerFn({ method: "POST" })
       );
     }
 
+    const rowIds = (rows ?? []).map((r: any) => r.id);
+    const { getTicketOrganizationMeta } = await import("@/lib/crm/support-folders.functions");
+    const { starredSet, ticketFolderMap } = await getTicketOrganizationMeta(context.userId, rowIds);
+
     let tickets = (rows ?? []).map((r: any) => {
       const isUnread = Boolean(
         r.last_customer_message_at &&
@@ -311,9 +338,15 @@ export const listTickets = createServerFn({ method: "POST" })
       const lastActivityAt = r.last_customer_message_at || r.last_staff_message_at || r.updated_at || r.created_at;
       const lastActivityActor: "customer" | "staff" = lastCustomerTime >= lastStaffTime && lastCustomerTime > 0 ? "customer" : "staff";
 
+      const folderInfo = ticketFolderMap.get(r.id);
+
       return {
         id: r.id,
         ticket_number: r.ticket_number,
+        is_starred: starredSet.has(r.id),
+        folder_id: folderInfo?.folderId ?? null,
+        folder_name: folderInfo?.folderName ?? null,
+        folder_color: folderInfo?.color ?? null,
         subject: r.subject,
         description: r.description,
         status: r.status as TicketStatus,

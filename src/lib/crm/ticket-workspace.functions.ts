@@ -170,7 +170,7 @@ export const syncTicketAttachmentsFn = createServerFn({ method: "POST" })
 export const getTicketWorkspace = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => z.object({ ticketId: z.string().uuid() }).parse(i))
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
     const admin = await getAdmin();
 
     // 1. Fetch primary ticket record — includes order_link_status and is_unlinked
@@ -699,9 +699,18 @@ export const getTicketWorkspace = createServerFn({ method: "POST" })
         }
       : null;
 
+    const { getTicketOrganizationMeta } = await import("@/lib/crm/support-folders.functions");
+    const { starredSet, ticketFolderMap } = await getTicketOrganizationMeta(context.userId, [data.ticketId]);
+    const fInfo = ticketFolderMap.get(data.ticketId);
+    const isStarred = starredSet.has(data.ticketId);
+
     return {
       ticket: {
         ...t,
+        is_starred: isStarred,
+        folder_id: fInfo?.folderId ?? null,
+        folder_name: fInfo?.folderName ?? null,
+        folder_color: fInfo?.color ?? null,
         application_id: applicationId,
         order_link_status: orderLinkStatus,
         applications: appPayload,

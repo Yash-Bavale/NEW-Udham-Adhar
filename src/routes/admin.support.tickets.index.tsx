@@ -7,7 +7,7 @@ import {
   Search, ChevronLeft, ChevronRight, RotateCcw, X, Filter, Loader2,
   ArrowUpDown, ArrowUp, ArrowDown, Inbox, Plus, UserCheck, CheckCircle2,
   AlertCircle, Clock, ShieldAlert, Sparkles, MessageSquare, Tag, Flag,
-  MoreVertical, Copy, ExternalLink, Eye
+  MoreVertical, Copy, ExternalLink, Eye, Star, Folder, FolderPlus, Trash2, Edit2, Check
 } from "lucide-react";
 import { formatIST, istDateKey } from "@/lib/datetime";
 import { toast } from "sonner";
@@ -25,6 +25,16 @@ import {
   TICKET_STATUSES,
   PRIORITIES,
 } from "@/lib/crm/tickets.functions";
+import {
+  listSupportFolders,
+  createSupportFolder,
+  renameSupportFolder,
+  deleteSupportFolder,
+  toggleTicketStar,
+  bulkToggleTicketStar,
+  moveTicketsToFolder,
+  removeTicketsFromFolder,
+} from "@/lib/crm/support-folders.functions";
 import { listStaff } from "@/lib/crm/leads-admin.functions";
 import { listServices } from "@/lib/crm/services-admin.functions";
 import { STAGE_META, type OrderStage } from "@/lib/crm/computeOrderStage";
@@ -37,6 +47,12 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel,
 } from "@/components/ui/select";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent,
+} from "@/components/ui/dropdown-menu";
 import { AddTicketDialog } from "@/components/admin/AddTicketDialog";
 import { useRole } from "@/hooks/useRole";
 import { usePermissions } from "@/hooks/usePermissions";
@@ -58,6 +74,8 @@ export const Route = createFileRoute("/admin/support/tickets/")({
     dateFrom?: string;
     dateTo?: string;
     preset?: string;
+    isStarred?: boolean;
+    folderId?: string;
   } => ({
     bucket: typeof search.bucket === "string" ? search.bucket : undefined,
     status: typeof search.status === "string" ? search.status : undefined,
@@ -70,6 +88,8 @@ export const Route = createFileRoute("/admin/support/tickets/")({
     dateFrom: typeof search.dateFrom === "string" ? search.dateFrom : undefined,
     dateTo: typeof search.dateTo === "string" ? search.dateTo : undefined,
     preset: typeof search.preset === "string" ? search.preset : undefined,
+    isStarred: typeof search.isStarred === "boolean" ? search.isStarred : search.isStarred === "true" ? true : undefined,
+    folderId: typeof search.folderId === "string" ? search.folderId : undefined,
   }),
   head: () => ({
     meta: [
@@ -237,8 +257,37 @@ function SupportTicketsOperationsPage() {
   const bulkPriorityFn = useServerFn(bulkUpdateTicketPriority);
   const bulkReadFn = useServerFn(bulkMarkTicketsRead);
 
+  // Folder & Star server functions
+  const foldersFn = useServerFn(listSupportFolders);
+  const createFolderFn = useServerFn(createSupportFolder);
+  const renameFolderFn = useServerFn(renameSupportFolder);
+  const deleteFolderFn = useServerFn(deleteSupportFolder);
+  const toggleStarFn = useServerFn(toggleTicketStar);
+  const bulkStarFn = useServerFn(bulkToggleTicketStar);
+  const moveTicketsFn = useServerFn(moveTicketsToFolder);
+  const removeTicketsFromFolderFn = useServerFn(removeTicketsFromFolder);
+
   const routeSearch = Route.useSearch();
   const todayKey = useMemo(() => istDateKey(new Date()), []);
+
+  // Organization navigation mode: "all" | "starred" | "folder"
+  const [viewMode, setViewMode] = useState<"all" | "starred" | "folder">(() => {
+    if (routeSearch.isStarred) return "starred";
+    if (routeSearch.folderId) return "folder";
+    return "all";
+  });
+  const [activeFolderId, setActiveFolderId] = useState<string | null>(() => routeSearch.folderId ?? null);
+
+  // Folder modal states
+  const [createFolderOpen, setCreateFolderOpen] = useState(false);
+  const [newFolderName, setNewFolderName] = useState("");
+  const [newFolderColor, setNewFolderColor] = useState<string>("slate");
+
+  const [folderToRename, setFolderToRename] = useState<{ id: string; name: string; color: string } | null>(null);
+  const [renameInput, setRenameInput] = useState("");
+  const [renameColor, setRenameColor] = useState("slate");
+
+  const [folderToDelete, setFolderToDelete] = useState<{ id: string; name: string } | null>(null);
 
   const [datePreset, setDatePreset] = useState<RangePreset>(() => {
     if (routeSearch.preset && ["today", "yesterday", "7d", "15d", "30d", "mtd", "custom"].includes(routeSearch.preset)) {
@@ -461,6 +510,8 @@ function SupportTicketsOperationsPage() {
     }
 
     return {
+      isStarred: viewMode === "starred" ? true : undefined,
+      folderId: viewMode === "folder" && activeFolderId ? activeFolderId : undefined,
       page,
       pageSize,
       q: debouncedSearch,
@@ -477,7 +528,7 @@ function SupportTicketsOperationsPage() {
       sort: sortField,
       scope: "all" as const,
     };
-  }, [page, pageSize, debouncedSearch, bucket, statusFilter, responseStateFilter, priorityFilter, assignedTo, serviceId, stageFilter, dateFrom, dateTo, sortField]);
+  }, [page, pageSize, debouncedSearch, bucket, statusFilter, responseStateFilter, priorityFilter, assignedTo, serviceId, stageFilter, dateFrom, dateTo, sortField, viewMode, activeFolderId]);
 
   const { data, isLoading, isFetching } = useQuery({
     queryKey: ["support-tickets-ops", queryPayload],
@@ -499,6 +550,104 @@ function SupportTicketsOperationsPage() {
     }
     return Array.from(map.entries()).sort((a, b) => b[0].localeCompare(a[0]));
   }, [tickets, bucket]);
+
+  // Folder & Star queries and mutations
+  const { data: foldersData, refetch: refetchFolders } = useQuery({
+    queryKey: ["support-ticket-folders"],
+    queryFn: () => foldersFn(),
+  });
+  const folders = foldersData?.folders ?? [];
+  const starredCount = foldersData?.starredCount ?? 0;
+
+  const toggleStarMutation = useMutation({
+    mutationFn: (variables: { ticketId: string; isStarred: boolean }) =>
+      toggleStarFn({ data: variables }),
+    onSuccess: (res) => {
+      invalidate();
+      refetchFolders();
+      toast.success(res.isStarred ? "Ticket starred" : "Ticket unstarred");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const bulkStarMutation = useMutation({
+    mutationFn: (variables: { ticketIds: string[]; isStarred: boolean }) =>
+      bulkStarFn({ data: variables }),
+    onSuccess: (res) => {
+      invalidate();
+      refetchFolders();
+      setSelectedTicketIds([]);
+      const isStarred = (res as any).isStarred ?? (res as any).star;
+      toast.success(isStarred ? `${res.count} tickets starred` : `${res.count} tickets unstarred`);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const moveTicketsMutation = useMutation({
+    mutationFn: (variables: { ticketIds: string[]; folderId: string }) =>
+      moveTicketsFn({ data: variables }),
+    onSuccess: (res) => {
+      invalidate();
+      refetchFolders();
+      setSelectedTicketIds([]);
+      toast.success(`${res.count} ticket(s) moved to folder`);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const removeTicketsMutation = useMutation({
+    mutationFn: (variables: { ticketIds: string[] }) =>
+      removeTicketsFromFolderFn({ data: variables }),
+    onSuccess: (res) => {
+      invalidate();
+      refetchFolders();
+      setSelectedTicketIds([]);
+      toast.success(`${res.count} ticket(s) removed from folder`);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const createFolderMutation = useMutation({
+    mutationFn: (variables: { name: string; color?: string }) =>
+      createFolderFn({ data: variables }),
+    onSuccess: (res) => {
+      refetchFolders();
+      setCreateFolderOpen(false);
+      setNewFolderName("");
+      toast.success(`Folder "${res.folder.name}" created`);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const renameFolderMutation = useMutation({
+    mutationFn: (variables: { folderId: string; name: string; color?: string }) =>
+      renameFolderFn({ data: variables }),
+    onSuccess: (res) => {
+      refetchFolders();
+      setFolderToRename(null);
+      toast.success(`Folder renamed to "${res.folder.name}"`);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const deleteFolderMutation = useMutation({
+    mutationFn: (folderId: string) => deleteFolderFn({ data: { folderId } }),
+    onSuccess: () => {
+      refetchFolders();
+      invalidate();
+      if (activeFolderId === folderToDelete?.id) {
+        setViewMode("all");
+        setActiveFolderId(null);
+        navigate({
+          search: ((prev: any) => ({ ...prev, isStarred: undefined, folderId: undefined })) as any,
+          replace: true,
+        });
+      }
+      setFolderToDelete(null);
+      toast.success("Folder deleted (tickets preserved)");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
 
   // Bulk mutations
   const assignMutation = useMutation({
@@ -542,6 +691,8 @@ function SupportTicketsOperationsPage() {
   });
 
   const handleResetFilters = () => {
+    setViewMode("all");
+    setActiveFolderId(null);
     setBucket("need_action");
     setSearch("");
     setDebouncedSearch("");
@@ -555,9 +706,14 @@ function SupportTicketsOperationsPage() {
     setSortField("last_activity");
     setPage(1);
     setSelectedTicketIds([]);
+    navigate({
+      search: ((prev: any) => ({ ...prev, isStarred: undefined, folderId: undefined })) as any,
+      replace: true,
+    });
   };
 
   const isFiltering =
+    viewMode !== "all" ||
     bucket !== "need_action" ||
     search !== "" ||
     statusFilter !== "all" ||
@@ -571,7 +727,7 @@ function SupportTicketsOperationsPage() {
     (dateTo !== "" && dateTo !== todayKey) ||
     sortField !== "last_activity";
 
-  const colCount = 13;
+  const colCount = 14;
 
   return (
     <div className="p-4 md:p-6 space-y-4 w-full min-w-0">
@@ -772,6 +928,151 @@ function SupportTicketsOperationsPage() {
             </button>
           );
         })}
+      </div>
+
+      {/* ── 2.5 Folders / Starred Email Organisation Strip ──────── */}
+      <div className="flex flex-wrap items-center justify-between gap-2 p-2 rounded-xl border border-slate-200 bg-white shadow-2xs">
+        <div className="flex flex-wrap items-center gap-1.5">
+          {/* All Tickets tab */}
+          <button
+            type="button"
+            onClick={() => {
+              setViewMode("all");
+              setActiveFolderId(null);
+              navigate({
+                search: ((prev: any) => ({ ...prev, isStarred: undefined, folderId: undefined })) as any,
+                replace: true,
+              });
+            }}
+            className={`inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-xs font-semibold transition-all ${
+              viewMode === "all"
+                ? "bg-slate-900 text-white shadow-xs"
+                : "bg-slate-50 text-slate-600 hover:bg-slate-100 hover:text-slate-900 border border-slate-200"
+            }`}
+          >
+            <Inbox className="size-3.5" />
+            <span>All Tickets</span>
+          </button>
+
+          {/* Starred tab */}
+          <button
+            type="button"
+            onClick={() => {
+              setViewMode("starred");
+              setActiveFolderId(null);
+              navigate({
+                search: ((prev: any) => ({ ...prev, isStarred: true, folderId: undefined })) as any,
+                replace: true,
+              });
+            }}
+            className={`inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-xs font-semibold transition-all ${
+              viewMode === "starred"
+                ? "bg-amber-500 text-white shadow-xs"
+                : "bg-amber-50/60 text-amber-800 hover:bg-amber-100 hover:text-amber-900 border border-amber-200"
+            }`}
+          >
+            <Star className={`size-3.5 ${viewMode === "starred" ? "fill-white" : "fill-amber-400 text-amber-500"}`} />
+            <span>Starred</span>
+            {starredCount > 0 && (
+              <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                viewMode === "starred" ? "bg-white/20 text-white" : "bg-amber-200/80 text-amber-900"
+              }`}>
+                {starredCount}
+              </span>
+            )}
+          </button>
+
+          <div className="h-4 w-px bg-slate-200 mx-1 hidden sm:block" />
+
+          {/* Custom Folders list */}
+          {folders.map((f: any) => {
+            const isFolderActive = viewMode === "folder" && activeFolderId === f.id;
+            return (
+              <div key={f.id} className="relative group inline-flex items-center">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setViewMode("folder");
+                    setActiveFolderId(f.id);
+                    navigate({
+                      search: ((prev: any) => ({ ...prev, isStarred: undefined, folderId: f.id })) as any,
+                      replace: true,
+                    });
+                  }}
+                  className={`inline-flex items-center gap-1.5 h-8 pl-3 pr-2 rounded-lg text-xs font-semibold transition-all ${
+                    isFolderActive
+                      ? "bg-indigo-600 text-white shadow-xs"
+                      : "bg-slate-50 text-slate-700 hover:bg-slate-100 border border-slate-200"
+                  }`}
+                >
+                  <Folder className={`size-3.5 ${isFolderActive ? "text-white" : "text-indigo-500"}`} />
+                  <span className="max-w-[130px] truncate">{f.name}</span>
+                  <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                    isFolderActive ? "bg-white/20 text-white" : "bg-slate-200/80 text-slate-700"
+                  }`}>
+                    {f.ticket_count ?? 0}
+                  </span>
+                </button>
+
+                {/* Folder Actions Menu (Rename / Delete) */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      type="button"
+                      className={`h-8 px-1 rounded-r-lg -ml-1 flex items-center justify-center transition-colors ${
+                        isFolderActive
+                          ? "text-white/80 hover:text-white hover:bg-indigo-700"
+                          : "text-slate-400 hover:text-slate-700 hover:bg-slate-200/60"
+                      }`}
+                      title={`Manage folder ${f.name}`}
+                    >
+                      <MoreVertical className="size-3" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-40">
+                    <DropdownMenuItem
+                      onClick={() => {
+                        setFolderToRename(f);
+                        setRenameInput(f.name);
+                        setRenameColor(f.color || "slate");
+                      }}
+                      className="text-xs cursor-pointer"
+                    >
+                      <Edit2 className="size-3.5 mr-2 text-slate-500" />
+                      Rename Folder
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onClick={() => setFolderToDelete({ id: f.id, name: f.name })}
+                      className="text-xs text-rose-600 focus:text-rose-600 cursor-pointer"
+                    >
+                      <Trash2 className="size-3.5 mr-2 text-rose-500" />
+                      Delete Folder
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Right side: + New Folder Button */}
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              setNewFolderName("");
+              setNewFolderColor("slate");
+              setCreateFolderOpen(true);
+            }}
+            className="h-8 px-2.5 text-xs font-semibold text-slate-700 border-slate-200 hover:bg-slate-50"
+          >
+            <FolderPlus className="size-3.5 mr-1.5 text-indigo-600" />
+            New Folder
+          </Button>
+        </div>
       </div>
 
       {/* ── 3. Filters Toolbar (Single Line Toolbar) ─────────────── */}
@@ -1020,6 +1321,73 @@ function SupportTicketsOperationsPage() {
               </SelectContent>
             </Select>
 
+            {/* Bulk Star / Unstar */}
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => bulkStarMutation.mutate({ ticketIds: selectedTicketIds, isStarred: true })}
+              disabled={bulkStarMutation.isPending}
+              className="h-8 text-xs bg-slate-800 border-slate-700 text-white hover:bg-slate-700"
+            >
+              <Star className="size-3.5 mr-1 text-amber-400 fill-amber-400" />
+              Star
+            </Button>
+
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => bulkStarMutation.mutate({ ticketIds: selectedTicketIds, isStarred: false })}
+              disabled={bulkStarMutation.isPending}
+              className="h-8 text-xs bg-slate-800 border-slate-700 text-white hover:bg-slate-700"
+            >
+              <Star className="size-3.5 mr-1 text-slate-400" />
+              Unstar
+            </Button>
+
+            {/* Bulk Move to Folder */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={moveTicketsMutation.isPending}
+                  className="h-8 text-xs bg-slate-800 border-slate-700 text-white hover:bg-slate-700"
+                >
+                  <Folder className="size-3.5 mr-1.5 text-indigo-400" />
+                  Move to Folder…
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-52">
+                <div className="px-2 py-1 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                  Select Destination Folder
+                </div>
+                {folders.length === 0 ? (
+                  <div className="px-2 py-2 text-xs text-slate-400 italic">No folders created yet</div>
+                ) : (
+                  folders.map((f: any) => (
+                    <DropdownMenuItem
+                      key={f.id}
+                      onClick={() => moveTicketsMutation.mutate({ ticketIds: selectedTicketIds, folderId: f.id })}
+                      className="text-xs cursor-pointer flex items-center justify-between"
+                    >
+                      <span className="flex items-center gap-2 truncate">
+                        <Folder className="size-3.5 text-indigo-600" />
+                        <span className="truncate">{f.name}</span>
+                      </span>
+                      <span className="text-[10px] text-slate-400">({f.ticket_count ?? 0})</span>
+                    </DropdownMenuItem>
+                  ))
+                )}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => removeTicketsMutation.mutate({ ticketIds: selectedTicketIds })}
+                  className="text-xs text-rose-600 cursor-pointer"
+                >
+                  <X className="size-3.5 mr-2" /> Remove from folder
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
             {/* Bulk Mark Read */}
             <Button
               size="sm"
@@ -1059,6 +1427,7 @@ function SupportTicketsOperationsPage() {
                     aria-label="Select all tickets"
                   />
                 </th>
+                <th className="w-8 px-1 py-2.5 text-center" title="Starred"></th>
                 <th className="text-left font-semibold px-3 py-2.5">Ticket #</th>
                 <th className="text-left font-semibold px-3 py-2.5">{bucket === "closed" ? "Closed Date" : "Created"}</th>
                 <th className="text-left font-semibold px-3 py-2.5">Customer</th>
@@ -1120,10 +1489,20 @@ function SupportTicketsOperationsPage() {
                         ticket={t}
                         bucket={bucket}
                         selected={selectedTicketIds.includes(t.id)}
+                        folders={folders}
                         onToggleSelect={(id, checked) =>
                           setSelectedTicketIds((prev) =>
                             checked ? [...prev, id] : prev.filter((x) => x !== id)
                           )
+                        }
+                        onToggleStar={(id, isStarred) =>
+                          toggleStarMutation.mutate({ ticketId: id, isStarred })
+                        }
+                        onMoveToFolder={(id, folderId) =>
+                          moveTicketsMutation.mutate({ ticketIds: [id], folderId })
+                        }
+                        onRemoveFromFolder={(id) =>
+                          removeTicketsMutation.mutate({ ticketIds: [id] })
                         }
                         onOpen={(id) => {
                           try {
@@ -1166,10 +1545,14 @@ function SupportTicketsOperationsPage() {
                     ticket={t}
                     bucket={bucket}
                     selected={selectedTicketIds.includes(t.id)}
+                    folders={folders}
                     onToggleSelect={(id, checked) =>
                       setSelectedTicketIds((prev) =>
                         checked ? [...prev, id] : prev.filter((x) => x !== id)
                       )
+                    }
+                    onToggleStar={(id, isStarred) =>
+                      toggleStarMutation.mutate({ ticketId: id, isStarred })
                     }
                     onOpen={(id) => {
                       try {
@@ -1221,6 +1604,156 @@ function SupportTicketsOperationsPage() {
           navigate({ to: `/admin/support/tickets/${id}` as any });
         }}
       />
+
+      {/* Create Folder Dialog */}
+      <Dialog open={createFolderOpen} onOpenChange={setCreateFolderOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-base font-bold text-slate-900 flex items-center gap-2">
+              <FolderPlus className="size-5 text-indigo-600" />
+              Create New Folder
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div>
+              <label className="text-xs font-semibold text-slate-700 block mb-1.5">
+                Folder Name
+              </label>
+              <Input
+                value={newFolderName}
+                onChange={(e) => setNewFolderName(e.target.value)}
+                placeholder="e.g. VIP Inquiries, Escalated, Urgent GST"
+                className="h-9 text-xs"
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && newFolderName.trim()) {
+                    createFolderMutation.mutate({ name: newFolderName.trim(), color: newFolderColor });
+                  }
+                }}
+              />
+            </div>
+          </div>
+          <DialogFooter className="flex justify-end gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setCreateFolderOpen(false)}
+              className="text-xs"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              disabled={!newFolderName.trim() || createFolderMutation.isPending}
+              onClick={() => createFolderMutation.mutate({ name: newFolderName.trim(), color: newFolderColor })}
+              className="text-xs bg-indigo-600 hover:bg-indigo-700 text-white"
+            >
+              {createFolderMutation.isPending ? "Creating…" : "Create Folder"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Rename Folder Dialog */}
+      <Dialog open={!!folderToRename} onOpenChange={(open) => !open && setFolderToRename(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-base font-bold text-slate-900 flex items-center gap-2">
+              <Edit2 className="size-5 text-indigo-600" />
+              Rename Folder
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div>
+              <label className="text-xs font-semibold text-slate-700 block mb-1.5">
+                Folder Name
+              </label>
+              <Input
+                value={renameInput}
+                onChange={(e) => setRenameInput(e.target.value)}
+                placeholder="Folder name"
+                className="h-9 text-xs"
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && renameInput.trim() && folderToRename) {
+                    renameFolderMutation.mutate({ folderId: folderToRename.id, name: renameInput.trim(), color: renameColor });
+                  }
+                }}
+              />
+            </div>
+          </div>
+          <DialogFooter className="flex justify-end gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setFolderToRename(null)}
+              className="text-xs"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              disabled={!renameInput.trim() || renameFolderMutation.isPending}
+              onClick={() => {
+                if (folderToRename && renameInput.trim()) {
+                  renameFolderMutation.mutate({ folderId: folderToRename.id, name: renameInput.trim(), color: renameColor });
+                }
+              }}
+              className="text-xs bg-indigo-600 hover:bg-indigo-700 text-white"
+            >
+              {renameFolderMutation.isPending ? "Saving…" : "Save Changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Folder Dialog */}
+      <Dialog open={!!folderToDelete} onOpenChange={(open) => !open && setFolderToDelete(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-base font-bold text-slate-900 flex items-center gap-2">
+              <Trash2 className="size-5 text-rose-600" />
+              Delete Folder
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2 text-xs text-slate-600">
+            <p>
+              Are you sure you want to delete folder <strong className="text-slate-900 font-semibold">{folderToDelete?.name}</strong>?
+            </p>
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-900 text-xs">
+              <strong>Safe deletion guarantee:</strong> Deleting this folder will NOT delete any underlying emails, tickets, attachments, or conversation history. Tickets will simply return to the default unorganized view.
+            </div>
+          </div>
+          <DialogFooter className="flex justify-end gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setFolderToDelete(null)}
+              className="text-xs"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              disabled={deleteFolderMutation.isPending}
+              onClick={() => {
+                if (folderToDelete) {
+                  deleteFolderMutation.mutate(folderToDelete.id);
+                }
+              }}
+              className="text-xs bg-rose-600 hover:bg-rose-700 text-white"
+            >
+              {deleteFolderMutation.isPending ? "Deleting…" : "Delete Folder"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -1229,13 +1762,21 @@ function TicketTableRow({
   ticket,
   bucket,
   selected,
+  folders,
   onToggleSelect,
+  onToggleStar,
+  onMoveToFolder,
+  onRemoveFromFolder,
   onOpen,
 }: {
   ticket: any;
   bucket?: Bucket;
   selected?: boolean;
+  folders?: any[];
   onToggleSelect?: (id: string, checked: boolean) => void;
+  onToggleStar?: (id: string, isStarred: boolean) => void;
+  onMoveToFolder?: (id: string, folderId: string) => void;
+  onRemoveFromFolder?: (id: string) => void;
   onOpen: (id: string) => void;
 }) {
   const statusPill = STATUS_PILL[ticket.status as TicketStatus] ?? STATUS_PILL.open;
@@ -1279,6 +1820,22 @@ function TicketTableRow({
           onCheckedChange={(v) => onToggleSelect?.(ticket.id, !!v)}
           aria-label={`Select ticket ${ticket.ticket_number}`}
         />
+      </td>
+
+      {/* Star */}
+      <td className="w-8 px-1 py-2.5 text-center" data-no-row-click onClick={(e) => e.stopPropagation()}>
+        <button
+          type="button"
+          onClick={() => onToggleStar?.(ticket.id, !ticket.is_starred)}
+          className="size-7 rounded-md flex items-center justify-center transition-colors mx-auto text-slate-300 hover:text-amber-500"
+          title={ticket.is_starred ? "Unstar ticket" : "Star ticket"}
+        >
+          <Star
+            className={`size-4 transition-transform hover:scale-110 ${
+              ticket.is_starred ? "fill-amber-400 text-amber-500" : "text-slate-300 hover:text-amber-400"
+            }`}
+          />
+        </button>
       </td>
 
       {/* Ticket # */}
@@ -1335,13 +1892,24 @@ function TicketTableRow({
 
       {/* Subject */}
       <td className="px-3 py-2.5 max-w-[280px]">
-        <div
-          className={`text-[13px] leading-snug truncate ${
-            isUnreadOrNew ? "font-bold text-slate-950" : "font-normal text-slate-700"
-          }`}
-          title={ticket.subject || "(no subject)"}
-        >
-          {ticket.subject || "(no subject)"}
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span
+            className={`text-[13px] leading-snug truncate ${
+              isUnreadOrNew ? "font-bold text-slate-950" : "font-normal text-slate-700"
+            }`}
+            title={ticket.subject || "(no subject)"}
+          >
+            {ticket.subject || "(no subject)"}
+          </span>
+          {ticket.folder_name && (
+            <span
+              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200 shrink-0"
+              title={`In folder: ${ticket.folder_name}`}
+            >
+              <Folder className="size-2.5 text-indigo-500" />
+              {ticket.folder_name}
+            </span>
+          )}
         </div>
         {ticket.description && (
           <div className="text-[11px] text-slate-400 truncate mt-0.5">
@@ -1433,14 +2001,61 @@ function TicketTableRow({
 
       {/* Row Actions (3-dots) */}
       <td className="w-10 px-2 py-2.5 text-center whitespace-nowrap" data-no-row-click onClick={(e) => e.stopPropagation()}>
-        <button
-          type="button"
-          onClick={() => onOpen(ticket.id)}
-          className="size-7 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center transition-colors mx-auto"
-          title="Open ticket workspace"
-        >
-          <MoreVertical className="size-4" />
-        </button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              className="size-7 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center transition-colors mx-auto"
+              title="Ticket options"
+            >
+              <MoreVertical className="size-4" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-48">
+            <DropdownMenuItem onClick={() => onOpen(ticket.id)} className="text-xs cursor-pointer">
+              <Eye className="size-3.5 mr-2 text-slate-500" /> Open Ticket
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => onToggleStar?.(ticket.id, !ticket.is_starred)}
+              className="text-xs cursor-pointer"
+            >
+              <Star className={`size-3.5 mr-2 ${ticket.is_starred ? "fill-amber-400 text-amber-500" : "text-slate-400"}`} />
+              {ticket.is_starred ? "Unstar Ticket" : "Star Ticket"}
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <div className="px-2 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+              Move to Folder
+            </div>
+            {folders && folders.length > 0 ? (
+              folders.map((f: any) => (
+                <DropdownMenuItem
+                  key={f.id}
+                  onClick={() => onMoveToFolder?.(ticket.id, f.id)}
+                  className="text-xs cursor-pointer flex items-center justify-between"
+                >
+                  <span className="flex items-center gap-1.5 truncate">
+                    <Folder className="size-3 text-indigo-500" />
+                    <span className="truncate">{f.name}</span>
+                  </span>
+                  {ticket.folder_id === f.id && <Check className="size-3 text-emerald-600" />}
+                </DropdownMenuItem>
+              ))
+            ) : (
+              <div className="px-2 py-1 text-[11px] text-slate-400 italic">No folders created</div>
+            )}
+            {ticket.folder_id && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => onRemoveFromFolder?.(ticket.id)}
+                  className="text-xs text-rose-600 cursor-pointer"
+                >
+                  <X className="size-3.5 mr-2" /> Remove from folder
+                </DropdownMenuItem>
+              </>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </td>
     </tr>
   );
@@ -1450,13 +2065,17 @@ function TicketMobileCard({
   ticket,
   bucket,
   selected,
+  folders,
   onToggleSelect,
+  onToggleStar,
   onOpen,
 }: {
   ticket: any;
   bucket?: Bucket;
   selected?: boolean;
+  folders?: any[];
   onToggleSelect?: (id: string, checked: boolean) => void;
+  onToggleStar?: (id: string, isStarred: boolean) => void;
   onOpen: (id: string) => void;
 }) {
   const statusPill = STATUS_PILL[ticket.status as TicketStatus] ?? STATUS_PILL.open;
@@ -1482,10 +2101,31 @@ function TicketMobileCard({
               onCheckedChange={(v) => onToggleSelect?.(ticket.id, !!v)}
             />
           </div>
+          <button
+            type="button"
+            data-no-row-click
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleStar?.(ticket.id, !ticket.is_starred);
+            }}
+            className="p-1 -ml-1 text-slate-300 hover:text-amber-500"
+          >
+            <Star
+              className={`size-3.5 ${
+                ticket.is_starred ? "fill-amber-400 text-amber-500" : "text-slate-300"
+              }`}
+            />
+          </button>
           <span className="font-mono text-xs font-bold text-indigo-600">{ticket.ticket_number}</span>
           {ticket.is_new && (
             <span className="px-1.5 py-0.2 rounded text-[9px] font-extrabold uppercase bg-rose-600 text-white">
               NEW
+            </span>
+          )}
+          {ticket.folder_name && (
+            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[9px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
+              <Folder className="size-2 text-indigo-500" />
+              {ticket.folder_name}
             </span>
           )}
         </div>
