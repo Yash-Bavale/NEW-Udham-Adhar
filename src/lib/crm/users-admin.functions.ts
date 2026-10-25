@@ -531,6 +531,16 @@ export const setEmploymentStatus = createServerFn({ method: "POST" })
         console.warn("[setEmploymentStatus] user_roles ensure notice:", rErr);
       }
     } else {
+      // Immediately end every CRM session and sign the account out everywhere
+      try {
+        await admin.rpc("admin_force_logout_all_sessions", {
+          p_employee_id: data.user_id,
+          p_reason: `Employee status changed to ${data.status}`,
+        } as never);
+      } catch (sErr) {
+        console.warn("[setEmploymentStatus] session termination notice:", sErr);
+      }
+
       // Sync assignment_pool table when deactivated
       try {
         await admin.from("assignment_pool").update({ is_active: false }).eq("user_id", data.user_id);

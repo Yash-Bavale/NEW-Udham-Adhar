@@ -5649,6 +5649,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_account_disabled: { Args: { _user_id: string }; Returns: boolean }
       is_finance_viewer: { Args: { _user_id: string }; Returns: boolean }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
       is_workflow_manager: { Args: { _user_id: string }; Returns: boolean }
