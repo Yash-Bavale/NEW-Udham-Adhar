@@ -2139,7 +2139,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
           name,
           email: p.email,
           needsAction: 0,
-          latestActionAt: lastAct,
+          latestActionAt: lastAct ?? undefined,
           hotOrders: 0,
           backlog: 0,
           technicalDelay: 0,

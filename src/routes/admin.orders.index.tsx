@@ -475,7 +475,7 @@ export function OrdersListPage({ mode = "self" }: { mode?: "self" | "team" }) {
   }, [fulfillmentStatus, serviceId, assignedTo, paymentStatus, actionStatusFilter, stageFilter, dateFrom, dateTo, bucket, pendingAge, customDays, sortField, sortOrder]);
 
   const routerState = useRouterState({ select: (s) => (s.location.search as any) ?? {} });
-  const routeSearch = routerState;
+  const routeSearch = ((routerState as any)?.location?.search ?? {}) as Record<string, string | undefined>;
   const lastProcessedSearchRef = useRef<string>("");
 
   // Hydrate filters from URL query params (deep-links from dashboard KPIs) ONLY when URL search actually changes.
