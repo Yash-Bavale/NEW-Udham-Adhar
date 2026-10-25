@@ -62,6 +62,7 @@ const NAV: NavGroup[] = [
       { to: "/admin/dashboard", label: "Executive Dashboard", icon: LayoutDashboard, module: "dashboard", requireAnyRole: ADMIN_ROLES },
       { to: "/admin/my-work", label: "My Dashboard", icon: Inbox },
       { to: "/admin/orders", label: "Orders", icon: ShoppingBag, module: "orders", requireAnyRole: ALL_STAFF_ROLES },
+      { to: "/admin/team-orders", label: "Team Orders", icon: Users, module: "orders", requireAnyRole: ["admin", "super_admin", "manager"] },
       { to: "/admin/tickets", label: "Support Tickets", icon: LifeBuoy, module: "tickets", requireAnyRole: SUPPORT_ROLES },
       { to: "/admin/employees", label: "Employees", icon: UserCog, module: "employees", requireAnyRole: ADMIN_ROLES },
     ],
@@ -308,6 +309,12 @@ function Shell({ children, email }: { children: ReactNode; email?: string }) {
                     if (isMobile) setMobileOpen(false);
                     if (n.to === "/admin/orders") {
                       clearModuleFilterState("admin.orders");
+                      if (typeof window !== "undefined") {
+                        window.dispatchEvent(new CustomEvent("reset-orders-filters"));
+                      }
+                    }
+                    if (n.to === "/admin/team-orders") {
+                      clearModuleFilterState("admin.team-orders");
                       if (typeof window !== "undefined") {
                         window.dispatchEvent(new CustomEvent("reset-orders-filters"));
                       }

@@ -94,6 +94,7 @@ import { Route as AdminSettingsRouteImport } from './routes/admin.settings'
 import { Route as AdminSubmissionsRouteImport } from './routes/admin.submissions'
 import { Route as AdminSuperRouteImport } from './routes/admin.super'
 import { Route as AdminTasksRouteImport } from './routes/admin.tasks'
+import { Route as AdminTeamOrdersRouteImport } from './routes/admin.team-orders'
 import { Route as AdminTrainingRouteImport } from './routes/admin.training'
 import { Route as AdminUsersRouteImport } from './routes/admin.users'
 import { Route as AdminWebsitesRouteImport } from './routes/admin.websites'
@@ -605,6 +606,11 @@ const AdminTasksRoute = AdminTasksRouteImport.update({
   path: '/tasks',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminTeamOrdersRoute = AdminTeamOrdersRouteImport.update({
+  id: '/team-orders',
+  path: '/team-orders',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminTrainingRoute = AdminTrainingRouteImport.update({
   id: '/training',
   path: '/training',
@@ -1109,6 +1115,7 @@ export interface FileRoutesByFullPath {
   '/admin/submissions': typeof AdminSubmissionsRouteWithChildren
   '/admin/super': typeof AdminSuperRoute
   '/admin/tasks': typeof AdminTasksRoute
+  '/admin/team-orders': typeof AdminTeamOrdersRoute
   '/admin/training': typeof AdminTrainingRoute
   '/admin/users': typeof AdminUsersRoute
   '/admin/websites': typeof AdminWebsitesRoute
@@ -1269,6 +1276,7 @@ export interface FileRoutesByTo {
   '/admin/submissions': typeof AdminSubmissionsRouteWithChildren
   '/admin/super': typeof AdminSuperRoute
   '/admin/tasks': typeof AdminTasksRoute
+  '/admin/team-orders': typeof AdminTeamOrdersRoute
   '/admin/training': typeof AdminTrainingRoute
   '/admin/users': typeof AdminUsersRoute
   '/admin/websites': typeof AdminWebsitesRoute
@@ -1433,6 +1441,7 @@ export interface FileRoutesById {
   '/admin/submissions': typeof AdminSubmissionsRouteWithChildren
   '/admin/super': typeof AdminSuperRoute
   '/admin/tasks': typeof AdminTasksRoute
+  '/admin/team-orders': typeof AdminTeamOrdersRoute
   '/admin/training': typeof AdminTrainingRoute
   '/admin/users': typeof AdminUsersRoute
   '/admin/websites': typeof AdminWebsitesRoute
@@ -1599,6 +1608,7 @@ export interface FileRouteTypes {
     | '/admin/submissions'
     | '/admin/super'
     | '/admin/tasks'
+    | '/admin/team-orders'
     | '/admin/training'
     | '/admin/users'
     | '/admin/websites'
@@ -1759,6 +1769,7 @@ export interface FileRouteTypes {
     | '/admin/submissions'
     | '/admin/super'
     | '/admin/tasks'
+    | '/admin/team-orders'
     | '/admin/training'
     | '/admin/users'
     | '/admin/websites'
@@ -1922,6 +1933,7 @@ export interface FileRouteTypes {
     | '/admin/submissions'
     | '/admin/super'
     | '/admin/tasks'
+    | '/admin/team-orders'
     | '/admin/training'
     | '/admin/users'
     | '/admin/websites'
@@ -2697,6 +2709,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminTasksRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/team-orders': {
+      id: '/admin/team-orders'
+      path: '/team-orders'
+      fullPath: '/admin/team-orders'
+      preLoaderRoute: typeof AdminTeamOrdersRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/training': {
       id: '/admin/training'
       path: '/training'
@@ -3398,6 +3417,7 @@ interface AdminRouteChildren {
   AdminSubmissionsRoute: typeof AdminSubmissionsRouteWithChildren
   AdminSuperRoute: typeof AdminSuperRoute
   AdminTasksRoute: typeof AdminTasksRoute
+  AdminTeamOrdersRoute: typeof AdminTeamOrdersRoute
   AdminTrainingRoute: typeof AdminTrainingRoute
   AdminUsersRoute: typeof AdminUsersRoute
   AdminWebsitesRoute: typeof AdminWebsitesRoute
@@ -3453,6 +3473,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminSubmissionsRoute: AdminSubmissionsRouteWithChildren,
   AdminSuperRoute: AdminSuperRoute,
   AdminTasksRoute: AdminTasksRoute,
+  AdminTeamOrdersRoute: AdminTeamOrdersRoute,
   AdminTrainingRoute: AdminTrainingRoute,
   AdminUsersRoute: AdminUsersRoute,
   AdminWebsitesRoute: AdminWebsitesRoute,

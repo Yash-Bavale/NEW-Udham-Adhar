@@ -805,6 +805,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         customDays: z.string().optional(),
         sortField: z.enum(["created_at", "stage", "stage_journey"]).optional().default("created_at"),
         sortOrder: z.enum(["asc", "desc"]).optional().default("desc"),
+        viewMode: z.enum(["self", "team"]).optional().default("self"),
       })
       .parse(i ?? {}),
   )
@@ -824,6 +825,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         ageBuckets: { d1: 0, d2: 0, d3: 0, d7: 0, older: 0 },
         page: data.page,
         pageSize: data.pageSize,
+        teamBreakdown: [],
       };
     }
 
@@ -867,14 +869,31 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       if (data.serviceId && data.serviceId !== "all" && data.serviceId.trim() !== "") {
         query = query.eq("service_id", data.serviceId);
       }
+
       const hasSearch = Boolean(data.search && data.search.trim());
-      if (!isAdmin && (!isManager || !hasSearch)) {
-        query = query.eq("assigned_to", context.userId);
-      } else if (data.assignedTo && data.assignedTo !== "all" && data.assignedTo.trim() !== "") {
-        if (data.assignedTo === "unassigned") {
-          query = query.is("assigned_to", null);
-        } else {
-          query = query.eq("assigned_to", data.assignedTo);
+      const isTeamMode = data.viewMode === "team";
+
+      if (isTeamMode) {
+        if (data.assignedTo && data.assignedTo !== "all" && data.assignedTo.trim() !== "") {
+          if (data.assignedTo === "unassigned") {
+            query = query.is("assigned_to", null);
+          } else {
+            query = query.eq("assigned_to", data.assignedTo);
+          }
+        } else if (!isAdmin) {
+          // In team view without a specific assignee, exclude self orders so manager views other employees' metrics
+          query = query.neq("assigned_to", context.userId);
+        }
+      } else {
+        // Self orders mode
+        if (!isAdmin && (!isManager || !hasSearch)) {
+          query = query.eq("assigned_to", context.userId);
+        } else if (data.assignedTo && data.assignedTo !== "all" && data.assignedTo.trim() !== "") {
+          if (data.assignedTo === "unassigned") {
+            query = query.is("assigned_to", null);
+          } else {
+            query = query.eq("assigned_to", data.assignedTo);
+          }
         }
       }
 
@@ -2058,9 +2077,52 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
     const maxPage = Math.max(1, Math.ceil(total / data.pageSize));
     const page = Math.min(Math.max(1, data.page), maxPage);
     const start = (page - 1) * data.pageSize;
-    // Security / Phase 2: For Managers, the dashboard endpoint returns aggregate counts only.
-    // Individual order records are withheld from the dashboard payload.
-    const rows = (isManager && !isAdmin) ? [] : filtered.slice(start, start + data.pageSize);
+    // In team mode: counts only are returned, individual rows are withheld.
+    // In self mode: staff and managers can view their assigned order rows.
+    const rows = data.viewMode === "team" ? [] : filtered.slice(start, start + data.pageSize);
+
+    // Compute team-level breakdown for team mode
+    const teamBreakdownMap = new Map<string, {
+      employeeId: string;
+      name: string;
+      total: number;
+      needsAction: number;
+      hotOrders: number;
+      backlog: number;
+      completed: number;
+      closed: number;
+    }>();
+
+    if (data.viewMode === "team") {
+      for (const r of baseFilteredRows) {
+        const empId = r.assigned_to || "unassigned";
+        let entry = teamBreakdownMap.get(empId);
+        if (!entry) {
+          const st = r.assigned_to ? staffMap.get(r.assigned_to) : null;
+          const name = r.assigned_to ? (st?.display_name || st?.full_name || st?.email || "Staff") : "Unassigned";
+          entry = {
+            employeeId: empId,
+            name,
+            total: 0,
+            needsAction: 0,
+            hotOrders: 0,
+            backlog: 0,
+            completed: 0,
+            closed: 0,
+          };
+          teamBreakdownMap.set(empId, entry);
+        }
+        entry.total++;
+        if (isNeedsActionOrder(r)) entry.needsAction++;
+        if (r.is_hot) entry.hotOrders++;
+        const rowDate = istDateKey(r.created_at);
+        if (isNeedsActionOrder(r) && Boolean(rowDate && rowDate < todayIst)) entry.backlog++;
+        if (r.in_range_completed) entry.completed++;
+        if (r.in_range_closed) entry.closed++;
+      }
+    }
+
+    const teamBreakdown = Array.from(teamBreakdownMap.values()).sort((a, b) => b.needsAction - a.needsAction);
 
     return {
       rows,
@@ -2069,6 +2131,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       ageBuckets,
       page,
       pageSize: data.pageSize,
+      teamBreakdown,
     };
   });
 

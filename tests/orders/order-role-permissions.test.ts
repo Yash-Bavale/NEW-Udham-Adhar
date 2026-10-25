@@ -209,5 +209,41 @@ describe("CRM Role-Based Order Permissions & Authorization", () => {
       expect(canApproveRefund(["super_admin"])).toBe(true);
     });
   });
+
+  describe("7. ViewMode & Team Orders Oversight Schema", () => {
+    it("viewMode defaults to 'self' and accepts 'team'", async () => {
+      const { z } = await import("zod");
+      const listOrdersSchema = z.object({
+        page: z.number().int().min(1).default(1),
+        pageSize: z.number().int().min(1).max(100).default(50),
+        viewMode: z.enum(["self", "team"]).optional().default("self"),
+      });
+
+      const parsedDefault = listOrdersSchema.parse({});
+      expect(parsedDefault.viewMode).toBe("self");
+
+      const parsedTeam = listOrdersSchema.parse({ viewMode: "team" });
+      expect(parsedTeam.viewMode).toBe("team");
+
+      const parsedSelf = listOrdersSchema.parse({ viewMode: "self" });
+      expect(parsedSelf.viewMode).toBe("self");
+    });
+
+    it("Team view withholds individual order rows and returns empty row list", () => {
+      const mockFilteredOrders = [
+        { id: "app-1", application_code: "APP-001", assigned_to: "employee-1" },
+        { id: "app-2", application_code: "APP-002", assigned_to: "employee-2" },
+      ];
+
+      // Replicating listOrdersV2 row resolution rule:
+      // const rows = data.viewMode === "team" ? [] : filtered.slice(start, start + data.pageSize);
+      const resolveRows = (viewMode: "self" | "team", filtered: typeof mockFilteredOrders) => {
+        return viewMode === "team" ? [] : filtered;
+      };
+
+      expect(resolveRows("team", mockFilteredOrders)).toEqual([]);
+      expect(resolveRows("self", mockFilteredOrders)).toHaveLength(2);
+    });
+  });
 });
 

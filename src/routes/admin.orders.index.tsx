@@ -1,9 +1,9 @@
 import { isVisibleService } from "@/lib/crm/visible-services";
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, keepPreviousData, useQueryClient } from "@tanstack/react-query";
 import { Fragment, useEffect, useMemo, useRef, useState, useCallback } from "react";
-import { ChevronLeft, ChevronRight, RotateCcw, X, Filter, Loader2, ArrowUpDown, ArrowUp, ArrowDown, ShieldAlert, Flame, PhoneCall, PhoneForwarded, Clock, Server, LayoutGrid, Inbox, Bell, Hourglass, CheckCircle2, CheckCheck, AlertTriangle, UserX, UserCheck, Scale, Sparkles, RefreshCw, LifeBuoy, Timer } from "lucide-react";
+import { ChevronLeft, ChevronRight, RotateCcw, X, Filter, Loader2, ArrowUpDown, ArrowUp, ArrowDown, ShieldAlert, Flame, PhoneCall, PhoneForwarded, Clock, Server, LayoutGrid, Inbox, Bell, Hourglass, CheckCircle2, CheckCheck, AlertTriangle, UserX, UserCheck, Scale, Sparkles, RefreshCw, LifeBuoy, Timer, Users } from "lucide-react";
 import { formatIST, istDateKey } from "@/lib/datetime";
 import { toast } from "sonner";
 
@@ -364,7 +364,8 @@ function OrderIdleTimerKpiCard({
   );
 }
 
-function OrdersListPage() {
+export function OrdersListPage({ mode = "self" }: { mode?: "self" | "team" }) {
+  const isTeam = mode === "team";
   const listFn = useServerFn(listOrdersV2);
   const assignStaffFn = useServerFn(listAssignmentStaff);
   const historicalStaffFn = useServerFn(listAllHistoricalStaff);
@@ -374,7 +375,7 @@ function OrdersListPage() {
   const userPerms = usePermissions();
   const isAdmin = role.hasAny(["admin", "super_admin"]) || Boolean(userPerms.perms?.isAdmin);
   const isManager = role.has("manager");
-  const isPrivileged = isAdmin;
+  const isPrivileged = isAdmin || isTeam;
 
   const hideMoney = role.hideMoney();
   const navigate = useNavigate();
@@ -392,7 +393,8 @@ function OrdersListPage() {
   const latestActionLabel = actionMetrics?.latestActionLabel;
   const latestActionOrderCode = actionMetrics?.latestActionOrderCode;
 
-  const savedState = useMemo(() => getModuleFilterState("admin.orders"), []);
+  const storageKey = isTeam ? "admin.team-orders" : "admin.orders";
+  const savedState = useMemo(() => getModuleFilterState(storageKey), [storageKey]);
 
   const todayKey = useMemo(() => istDateKey(new Date()), []);
 
@@ -451,12 +453,12 @@ function OrdersListPage() {
 
   // Persist state across navigation
   useEffect(() => {
-    saveModuleFilterState("admin.orders", {
+    saveModuleFilterState(storageKey, {
       datePreset, fulfillmentStatus, serviceId, assignedTo,
       paymentStatus, actionStatusFilter, stageFilter, dateFrom, dateTo, bucket, pendingAge,
       customDays, sortField, sortOrder, page,
     });
-  }, [datePreset, fulfillmentStatus, serviceId, assignedTo, paymentStatus, actionStatusFilter, stageFilter, dateFrom, dateTo, bucket, pendingAge, customDays, sortField, sortOrder, page]);
+  }, [storageKey, datePreset, fulfillmentStatus, serviceId, assignedTo, paymentStatus, actionStatusFilter, stageFilter, dateFrom, dateTo, bucket, pendingAge, customDays, sortField, sortOrder, page]);
 
   // Reset page to 1 whenever filters change (skip on initial mount to preserve Page 2/3 when returning via Back button)
   useEffect(() => {
@@ -467,7 +469,8 @@ function OrdersListPage() {
     setPage(1);
   }, [fulfillmentStatus, serviceId, assignedTo, paymentStatus, actionStatusFilter, stageFilter, dateFrom, dateTo, bucket, pendingAge, customDays, sortField, sortOrder]);
 
-  const routeSearch = Route.useSearch();
+  const routerState = useRouterState({ select: (s) => (s.location.search as any) ?? {} });
+  const routeSearch = routerState;
   const lastProcessedSearchRef = useRef<string>("");
 
   // Hydrate filters from URL query params (deep-links from dashboard KPIs) ONLY when URL search actually changes.
@@ -601,20 +604,21 @@ function OrdersListPage() {
   const queryPayload = useMemo(() => ({
     page,
     pageSize,
+    viewMode: mode,
     fulfillmentStatus: fulfillmentStatus === "all" ? undefined : fulfillmentStatus,
     serviceId: serviceId === "all" ? undefined : serviceId,
     assignedTo: assignedTo === "all" ? undefined : assignedTo,
     paymentStatus: paymentStatus === "all" ? undefined : paymentStatus,
     dateFrom: dateFrom || undefined,
     dateTo: dateTo || undefined,
-    bucket: bucket || "all",
+    bucket: bucket || (isTeam ? "all" : (isPrivileged ? "all" : "needs_action")),
     stage: stageFilter === "all" ? undefined : stageFilter,
     actionStatus: actionStatusFilter || "all",
     pendingAge: pendingAge === "any" ? undefined : pendingAge,
     customDays: customDays || undefined,
     sortField,
     sortOrder,
-  }), [page, pageSize, fulfillmentStatus, serviceId, assignedTo, paymentStatus, dateFrom, dateTo, bucket, stageFilter, actionStatusFilter, pendingAge, customDays, sortField, sortOrder]);
+  }), [page, pageSize, mode, isTeam, isPrivileged, fulfillmentStatus, serviceId, assignedTo, paymentStatus, dateFrom, dateTo, bucket, stageFilter, actionStatusFilter, pendingAge, customDays, sortField, sortOrder]);
 
   const normalizedFilter = useMemo(() => normalizeOrdersFilter(queryPayload), [queryPayload]);
 
@@ -629,6 +633,16 @@ function OrdersListPage() {
   });
 
   const rows = (data?.rows ?? []) as any[];
+  const teamBreakdown = ((data as any)?.teamBreakdown ?? []) as Array<{
+    employeeId: string;
+    name: string;
+    total: number;
+    needsAction: number;
+    hotOrders: number;
+    backlog: number;
+    completed: number;
+    closed: number;
+  }>;
   const total = data?.total ?? 0;
   const counts = (data?.counts as any) ?? {
     all: 0,
@@ -647,9 +661,8 @@ function OrdersListPage() {
   };
   const ageBuckets = data?.ageBuckets ?? { d1: 0, d2: 0, d3: 0, d7: 0, older: 0 };
 
-
 // Preserve scroll position when navigating back from order detail view
-usePreserveScroll("admin.orders", !isLoading);
+usePreserveScroll(storageKey, !isLoading);
 
 // Real-time subscription with debouncing to prevent spamming queries
 const invalidateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -843,13 +856,20 @@ return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
       <div>
         <div className="flex items-center gap-2">
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Orders</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+            {isTeam ? "Team Orders" : "Orders"}
+          </h1>
           {isFetching && !isLoading && (
             <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-600 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-full animate-pulse">
               <Loader2 className="size-3 animate-spin text-indigo-600" /> Updating…
             </span>
           )}
         </div>
+        {isTeam && (
+          <p className="text-xs text-slate-500 mt-0.5">
+            Workforce order counts and status breakdown across other employees.
+          </p>
+        )}
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
@@ -1395,8 +1415,17 @@ return (
       </div>
     )}
 
-    {/* Desktop Table View */}
-    <div className="hidden md:block rounded-xl border border-slate-200 bg-white overflow-hidden shadow-xs">
+    {isTeam ? (
+      <TeamWorkforceBreakdown
+        teamBreakdown={teamBreakdown}
+        isLoading={isLoading}
+        assignedTo={assignedTo}
+        onSelectEmployee={setAssignedTo}
+      />
+    ) : (
+      <>
+        {/* Desktop Table View */}
+        <div className="hidden md:block rounded-xl border border-slate-200 bg-white overflow-hidden shadow-xs">
       <ScrollableTable>
         <table className="w-full text-sm min-w-[950px]">
           <thead>
@@ -1707,8 +1736,222 @@ return (
         </div>
       </div>
     )}
+      </>
+    )}
   </div>
 );
+}
+
+function TeamWorkforceBreakdown({
+  teamBreakdown,
+  isLoading,
+  assignedTo,
+  onSelectEmployee,
+}: {
+  teamBreakdown: Array<{
+    employeeId: string;
+    name: string;
+    total: number;
+    needsAction: number;
+    hotOrders: number;
+    backlog: number;
+    completed: number;
+    closed: number;
+  }>;
+  isLoading: boolean;
+  assignedTo: string;
+  onSelectEmployee: (id: string) => void;
+}) {
+  return (
+    <div className="space-y-4">
+      {/* Desktop View */}
+      <div className="hidden md:block rounded-xl border border-slate-200 bg-white overflow-hidden shadow-xs">
+        <div className="px-4 py-3 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Users className="size-4 text-indigo-600" />
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
+              Workforce Order Counts & Status Overview
+            </span>
+          </div>
+          {assignedTo !== "all" && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 text-xs gap-1 border-indigo-200 text-indigo-700 hover:bg-indigo-50"
+              onClick={() => onSelectEmployee("all")}
+            >
+              <RotateCcw className="size-3" /> Reset to All Employees
+            </Button>
+          )}
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="border-b border-slate-200 bg-slate-50/50 text-[11px] font-semibold text-slate-500 uppercase tracking-wider text-left">
+                <th className="px-4 py-2.5">Employee</th>
+                <th className="px-3 py-2.5 text-center">Touch SLA Pending</th>
+                <th className="px-3 py-2.5 text-center">Hot Orders</th>
+                <th className="px-3 py-2.5 text-center">Backlog</th>
+                <th className="px-3 py-2.5 text-center">Fulfilled in Range</th>
+                <th className="px-3 py-2.5 text-center">Closed in Range</th>
+                <th className="px-3 py-2.5 text-center">Total In Filter</th>
+                <th className="px-4 py-2.5 text-right">Action</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {isLoading && (
+                <tr>
+                  <td colSpan={8} className="px-4 py-12 text-center text-slate-500">
+                    <Loader2 className="size-5 animate-spin mx-auto mb-2 text-indigo-600" />
+                    Loading workforce counts…
+                  </td>
+                </tr>
+              )}
+              {!isLoading && teamBreakdown.length === 0 && (
+                <tr>
+                  <td colSpan={8} className="px-4 py-12 text-center text-slate-500">
+                    No active orders found for other employees in this view.
+                  </td>
+                </tr>
+              )}
+              {!isLoading &&
+                teamBreakdown.map((member) => {
+                  const isSelected = assignedTo === member.employeeId;
+                  return (
+                    <tr
+                      key={member.employeeId}
+                      className={cn(
+                        "hover:bg-slate-50 transition-colors",
+                        isSelected && "bg-indigo-50/60 font-medium"
+                      )}
+                    >
+                      <td className="px-4 py-3">
+                        <div className="font-semibold text-slate-800">{member.name}</div>
+                        <div className="text-[10px] text-slate-400 font-mono">
+                          {member.employeeId === "unassigned" ? "Unassigned Pool" : member.employeeId}
+                        </div>
+                      </td>
+                      <td className="px-3 py-3 text-center">
+                        <span
+                          className={cn(
+                            "inline-flex items-center px-2 py-0.5 rounded-full font-bold",
+                            member.needsAction > 0 ? "bg-rose-100 text-rose-700" : "text-slate-400"
+                          )}
+                        >
+                          {member.needsAction}
+                        </span>
+                      </td>
+                      <td className="px-3 py-3 text-center">
+                        <span
+                          className={cn(
+                            "inline-flex items-center px-2 py-0.5 rounded-full font-bold",
+                            member.hotOrders > 0 ? "bg-amber-100 text-amber-700" : "text-slate-400"
+                          )}
+                        >
+                          {member.hotOrders}
+                        </span>
+                      </td>
+                      <td className="px-3 py-3 text-center">
+                        <span
+                          className={cn(
+                            "inline-flex items-center px-2 py-0.5 rounded-full font-bold",
+                            member.backlog > 0 ? "bg-orange-100 text-orange-700" : "text-slate-400"
+                          )}
+                        >
+                          {member.backlog}
+                        </span>
+                      </td>
+                      <td className="px-3 py-3 text-center font-semibold text-emerald-600">
+                        {member.completed}
+                      </td>
+                      <td className="px-3 py-3 text-center text-slate-600">
+                        {member.closed}
+                      </td>
+                      <td className="px-3 py-3 text-center font-bold text-slate-900">
+                        {member.total}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <Button
+                          size="sm"
+                          variant={isSelected ? "default" : "outline"}
+                          className="h-7 text-xs px-2.5"
+                          onClick={() => onSelectEmployee(isSelected ? "all" : member.employeeId)}
+                        >
+                          {isSelected ? "Filtered ✓" : "Filter KPIs"}
+                        </Button>
+                      </td>
+                    </tr>
+                  );
+                })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Mobile Card View */}
+      <div className="block md:hidden space-y-3">
+        {isLoading && (
+          <div className="p-8 text-center text-sm text-slate-500 bg-white rounded-xl border border-slate-200">
+            <Loader2 className="size-5 animate-spin mx-auto mb-2 text-indigo-600" />
+            Loading workforce counts…
+          </div>
+        )}
+        {!isLoading && teamBreakdown.length === 0 && (
+          <div className="p-8 text-center text-sm text-slate-500 bg-white rounded-xl border border-slate-200">
+            No active orders found for other employees in this view.
+          </div>
+        )}
+        {!isLoading &&
+          teamBreakdown.map((member) => {
+            const isSelected = assignedTo === member.employeeId;
+            return (
+              <div
+                key={member.employeeId}
+                className={cn(
+                  "p-3.5 rounded-xl border bg-white space-y-2.5 shadow-2xs",
+                  isSelected ? "border-indigo-500 ring-2 ring-indigo-100" : "border-slate-200"
+                )}
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-sm font-semibold text-slate-800">{member.name}</div>
+                    <div className="text-[10px] text-slate-400 font-mono">
+                      {member.employeeId === "unassigned" ? "Unassigned Pool" : member.employeeId}
+                    </div>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant={isSelected ? "default" : "outline"}
+                    className="h-7 text-xs px-2.5"
+                    onClick={() => onSelectEmployee(isSelected ? "all" : member.employeeId)}
+                  >
+                    {isSelected ? "Filtered ✓" : "Filter"}
+                  </Button>
+                </div>
+                <div className="grid grid-cols-4 gap-1.5 text-center text-xs pt-1 border-t border-slate-100">
+                  <div className="bg-rose-50/70 p-1.5 rounded-lg">
+                    <div className="text-[10px] text-rose-600 font-medium">Needs Action</div>
+                    <div className="font-bold text-rose-700">{member.needsAction}</div>
+                  </div>
+                  <div className="bg-amber-50/70 p-1.5 rounded-lg">
+                    <div className="text-[10px] text-amber-600 font-medium">Hot</div>
+                    <div className="font-bold text-amber-700">{member.hotOrders}</div>
+                  </div>
+                  <div className="bg-orange-50/70 p-1.5 rounded-lg">
+                    <div className="text-[10px] text-orange-600 font-medium">Backlog</div>
+                    <div className="font-bold text-orange-700">{member.backlog}</div>
+                  </div>
+                  <div className="bg-emerald-50/70 p-1.5 rounded-lg">
+                    <div className="text-[10px] text-emerald-600 font-medium">Fulfilled</div>
+                    <div className="font-bold text-emerald-700">{member.completed}</div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+      </div>
+    </div>
+  );
 }
 
 function OrderActionHistoryBadge({ order }: { order: any }) {
