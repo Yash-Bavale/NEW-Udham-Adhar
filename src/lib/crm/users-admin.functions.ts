@@ -540,9 +540,6 @@ export const setEmploymentStatus = createServerFn({ method: "POST" })
       } catch (sErr) {
         console.warn("[setEmploymentStatus] session termination notice:", sErr);
       }
-      try {
-        await (admin.auth.admin as any).signOut?.(data.user_id, "global");
-      } catch { /* ban + DB gate still block access */ }
 
       // Sync assignment_pool table when deactivated
       try {
