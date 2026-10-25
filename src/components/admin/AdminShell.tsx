@@ -638,13 +638,13 @@ function GlobalSearchInput({ onOpenPalette }: { onOpenPalette: () => void }) {
                               {formattedDate && <span>· {formattedDate}</span>}
                             </div>
                           </div>
-                          {/* Below Line: Mobile · Email · Service Selected · Stage (if order) */}
+                          {/* Below Line: Mobile · Email · Service Selected · Direct Assignee Name (if order) */}
                           <div className="text-[11px] truncate mt-0.5" style={{ color: "var(--admin-fg-muted)" }}>
                             {[
                               h.mobile ? `+91 ${h.mobile}` : null,
                               h.email || null,
                               h.service || null,
-                              isApp && h.stage ? `Stage: ${h.stage}` : null,
+                              isApp ? (h.assignee || "Unassigned") : null,
                             ]
                               .filter(Boolean)
                               .join(" · ")}

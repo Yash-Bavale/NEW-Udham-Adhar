@@ -12,6 +12,7 @@ export type SearchHit = {
   email?: string | null;
   service?: string | null;
   stage?: string | null;
+  assignee?: string | null;
   title: string;
   subtitle?: string;
   href: string;
@@ -198,6 +199,26 @@ export const globalSearch = createServerFn({ method: "POST" })
     const leadMap = new Map<string, any>(fullLeads.map((r: any) => [r.id, r]));
     const custMap = new Map<string, any>(fullCusts.map((r: any) => [r.id, r]));
 
+    // Batch resolve staff assignee names with a single fast indexed query
+    const staffIds = Array.from(
+      new Set(
+        [
+          ...allApps.map((a: any) => a.assigned_to),
+          ...(l.data || []).map((ld: any) => ld.assigned_to),
+        ].filter(Boolean),
+      ),
+    );
+    const staffMap = new Map<string, string>();
+    if (staffIds.length > 0) {
+      const { data: profs } = await admin
+        .from("profiles")
+        .select("id, full_name, display_name")
+        .in("id", staffIds);
+      (profs ?? []).forEach((p: any) => {
+        staffMap.set(p.id, p.full_name || p.display_name || "Staff");
+      });
+    }
+
     const candidateHits: SearchHit[] = [];
 
     // 1. ORDERS / APPLICATIONS
@@ -213,6 +234,7 @@ export const globalSearch = createServerFn({ method: "POST" })
       const customerEmail = lead?.email || cust?.primary_email || null;
       const customerMobile = lead?.mobile || cust?.primary_mobile || null;
       const serviceName = (r.services as any)?.service_name || lead?.service || null;
+      const assigneeName = r.assigned_to ? (staffMap.get(r.assigned_to) || "Unassigned") : "Unassigned";
 
       candidateHits.push({
         kind: "application",
@@ -224,9 +246,10 @@ export const globalSearch = createServerFn({ method: "POST" })
         email: customerEmail,
         service: serviceName,
         stage: r.application_status || r.fulfillment_status,
+        assignee: assigneeName,
         title: r.application_code,
-        subtitle: [r.application_status || r.fulfillment_status, serviceName, customerName, customerEmail, customerMobile].filter(Boolean).join(" · "),
-        details: `Order Code: ${r.application_code}, Customer: ${customerName}, Email: ${customerEmail ?? ""}, Mobile: ${customerMobile ?? ""}, Service: ${serviceName ?? "General"}, Status: ${r.application_status ?? ""}`,
+        subtitle: [assigneeName, serviceName, customerName, customerEmail, customerMobile].filter(Boolean).join(" · "),
+        details: `Order Code: ${r.application_code}, Customer: ${customerName}, Email: ${customerEmail ?? ""}, Mobile: ${customerMobile ?? ""}, Service: ${serviceName ?? "General"}, Assignee: ${assigneeName}, Status: ${r.application_status ?? ""}`,
         href: `/admin/orders/${r.id}`,
       });
     });
@@ -243,6 +266,7 @@ export const globalSearch = createServerFn({ method: "POST" })
         email: r.email || null,
         service: r.service || null,
         stage: r.lead_status_v2 || r.status,
+        assignee: r.assigned_to ? (staffMap.get(r.assigned_to) || null) : null,
         title: r.name || r.lead_code,
         subtitle: [r.lead_code, r.service, r.lead_status_v2 || r.status, r.email, r.mobile].filter(Boolean).join(" · "),
         details: `Lead Name: ${r.name ?? ""}, Code: ${r.lead_code ?? ""}, Email: ${r.email ?? ""}, Mobile: ${r.mobile ?? ""}, Service: ${r.service ?? ""}, Status: ${r.lead_status_v2 ?? r.status ?? ""}, Notes: ${r.notes ?? ""}`,
