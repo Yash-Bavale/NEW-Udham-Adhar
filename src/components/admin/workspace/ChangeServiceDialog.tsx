@@ -1,3 +1,4 @@
+import { isVisibleService } from "@/lib/crm/visible-services";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -76,7 +77,7 @@ function ChangeServiceDialog({
 
   const GST_DOMAIN = "gstcertificate.in";
   const options = (data?.rows ?? []).filter(
-    (s: any) => s.id !== currentServiceId && s.is_active && s.website?.domain !== GST_DOMAIN
+    (s: any) => s.id !== currentServiceId && isVisibleService(s)
   );
   const currentSvc = (data?.rows ?? []).find((s: any) => s.id === currentServiceId);
   const selected = options.find((s: any) => s.id === newId);
@@ -188,40 +189,10 @@ function ChangeServiceDialog({
               </div>
             </div>
 
-            {/* Payment Link Card (if topUpUrl exists or upgrade mode) */}
+            {/* Payment link is emailed to the customer; the web address is never shown to staff. */}
             {result.topUpUrl && (
-              <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-3.5 space-y-2">
-                <div className="flex items-center justify-between text-xs font-semibold text-amber-900">
-                  <span>Balance Payment Link (₹{result.delta?.toFixed(2)})</span>
-                  <a
-                    href={result.topUpUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-amber-700 hover:underline inline-flex items-center gap-1 text-[11px]"
-                  >
-                    Open <ExternalLink className="w-3 h-3" />
-                  </a>
-                </div>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    readOnly
-                    value={result.topUpUrl}
-                    className="flex-1 rounded-md border border-amber-200 bg-white px-2.5 py-1.5 text-xs font-mono text-slate-800 outline-none select-all"
-                  />
-                  <Button
-                    type="button"
-                    size="sm"
-                    className="bg-amber-600 hover:bg-amber-700 text-white shrink-0 h-8 gap-1.5 text-xs font-medium"
-                    onClick={() => handleCopy(result.topUpUrl, "pay")}
-                  >
-                    {copiedLink === "pay" ? (
-                      <><Check className="w-3.5 h-3.5" /> Copied</>
-                    ) : (
-                      <><Copy className="w-3.5 h-3.5" /> Copy Link</>
-                    )}
-                  </Button>
-                </div>
+              <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-3.5 text-xs font-semibold text-amber-900">
+                Balance payment of ₹{result.delta?.toFixed(2)} requested — the payment link is sent to the customer by email.
               </div>
             )}
 

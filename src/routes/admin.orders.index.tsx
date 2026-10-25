@@ -1,3 +1,4 @@
+import { isVisibleService } from "@/lib/crm/visible-services";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, keepPreviousData, useQueryClient } from "@tanstack/react-query";
@@ -577,7 +578,7 @@ function OrdersListPage() {
   // Group active services website-wise
   const groupedServices = useMemo(() => {
     const raw = (svcData?.rows ?? []) as any[];
-    const activeOnly = raw.filter((s) => s.is_active !== false && s.website?.domain !== "gstcertificate.in");
+    const activeOnly = raw.filter((s) => isVisibleService(s));
     const map = new Map<string, { websiteName: string; domain: string; services: any[] }>();
 
     for (const s of activeOnly) {
@@ -963,7 +964,7 @@ return (
             {groupedServices.map((g) => (
               <SelectGroup key={g.id}>
                 <SelectLabel className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-indigo-700 bg-indigo-50/80 rounded-md my-1 flex items-center gap-1">
-                  🌐 {g.websiteName} {g.domain ? `(${g.domain})` : ""}
+                  Udyam Aadhar Services
                 </SelectLabel>
                 {g.services.map((s: any) => (
                   <SelectItem key={s.id} value={s.id} className="pl-3 text-xs">
