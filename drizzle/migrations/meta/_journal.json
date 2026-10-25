@@ -260,6 +260,13 @@
       "when": 1792816473690,
       "tag": "0036_telephony_wrapup_fields",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1792909262359,
+      "tag": "0037_active_profile_role_gate",
+      "breakpoints": true
     }
   ]
 }
