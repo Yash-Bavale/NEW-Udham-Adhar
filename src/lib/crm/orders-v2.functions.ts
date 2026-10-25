@@ -2183,16 +2183,25 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         if (isTechnicalDelayOrder(r)) entry.technicalDelay++;
         if (isCallbackScheduledOrder(r)) entry.callbackScheduled++;
         if (isCustomerDelayOrder(r)) entry.customerDelay++;
-        if (r.in_range_action_taken) entry.actionTaken++;
         if (r.in_range_completed) entry.completed++;
         if (r.in_range_closed) entry.closed++;
+      }
 
-        if (r.latest_action_at) {
-          const tRow = new Date(r.latest_action_at).getTime();
+      // 3. Credit actions strictly to the staff member who performed them.
+      // Superadmin/support interventions on an order never count for, or wake up, the assignee.
+      for (const r of baseFilteredRows) {
+        const byActor = new Map<string, string>();
+        for (const a of ((r as any).action_actors ?? []) as Array<{ actor_id: string | null; created_at: string }>) {
+          if (!a.actor_id) continue;
+          const prev = byActor.get(a.actor_id);
+          if (!prev || new Date(a.created_at).getTime() > new Date(prev).getTime()) byActor.set(a.actor_id, a.created_at);
+        }
+        for (const [actorId, latest] of byActor) {
+          const entry = teamBreakdownMap.get(actorId);
+          if (!entry) continue;
+          entry.actionTaken++;
           const tCurr = entry.latestActionAt ? new Date(entry.latestActionAt).getTime() : 0;
-          if (tRow > tCurr) {
-            entry.latestActionAt = r.latest_action_at;
-          }
+          if (new Date(latest).getTime() > tCurr) entry.latestActionAt = latest;
         }
       }
     }
