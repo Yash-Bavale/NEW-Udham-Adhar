@@ -1139,7 +1139,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         admin.from("payments").select("id, application_id, lead_id, status, amount, payment_date").in("lead_id", chunk)
       ),
       fetchInChunks<any>(staffIds, 200, (chunk) =>
-        admin.from("profiles").select("id, full_name, display_name, email").in("id", chunk)
+        admin.from("profiles").select("id, full_name, display_name, email, is_active, employment_status").in("id", chunk)
       ),
     ]);
 
@@ -2081,48 +2081,114 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
     // In self mode: staff and managers can view their assigned order rows.
     const rows = data.viewMode === "team" ? [] : filtered.slice(start, start + data.pageSize);
 
-    // Compute team-level breakdown for team mode
+    // Compute team-level breakdown for team mode (Active Workforce only)
     const teamBreakdownMap = new Map<string, {
       employeeId: string;
       name: string;
-      total: number;
+      email?: string;
       needsAction: number;
+      latestActionAt: string | null;
       hotOrders: number;
       backlog: number;
+      technicalDelay: number;
+      callbackScheduled: number;
+      customerDelay: number;
+      actionTaken: number;
       completed: number;
       closed: number;
+      total: number;
     }>();
 
     if (data.viewMode === "team") {
-      for (const r of baseFilteredRows) {
-        const empId = r.assigned_to || "unassigned";
-        let entry = teamBreakdownMap.get(empId);
-        if (!entry) {
-          const st = r.assigned_to ? staffMap.get(r.assigned_to) : null;
-          const name = r.assigned_to ? (st?.display_name || st?.full_name || st?.email || "Staff") : "Unassigned";
-          entry = {
-            employeeId: empId,
-            name,
-            total: 0,
-            needsAction: 0,
-            hotOrders: 0,
-            backlog: 0,
-            completed: 0,
-            closed: 0,
-          };
-          teamBreakdownMap.set(empId, entry);
+      const [{ data: profs }, { data: superAdminRoles }, { data: sessions }] = await Promise.all([
+        admin.from("profiles").select("id, full_name, display_name, email, is_active, employment_status"),
+        admin.from("user_roles").select("user_id").eq("role", "super_admin"),
+        admin
+          .from("employee_sessions")
+          .select("employee_id, last_activity_at, last_heartbeat_at, login_at, status, is_active")
+          .order("last_activity_at", { ascending: false }),
+      ]);
+
+      const superAdminIds = new Set((superAdminRoles ?? []).map((r: any) => String(r.user_id)));
+      const employeeSessionsMap = new Map<string, any>();
+      for (const s of sessions ?? []) {
+        const empId = String(s.employee_id);
+        if (!employeeSessionsMap.has(empId)) {
+          employeeSessionsMap.set(empId, s);
         }
+      }
+
+      // 1. Pre-populate all ACTIVE workforce employees (strictly excluding deactivated/archived staff and manager self)
+      for (const p of profs ?? []) {
+        const uid = String(p.id);
+        if (uid === context.userId) continue; // Exclude manager self
+        if (superAdminIds.has(uid)) continue; // Exclude super admin accounts
+        const isAct =
+          p.is_active !== false &&
+          p.employment_status !== "ARCHIVED" &&
+          p.employment_status !== "TERMINATED" &&
+          p.employment_status !== "INACTIVE";
+        if (!isAct) continue; // Exclude deactivated/archived employees
+
+        const name = p.display_name || p.full_name || p.email?.split("@")[0] || "Staff";
+        const sess = employeeSessionsMap.get(uid);
+        const lastAct = sess?.last_activity_at || sess?.last_heartbeat_at || sess?.login_at || null;
+
+        teamBreakdownMap.set(uid, {
+          employeeId: uid,
+          name,
+          email: p.email,
+          needsAction: 0,
+          latestActionAt: lastAct,
+          hotOrders: 0,
+          backlog: 0,
+          technicalDelay: 0,
+          callbackScheduled: 0,
+          customerDelay: 0,
+          actionTaken: 0,
+          completed: 0,
+          closed: 0,
+          total: 0,
+        });
+      }
+
+      // 2. Aggregate order metrics for active team members
+      for (const r of baseFilteredRows) {
+        if (!r.assigned_to) continue;
+        const empId = String(r.assigned_to);
+        const entry = teamBreakdownMap.get(empId);
+        // If entry is not in active workforce map (e.g., archived staff or self), skip
+        if (!entry) continue;
+
         entry.total++;
         if (isNeedsActionOrder(r)) entry.needsAction++;
         if (r.is_hot) entry.hotOrders++;
         const rowDate = istDateKey(r.created_at);
         if (isNeedsActionOrder(r) && Boolean(rowDate && rowDate < todayIst)) entry.backlog++;
+        if (isTechnicalDelayOrder(r)) entry.technicalDelay++;
+        if (isCallbackScheduledOrder(r)) entry.callbackScheduled++;
+        if (isCustomerDelayOrder(r)) entry.customerDelay++;
+        if (r.in_range_action_taken) entry.actionTaken++;
         if (r.in_range_completed) entry.completed++;
         if (r.in_range_closed) entry.closed++;
+
+        if (r.latest_action_at) {
+          const tRow = new Date(r.latest_action_at).getTime();
+          const tCurr = entry.latestActionAt ? new Date(entry.latestActionAt).getTime() : 0;
+          if (tRow > tCurr) {
+            entry.latestActionAt = r.latest_action_at;
+          }
+        }
       }
     }
 
-    const teamBreakdown = Array.from(teamBreakdownMap.values()).sort((a, b) => b.needsAction - a.needsAction);
+    const teamBreakdown = Array.from(teamBreakdownMap.values()).sort((a, b) => {
+      if (b.needsAction !== a.needsAction) return b.needsAction - a.needsAction;
+      if (b.hotOrders !== a.hotOrders) return b.hotOrders - a.hotOrders;
+      if (b.backlog !== a.backlog) return b.backlog - a.backlog;
+      if (b.total !== a.total) return b.total - a.total;
+      return a.name.localeCompare(b.name);
+    });
 
     return {
       rows,

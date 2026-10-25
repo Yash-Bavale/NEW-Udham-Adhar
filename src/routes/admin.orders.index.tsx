@@ -118,7 +118,7 @@ const BUCKET_CARDS: BucketCardItem[] = [
   {
     id: "needs_action",
     label: "NEEDS ACTION",
-    subtitle: "Touch SLA Pending",
+    subtitle: "Needs Action",
     icon: Inbox,
     tone: "rose",
   },
@@ -411,7 +411,12 @@ export function OrdersListPage({ mode = "self" }: { mode?: "self" | "team" }) {
   const [stageFilter, setStageFilter] = useState<string>(savedState?.stageFilter ?? "all");
   const [dateFrom, setDateFrom] = useState<string>(savedState?.dateFrom ?? todayKey);
   const [dateTo, setDateTo] = useState<string>(savedState?.dateTo ?? todayKey);
-  const [bucket, setBucket] = useState<Bucket>(savedState?.bucket ?? (isPrivileged ? "all" : "needs_action"));
+  const [bucket, setBucket] = useState<Bucket>(() => {
+    if (isTeam) {
+      return (savedState?.bucket && savedState.bucket !== "all") ? (savedState.bucket as Bucket) : "needs_action";
+    }
+    return savedState?.bucket ?? (isPrivileged ? "all" : "needs_action");
+  });
   const [pendingAge, setPendingAge] = useState<PendingAge>(savedState?.pendingAge ?? "any");
   const [customDays, setCustomDays] = useState<string>(savedState?.customDays ?? "");
   const [sortField, setSortField] = useState<"created_at" | "stage" | "stage_journey">(savedState?.sortField ?? "created_at");
@@ -636,12 +641,18 @@ export function OrdersListPage({ mode = "self" }: { mode?: "self" | "team" }) {
   const teamBreakdown = ((data as any)?.teamBreakdown ?? []) as Array<{
     employeeId: string;
     name: string;
-    total: number;
+    email?: string;
     needsAction: number;
+    latestActionAt: string | null;
     hotOrders: number;
     backlog: number;
+    technicalDelay: number;
+    callbackScheduled: number;
+    customerDelay: number;
+    actionTaken: number;
     completed: number;
     closed: number;
+    total: number;
   }>;
   const total = data?.total ?? 0;
   const counts = (data?.counts as any) ?? {
@@ -1139,7 +1150,7 @@ return (
                 </SelectGroup>
               )}
 
-              {inactiveStaffList.length > 0 && (
+              {!isTeam && !isManager && isAdmin && inactiveStaffList.length > 0 && (
                 <SelectGroup>
                   <SelectLabel className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-rose-700 bg-rose-50/80 rounded-md my-1 flex items-center gap-1">
                     ⚪ Inactive / Exited Staff ({inactiveStaffList.length})
@@ -1175,11 +1186,11 @@ return (
     {/* KPI Cards Row */}
     <div className={cn(
       "grid gap-2 w-full",
-      isPrivileged
+      isPrivileged && !isTeam
         ? "grid-cols-2 sm:grid-cols-3 md:grid-cols-6 lg:grid-cols-11"
         : "grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-10"
     )}>
-      {(isPrivileged ? BUCKET_CARDS : BUCKET_CARDS.filter((b) => !b.adminOnly)).map((b) => {
+      {(isTeam ? BUCKET_CARDS.filter((b) => b.id !== "all") : (isPrivileged ? BUCKET_CARDS : BUCKET_CARDS.filter((b) => !b.adminOnly))).map((b) => {
         const active = bucket === b.id;
         const countVal = Number((counts as any)[b.id] ?? 0);
         const IconComponent = b.icon;
@@ -1742,6 +1753,69 @@ return (
 );
 }
 
+function EmployeeIdleTimerCell({
+  latestActionAt,
+}: {
+  latestActionAt?: string | null;
+}) {
+  const [elapsedMs, setElapsedMs] = useState(() =>
+    latestActionAt ? Math.max(0, Date.now() - new Date(latestActionAt).getTime()) : 0
+  );
+
+  useEffect(() => {
+    if (!latestActionAt) {
+      setElapsedMs(0);
+      return;
+    }
+    const tick = () => {
+      setElapsedMs(Math.max(0, Date.now() - new Date(latestActionAt).getTime()));
+    };
+    tick();
+    const interval = setInterval(tick, 1000);
+    return () => clearInterval(interval);
+  }, [latestActionAt]);
+
+  if (!latestActionAt) {
+    return <span className="text-slate-400 font-mono text-[11px]">—</span>;
+  }
+
+  const seconds = Math.floor(elapsedMs / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+
+  const displayTime =
+    hours > 0
+      ? `${hours}h ${String(minutes % 60).padStart(2, "0")}m`
+      : `${minutes}m ${String(seconds % 60).padStart(2, "0")}s`;
+
+  const isHealthy = minutes < 15;
+  const isAttention = minutes >= 15 && minutes < 60;
+
+  const badgeCls = isHealthy
+    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+    : isAttention
+    ? "bg-amber-50 text-amber-700 border-amber-200"
+    : "bg-rose-50 text-rose-700 border-rose-200";
+
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[11px] font-mono font-semibold border",
+        badgeCls
+      )}
+      title={`Last action: ${new Date(latestActionAt).toLocaleTimeString("en-IN")}`}
+    >
+      <span
+        className={cn(
+          "size-1.5 rounded-full animate-pulse",
+          isHealthy ? "bg-emerald-500" : isAttention ? "bg-amber-500" : "bg-rose-500"
+        )}
+      />
+      {displayTime}
+    </span>
+  );
+}
+
 function TeamWorkforceBreakdown({
   teamBreakdown,
   isLoading,
@@ -1751,12 +1825,18 @@ function TeamWorkforceBreakdown({
   teamBreakdown: Array<{
     employeeId: string;
     name: string;
-    total: number;
+    email?: string;
     needsAction: number;
+    latestActionAt: string | null;
     hotOrders: number;
     backlog: number;
+    technicalDelay: number;
+    callbackScheduled: number;
+    customerDelay: number;
+    actionTaken: number;
     completed: number;
     closed: number;
+    total: number;
   }>;
   isLoading: boolean;
   assignedTo: string;
@@ -1773,35 +1853,28 @@ function TeamWorkforceBreakdown({
               Workforce Order Counts & Status Overview
             </span>
           </div>
-          {assignedTo !== "all" && (
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-7 text-xs gap-1 border-indigo-200 text-indigo-700 hover:bg-indigo-50"
-              onClick={() => onSelectEmployee("all")}
-            >
-              <RotateCcw className="size-3" /> Reset to All Employees
-            </Button>
-          )}
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
-              <tr className="border-b border-slate-200 bg-slate-50/50 text-[11px] font-semibold text-slate-500 uppercase tracking-wider text-left">
-                <th className="px-4 py-2.5">Employee</th>
-                <th className="px-3 py-2.5 text-center">Touch SLA Pending</th>
-                <th className="px-3 py-2.5 text-center">Hot Orders</th>
-                <th className="px-3 py-2.5 text-center">Backlog</th>
-                <th className="px-3 py-2.5 text-center">Fulfilled in Range</th>
-                <th className="px-3 py-2.5 text-center">Closed in Range</th>
-                <th className="px-3 py-2.5 text-center">Total In Filter</th>
-                <th className="px-4 py-2.5 text-right">Action</th>
+              <tr className="border-b border-slate-200 bg-slate-50/70 text-[10px] font-bold text-slate-600 uppercase tracking-wider text-left">
+                <th className="px-3.5 py-2.5">Employee</th>
+                <th className="px-2 py-2.5 text-center text-rose-600">Needs Action</th>
+                <th className="px-2 py-2.5 text-center text-emerald-700">Idle Time</th>
+                <th className="px-2 py-2.5 text-center text-rose-600">Hot Orders</th>
+                <th className="px-2 py-2.5 text-center text-amber-700">Backlog</th>
+                <th className="px-2 py-2.5 text-center text-sky-700">Technical Delay</th>
+                <th className="px-2 py-2.5 text-center text-indigo-700">Callback Scheduled</th>
+                <th className="px-2 py-2.5 text-center text-amber-800">Customer Delay</th>
+                <th className="px-2 py-2.5 text-center text-amber-600">Action Taken</th>
+                <th className="px-2 py-2.5 text-center text-emerald-600">Completed</th>
+                <th className="px-2 py-2.5 text-center text-slate-600">Closed</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {isLoading && (
                 <tr>
-                  <td colSpan={8} className="px-4 py-12 text-center text-slate-500">
+                  <td colSpan={11} className="px-4 py-12 text-center text-slate-500">
                     <Loader2 className="size-5 animate-spin mx-auto mb-2 text-indigo-600" />
                     Loading workforce counts…
                   </td>
@@ -1809,76 +1882,99 @@ function TeamWorkforceBreakdown({
               )}
               {!isLoading && teamBreakdown.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-4 py-12 text-center text-slate-500">
-                    No active orders found for other employees in this view.
+                  <td colSpan={11} className="px-4 py-12 text-center text-slate-500">
+                    No active employees found in this view.
                   </td>
                 </tr>
               )}
               {!isLoading &&
                 teamBreakdown.map((member) => {
-                  const isSelected = assignedTo === member.employeeId;
                   return (
                     <tr
                       key={member.employeeId}
-                      className={cn(
-                        "hover:bg-slate-50 transition-colors",
-                        isSelected && "bg-indigo-50/60 font-medium"
-                      )}
+                      className="hover:bg-slate-50/80 transition-colors"
                     >
-                      <td className="px-4 py-3">
-                        <div className="font-semibold text-slate-800">{member.name}</div>
-                        <div className="text-[10px] text-slate-400 font-mono">
-                          {member.employeeId === "unassigned" ? "Unassigned Pool" : member.employeeId}
-                        </div>
+                      <td className="px-3.5 py-2.5">
+                        <div className="font-semibold text-slate-800 whitespace-nowrap">{member.name}</div>
                       </td>
-                      <td className="px-3 py-3 text-center">
+                      <td className="px-2 py-2.5 text-center">
                         <span
                           className={cn(
-                            "inline-flex items-center px-2 py-0.5 rounded-full font-bold",
+                            "inline-flex items-center px-2 py-0.5 rounded-full font-bold text-xs",
                             member.needsAction > 0 ? "bg-rose-100 text-rose-700" : "text-slate-400"
                           )}
                         >
                           {member.needsAction}
                         </span>
                       </td>
-                      <td className="px-3 py-3 text-center">
+                      <td className="px-2 py-2.5 text-center">
+                        <EmployeeIdleTimerCell latestActionAt={member.latestActionAt} />
+                      </td>
+                      <td className="px-2 py-2.5 text-center">
                         <span
                           className={cn(
-                            "inline-flex items-center px-2 py-0.5 rounded-full font-bold",
-                            member.hotOrders > 0 ? "bg-amber-100 text-amber-700" : "text-slate-400"
+                            "inline-flex items-center px-2 py-0.5 rounded-full font-bold text-xs",
+                            member.hotOrders > 0 ? "bg-rose-50 text-rose-700 border border-rose-200" : "text-slate-400"
                           )}
                         >
                           {member.hotOrders}
                         </span>
                       </td>
-                      <td className="px-3 py-3 text-center">
+                      <td className="px-2 py-2.5 text-center">
                         <span
                           className={cn(
-                            "inline-flex items-center px-2 py-0.5 rounded-full font-bold",
-                            member.backlog > 0 ? "bg-orange-100 text-orange-700" : "text-slate-400"
+                            "inline-flex items-center px-2 py-0.5 rounded-full font-bold text-xs",
+                            member.backlog > 0 ? "bg-amber-100 text-amber-800" : "text-slate-400"
                           )}
                         >
                           {member.backlog}
                         </span>
                       </td>
-                      <td className="px-3 py-3 text-center font-semibold text-emerald-600">
+                      <td className="px-2 py-2.5 text-center">
+                        <span
+                          className={cn(
+                            "inline-flex items-center px-1.5 py-0.5 rounded-md font-semibold text-xs",
+                            member.technicalDelay > 0 ? "bg-sky-50 text-sky-700 border border-sky-200" : "text-slate-400"
+                          )}
+                        >
+                          {member.technicalDelay}
+                        </span>
+                      </td>
+                      <td className="px-2 py-2.5 text-center">
+                        <span
+                          className={cn(
+                            "inline-flex items-center px-1.5 py-0.5 rounded-md font-semibold text-xs",
+                            member.callbackScheduled > 0 ? "bg-indigo-50 text-indigo-700 border border-indigo-200" : "text-slate-400"
+                          )}
+                        >
+                          {member.callbackScheduled}
+                        </span>
+                      </td>
+                      <td className="px-2 py-2.5 text-center">
+                        <span
+                          className={cn(
+                            "inline-flex items-center px-1.5 py-0.5 rounded-md font-semibold text-xs",
+                            member.customerDelay > 0 ? "bg-amber-50 text-amber-800 border border-amber-200" : "text-slate-400"
+                          )}
+                        >
+                          {member.customerDelay}
+                        </span>
+                      </td>
+                      <td className="px-2 py-2.5 text-center">
+                        <span
+                          className={cn(
+                            "inline-flex items-center px-1.5 py-0.5 rounded-md font-semibold text-xs",
+                            member.actionTaken > 0 ? "bg-amber-50 text-amber-700 font-bold" : "text-slate-400"
+                          )}
+                        >
+                          {member.actionTaken}
+                        </span>
+                      </td>
+                      <td className="px-2 py-2.5 text-center font-bold text-emerald-600">
                         {member.completed}
                       </td>
-                      <td className="px-3 py-3 text-center text-slate-600">
+                      <td className="px-2 py-2.5 text-center font-semibold text-slate-600">
                         {member.closed}
-                      </td>
-                      <td className="px-3 py-3 text-center font-bold text-slate-900">
-                        {member.total}
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <Button
-                          size="sm"
-                          variant={isSelected ? "default" : "outline"}
-                          className="h-7 text-xs px-2.5"
-                          onClick={() => onSelectEmployee(isSelected ? "all" : member.employeeId)}
-                        >
-                          {isSelected ? "Filtered ✓" : "Filter KPIs"}
-                        </Button>
                       </td>
                     </tr>
                   );
@@ -1898,52 +1994,66 @@ function TeamWorkforceBreakdown({
         )}
         {!isLoading && teamBreakdown.length === 0 && (
           <div className="p-8 text-center text-sm text-slate-500 bg-white rounded-xl border border-slate-200">
-            No active orders found for other employees in this view.
+            No active employees found in this view.
           </div>
         )}
         {!isLoading &&
           teamBreakdown.map((member) => {
-            const isSelected = assignedTo === member.employeeId;
             return (
               <div
                 key={member.employeeId}
-                className={cn(
-                  "p-3.5 rounded-xl border bg-white space-y-2.5 shadow-2xs",
-                  isSelected ? "border-indigo-500 ring-2 ring-indigo-100" : "border-slate-200"
-                )}
+                className="p-3.5 rounded-xl border border-slate-200 bg-white space-y-2.5 shadow-2xs"
               >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="text-sm font-semibold text-slate-800">{member.name}</div>
-                    <div className="text-[10px] text-slate-400 font-mono">
-                      {member.employeeId === "unassigned" ? "Unassigned Pool" : member.employeeId}
-                    </div>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="text-sm font-semibold text-slate-800 truncate">{member.name}</div>
                   </div>
-                  <Button
-                    size="sm"
-                    variant={isSelected ? "default" : "outline"}
-                    className="h-7 text-xs px-2.5"
-                    onClick={() => onSelectEmployee(isSelected ? "all" : member.employeeId)}
-                  >
-                    {isSelected ? "Filtered ✓" : "Filter"}
-                  </Button>
+                  <div className="shrink-0">
+                    <EmployeeIdleTimerCell latestActionAt={member.latestActionAt} />
+                  </div>
                 </div>
-                <div className="grid grid-cols-4 gap-1.5 text-center text-xs pt-1 border-t border-slate-100">
+                <div className="grid grid-cols-5 gap-1 text-center text-xs pt-1.5 border-t border-slate-100">
                   <div className="bg-rose-50/70 p-1.5 rounded-lg">
-                    <div className="text-[10px] text-rose-600 font-medium">Needs Action</div>
+                    <div className="text-[9px] text-rose-600 font-medium">Needs Action</div>
                     <div className="font-bold text-rose-700">{member.needsAction}</div>
                   </div>
-                  <div className="bg-amber-50/70 p-1.5 rounded-lg">
-                    <div className="text-[10px] text-amber-600 font-medium">Hot</div>
-                    <div className="font-bold text-amber-700">{member.hotOrders}</div>
+                  <div className="bg-rose-50/70 p-1.5 rounded-lg">
+                    <div className="text-[9px] text-rose-600 font-medium">Hot</div>
+                    <div className="font-bold text-rose-700">{member.hotOrders}</div>
                   </div>
-                  <div className="bg-orange-50/70 p-1.5 rounded-lg">
-                    <div className="text-[10px] text-orange-600 font-medium">Backlog</div>
-                    <div className="font-bold text-orange-700">{member.backlog}</div>
+                  <div className="bg-amber-50/70 p-1.5 rounded-lg">
+                    <div className="text-[9px] text-amber-700 font-medium">Backlog</div>
+                    <div className="font-bold text-amber-800">{member.backlog}</div>
+                  </div>
+                  <div className="bg-sky-50/70 p-1.5 rounded-lg">
+                    <div className="text-[9px] text-sky-700 font-medium">Tech Delay</div>
+                    <div className="font-bold text-sky-800">{member.technicalDelay}</div>
+                  </div>
+                  <div className="bg-indigo-50/70 p-1.5 rounded-lg">
+                    <div className="text-[9px] text-indigo-700 font-medium">Callback</div>
+                    <div className="font-bold text-indigo-800">{member.callbackScheduled}</div>
+                  </div>
+                </div>
+                <div className="grid grid-cols-5 gap-1 text-center text-xs">
+                  <div className="bg-amber-50/70 p-1.5 rounded-lg">
+                    <div className="text-[9px] text-amber-700 font-medium">Cust Delay</div>
+                    <div className="font-bold text-amber-800">{member.customerDelay}</div>
+                  </div>
+                  <div className="bg-amber-50/70 p-1.5 rounded-lg">
+                    <div className="text-[9px] text-amber-700 font-medium">Action Taken</div>
+                    <div className="font-bold text-amber-800">{member.actionTaken}</div>
                   </div>
                   <div className="bg-emerald-50/70 p-1.5 rounded-lg">
-                    <div className="text-[10px] text-emerald-600 font-medium">Fulfilled</div>
-                    <div className="font-bold text-emerald-700">{member.completed}</div>
+                    <div className="text-[9px] text-emerald-700 font-medium">Completed</div>
+                    <div className="font-bold text-emerald-800">{member.completed}</div>
+                  </div>
+                  <div className="bg-slate-50 p-1.5 rounded-lg">
+                    <div className="text-[9px] text-slate-600 font-medium">Closed</div>
+                    <div className="font-bold text-slate-700">{member.closed}</div>
+                  </div>
+                  <div className="bg-slate-100 p-1.5 rounded-lg">
+                    <div className="text-[9px] text-slate-700 font-medium">Total</div>
+                    <div className="font-bold text-slate-900">{member.total}</div>
                   </div>
                 </div>
               </div>
