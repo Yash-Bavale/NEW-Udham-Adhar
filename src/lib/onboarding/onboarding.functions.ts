@@ -531,6 +531,9 @@ export const confirmDocumentUpload = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const lead = await loadAuthorizedLead(supabaseAdmin, data.leadCode, data.accessToken, "documents");
+    if (!data.filePath.startsWith(`${lead.id}/`) || data.filePath.includes("..")) {
+      throw new Error("Upload could not be verified. Please try again.");
+    }
 
     // Find any existing doc of same type to replace (keeps storage tidy)
     const { data: existing } = await supabaseAdmin
