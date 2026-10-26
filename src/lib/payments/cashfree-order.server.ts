@@ -27,7 +27,7 @@ export async function buildCashfreeOrder(leadCodeInput: string, returnNonce?: st
   const { data: lead, error: leadErr } = await supabaseAdmin
     .from("leads")
     .select(
-      "id, lead_code, name, email, mobile, total_amount, base_amount, gst_amount, service, status, lead_status_v2",
+      "id, lead_code, website_id, name, email, mobile, total_amount, base_amount, gst_amount, service, status, lead_status_v2",
     )
     .eq("lead_code", leadCodeInput)
     .maybeSingle();
@@ -35,6 +35,11 @@ export async function buildCashfreeOrder(leadCodeInput: string, returnNonce?: st
   if (!lead) throw new Error("Lead not found");
   if (!lead.lead_code) throw new Error("Lead is missing a lead code");
   const leadCode: string = lead.lead_code;
+
+  // 2b) Pick the merchant account strictly from the lead's stored website.
+  // Fails closed (no global fallback) before any payment row is written.
+  const { credsForWebsite } = await import("@/lib/payments/cashfree-accounts.server");
+  const creds = await credsForWebsite((lead as any).website_id);
 
   // 3) Look up existing application (if any)
   const { data: application } = await supabaseAdmin
@@ -112,7 +117,8 @@ export async function buildCashfreeOrder(leadCodeInput: string, returnNonce?: st
       currency: "INR",
       status: "created",
       idempotency_key: `cashfree:${cfOrderId}`,
-    })
+      payment_account_id: creds.accountId,
+    } as any)
     .select("id")
     .single();
   if (insErr || !inserted) {
@@ -139,7 +145,7 @@ export async function buildCashfreeOrder(leadCodeInput: string, returnNonce?: st
     customerName: name,
     returnUrl,
     notifyUrl,
-  });
+  }, creds);
 
   // 11) Store Cashfree cf_order_id in the payment row for later lookup
   await supabaseAdmin
@@ -153,8 +159,7 @@ export async function buildCashfreeOrder(leadCodeInput: string, returnNonce?: st
   // Sandbox: https://sandbox.cashfree.com/pgbillpay/checkout/post/{payment_session_id}
   // Mode is resolved from the SAME credential source as the API call
   // (env vars or DB config) so the checkout host can never disagree.
-  const { getCashfreeCreds } = await import("@/lib/payments/cashfree.server");
-  const { isProd } = await getCashfreeCreds();
+  const isProd = creds.isProd;
 
   return {
     actionUrl: cfOrder.payment_link || "",
