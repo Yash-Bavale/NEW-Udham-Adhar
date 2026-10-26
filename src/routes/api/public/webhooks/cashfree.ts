@@ -29,7 +29,7 @@ export const Route = createFileRoute("/api/public/webhooks/cashfree")({
         // Fetch payment record
         const { data: payment } = await supabaseAdmin
           .from("payments")
-          .select("id, lead_id, status, amount, leads:lead_id (lead_code)")
+          .select("id, lead_id, status, amount, payment_account_id, leads:lead_id (lead_code)")
           .or(`transaction_id.eq.${orderId},razorpay_order_id.eq.${orderId}`)
           .maybeSingle();
 
@@ -40,8 +40,13 @@ export const Route = createFileRoute("/api/public/webhooks/cashfree")({
         }
 
         try {
-          const cfOrder = await getOrderStatus(orderId);
-          const isSuccess = cfOrder.order_status === "PAID";
+          if (!payment) return await redirectToPending(leadCode, returnNonce);
+          const { credsForPayment } = await import("@/lib/payments/cashfree-accounts.server");
+          const creds = await credsForPayment((payment as any).payment_account_id);
+          const cfOrder = await getOrderStatus(orderId, creds);
+          const paidAmount = Number(cfOrder.order_amount ?? 0);
+          const isSuccess =
+            cfOrder.order_status === "PAID" && Math.abs(paidAmount - Number(payment.amount)) <= 0.01;
 
           if (isSuccess && payment) {
             await supabaseAdmin
@@ -85,23 +90,6 @@ export const Route = createFileRoute("/api/public/webhooks/cashfree")({
         const signature = request.headers.get("x-webhook-signature") || "";
         const timestamp = request.headers.get("x-webhook-timestamp") || "";
 
-        // Verify webhook signature. If Cashfree did not send signature headers,
-        // we do NOT trust the payload body — the order status is confirmed
-        // directly with Cashfree's API below before any state change.
-        let signatureVerified = false;
-        if (signature && timestamp) {
-          try {
-            signatureVerified = await verifyWebhookSignature(timestamp, rawBody, signature);
-            if (!signatureVerified) {
-              console.error("[cashfree-webhook] Signature verification failed");
-              return new Response("Invalid signature", { status: 400 });
-            }
-          } catch (e) {
-            console.error("[cashfree-webhook] Signature check error", e);
-            return new Response("Signature check failed", { status: 400 });
-          }
-        }
-
         let payload: any = {};
         try {
           payload = JSON.parse(rawBody);
@@ -120,13 +108,40 @@ export const Route = createFileRoute("/api/public/webhooks/cashfree")({
         // Fetch payment row
         let { data: payment } = await supabaseAdmin
           .from("payments")
-          .select("id, lead_id, application_id, status, amount")
+          .select("id, lead_id, application_id, status, amount, payment_account_id")
           .or(`transaction_id.eq.${orderId},razorpay_order_id.eq.${orderId}`)
           .maybeSingle();
 
         if (!payment) {
           console.error("[cashfree-webhook] Payment row not found for orderId:", orderId);
           return new Response("Payment not found", { status: 200 }); // 200 so Cashfree doesn't retry endlessly
+        }
+
+        // Verify with the merchant account this payment was created on.
+        const { credsForPayment } = await import("@/lib/payments/cashfree-accounts.server");
+        let creds;
+        try {
+          creds = await credsForPayment((payment as any).payment_account_id);
+        } catch (e) {
+          console.error("[cashfree-webhook] account resolution failed", { orderId, error: String(e) });
+          return new Response("Account unavailable", { status: 500 });
+        }
+
+        // Verify webhook signature. If Cashfree did not send signature headers,
+        // we do NOT trust the payload body — the order status is confirmed
+        // directly with Cashfree's API below before any state change.
+        let signatureVerified = false;
+        if (signature && timestamp) {
+          try {
+            signatureVerified = await verifyWebhookSignature(timestamp, rawBody, signature, creds.clientSecret);
+            if (!signatureVerified) {
+              console.error("[cashfree-webhook] Signature verification failed");
+              return new Response("Invalid signature", { status: 400 });
+            }
+          } catch (e) {
+            console.error("[cashfree-webhook] Signature check error", e);
+            return new Response("Signature check failed", { status: 400 });
+          }
         }
 
         // Idempotency: if already paid, return 200 immediately
@@ -146,7 +161,7 @@ export const Route = createFileRoute("/api/public/webhooks/cashfree")({
           verifiedSuccess = true;
         } else {
           try {
-            const cfOrder = await getOrderStatus(orderId);
+            const cfOrder = await getOrderStatus(orderId, creds);
             if (cfOrder.order_status === "PAID") {
               const paidAmount = Number(cfOrder.order_amount ?? payment.amount);
               if (Math.abs(paidAmount - Number(payment.amount)) <= 0.01) {

@@ -303,7 +303,10 @@ export const reconcilePaymentStatus = createServerFn({ method: "POST" })
       const orderId = payment.transaction_id || payment.razorpay_order_id;
       if (!orderId) throw new Error("Payment is missing an order id");
 
-      const cfOrder = await getOrderStatus(orderId);
+      const { credsForPayment } = await import("@/lib/payments/cashfree-accounts.server");
+      const { data: acct } = await (await getAdmin())
+        .from("payments").select("payment_account_id").eq("id", payment.id).single();
+      const cfOrder = await getOrderStatus(orderId, await credsForPayment((acct as any)?.payment_account_id));
       const cfStatus = String(cfOrder?.order_status ?? "").toUpperCase();
       const newStatus = cfStatus === "PAID" ? "paid"
         : cfStatus === "EXPIRED" || cfStatus === "TERMINATED" ? "failed"
