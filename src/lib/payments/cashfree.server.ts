@@ -84,10 +84,13 @@ export interface CashfreeOrderResponse {
   payments?: { url?: string };
 }
 
+type ExplicitCreds = { clientId: string; clientSecret: string; apiUrl: string };
+
 export async function createCashfreeOrder(
   params: CashfreeCreateOrderParams,
+  creds: ExplicitCreds,
 ): Promise<CashfreeOrderResponse> {
-  const { clientId, clientSecret, apiUrl } = await getCashfreeCreds();
+  const { clientId, clientSecret, apiUrl } = creds;
 
   const body = {
     order_id: params.orderId,
@@ -142,8 +145,9 @@ export interface CashfreeOrderStatusResponse {
 
 export async function getOrderStatus(
   orderId: string,
+  creds: ExplicitCreds,
 ): Promise<CashfreeOrderStatusResponse> {
-  const { clientId, clientSecret, apiUrl } = await getCashfreeCreds();
+  const { clientId, clientSecret, apiUrl } = creds;
 
   const res = await fetch(`${apiUrl}/orders/${encodeURIComponent(orderId)}`, {
     method: "GET",
@@ -175,8 +179,8 @@ export async function verifyWebhookSignature(
   timestamp: string,
   rawBody: string,
   receivedSignature: string,
+  clientSecret: string,
 ): Promise<boolean> {
-  const { clientSecret } = await getCashfreeCreds();
   const data = timestamp + rawBody;
   const computed = createHmac("sha256", clientSecret).update(data).digest("base64");
   return computed === receivedSignature;
