@@ -11,6 +11,7 @@ import { createHmac } from "crypto";
 
 const CASHFREE_API_VERSION = "2023-08-01";
 
+/** @deprecated Global resolver kept for reference only. Use cashfree-accounts.server (credsForWebsite / credsForPayment). */
 export async function getCashfreeCreds() {
   let clientId = process.env.CASHFREE_CLIENT_ID;
   let clientSecret = process.env.CASHFREE_CLIENT_SECRET;
