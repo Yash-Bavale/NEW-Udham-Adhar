@@ -67,7 +67,7 @@ export const Route = createFileRoute("/api/public/webhooks/ccavenue")({
         if (!payment) {
           console.error("[ccavenue] payment row missing", { orderId });
           return isBrowser
-            ? redirectToPending(leadCodeFromParam || orderId)
+            ? await redirectToPending(leadCodeFromParam || orderId)
             : new Response("payment-not-found", { status: 200 });
         }
 
@@ -124,7 +124,7 @@ export const Route = createFileRoute("/api/public/webhooks/ccavenue")({
             console.error("[ccavenue] paid payment finalization retry failed", e);
           }
           return isBrowser
-            ? redirectToSuccess(leadCodeFromParam || orderId)
+            ? await redirectToSuccess(leadCodeFromParam || orderId)
             : new Response("OK", { status: 200 });
         }
 
@@ -158,7 +158,7 @@ export const Route = createFileRoute("/api/public/webhooks/ccavenue")({
         if (paymentUpdateError) {
           console.error("[ccavenue] payment update failed", { orderId, error: paymentUpdateError });
           return isBrowser
-            ? redirectToPending(leadCodeFromParam || orderId)
+            ? await redirectToPending(leadCodeFromParam || orderId)
             : new Response("payment-update-failed", { status: 200 });
         }
 
@@ -175,7 +175,7 @@ export const Route = createFileRoute("/api/public/webhooks/ccavenue")({
           }
 
           return isBrowser
-            ? redirectToSuccess(leadCodeFromParam || orderId)
+            ? await redirectToSuccess(leadCodeFromParam || orderId)
             : new Response("OK", { status: 200 });
         }
 
@@ -184,12 +184,12 @@ export const Route = createFileRoute("/api/public/webhooks/ccavenue")({
             .update({ status: "payment_pending" })
             .eq("id", payment.lead_id);
           return isBrowser
-            ? redirectToFailure(leadCodeFromParam || orderId, failureMessage || "Payment failed")
+            ? await redirectToFailure(leadCodeFromParam || orderId, failureMessage || "Payment failed")
             : new Response("OK", { status: 200 });
         }
 
         return isBrowser
-          ? redirectToPending(leadCodeFromParam || orderId)
+          ? await redirectToPending(leadCodeFromParam || orderId)
           : new Response("OK", { status: 200 });
       },
     },
@@ -200,24 +200,17 @@ const APP_ORIGIN = process.env.APP_BASE_URL ||
   process.env.PUBLIC_SITE_URL ||
   "https://udyamadhar.in";
 
-function redirectToSuccess(leadCode: string) {
-  return new Response(null, {
-    status: 303,
-    headers: { Location: `${APP_ORIGIN}/success/${encodeURIComponent(leadCode)}` },
-  });
+async function redirectToSuccess(leadCode: string) {
+  const { gatewayReturnRedirect } = await import("@/lib/security/customer-access.server");
+  return gatewayReturnRedirect(leadCode, "success", APP_ORIGIN);
 }
-function redirectToPending(leadCode: string) {
-  return new Response(null, {
-    status: 303,
-    headers: { Location: `${APP_ORIGIN}/payment-pending/${encodeURIComponent(leadCode)}` },
-  });
+async function redirectToPending(leadCode: string) {
+  const { gatewayReturnRedirect } = await import("@/lib/security/customer-access.server");
+  return gatewayReturnRedirect(leadCode, "payment-pending", APP_ORIGIN);
 }
-function redirectToFailure(leadCode: string, reason: string) {
-  const q = new URLSearchParams({ reason }).toString();
-  return new Response(null, {
-    status: 303,
-    headers: { Location: `${APP_ORIGIN}/payment-failed/${encodeURIComponent(leadCode)}?${q}` },
-  });
+async function redirectToFailure(leadCode: string, reason: string) {
+  const { gatewayReturnRedirect } = await import("@/lib/security/customer-access.server");
+  return gatewayReturnRedirect(leadCode, "payment-failed", APP_ORIGIN, { reason });
 }
 
 async function readFormFields(request: Request): Promise<URLSearchParams | null> {
