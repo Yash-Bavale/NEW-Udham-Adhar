@@ -640,9 +640,10 @@ export async function calculateStaffWorkloads(): Promise<StaffWorkloadSummary[]>
     const counts = workloadByEmp.get(uid) || { activeActionOrders: 0, hotOrders: 0, techDelayOrders: 0, weightedWorkload: 0 };
 
     const rawStatus = prof?.employment_status;
+    // A disabled login (is_active = false) is never ACTIVE, even if employment_status was left stale.
     const empStatus: EmploymentStatus =
       rawStatus && ["ACTIVE", "INACTIVE", "SUSPENDED", "TERMINATED", "ARCHIVED"].includes(rawStatus)
-        ? rawStatus
+        ? (rawStatus === "ACTIVE" && prof?.is_active === false ? "INACTIVE" : rawStatus)
         : prof?.is_active === false
           ? "INACTIVE"
           : "ACTIVE";
