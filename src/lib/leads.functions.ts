@@ -202,9 +202,13 @@ export const createLead = createServerFn({ method: "POST" })
 
     // Lead notifications intentionally disabled — the bell never rings for leads.
 
+    const { issueCustomerToken } = await import("@/lib/security/customer-access.server");
+    const accessToken = await issueCustomerToken(leadId, "co", { reason: "lead_created" });
+
     return {
       leadId,
       leadCode,
+      accessToken,
       baseAmount,
       gstAmount,
       totalAmount,

@@ -155,11 +155,11 @@ export const Route = createFileRoute("/api/public/site/lead")({
           }
 
           const base = process.env["APP_BASE_URL"] || new URL(request.url).origin;
-          const paymentUrl = `${base}/payment/${encodeURIComponent(lead.lead_code)}`;
+          const { secureCustomerUrl } = await import("@/lib/security/customer-access.server");
+          const paymentUrl = await secureCustomerUrl(base, `/payment/${encodeURIComponent(lead.lead_code)}`, lead.id, "co", "site_lead");
           return siteJson({
             ok: true,
             success: true,
-            leadId: lead.id,
             leadCode: lead.lead_code,
             lead_code: lead.lead_code,
             service: service.service_name,
