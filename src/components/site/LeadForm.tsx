@@ -1,5 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
-import { storeAccessToken } from "@/lib/security/customer-access.client";
+import { storeAccessToken } from "@/lib/security/customer-access-browser";
 import { useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { createLead } from "@/lib/leads.functions";

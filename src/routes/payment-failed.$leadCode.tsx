@@ -6,7 +6,7 @@ import { XCircle, RefreshCw, MessageCircle, ShieldCheck } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { getApplicationSummary } from "@/lib/payments/gateways.functions";
-import { useAccessToken } from "@/lib/security/customer-access.client";
+import { useAccessToken } from "@/lib/security/customer-access-browser";
 import { SecureLinkNotice } from "@/components/site/SecureLinkNotice";
 
 import { trackEvent } from "@/lib/analytics/track";

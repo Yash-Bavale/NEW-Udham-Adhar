@@ -3,7 +3,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { ShieldCheck, FileCheck2, Sparkles, CheckCircle2, Mail, History } from "lucide-react";
 import { getApplicationSummary } from "@/lib/payments/gateways.functions";
-import { useAccessToken, markConversionOnce } from "@/lib/security/customer-access.client";
+import { useAccessToken, markConversionOnce } from "@/lib/security/customer-access-browser";
 import { SecureLinkNotice } from "@/components/site/SecureLinkNotice";
 import { trackEvent } from "@/lib/analytics/track";
 import { Button } from "@/components/ui/button";

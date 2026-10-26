@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { storeAccessToken } from "@/lib/security/customer-access.client";
+import { storeAccessToken } from "@/lib/security/customer-access-browser";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { INDIAN_STATES, LANGUAGES } from "@/lib/constants";

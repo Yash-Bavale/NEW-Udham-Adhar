@@ -4,7 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useEffect } from "react";
 import { SiteShell } from "@/components/site/SiteShell";
 import { resolveApplicationLink } from "@/lib/applications/links.functions";
-import { storeAccessToken } from "@/lib/security/customer-access.client";
+import { storeAccessToken } from "@/lib/security/customer-access-browser";
 
 export const Route = createFileRoute("/app/$token")({
   component: AppTokenPage,

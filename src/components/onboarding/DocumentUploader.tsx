@@ -3,7 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { motion, AnimatePresence } from "motion/react";
 import { CheckCircle2, Download, FileText, Upload, XCircle, Loader2, Clock, Image as ImageIcon } from "lucide-react";
 import { requestDocumentUpload, confirmDocumentUpload } from "@/lib/onboarding/onboarding.functions";
-import { readAccessToken } from "@/lib/security/customer-access.client";
+import { readAccessToken } from "@/lib/security/customer-access-browser";
 import { ALLOWED_DOC_MIME, MAX_DOC_SIZE_BYTES, type DocDef } from "@/lib/onboarding/schemas";
 
 type ExistingDoc = {

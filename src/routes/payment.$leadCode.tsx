@@ -23,7 +23,7 @@ import {
   getApplicationSummary,
   updateLeadContact,
 } from "@/lib/payments/gateways.functions";
-import { useAccessToken, pickAccessToken } from "@/lib/security/customer-access.client";
+import { useAccessToken, pickAccessToken } from "@/lib/security/customer-access-browser";
 import { SecureLinkNotice } from "@/components/site/SecureLinkNotice";
 import { initiatePayment, type InitiatePaymentResult } from "@/lib/payments/initiate.functions";
 import { trackEvent } from "@/lib/analytics/track";

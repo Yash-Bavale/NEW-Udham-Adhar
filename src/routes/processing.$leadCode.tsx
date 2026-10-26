@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { ShieldCheck, FileCheck2, Sparkles, CheckCircle2 } from "lucide-react";
 import { trackEvent } from "@/lib/analytics/track";
-import { captureAccessToken } from "@/lib/security/customer-access.client";
+import { captureAccessToken } from "@/lib/security/customer-access-browser";
 import { TrustBlock } from "@/components/site/TrustBlock";
 import { CountdownCard, type CountdownStep } from "@/components/site/CountdownCard";
 

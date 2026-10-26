@@ -5,7 +5,7 @@ import {
   captureAccessToken,
   readAccessToken,
   storeAccessToken,
-} from "@/lib/security/customer-access.client";
+} from "@/lib/security/customer-access-browser";
 
 /**
  * Onboarding access token for this browser: `undefined` while resolving,

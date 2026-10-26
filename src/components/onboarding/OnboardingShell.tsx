@@ -4,7 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { Check, Download, Loader2 } from "lucide-react";
 import { motion } from "motion/react";
 import { requestFormHelp } from "@/lib/onboarding/onboarding.functions";
-import { readAccessToken } from "@/lib/security/customer-access.client";
+import { readAccessToken } from "@/lib/security/customer-access-browser";
 
 type Step = 1 | 2 | 3;
 
