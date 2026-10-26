@@ -426,7 +426,7 @@ export const updateEmployee = createServerFn({ method: "POST" })
         await admin
           .from("assignment_pool")
           .insert({ user_id: data.user_id, is_active: data.auto_assign_enabled } as any);
-      }      }
+      }
       await (admin.from("profiles") as any).update({ auto_assign_enabled: data.auto_assign_enabled }).eq("id", data.user_id);
     }
 
