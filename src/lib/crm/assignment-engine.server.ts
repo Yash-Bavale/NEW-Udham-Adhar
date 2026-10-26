@@ -651,7 +651,8 @@ export async function calculateStaffWorkloads(): Promise<StaffWorkloadSummary[]>
     const isOnLeave = !!leave;
     // An employee is active in pool ONLY if they have an active (is_active = true) row in assignment_pool
     const isPoolActive = poolActiveSet.has(uid);
-    const autoAssignEnabled = isPoolActive && (prof?.auto_assign_enabled !== false);
+    // The admin pool toggle (assignment_pool.is_active) is the source of truth; profiles.auto_assign_enabled can be stale.
+    const autoAssignEnabled = isPoolActive;
     const maxWorkload = Number(prof?.max_workload || 50);
     const effectiveWorkload = Math.round(counts.weightedWorkload * 10) / 10;
     const remainingCapacity = Math.max(0, maxWorkload - counts.activeActionOrders);
