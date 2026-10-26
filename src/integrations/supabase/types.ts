@@ -820,6 +820,75 @@ export type Database = {
         }
         Relationships: []
       }
+      cashfree_merchant_accounts: {
+        Row: {
+          account_key: string
+          created_at: string
+          id: string
+          is_active: boolean
+          is_legacy: boolean
+          label: string
+          updated_at: string
+        }
+        Insert: {
+          account_key: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          is_legacy?: boolean
+          label: string
+          updated_at?: string
+        }
+        Update: {
+          account_key?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          is_legacy?: boolean
+          label?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      cashfree_website_accounts: {
+        Row: {
+          account_id: string
+          created_at: string
+          is_enabled: boolean
+          updated_at: string
+          website_id: string
+        }
+        Insert: {
+          account_id: string
+          created_at?: string
+          is_enabled?: boolean
+          updated_at?: string
+          website_id: string
+        }
+        Update: {
+          account_id?: string
+          created_at?: string
+          is_enabled?: boolean
+          updated_at?: string
+          website_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cashfree_website_accounts_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "cashfree_merchant_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cashfree_website_accounts_website_id_fkey"
+            columns: ["website_id"]
+            isOneToOne: true
+            referencedRelation: "websites"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       certificates: {
         Row: {
           application_id: string
@@ -3551,6 +3620,7 @@ export type Database = {
           is_test_payment: boolean | null
           lead_id: string
           parent_payment_id: string | null
+          payment_account_id: string | null
           payment_date: string | null
           payu_bank_ref_num: string | null
           payu_error_message: string | null
@@ -3584,6 +3654,7 @@ export type Database = {
           is_test_payment?: boolean | null
           lead_id: string
           parent_payment_id?: string | null
+          payment_account_id?: string | null
           payment_date?: string | null
           payu_bank_ref_num?: string | null
           payu_error_message?: string | null
@@ -3617,6 +3688,7 @@ export type Database = {
           is_test_payment?: boolean | null
           lead_id?: string
           parent_payment_id?: string | null
+          payment_account_id?: string | null
           payment_date?: string | null
           payu_bank_ref_num?: string | null
           payu_error_message?: string | null
@@ -3677,6 +3749,13 @@ export type Database = {
             columns: ["parent_payment_id"]
             isOneToOne: false
             referencedRelation: "payments_safe"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_payment_account_id_fkey"
+            columns: ["payment_account_id"]
+            isOneToOne: false
+            referencedRelation: "cashfree_merchant_accounts"
             referencedColumns: ["id"]
           },
         ]
