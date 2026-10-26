@@ -1001,14 +1001,16 @@ function AddLeadDialog({
     enabled: open,
   });
 
-  // Filter services by selected website; show all if no website selected
+  // Admins can pick services from any website; other staff only see Udyam Aadhar services.
+  const dialogRole = useRole();
+  const isAdminUser = dialogRole.hasAny(["super_admin", "admin"]);
   const filteredServices = useMemo(() => {
-    const rows = ((servicesData?.rows ?? []) as any[]).filter(
-      (s: any) => isVisibleService(s)
+    const rows = ((servicesData?.rows ?? []) as any[]).filter((s: any) =>
+      isAdminUser ? s?.is_active !== false : isVisibleService(s)
     );
     if (!form.website_id) return rows;
-    return rows.filter((s: any) => s.website_id === form.website_id);
-  }, [servicesData, form.website_id]);
+    return rows.filter((s: any) => (s.website_id ?? s.website?.id) === form.website_id);
+  }, [servicesData, form.website_id, isAdminUser]);
 
   const onServiceChange = (val: string) => {
     setField("service", val);
