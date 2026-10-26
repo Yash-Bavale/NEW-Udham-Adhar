@@ -172,3 +172,62 @@ export async function leadIdByCode(leadCode: string): Promise<string | null> {
   const { data } = await db.from("leads").select("id").eq("lead_code", leadCode).maybeSingle();
   return data?.id ?? null;
 }
+
+const LINK_RE =
+  /(https?:\/\/[A-Za-z0-9.-]+(?::\d+)?)\/(onboarding|payment)\/([A-Za-z]{2}(?:-|%2D)\d{4}(?:-|%2D)\d{6})(\/(?:documents|done))?(?![\w\/#%-])/g;
+const RESUME_RE = /(https?:\/\/[A-Za-z0-9.-]+(?::\d+)?)?\/resume\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?![\w\/#-])/gi;
+
+/**
+ * Rewrite customer form/payment links inside outgoing text so each carries a
+ * freshly issued, correctly scoped token in the URL fragment. Links that
+ * already carry a token, or whose order cannot be found, are left unchanged.
+ */
+export async function secureCustomerLinksInText(text: string, reason: string): Promise<string> {
+  if (!text || (!text.includes("/onboarding/") && !text.includes("/payment/") && !text.includes("/resume/"))) {
+    return text;
+  }
+  const db = await admin();
+  const cache = new Map<string, string | null>();
+  const leadIdCache = new Map<string, string | null>();
+
+  async function tokenFor(leadId: string, kind: TokenKind): Promise<string | null> {
+    const k = `${leadId}:${kind}`;
+    if (!cache.has(k)) {
+      try {
+        cache.set(k, await issueCustomerToken(leadId, kind, { reason }));
+      } catch {
+        cache.set(k, null);
+      }
+    }
+    return cache.get(k) ?? null;
+  }
+
+  // 1) /resume/<order uuid>  ->  /onboarding/<code>#t=...
+  const resumeMatches = [...text.matchAll(RESUME_RE)];
+  for (const m of resumeMatches) {
+    const { data: app } = await db.from("applications").select("lead_id").eq("id", m[2]).maybeSingle();
+    if (!app?.lead_id) continue;
+    const { data: lead } = await db.from("leads").select("lead_code").eq("id", app.lead_id).maybeSingle();
+    if (!lead?.lead_code) continue;
+    const origin = m[1] || process.env.APP_BASE_URL || "https://udyamadhar.in";
+    text = text.split(m[0]).join(`${origin}/onboarding/${lead.lead_code}`);
+  }
+
+  // 2) /onboarding/<code> and /payment/<code>
+  const matches = [...text.matchAll(LINK_RE)];
+  if (matches.length === 0) return text;
+  let out = "";
+  let last = 0;
+  for (const m of matches) {
+    const idx = m.index ?? 0;
+    out += text.slice(last, idx);
+    last = idx + m[0].length;
+    const code = decodeURIComponent(m[3]).toUpperCase();
+    if (!leadIdCache.has(code)) leadIdCache.set(code, await leadIdByCode(code));
+    const leadId = leadIdCache.get(code);
+    const kind: TokenKind = m[2] === "payment" ? "co" : "ob";
+    const t = leadId ? await tokenFor(leadId, kind) : null;
+    out += t ? `${m[0]}#t=${t}` : m[0];
+  }
+  return out + text.slice(last);
+}
