@@ -6,6 +6,8 @@ import { useQuery } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { getOnboarding, submitOnboarding } from "@/lib/onboarding/onboarding.functions";
+import { useOnboardingAccess } from "@/hooks/useOnboardingAccess";
+import { SecureLinkNotice } from "@/components/site/SecureLinkNotice";
 import { OnboardingShell } from "@/components/onboarding/OnboardingShell";
 import { OnboardingForm } from "@/components/onboarding/OnboardingForm";
 import { CORRECT_PAN_AADHAAR_STAGE2 } from "@/lib/onboarding/schemas";
@@ -33,12 +35,16 @@ function OnboardingDetailsPage() {
   const [submitting, setSubmitting] = useState(false);
   const [stage, setStage] = useState<1 | 2>(1);
 
-  const { data, isLoading } = useQuery({
-    queryKey: ["onboarding", leadCode],
-    queryFn: () => fetchFn({ data: { leadCode } }),
+  const accessToken = useOnboardingAccess(leadCode);
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ["onboarding", leadCode, accessToken],
+    queryFn: () => fetchFn({ data: { leadCode, accessToken: accessToken as string } }),
+    enabled: !!accessToken,
+    retry: false,
   });
 
-  if (isLoading) {
+  if (accessToken === null || isError) return <SecureLinkNotice leadCode={leadCode} />;
+  if (accessToken === undefined || isLoading) {
     return (
       <div className="mx-auto max-w-3xl px-4 py-20 text-center">
         <Loader2 className="w-6 h-6 animate-spin mx-auto text-muted-foreground" />
@@ -152,14 +158,14 @@ function OnboardingDetailsPage() {
             : "Details submitted successfully. Finalising…"
         }
         onSaveDraft={async (values) => {
-          await submitFn({ data: { leadCode, data: cleanPayload(values), draft: true } });
+          await submitFn({ data: { leadCode, accessToken: accessToken as string, data: cleanPayload(values), draft: true } });
         }}
         onSubmit={async (values) => {
           if (submitting) return;
           setSubmitting(true);
           try {
             const finalSubmit = isFinalFormStage;
-            await submitFn({ data: { leadCode, data: cleanPayload(values), draft: !finalSubmit } });
+            await submitFn({ data: { leadCode, accessToken: accessToken as string, data: cleanPayload(values), draft: !finalSubmit } });
             if (finalSubmit) toast.success("Details submitted successfully");
           } catch (e) {
             const msg = e instanceof Error ? e.message : "Could not submit. Please try again.";
