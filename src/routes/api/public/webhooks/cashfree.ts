@@ -15,6 +15,7 @@ export const Route = createFileRoute("/api/public/webhooks/cashfree")({
   server: {
     handlers: {
       GET: async ({ request }) => {
+        const returnNonce = new URL(request.url).searchParams.get("r");
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
         const { getOrderStatus } = await import("@/lib/payments/cashfree.server");
 
@@ -22,7 +23,7 @@ export const Route = createFileRoute("/api/public/webhooks/cashfree")({
         const orderId = url.searchParams.get("order_id") || url.searchParams.get("orderId");
 
         if (!orderId) {
-          return redirectToPending("unknown");
+          return await redirectToPending("unknown", returnNonce);
         }
 
         // Fetch payment record
@@ -35,7 +36,7 @@ export const Route = createFileRoute("/api/public/webhooks/cashfree")({
         const leadCode = (payment as any)?.leads?.lead_code || orderId.replace(/^CF-/, "").split("-")[0] || orderId;
 
         if (payment?.status === "paid") {
-          return redirectToSuccess(leadCode);
+          return await redirectToSuccess(leadCode, returnNonce);
         }
 
         try {
@@ -59,7 +60,7 @@ export const Route = createFileRoute("/api/public/webhooks/cashfree")({
               txnid: orderId,
             });
 
-            return redirectToSuccess(leadCode);
+            return await redirectToSuccess(leadCode, returnNonce);
           } else if (cfOrder.order_status === "EXPIRED" || cfOrder.order_status === "TERMINATED") {
             if (payment) {
               await supabaseAdmin
@@ -67,13 +68,13 @@ export const Route = createFileRoute("/api/public/webhooks/cashfree")({
                 .update({ status: "failed", raw_response: cfOrder as any } as any)
                 .eq("id", payment.id);
             }
-            return redirectToFailure(leadCode, `Payment ${cfOrder.order_status.toLowerCase()}`);
+            return await redirectToFailure(leadCode, `Payment ${cfOrder.order_status.toLowerCase()}`, returnNonce);
           }
         } catch (e) {
           console.error("[cashfree-get] verification failed", { orderId, error: e });
         }
 
-        return redirectToPending(leadCode);
+        return await redirectToPending(leadCode, returnNonce);
       },
 
       POST: async ({ request }) => {
@@ -220,24 +221,15 @@ export const Route = createFileRoute("/api/public/webhooks/cashfree")({
 const APP_ORIGIN =
   process.env.APP_BASE_URL || process.env.PUBLIC_SITE_URL || "https://udyamadhar.in";
 
-function redirectToSuccess(leadCode: string) {
-  return new Response(null, {
-    status: 303,
-    headers: { Location: `${APP_ORIGIN}/success/${encodeURIComponent(leadCode)}` },
-  });
+async function redirectToSuccess(leadCode: string, nonce?: string | null) {
+  const { gatewayReturnRedirect } = await import("@/lib/security/customer-access.server");
+  return gatewayReturnRedirect(leadCode, "success", APP_ORIGIN, undefined, nonce);
 }
-
-function redirectToPending(leadCode: string) {
-  return new Response(null, {
-    status: 303,
-    headers: { Location: `${APP_ORIGIN}/payment-pending/${encodeURIComponent(leadCode)}` },
-  });
+async function redirectToPending(leadCode: string, nonce?: string | null) {
+  const { gatewayReturnRedirect } = await import("@/lib/security/customer-access.server");
+  return gatewayReturnRedirect(leadCode, "payment-pending", APP_ORIGIN, undefined, nonce);
 }
-
-function redirectToFailure(leadCode: string, reason: string) {
-  const q = new URLSearchParams({ reason }).toString();
-  return new Response(null, {
-    status: 303,
-    headers: { Location: `${APP_ORIGIN}/payment-failed/${encodeURIComponent(leadCode)}?${q}` },
-  });
+async function redirectToFailure(leadCode: string, reason: string, nonce?: string | null) {
+  const { gatewayReturnRedirect } = await import("@/lib/security/customer-access.server");
+  return gatewayReturnRedirect(leadCode, "payment-failed", APP_ORIGIN, { reason }, nonce);
 }

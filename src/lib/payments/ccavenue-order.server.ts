@@ -2,7 +2,7 @@
  * Server-only CCAvenue order builder. Shared by createCcavenueOrder and
  * initiatePayment so neither has to call the other's RPC stub.
  */
-export async function buildCcavenueOrderForLead(leadCodeInput: string) {
+export async function buildCcavenueOrderForLead(leadCodeInput: string, returnNonce?: string) {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { CCAV_REDIRECT_URL, buildCcavOrderId, buildCcavPayload, encryptRequest, getCcavCreds } =
     await import("@/lib/payments/ccavenue.server");
@@ -108,8 +108,9 @@ export async function buildCcavenueOrderForLead(leadCodeInput: string) {
 
   const origin = process.env.APP_BASE_URL || process.env.PUBLIC_SITE_URL ||
     "https://udyamadhar.in";
-  const redirectUrl = `${origin}/api/public/webhooks/ccavenue`;
-  const cancelUrl = `${origin}/api/public/webhooks/ccavenue`;
+  const rq = returnNonce ? `?r=${encodeURIComponent(returnNonce)}` : "";
+  const redirectUrl = `${origin}/api/public/webhooks/ccavenue${rq}`;
+  const cancelUrl = `${origin}/api/public/webhooks/ccavenue${rq}`;
 
   const billingName = String(lead.name ?? "Customer").replace(/[^a-zA-Z0-9\s]/g, " ").trim().slice(0, 60) || "Customer";
   const billingTel = String(lead.mobile ?? "").replace(/\D/g, "").slice(-10) || "9999999999";

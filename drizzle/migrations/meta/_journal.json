@@ -288,6 +288,20 @@
       "when": 1792991428987,
       "tag": "0040_customer_access_tokens",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1792992851333,
+      "tag": "0041_payments_return_origin",
+      "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1792992993789,
+      "tag": "0042_payments_return_nonce",
+      "breakpoints": true
     }
   ]
 }

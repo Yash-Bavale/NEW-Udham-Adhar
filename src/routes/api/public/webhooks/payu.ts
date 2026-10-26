@@ -13,6 +13,7 @@ export const Route = createFileRoute("/api/public/webhooks/payu")({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        const returnNonce = new URL(request.url).searchParams.get("r");
         const { computeResponseHash, getPayUCreds, verifyPayUPayment } = await import(
           "@/lib/payments/payu.server"
         );
@@ -79,7 +80,7 @@ export const Route = createFileRoute("/api/public/webhooks/payu")({
           if (!isPayUSuccess(verifiedPayment)) {
             console.error("[payu] hash mismatch", { txnid: fields.txnid });
             return isBrowser
-              ? redirectToPending(get("udf3") || fields.txnid)
+              ? await redirectToPending(get("udf3") || fields.txnid, returnNonce)
               : new Response("hash-mismatch", { status: 200 });
           }
 
@@ -144,7 +145,7 @@ export const Route = createFileRoute("/api/public/webhooks/payu")({
         if (!payment) {
           console.error("[payu] payment row missing even after lead lookup", fields.txnid);
           return isBrowser
-            ? redirectToPending(get("udf3") || fields.txnid)
+            ? await redirectToPending(get("udf3") || fields.txnid, returnNonce)
             : new Response("payment-not-found", { status: 200 });
         }
 
@@ -171,7 +172,7 @@ export const Route = createFileRoute("/api/public/webhooks/payu")({
             console.error("[payu] paid payment finalization retry failed", e);
           }
           return isBrowser
-            ? redirectToSuccess(get("udf3") || fields.txnid)
+            ? await redirectToSuccess(get("udf3") || fields.txnid, returnNonce)
             : new Response("OK", { status: 200 });
         }
 
@@ -224,7 +225,7 @@ export const Route = createFileRoute("/api/public/webhooks/payu")({
           console.error("[payu] payment update failed", { txnid: fields.txnid, error: paymentUpdateError });
           await logWebhookError("payu", paymentUpdateError.message, rawPayload);
           return isBrowser
-            ? redirectToPending(get("udf3") || fields.txnid)
+            ? await redirectToPending(get("udf3") || fields.txnid, returnNonce)
             : new Response("payment-update-failed", { status: 200 });
         }
 
@@ -242,7 +243,7 @@ export const Route = createFileRoute("/api/public/webhooks/payu")({
           }
 
           return isBrowser
-            ? redirectToSuccess(get("udf3") || fields.txnid)
+            ? await redirectToSuccess(get("udf3") || fields.txnid, returnNonce)
             : new Response("OK", { status: 200 });
         }
 
@@ -256,12 +257,12 @@ export const Route = createFileRoute("/api/public/webhooks/payu")({
             .eq("lead_id", payment.lead_id)
             .eq("status", "pending");
           return isBrowser
-            ? redirectToFailure(get("udf3") || fields.txnid, "Payment failed")
+            ? await redirectToFailure(get("udf3") || fields.txnid, "Payment failed", returnNonce)
             : new Response("OK", { status: 200 });
         }
 
         return isBrowser
-          ? redirectToPending(get("udf3") || fields.txnid)
+          ? await redirectToPending(get("udf3") || fields.txnid, returnNonce)
           : new Response("OK", { status: 200 });
       },
     },
@@ -285,24 +286,17 @@ const APP_ORIGIN = process.env.APP_BASE_URL ||
   process.env.PUBLIC_SITE_URL ||
   "https://udyamadhar.in";
 
-function redirectToSuccess(leadCode: string) {
-  return new Response(null, {
-    status: 303,
-    headers: { Location: `${APP_ORIGIN}/success/${encodeURIComponent(leadCode)}` },
-  });
+async function redirectToSuccess(leadCode: string, nonce?: string | null) {
+  const { gatewayReturnRedirect } = await import("@/lib/security/customer-access.server");
+  return gatewayReturnRedirect(leadCode, "success", APP_ORIGIN, undefined, nonce);
 }
-function redirectToPending(leadCode: string) {
-  return new Response(null, {
-    status: 303,
-    headers: { Location: `${APP_ORIGIN}/payment-pending/${encodeURIComponent(leadCode)}` },
-  });
+async function redirectToPending(leadCode: string, nonce?: string | null) {
+  const { gatewayReturnRedirect } = await import("@/lib/security/customer-access.server");
+  return gatewayReturnRedirect(leadCode, "payment-pending", APP_ORIGIN, undefined, nonce);
 }
-function redirectToFailure(leadCode: string, reason: string) {
-  const q = new URLSearchParams({ reason }).toString();
-  return new Response(null, {
-    status: 303,
-    headers: { Location: `${APP_ORIGIN}/payment-failed/${encodeURIComponent(leadCode)}?${q}` },
-  });
+async function redirectToFailure(leadCode: string, reason: string, nonce?: string | null) {
+  const { gatewayReturnRedirect } = await import("@/lib/security/customer-access.server");
+  return gatewayReturnRedirect(leadCode, "payment-failed", APP_ORIGIN, { reason }, nonce);
 }
 
 function isPayUSuccess(payment: Record<string, unknown> | null | undefined) {
