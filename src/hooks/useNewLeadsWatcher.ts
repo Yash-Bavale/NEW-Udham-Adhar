@@ -15,13 +15,17 @@ export function useNewLeadsWatcher() {
   const role = useRole();
   const userPerms = usePermissions();
 
-  const isAdm = role.hasAny(["admin", "super_admin"]);
+  const isSuperAdmin = role.has("super_admin");
+  const isManager = role.has("manager");
+  const isAdm = isSuperAdmin || (role.has("admin") && !isManager);
   const isLoaded = !role.loading && !userPerms.isLoading;
-  const canSeeLeads = isLoaded && (isAdm || (role.can("leads") && userPerms.can("leads", "view")));
-  const canSeeOrders = isLoaded && (isAdm || (role.can("orders") && userPerms.can("orders", "view")));
+  const canSeeLeads = isLoaded && (isAdm || isManager || (role.can("leads") && userPerms.can("leads", "view")));
+  const canSeeOrders = isLoaded && (isAdm || isManager || (role.can("orders") && userPerms.can("orders", "view")));
 
   // Keep live references to permissions to prevent stale closure issues in realtime websocket callbacks
   const livePermsRef = useRef({
+    isSuperAdmin,
+    isManager,
     isAdmin: isAdm,
     canSeeLeads,
     canSeeOrders,
@@ -30,12 +34,14 @@ export function useNewLeadsWatcher() {
 
   useEffect(() => {
     livePermsRef.current = {
+      isSuperAdmin,
+      isManager,
       isAdmin: isAdm,
       canSeeLeads,
       canSeeOrders,
       rolesLoading: !isLoaded,
     };
-  }, [isAdm, canSeeLeads, canSeeOrders, isLoaded]);
+  }, [isSuperAdmin, isManager, isAdm, canSeeLeads, canSeeOrders, isLoaded]);
 
   // Deduplication cache: key -> timestamp (ms) to avoid duplicate toasts & sounds for same event
   const notifiedKeysRef = useRef<Map<string, number>>(new Map());
@@ -183,11 +189,15 @@ export function useNewLeadsWatcher() {
           "postgres_changes" as never,
           { event: "INSERT", schema: "public", table: "applications" },
           (payload: { new?: { id?: string; application_code?: string | null; assigned_to?: string | null } }) => {
-            const { isAdmin: isAdm, canSeeOrders: canOrders, rolesLoading } = livePermsRef.current;
+            const { isSuperAdmin: isSuper, isManager: isMgr, canSeeOrders: canOrders, rolesLoading } = livePermsRef.current;
             if (rolesLoading || !canOrders) return;
 
             const app = payload.new ?? {};
-            if (!isAdm && app.assigned_to !== uid) return;
+            // Managers and operations staff must NEVER receive global notifications for every order coming into the system.
+            // Only orders explicitly assigned to them trigger an alert.
+            if (isMgr || !isSuper) {
+              if (app.assigned_to !== uid) return;
+            }
 
             const dedupeKey = app.id ? `app-${app.id}` : `app-${Date.now()}`;
             const title = "🔔 New Order Received!";
