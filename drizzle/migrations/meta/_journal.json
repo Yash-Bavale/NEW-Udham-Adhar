@@ -267,6 +267,13 @@
       "when": 1792909262359,
       "tag": "0037_active_profile_role_gate",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1792990119950,
+      "tag": "0038_support_ticket_folders_and_stars",
+      "breakpoints": true
     }
   ]
 }
