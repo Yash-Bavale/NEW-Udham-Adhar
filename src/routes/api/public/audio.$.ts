@@ -11,7 +11,13 @@ export const Route = (createFileRoute as any)("/api/public/audio/$")({
           return new Response("Not found", { status: 404 });
         }
 
-        const path = splat.startsWith("audio/") ? splat : `audio/${splat}`;
+        // Containment: only flat reminder-sound files are served. No folders,
+        // no other buckets, no call recordings.
+        const name = splat.startsWith("audio/") ? splat.slice(6) : splat;
+        if (!/^[A-Za-z0-9._-]{1,120}\.(mp3|wav|ogg|m4a|aac)$/.test(name) || name.startsWith(".")) {
+          return new Response("Not found", { status: 404 });
+        }
+        const path = `audio/${name}`;
 
         try {
           const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
