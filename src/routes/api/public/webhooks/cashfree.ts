@@ -15,6 +15,7 @@ export const Route = createFileRoute("/api/public/webhooks/cashfree")({
   server: {
     handlers: {
       GET: async ({ request }) => {
+        const returnNonce = new URL(request.url).searchParams.get("r");
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
         const { getOrderStatus } = await import("@/lib/payments/cashfree.server");
 

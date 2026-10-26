@@ -11,6 +11,7 @@ export const Route = createFileRoute("/api/public/webhooks/ccavenue")({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        const returnNonce = new URL(request.url).searchParams.get("r");
         const { callOrderStatusApi, decryptResponse, getCcavCreds, normalizeCcavStatus, parseCcavPayload } =
           await import("@/lib/payments/ccavenue.server");
         let creds: ReturnType<typeof getCcavCreds>;

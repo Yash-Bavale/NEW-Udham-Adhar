@@ -13,6 +13,7 @@ export const Route = createFileRoute("/api/public/webhooks/payu")({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        const returnNonce = new URL(request.url).searchParams.get("r");
         const { computeResponseHash, getPayUCreds, verifyPayUPayment } = await import(
           "@/lib/payments/payu.server"
         );
