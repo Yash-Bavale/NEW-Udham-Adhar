@@ -281,6 +281,13 @@
       "when": 1792990242975,
       "tag": "0039_lock_support_folder_items",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1792991428987,
+      "tag": "0040_customer_access_tokens",
+      "breakpoints": true
     }
   ]
 }

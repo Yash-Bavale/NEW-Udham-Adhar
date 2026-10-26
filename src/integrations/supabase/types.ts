@@ -980,6 +980,90 @@ export type Database = {
           },
         ]
       }
+      customer_access_events: {
+        Row: {
+          created_at: string
+          event: string
+          id: string
+          ip_hash: string | null
+          lead_code: string | null
+          lead_id: string | null
+          reason: string | null
+          scope: string | null
+          user_agent: string | null
+        }
+        Insert: {
+          created_at?: string
+          event: string
+          id?: string
+          ip_hash?: string | null
+          lead_code?: string | null
+          lead_id?: string | null
+          reason?: string | null
+          scope?: string | null
+          user_agent?: string | null
+        }
+        Update: {
+          created_at?: string
+          event?: string
+          id?: string
+          ip_hash?: string | null
+          lead_code?: string | null
+          lead_id?: string | null
+          reason?: string | null
+          scope?: string | null
+          user_agent?: string | null
+        }
+        Relationships: []
+      }
+      customer_access_tokens: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          expires_at: string
+          id: string
+          issued_reason: string | null
+          kind: string
+          last_used_at: string | null
+          lead_id: string
+          max_uses: number | null
+          revoked_at: string | null
+          scopes: string[]
+          token_hash: string
+          use_count: number
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          expires_at: string
+          id?: string
+          issued_reason?: string | null
+          kind: string
+          last_used_at?: string | null
+          lead_id: string
+          max_uses?: number | null
+          revoked_at?: string | null
+          scopes: string[]
+          token_hash: string
+          use_count?: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          expires_at?: string
+          id?: string
+          issued_reason?: string | null
+          kind?: string
+          last_used_at?: string | null
+          lead_id?: string
+          max_uses?: number | null
+          revoked_at?: string | null
+          scopes?: string[]
+          token_hash?: string
+          use_count?: number
+        }
+        Relationships: []
+      }
       customer_notes: {
         Row: {
           created_at: string
