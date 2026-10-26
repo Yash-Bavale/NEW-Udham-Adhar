@@ -23,6 +23,8 @@ import {
   getApplicationSummary,
   updateLeadContact,
 } from "@/lib/payments/gateways.functions";
+import { useAccessToken, pickAccessToken } from "@/lib/security/customer-access.client";
+import { SecureLinkNotice } from "@/components/site/SecureLinkNotice";
 import { initiatePayment, type InitiatePaymentResult } from "@/lib/payments/initiate.functions";
 import { trackEvent } from "@/lib/analytics/track";
 import { CountdownCard, type CountdownStep } from "@/components/site/CountdownCard";
@@ -111,14 +113,17 @@ function isSupportedGateway(name: string | null | undefined) {
 
 function PaymentPage() {
   const { leadCode } = Route.useParams();
+  const accessToken = useAccessToken(leadCode, ["co", "ob"]);
   const navigate = useNavigate();
   const getSummary = useServerFn(getApplicationSummary);
   const updateContact = useServerFn(updateLeadContact);
   const createOrder = useServerFn(initiatePayment);
 
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ["payment.summary", leadCode],
-    queryFn: () => getSummary({ data: { leadCode } }),
+    queryKey: ["payment.summary", leadCode, accessToken],
+    queryFn: () => getSummary({ data: { leadCode, accessToken: accessToken as string } }),
+    enabled: !!accessToken,
+    retry: false,
   });
 
   const [chosen, setChosen] = useState<string | null>(null);
@@ -167,7 +172,8 @@ function PaymentPage() {
     return SERVICE_INFO[s] ?? SERVICE_INFO.default;
   }, [lead?.service]);
 
-  if (isLoading) {
+  if (accessToken === null || (error && !data)) return <SecureLinkNotice leadCode={leadCode} />;
+  if (accessToken === undefined || isLoading) {
     return (
       <div className="mx-auto max-w-2xl px-4 py-16 text-center text-muted-foreground">
         <Loader2 className="w-8 h-8 animate-spin mx-auto mb-3 text-brand-navy" />
@@ -212,7 +218,7 @@ function PaymentPage() {
     setPayError(null);
     trackEvent("payment_initiated", { gateway: activeGateway, leadCode });
     try {
-      const res = await createOrder({ data: { leadCode, gatewayCode: activeGateway } });
+      const res = await createOrder({ data: { leadCode, gatewayCode: activeGateway, accessToken: pickAccessToken(leadCode, ["co"]) ?? "" } });
       if (res.paymentSessionId) {
         await loadAndTriggerCashfreeCheckout(res.paymentSessionId, res.isProd);
         return;
@@ -334,7 +340,7 @@ function PaymentPage() {
                     setSavingEdit(true);
                     setEditError(null);
                     try {
-                      await updateContact({ data: payload });
+                      await updateContact({ data: { ...payload, accessToken: pickAccessToken(leadCode, ["co"]) ?? "" } });
                       await refetch();
                       setEditing(false);
                     } catch (err) {

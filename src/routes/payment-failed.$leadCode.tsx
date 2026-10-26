@@ -6,6 +6,9 @@ import { XCircle, RefreshCw, MessageCircle, ShieldCheck } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { getApplicationSummary } from "@/lib/payments/gateways.functions";
+import { useAccessToken } from "@/lib/security/customer-access.client";
+import { SecureLinkNotice } from "@/components/site/SecureLinkNotice";
+
 import { trackEvent } from "@/lib/analytics/track";
 
 const PAID_STATUSES = new Set(["payment_successful", "under_process", "completed"]);
@@ -25,14 +28,17 @@ export const Route = createFileRoute("/payment-failed/$leadCode")({
 
 function FailedPage() {
   const { leadCode } = Route.useParams();
+  const accessToken = useAccessToken(leadCode, ["co", "ob"]);
   const { reason } = Route.useSearch();
   const navigate = useNavigate();
   const getSummary = useServerFn(getApplicationSummary);
   const [allowFailureView, setAllowFailureView] = useState(false);
 
   const { data } = useQuery({
-    queryKey: ["summary", leadCode],
-    queryFn: () => getSummary({ data: { leadCode } }),
+    queryKey: ["summary", leadCode, accessToken],
+    queryFn: () => getSummary({ data: { leadCode, accessToken: accessToken as string } }),
+    enabled: !!accessToken,
+    retry: false,
     refetchInterval: allowFailureView ? false : 2000,
   });
 
@@ -54,6 +60,7 @@ function FailedPage() {
 
   const lead = data?.lead;
 
+  if (accessToken === null) return <SecureLinkNotice leadCode={leadCode} />;
   if (!allowFailureView) {
     return (
       <div className="min-h-[80vh] flex items-center justify-center p-4 bg-gradient-to-b from-amber-50/40 to-slate-50">
