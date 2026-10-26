@@ -16,6 +16,7 @@ export const Route = createFileRoute("/payment-pending/$leadCode")({
     meta: [
       { title: "Confirming Payment — Business Help Services" },
       { name: "robots", content: "noindex,nofollow" },
+      { name: "referrer", content: "no-referrer" },
     ],
   }),
   component: PendingPage,

@@ -16,6 +16,7 @@ export const Route = createFileRoute("/success/$leadCode")({
       { title: "Payment Successful — Business Help Services" },
       { name: "description", content: "Your payment was received successfully." },
       { name: "robots", content: "noindex,nofollow" },
+      { name: "referrer", content: "no-referrer" },
     ],
   }),
   component: SuccessPage,

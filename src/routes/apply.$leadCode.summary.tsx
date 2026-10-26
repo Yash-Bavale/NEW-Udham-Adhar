@@ -50,6 +50,7 @@ export const Route = createFileRoute("/apply/$leadCode/summary")({
     meta: [
       { title: "Your Application Is Ready — Business Help Services" },
       { name: "robots", content: "noindex,nofollow" },
+      { name: "referrer", content: "no-referrer" },
     ],
   }),
   component: SummaryPage,

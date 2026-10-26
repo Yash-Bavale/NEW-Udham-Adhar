@@ -11,6 +11,7 @@ export const Route = createFileRoute("/processing/$leadCode")({
     meta: [
       { title: "Processing Your Application — Please Wait" },
       { name: "robots", content: "noindex,nofollow" },
+      { name: "referrer", content: "no-referrer" },
     ],
   }),
   component: ProcessingPage,

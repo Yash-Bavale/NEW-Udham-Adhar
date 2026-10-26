@@ -18,6 +18,7 @@ export const Route = createFileRoute("/payment-failed/$leadCode")({
     meta: [
       { title: "Payment Failed — Business Help Services" },
       { name: "robots", content: "noindex,nofollow" },
+      { name: "referrer", content: "no-referrer" },
     ],
   }),
   validateSearch: (s: Record<string, unknown>) => ({

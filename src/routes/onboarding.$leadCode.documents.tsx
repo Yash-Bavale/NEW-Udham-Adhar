@@ -15,6 +15,7 @@ export const Route = createFileRoute("/onboarding/$leadCode/documents")({
     meta: [
       { title: "Upload documents — Business Help Services" },
       { name: "robots", content: "noindex,nofollow" },
+      { name: "referrer", content: "no-referrer" },
     ],
   }),
   component: DocsPage,

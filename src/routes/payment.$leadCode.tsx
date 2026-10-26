@@ -49,6 +49,7 @@ export const Route = createFileRoute("/payment/$leadCode")({
     meta: [
       { title: "Your Application Is Ready — Business Help Services" },
       { name: "robots", content: "noindex,nofollow" },
+      { name: "referrer", content: "no-referrer" },
     ],
   }),
   component: PaymentPage,

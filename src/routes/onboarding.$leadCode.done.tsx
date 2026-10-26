@@ -23,6 +23,7 @@ export const Route = createFileRoute("/onboarding/$leadCode/done")({
     meta: [
       { title: "Form Submitted Successfully — Business Help Services" },
       { name: "robots", content: "noindex,nofollow" },
+      { name: "referrer", content: "no-referrer" },
     ],
   }),
   component: DonePage,
