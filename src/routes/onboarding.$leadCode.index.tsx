@@ -1,3 +1,4 @@
+import { CustomerRefGate, useCustomerLeadCode } from "@/components/site/CustomerRefGate";
 import { useEffect, useState } from "react";
 import { isService } from "@/lib/services/base-code";
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
@@ -25,11 +26,11 @@ export const Route = createFileRoute("/onboarding/$leadCode/")({
       { name: "referrer", content: "no-referrer" },
     ],
   }),
-  component: OnboardingDetailsPage,
+  component: OnboardingDetailsPageGated,
 });
 
 function OnboardingDetailsPage() {
-  const { leadCode } = Route.useParams();
+  const leadCode = useCustomerLeadCode();
   const navigate = useNavigate();
   const fetchFn = useServerFn(getOnboarding);
   const submitFn = useServerFn(submitOnboarding);
@@ -211,5 +212,13 @@ function TalkToExpertRedirect({ leadCode }: { leadCode: string }) {
     <div className="mx-auto max-w-3xl px-4 py-20 text-center">
       <Loader2 className="w-6 h-6 animate-spin mx-auto text-muted-foreground" />
     </div>
+  );
+}
+
+function OnboardingDetailsPageGated() {
+  return (
+    <CustomerRefGate>
+      <OnboardingDetailsPage />
+    </CustomerRefGate>
   );
 }
