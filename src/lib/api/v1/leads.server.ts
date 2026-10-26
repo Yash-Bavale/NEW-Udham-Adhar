@@ -23,6 +23,7 @@ export type ApiLeadInput = {
 export type ApiLeadResult = {
   leadId: string;
   leadCode: string;
+  accessToken: string;
   service: { id: string; code: string; name: string };
   pricing: { baseAmount: number; gstAmount: number; totalAmount: number };
 };
@@ -196,9 +197,12 @@ export async function createApiLead(
     console.error("[api/v1/leads] notification failed", e);
   }
 
+  const { issueCustomerToken } = await import("@/lib/security/customer-access.server");
+  const accessToken = await issueCustomerToken(lead.id as string, "co", { reason: "api_v1_lead" });
   return {
     leadId: lead.id,
     leadCode: lead.lead_code as string,
+    accessToken,
     service: {
       id: service.id as string,
       code: service.service_code as string,
