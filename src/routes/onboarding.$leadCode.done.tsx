@@ -1,3 +1,4 @@
+import { CustomerRefGate, useCustomerLeadCode } from "@/components/site/CustomerRefGate";
 import { useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
@@ -26,11 +27,11 @@ export const Route = createFileRoute("/onboarding/$leadCode/done")({
       { name: "referrer", content: "no-referrer" },
     ],
   }),
-  component: DonePage,
+  component: DonePageGated,
 });
 
 function DonePage() {
-  const { leadCode } = Route.useParams();
+  const leadCode = useCustomerLeadCode();
   const { help } = Route.useSearch();
   const helpMode = help === 1;
   const fetchFn = useServerFn(getOnboarding);
@@ -204,5 +205,13 @@ function DonePage() {
         </section>
       </main>
     </div>
+  );
+}
+
+function DonePageGated() {
+  return (
+    <CustomerRefGate>
+      <DonePage />
+    </CustomerRefGate>
   );
 }

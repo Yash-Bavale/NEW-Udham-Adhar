@@ -1,3 +1,4 @@
+import { CustomerRefGate, useCustomerLeadCode } from "@/components/site/CustomerRefGate";
 import { useEffect, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
@@ -19,7 +20,7 @@ export const Route = createFileRoute("/success/$leadCode")({
       { name: "referrer", content: "no-referrer" },
     ],
   }),
-  component: SuccessPage,
+  component: SuccessPageGated,
 });
 
 const PAID_STATUSES = new Set(["payment_successful", "under_process", "completed"]);
@@ -34,7 +35,7 @@ const STEPS: readonly CountdownStep[] = [
 ] as const;
 
 function SuccessPage() {
-  const { leadCode } = Route.useParams();
+  const leadCode = useCustomerLeadCode();
   const accessToken = useAccessToken(leadCode, ["co", "ob"]);
   const [denied, setDenied] = useState(false);
   const navigate = useNavigate();
@@ -159,5 +160,13 @@ function SuccessPage() {
       />
       <TrustBlock />
     </div>
+  );
+}
+
+function SuccessPageGated() {
+  return (
+    <CustomerRefGate>
+      <SuccessPage />
+    </CustomerRefGate>
   );
 }

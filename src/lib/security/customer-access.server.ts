@@ -173,6 +173,13 @@ export async function leadIdByCode(leadCode: string): Promise<string | null> {
   return data?.id ?? null;
 }
 
+/** Random opaque id used in customer URLs instead of the sequential lead code. */
+export async function publicRefForLeadId(leadId: string): Promise<string | null> {
+  const db = await admin();
+  const { data } = await db.from("leads").select("public_ref").eq("id", leadId).maybeSingle();
+  return data?.public_ref ?? null;
+}
+
 const LINK_RE =
   /(https?:\/\/[A-Za-z0-9.-]+(?::\d+)?)\/(onboarding|payment)\/([A-Za-z]{2}(?:-|%2D)\d{4}(?:-|%2D)\d{6})(\/(?:documents|done))?(?![\w\/#%-])/g;
 const RESUME_RE = /(https?:\/\/[A-Za-z0-9.-]+(?::\d+)?)?\/resume\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?![\w\/#-])/gi;
@@ -227,7 +234,9 @@ export async function secureCustomerLinksInText(text: string, reason: string): P
     const leadId = leadIdCache.get(code);
     const kind: TokenKind = m[2] === "payment" ? "co" : "ob";
     const t = leadId ? await tokenFor(leadId, kind) : null;
-    out += t ? `${m[0]}#t=${t}` : m[0];
+    const ref = t && leadId ? await publicRefForLeadId(leadId) : null;
+    const linkText = ref ? m[0].replace(m[3], ref) : m[0];
+    out += t ? `${linkText}#t=${t}` : m[0];
   }
   return out + text.slice(last);
 }
@@ -308,7 +317,9 @@ export async function gatewayReturnRedirect(
     if (leadId && pay) {
       const origin = normalizeReturnOrigin(pay?.return_origin) ?? fallbackOrigin;
       const kind: TokenKind = page === "success" ? "ob" : "co";
-      location = await secureCustomerUrl(origin, path, leadId, kind, `gateway_${page}`);
+      const ref = await publicRefForLeadId(leadId);
+      const refPath = ref ? `/${page}/${ref}${qs}` : path;
+      location = await secureCustomerUrl(origin, refPath, leadId, kind, `gateway_${page}`);
     }
   } catch (e) {
     console.error("[gateway-return] could not attach secure link", { page, error: e });

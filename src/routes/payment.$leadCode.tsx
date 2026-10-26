@@ -1,3 +1,4 @@
+import { CustomerRefGate, useCustomerLeadCode } from "@/components/site/CustomerRefGate";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
@@ -52,7 +53,7 @@ export const Route = createFileRoute("/payment/$leadCode")({
       { name: "referrer", content: "no-referrer" },
     ],
   }),
-  component: PaymentPage,
+  component: PaymentPageGated,
 });
 
 const SERVICE_INFO: Record<string, { tagline: string; bullets: string[] }> = {
@@ -113,7 +114,7 @@ function isSupportedGateway(name: string | null | undefined) {
 }
 
 function PaymentPage() {
-  const { leadCode } = Route.useParams();
+  const leadCode = useCustomerLeadCode();
   const accessToken = useAccessToken(leadCode, ["co", "ob"]);
   const navigate = useNavigate();
   const getSummary = useServerFn(getApplicationSummary);
@@ -650,4 +651,12 @@ async function loadAndTriggerCashfreeCheckout(paymentSessionId: string, isProd?:
   } else {
     throw new Error("Cashfree SDK failed to initialize.");
   }
+}
+
+function PaymentPageGated() {
+  return (
+    <CustomerRefGate>
+      <PaymentPage />
+    </CustomerRefGate>
+  );
 }

@@ -1,3 +1,4 @@
+import { CustomerRefGate, useCustomerLeadCode } from "@/components/site/CustomerRefGate";
 import { useEffect, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { ShieldCheck, FileCheck2, Sparkles, CheckCircle2 } from "lucide-react";
@@ -14,7 +15,7 @@ export const Route = createFileRoute("/processing/$leadCode")({
       { name: "referrer", content: "no-referrer" },
     ],
   }),
-  component: ProcessingPage,
+  component: ProcessingPageGated,
 });
 
 const TOTAL_SECONDS = 30;
@@ -27,7 +28,7 @@ const STEPS: readonly CountdownStep[] = [
 ] as const;
 
 function ProcessingPage() {
-  const { leadCode } = Route.useParams();
+  const leadCode = useCustomerLeadCode();
   const navigate = useNavigate();
   const [elapsed, setElapsed] = useState(0);
 
@@ -76,5 +77,13 @@ function ProcessingPage() {
       />
       <TrustBlock />
     </div>
+  );
+}
+
+function ProcessingPageGated() {
+  return (
+    <CustomerRefGate>
+      <ProcessingPage />
+    </CustomerRefGate>
   );
 }

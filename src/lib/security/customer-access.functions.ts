@@ -111,3 +111,36 @@ export const mintCustomerLink = createServerFn({ method: "POST" })
     });
     return { url: `${origin}${path}#t=${token}` };
   });
+
+const PublicRef = z.string().trim().regex(/^[a-f0-9]{32}$/);
+
+/** Public: map an opaque URL id to its lead code (ids are unguessable). */
+export const resolveCustomerRef = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) => z.object({ ref: PublicRef }).parse(i))
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: lead } = await supabaseAdmin
+      .from("leads")
+      .select("lead_code")
+      .eq("public_ref", data.ref)
+      .maybeSingle();
+    if (!lead?.lead_code) {
+      const sec = await import("@/lib/security/customer-access.server");
+      await sec.logAccessEvent({ event: "denied", reason: "bad_ref" });
+    }
+    return { leadCode: lead?.lead_code ?? null };
+  });
+
+/** Public: give the opaque URL id for a lead code, only to a holder of a valid link for it. */
+export const customerRefForCode = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) => z.object({ leadCode: LeadCode, accessToken: Token }).parse(i))
+  .handler(async ({ data }) => {
+    const sec = await import("@/lib/security/customer-access.server");
+    const leadId = await sec.leadIdByCode(data.leadCode);
+    try {
+      await sec.assertCustomerAccess(data.accessToken, leadId, "status", data.leadCode);
+    } catch {
+      return { ref: null };
+    }
+    return { ref: leadId ? await sec.publicRefForLeadId(leadId) : null };
+  });

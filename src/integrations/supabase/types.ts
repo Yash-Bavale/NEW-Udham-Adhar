@@ -2843,6 +2843,7 @@ export type Database = {
           notes: string | null
           onboarding_reminded_at: string | null
           onboarding_reminder_count: number
+          public_ref: string
           remarks: string | null
           service: string
           service_id: string | null
@@ -2881,6 +2882,7 @@ export type Database = {
           notes?: string | null
           onboarding_reminded_at?: string | null
           onboarding_reminder_count?: number
+          public_ref?: string
           remarks?: string | null
           service: string
           service_id?: string | null
@@ -2919,6 +2921,7 @@ export type Database = {
           notes?: string | null
           onboarding_reminded_at?: string | null
           onboarding_reminder_count?: number
+          public_ref?: string
           remarks?: string | null
           service?: string
           service_id?: string | null

@@ -1,3 +1,4 @@
+import { CustomerRefGate, useCustomerLeadCode } from "@/components/site/CustomerRefGate";
 import { useEffect, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
@@ -19,11 +20,11 @@ export const Route = createFileRoute("/payment-pending/$leadCode")({
       { name: "referrer", content: "no-referrer" },
     ],
   }),
-  component: PendingPage,
+  component: PendingPageGated,
 });
 
 function PendingPage() {
-  const { leadCode } = Route.useParams();
+  const leadCode = useCustomerLeadCode();
   const accessToken = useAccessToken(leadCode, ["co", "ob"]);
   const navigate = useNavigate();
   const getSummary = useServerFn(getApplicationSummary);
@@ -128,5 +129,13 @@ function PendingPage() {
         </Card>
       </div>
     </div>
+  );
+}
+
+function PendingPageGated() {
+  return (
+    <CustomerRefGate>
+      <PendingPage />
+    </CustomerRefGate>
   );
 }

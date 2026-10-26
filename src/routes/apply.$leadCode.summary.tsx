@@ -1,3 +1,4 @@
+import { CustomerRefGate, useCustomerLeadCode } from "@/components/site/CustomerRefGate";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
@@ -53,7 +54,7 @@ export const Route = createFileRoute("/apply/$leadCode/summary")({
       { name: "referrer", content: "no-referrer" },
     ],
   }),
-  component: SummaryPage,
+  component: SummaryPageGated,
 });
 
 // Service blurbs — shown so the user sees value in what they're paying for.
@@ -155,7 +156,7 @@ const GATEWAY_BRAND: Record<
 
 
 function SummaryPage() {
-  const { leadCode } = Route.useParams();
+  const leadCode = useCustomerLeadCode();
   const accessToken = useAccessToken(leadCode, ["co", "ob"]);
   const navigate = useNavigate();
   const getSummary = useServerFn(getApplicationSummary);
@@ -715,3 +716,11 @@ async function loadAndTriggerCashfreeCheckout(paymentSessionId: string, isProd?:
   }
 }
 
+
+function SummaryPageGated() {
+  return (
+    <CustomerRefGate>
+      <SummaryPage />
+    </CustomerRefGate>
+  );
+}

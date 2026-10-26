@@ -1,3 +1,4 @@
+import { CustomerRefGate, useCustomerLeadCode } from "@/components/site/CustomerRefGate";
 import { useEffect } from "react";
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
@@ -18,11 +19,11 @@ export const Route = createFileRoute("/onboarding/$leadCode/documents")({
       { name: "referrer", content: "no-referrer" },
     ],
   }),
-  component: DocsPage,
+  component: DocsPageGated,
 });
 
 function DocsPage() {
-  const { leadCode } = Route.useParams();
+  const leadCode = useCustomerLeadCode();
   const navigate = useNavigate();
   const fetchFn = useServerFn(getOnboarding);
 
@@ -126,5 +127,13 @@ function DocsPage() {
         </button>
       </div>
     </OnboardingShell>
+  );
+}
+
+function DocsPageGated() {
+  return (
+    <CustomerRefGate>
+      <DocsPage />
+    </CustomerRefGate>
   );
 }

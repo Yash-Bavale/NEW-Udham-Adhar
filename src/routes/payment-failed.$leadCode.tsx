@@ -1,3 +1,4 @@
+import { CustomerRefGate, useCustomerLeadCode } from "@/components/site/CustomerRefGate";
 import { useEffect, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
@@ -24,11 +25,11 @@ export const Route = createFileRoute("/payment-failed/$leadCode")({
   validateSearch: (s: Record<string, unknown>) => ({
     reason: typeof s.reason === "string" ? s.reason : undefined,
   }),
-  component: FailedPage,
+  component: FailedPageGated,
 });
 
 function FailedPage() {
-  const { leadCode } = Route.useParams();
+  const leadCode = useCustomerLeadCode();
   const accessToken = useAccessToken(leadCode, ["co", "ob"]);
   const { reason } = Route.useSearch();
   const navigate = useNavigate();
@@ -135,5 +136,13 @@ function FailedPage() {
         </Card>
       </div>
     </div>
+  );
+}
+
+function FailedPageGated() {
+  return (
+    <CustomerRefGate>
+      <FailedPage />
+    </CustomerRefGate>
   );
 }
