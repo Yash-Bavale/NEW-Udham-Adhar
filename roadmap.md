@@ -21,3 +21,10 @@
 - [x] Customer Document Merge (service toggle + Merge PDF on order)
 
 - [x] Database optimization: notifications index bloat fixed (60 MB → 184 kB); lead-insert speed still to review
+
+## Customer link privacy
+- [x] Containment: audio address limited to reminder sounds; conversions fire only on server-verified payment once per order; customer data needs a secure link
+- [x] P1: secure-link store, scoped keys (checkout vs form), expiry, revocation, denied-attempt log and rate limit; all customer server functions protected
+- [x] P2: customer pages, emails (auto), staff copy buttons, partner APIs, staff-made links migrated
+- [ ] P2: live PayU / CCAvenue / Cashfree return test — blocked: needs a real payment on the preview/published site
+- [ ] P3: publish + watch denied-attempt log for 48h — waits on owner publishing
