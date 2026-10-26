@@ -79,12 +79,26 @@ export async function autoAssignLeadOrOrder(opts: {
         .maybeSingle();
 
       if (fallbackPool?.user_id) {
-        staffUserId = fallbackPool.user_id;
-        const curCount = Number((fallbackPool as any).total_assigned || 0) + 1;
-        await supabaseAdmin
-          .from("assignment_pool")
-          .update({ last_assigned_at: new Date().toISOString(), total_assigned: curCount } as never)
-          .eq("id", fallbackPool.id);
+        const { data: prof } = await (supabaseAdmin as any)
+          .from("profiles")
+          .select("id, is_active, employment_status, auto_assign_enabled")
+          .eq("id", fallbackPool.user_id)
+          .maybeSingle();
+
+        const isProfValid =
+          prof &&
+          prof.is_active !== false &&
+          (prof.employment_status === "ACTIVE" || !prof.employment_status) &&
+          prof.auto_assign_enabled !== false;
+
+        if (isProfValid) {
+          staffUserId = fallbackPool.user_id;
+          const curCount = Number((fallbackPool as any).total_assigned || 0) + 1;
+          await supabaseAdmin
+            .from("assignment_pool")
+            .update({ last_assigned_at: new Date().toISOString(), total_assigned: curCount } as never)
+            .eq("id", fallbackPool.id);
+        }
       }
     }
 

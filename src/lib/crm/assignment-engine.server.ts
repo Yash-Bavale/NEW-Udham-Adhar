@@ -560,9 +560,12 @@ export async function calculateStaffWorkloads(): Promise<StaffWorkloadSummary[]>
   const profileMap = new Map<string, any>();
   (activeProfiles ?? []).forEach((p: any) => profileMap.set(String(p.id), p));
 
-  const poolActiveMap = new Map<string, boolean>();
+  const inPoolSet = new Set<string>();
+  const poolActiveSet = new Set<string>();
   (poolRes.data ?? []).forEach((ap: any) => {
-    if (ap.is_active) poolActiveMap.set(String(ap.user_id), true);
+    const uidStr = String(ap.user_id);
+    inPoolSet.add(uidStr);
+    if (ap.is_active) poolActiveSet.add(uidStr);
   });
 
   const activeLeavesMap = new Map<string, any>();
@@ -645,8 +648,9 @@ export async function calculateStaffWorkloads(): Promise<StaffWorkloadSummary[]>
           : "ACTIVE";
     const isActiveAcc = prof?.is_active !== false && empStatus === "ACTIVE";
     const isOnLeave = !!leave;
-    const isPoolActive = poolActiveMap.has(uid) ? (poolActiveMap.get(uid) === true) : true;
-    const autoAssignEnabled = isPoolActive;
+    // An employee is active in pool ONLY if they have an active (is_active = true) row in assignment_pool
+    const isPoolActive = poolActiveSet.has(uid);
+    const autoAssignEnabled = isPoolActive && (prof?.auto_assign_enabled !== false);
     const maxWorkload = Number(prof?.max_workload || 50);
     const effectiveWorkload = Math.round(counts.weightedWorkload * 10) / 10;
     const remainingCapacity = Math.max(0, maxWorkload - counts.activeActionOrders);
@@ -763,13 +767,19 @@ export async function distributeOrdersEquallyCanonical(
   // Calculate live workloads across all workforce
   const allWorkloads = await calculateStaffWorkloads();
 
-  // Filter strictly out super_admins, admins, finance, and inactive/archived accounts
+  // Filter strictly out super_admins, admins, finance, inactive/archived accounts, and staff with auto-assign toggled OFF or not in pool
   const nonOpsRoles = new Set(["super_admin", "admin", "support", "finance", "accounts"]);
   let baseCandidates = allWorkloads.filter(
     (c) =>
       c.employmentStatus === "ACTIVE" &&
       !nonOpsRoles.has(c.role) &&
-      !c.ineligibilityReasons.some((r) => r.includes("Account is disabled") || r.includes("Employment status")),
+      !c.ineligibilityReasons.some(
+        (r) =>
+          r.includes("Account is disabled") ||
+          r.includes("Employment status") ||
+          r.includes("Auto-assignment is toggled OFF") ||
+          r.includes("Not an active member of Assignment Pool"),
+      ),
   );
 
   // If targeted specific employee IDs
@@ -1042,8 +1052,8 @@ export async function reassignOrdersFromUnavailableEmployee(params: {
   );
 
   // Fallback: If no currently online/pool staff found (e.g. outside shift hours or offline presence),
-  // fallback to active operations workforce members so orders are never orphaned!
-  // NEVER assign to super_admin or admin!
+  // fallback to active operations workforce members WHO HAVE AUTO-ASSIGNMENT POOL TOGGLE ON!
+  // NEVER assign to super_admin or admin, and NEVER assign to employees whose pool toggle is OFF!
   if (candidates.length === 0) {
     const allWorkloads = await calculateStaffWorkloads();
     candidates = allWorkloads.filter(
@@ -1056,21 +1066,6 @@ export async function reassignOrdersFromUnavailableEmployee(params: {
         c.role !== "finance" &&
         c.role !== "accounts" &&
         !c.ineligibilityReasons.some((r) => r.includes("Auto-assignment is toggled OFF") || r.includes("Not an active member of Assignment Pool")),
-    );
-  }
-
-  // Final fallback to any active operations employee
-  if (candidates.length === 0) {
-    const allWorkloads = await calculateStaffWorkloads();
-    candidates = allWorkloads.filter(
-      (c) =>
-        c.employeeId !== unavailableEmployeeId &&
-        c.employmentStatus === "ACTIVE" &&
-        c.role !== "super_admin" &&
-        c.role !== "admin" &&
-        c.role !== "support" &&
-        c.role !== "finance" &&
-        c.role !== "accounts",
     );
   }
 

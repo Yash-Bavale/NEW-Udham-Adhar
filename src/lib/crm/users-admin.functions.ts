@@ -541,11 +541,11 @@ export const setEmploymentStatus = createServerFn({ method: "POST" })
         console.warn("[setEmploymentStatus] session termination notice:", sErr);
       }
 
-      // Sync assignment_pool table when deactivated
+      // Remove from assignment_pool table when deactivated/archived
       try {
-        await admin.from("assignment_pool").update({ is_active: false }).eq("user_id", data.user_id);
+        await admin.from("assignment_pool").delete().eq("user_id", data.user_id);
       } catch (poolErr) {
-        console.warn("[setEmploymentStatus] assignment_pool disable notice:", poolErr);
+        console.warn("[setEmploymentStatus] assignment_pool removal notice:", poolErr);
       }
 
       // Automatically redistribute open action orders
@@ -633,11 +633,11 @@ export const archiveEmployee = createServerFn({ method: "POST" })
       await (admin.from("profiles") as any).update({ is_active: false }).eq("id", data.user_id);
     }
 
-    // 2. Disable assignment pool membership
+    // 2. Remove from assignment pool
     try {
-      await admin.from("assignment_pool").update({ is_active: false }).eq("user_id", data.user_id);
+      await admin.from("assignment_pool").delete().eq("user_id", data.user_id);
     } catch (e) {
-      console.warn("[archiveEmployee] assignment_pool update warning:", e);
+      console.warn("[archiveEmployee] assignment_pool removal warning:", e);
     }
 
     // 3. Suspend auth login
@@ -703,9 +703,9 @@ export const deleteEmployee = createServerFn({ method: "POST" })
       }
 
       try {
-        await admin.from("assignment_pool").update({ is_active: false }).eq("user_id", data.user_id);
+        await admin.from("assignment_pool").delete().eq("user_id", data.user_id);
       } catch (e) {
-        console.warn("[deleteEmployee] assignment_pool update warning:", e);
+        console.warn("[deleteEmployee] assignment_pool removal warning:", e);
       }
 
       try {

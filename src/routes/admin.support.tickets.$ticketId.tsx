@@ -1086,8 +1086,12 @@ function TicketWorkspace() {
           </div>
 
           {/* Row 2: Subject / Subtitle */}
-          <div className="mt-1 text-xs font-semibold text-slate-700 truncate">
-            {ticket.subject ? `Re: ${ticket.subject}` : "(no subject)"}
+          <div className="mt-1 text-xs font-semibold text-slate-700 break-words whitespace-normal leading-relaxed">
+            {ticket.subject
+              ? (ticket.subject.trim().toLowerCase().startsWith("re:")
+                  ? ticket.subject
+                  : `Re: ${ticket.subject}`)
+              : "(no subject)"}
           </div>
 
           {/* Relationship indicators (Created from closed ticket / follow-up tickets) */}

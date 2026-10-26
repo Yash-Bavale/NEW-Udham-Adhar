@@ -170,16 +170,40 @@ function formatDayHeader(day: string): string {
   return base;
 }
 
-function formatAge(ms: number): string {
-  if (!Number.isFinite(ms) || ms < 0) return "just now";
-  const s = Math.floor(ms / 1000);
-  if (s < 60) return `${s}s ago`;
-  const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m ago`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
-  const d = Math.floor(h / 24);
-  return `${d}d ago`;
+function formatAge(dateInput: string | number | Date): string {
+  if (!dateInput) return "just now";
+  const d =
+    typeof dateInput === "number" && dateInput < 1_000_000_000_000
+      ? new Date(Date.now() - dateInput)
+      : new Date(dateInput);
+
+  if (isNaN(d.getTime())) return "just now";
+
+  const now = new Date();
+  const ms = now.getTime() - d.getTime();
+  if (ms < 0) return "just now";
+
+  // Calculate calendar days in IST
+  const todayKey = istDateKey(now);
+  const targetKey = istDateKey(d);
+
+  if (todayKey === targetKey) {
+    const s = Math.floor(ms / 1000);
+    if (s < 60) return `${Math.max(1, s)}s ago`;
+    const m = Math.floor(s / 60);
+    if (m < 60) return `${m}m ago`;
+    const h = Math.floor(m / 60);
+    return `${h}h ago`;
+  }
+
+  const [tY, tM, tD] = todayKey.split("-").map(Number);
+  const [cY, cM, cD] = targetKey.split("-").map(Number);
+
+  const todayMidnight = Date.UTC(tY, tM - 1, tD);
+  const targetMidnight = Date.UTC(cY, cM - 1, cD);
+  const calendarDays = Math.max(1, Math.round((todayMidnight - targetMidnight) / (24 * 60 * 60 * 1000)));
+
+  return `${calendarDays}d ago`;
 }
 
 function getResponseStateBadge(ticket: {
@@ -1870,7 +1894,7 @@ function TicketTableRow({
             className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-700 border border-slate-200"
             title={bucket === "closed" ? "Time since closed" : "Time since ticket created"}
           >
-            {formatAge(Date.now() - new Date(displayDate).getTime())}
+            {formatAge(displayDate)}
           </span>
         </div>
       </td>
@@ -1994,7 +2018,7 @@ function TicketTableRow({
           <Clock className="size-3 text-slate-400" />
           <span>
             {ticket.last_activity_actor === "customer" ? "Customer " : "Staff "}
-            {formatAge(Date.now() - new Date(ticket.last_activity_at).getTime())}
+            {formatAge(ticket.last_activity_at)}
           </span>
         </div>
       </td>
@@ -2130,7 +2154,7 @@ function TicketMobileCard({
           )}
         </div>
         <span className="text-[11px] text-slate-400">
-          {formatAge(Date.now() - new Date(displayDate).getTime())}
+          {formatAge(displayDate)}
         </span>
       </div>
 

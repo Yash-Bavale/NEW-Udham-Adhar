@@ -59,7 +59,7 @@ export const listAssignmentPool = createServerFn({ method: "GET" })
 
     const [{ data: profs }, { data: roleRows }, { data: svcs }] = await Promise.all([
       userIds.length
-        ? admin.from("profiles").select("id, full_name, display_name, email").in("id", userIds)
+        ? admin.from("profiles").select("id, full_name, display_name, email, is_active, employment_status").in("id", userIds)
         : Promise.resolve({ data: [] as any[] }),
       userIds.length
         ? admin.from("user_roles").select("user_id, role").in("user_id", userIds)
@@ -68,6 +68,25 @@ export const listAssignmentPool = createServerFn({ method: "GET" })
         ? admin.from("services").select("id, service_name").in("id", svcIds)
         : Promise.resolve({ data: [] as any[] }),
     ]);
+
+    const profMap = new Map<string, any>();
+    (profs ?? []).forEach((p: any) => profMap.set(p.id, p));
+
+    // Auto-clean any archived or inactive employees from assignment_pool immediately
+    const staleUserIds = userIds.filter((uid) => {
+      const p = profMap.get(uid);
+      if (!p) return true;
+      const status = String(p.employment_status || "").toUpperCase();
+      return status === "ARCHIVED" || status === "TERMINATED" || p.is_active === false;
+    });
+
+    if (staleUserIds.length > 0) {
+      try {
+        await admin.from("assignment_pool").delete().in("user_id", staleUserIds);
+      } catch (cleanupErr) {
+        console.warn("[listAssignmentPool] stale pool cleanup notice:", cleanupErr);
+      }
+    }
 
     const nameMap = new Map<string, string>();
     (profs ?? []).forEach((p: any) =>
@@ -82,8 +101,12 @@ export const listAssignmentPool = createServerFn({ method: "GET" })
     const svcMap = new Map<string, string>();
     (svcs ?? []).forEach((s: any) => svcMap.set(s.id, s.service_name));
 
+    // Only return active, non-archived pool members
+    const staleSet = new Set(staleUserIds);
+    const validRows = (rows ?? []).filter((r: any) => !staleSet.has(r.user_id));
+
     return {
-      rows: (rows ?? []).map((r: any) => ({
+      rows: validRows.map((r: any) => ({
         id: r.id,
         user_id: r.user_id,
         user_name: nameMap.get(r.user_id) ?? "Staff",
@@ -179,11 +202,44 @@ export const togglePoolActive = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await assertAdmin(context.supabase, context.userId);
     const admin = await getAdmin();
+
+    // 1. Fetch current pool row to find the user_id
+    const { data: poolRow } = await admin
+      .from("assignment_pool")
+      .select("id, user_id")
+      .eq("id", data.id)
+      .maybeSingle();
+
     const { error } = await admin
       .from("assignment_pool")
       .update({ is_active: data.isActive } as never)
       .eq("id", data.id);
     if (error) throw new Error(error.message);
+
+    // 2. Synchronize profiles.auto_assign_enabled with pool active status
+    if (poolRow?.user_id) {
+      if (!data.isActive) {
+        // If toggled OFF, verify if employee has any other active pool entry
+        const { data: otherActive } = await admin
+          .from("assignment_pool")
+          .select("id")
+          .eq("user_id", poolRow.user_id)
+          .eq("is_active", true)
+          .neq("id", data.id)
+          .limit(1);
+
+        if (!otherActive || otherActive.length === 0) {
+          await (admin.from("profiles") as any)
+            .update({ auto_assign_enabled: false })
+            .eq("id", poolRow.user_id);
+        }
+      } else {
+        await (admin.from("profiles") as any)
+          .update({ auto_assign_enabled: true })
+          .eq("id", poolRow.user_id);
+      }
+    }
+
     return { ok: true };
   });
 
@@ -193,7 +249,31 @@ export const removeFromPool = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await assertAdmin(context.supabase, context.userId);
     const admin = await getAdmin();
+
+    const { data: poolRow } = await admin
+      .from("assignment_pool")
+      .select("id, user_id")
+      .eq("id", data.id)
+      .maybeSingle();
+
     const { error } = await admin.from("assignment_pool").delete().eq("id", data.id);
     if (error) throw new Error(error.message);
+
+    // If no remaining active pool rows, set auto_assign_enabled to false
+    if (poolRow?.user_id) {
+      const { data: remaining } = await admin
+        .from("assignment_pool")
+        .select("id")
+        .eq("user_id", poolRow.user_id)
+        .eq("is_active", true)
+        .limit(1);
+
+      if (!remaining || remaining.length === 0) {
+        await (admin.from("profiles") as any)
+          .update({ auto_assign_enabled: false })
+          .eq("id", poolRow.user_id);
+      }
+    }
+
     return { ok: true };
   });
