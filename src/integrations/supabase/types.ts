@@ -980,6 +980,90 @@ export type Database = {
           },
         ]
       }
+      customer_access_events: {
+        Row: {
+          created_at: string
+          event: string
+          id: string
+          ip_hash: string | null
+          lead_code: string | null
+          lead_id: string | null
+          reason: string | null
+          scope: string | null
+          user_agent: string | null
+        }
+        Insert: {
+          created_at?: string
+          event: string
+          id?: string
+          ip_hash?: string | null
+          lead_code?: string | null
+          lead_id?: string | null
+          reason?: string | null
+          scope?: string | null
+          user_agent?: string | null
+        }
+        Update: {
+          created_at?: string
+          event?: string
+          id?: string
+          ip_hash?: string | null
+          lead_code?: string | null
+          lead_id?: string | null
+          reason?: string | null
+          scope?: string | null
+          user_agent?: string | null
+        }
+        Relationships: []
+      }
+      customer_access_tokens: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          expires_at: string
+          id: string
+          issued_reason: string | null
+          kind: string
+          last_used_at: string | null
+          lead_id: string
+          max_uses: number | null
+          revoked_at: string | null
+          scopes: string[]
+          token_hash: string
+          use_count: number
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          expires_at: string
+          id?: string
+          issued_reason?: string | null
+          kind: string
+          last_used_at?: string | null
+          lead_id: string
+          max_uses?: number | null
+          revoked_at?: string | null
+          scopes: string[]
+          token_hash: string
+          use_count?: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          expires_at?: string
+          id?: string
+          issued_reason?: string | null
+          kind?: string
+          last_used_at?: string | null
+          lead_id?: string
+          max_uses?: number | null
+          revoked_at?: string | null
+          scopes?: string[]
+          token_hash?: string
+          use_count?: number
+        }
+        Relationships: []
+      }
       customer_notes: {
         Row: {
           created_at: string
@@ -2759,6 +2843,7 @@ export type Database = {
           notes: string | null
           onboarding_reminded_at: string | null
           onboarding_reminder_count: number
+          public_ref: string
           remarks: string | null
           service: string
           service_id: string | null
@@ -2797,6 +2882,7 @@ export type Database = {
           notes?: string | null
           onboarding_reminded_at?: string | null
           onboarding_reminder_count?: number
+          public_ref?: string
           remarks?: string | null
           service: string
           service_id?: string | null
@@ -2835,6 +2921,7 @@ export type Database = {
           notes?: string | null
           onboarding_reminded_at?: string | null
           onboarding_reminder_count?: number
+          public_ref?: string
           remarks?: string | null
           service?: string
           service_id?: string | null
@@ -3475,6 +3562,8 @@ export type Database = {
           razorpay_payment_id: string | null
           razorpay_signature: string | null
           refund_reason: string | null
+          return_nonce_hash: string | null
+          return_origin: string | null
           status: Database["public"]["Enums"]["payment_status"]
           transaction_id: string | null
           updated_at: string
@@ -3506,6 +3595,8 @@ export type Database = {
           razorpay_payment_id?: string | null
           razorpay_signature?: string | null
           refund_reason?: string | null
+          return_nonce_hash?: string | null
+          return_origin?: string | null
           status?: Database["public"]["Enums"]["payment_status"]
           transaction_id?: string | null
           updated_at?: string
@@ -3537,6 +3628,8 @@ export type Database = {
           razorpay_payment_id?: string | null
           razorpay_signature?: string | null
           refund_reason?: string | null
+          return_nonce_hash?: string | null
+          return_origin?: string | null
           status?: Database["public"]["Enums"]["payment_status"]
           transaction_id?: string | null
           updated_at?: string
@@ -4318,6 +4411,104 @@ export type Database = {
           updated_by?: string | null
         }
         Relationships: []
+      }
+      support_ticket_folder_items: {
+        Row: {
+          created_at: string
+          folder_id: string
+          id: string
+          ticket_id: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          folder_id: string
+          id?: string
+          ticket_id: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          folder_id?: string
+          id?: string
+          ticket_id?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_ticket_folder_items_folder_id_fkey"
+            columns: ["folder_id"]
+            isOneToOne: false
+            referencedRelation: "support_ticket_folders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "support_ticket_folder_items_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "support_tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      support_ticket_folders: {
+        Row: {
+          color: string | null
+          created_at: string
+          id: string
+          is_shared: boolean
+          name: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string
+          id?: string
+          is_shared?: boolean
+          name: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          color?: string | null
+          created_at?: string
+          id?: string
+          is_shared?: boolean
+          name?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      support_ticket_stars: {
+        Row: {
+          created_at: string
+          id: string
+          ticket_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          ticket_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          ticket_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_ticket_stars_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "support_tickets"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       support_tickets: {
         Row: {

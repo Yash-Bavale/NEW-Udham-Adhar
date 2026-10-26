@@ -267,6 +267,48 @@
       "when": 1792909262359,
       "tag": "0037_active_profile_role_gate",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1792990119950,
+      "tag": "0038_support_ticket_folders_and_stars",
+      "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1792990242975,
+      "tag": "0039_lock_support_folder_items",
+      "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1792991428987,
+      "tag": "0040_customer_access_tokens",
+      "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1792992851333,
+      "tag": "0041_payments_return_origin",
+      "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1792992993789,
+      "tag": "0042_payments_return_nonce",
+      "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1792998324390,
+      "tag": "0043_lead_public_ref",
+      "breakpoints": true
     }
   ]
 }

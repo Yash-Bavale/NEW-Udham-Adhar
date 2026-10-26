@@ -10,6 +10,8 @@ import { z } from "zod";
 const Input = z.object({
   leadCode: z.string().trim().min(3).max(80),
   gatewayCode: z.string().trim().min(2).max(40).optional(),
+  accessToken: z.string().trim().min(10).max(200),
+  returnOrigin: z.string().trim().max(200).optional(),
 });
 
 export type InitiatePaymentResult = {
@@ -27,6 +29,16 @@ export const initiatePayment = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => Input.parse(i))
   .handler(async ({ data }): Promise<InitiatePaymentResult> => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    {
+      const { assertCustomerAccess, leadIdByCode } = await import("@/lib/security/customer-access.server");
+      await assertCustomerAccess(data.accessToken, await leadIdByCode(data.leadCode), "payment", data.leadCode);
+    }
+    const access = await import("@/lib/security/customer-access.server");
+    const returnNonce = access.newReturnNonce();
+    const remember = async <T extends { paymentId: string }>(order: T): Promise<T> => {
+      await access.saveReturnContext(order.paymentId, access.normalizeReturnOrigin(data.returnOrigin), returnNonce);
+      return order;
+    };
     let chosen = (data.gatewayCode?.toLowerCase() ?? "").trim();
     if (!chosen) {
       const { data: gw } = await supabaseAdmin
@@ -49,19 +61,19 @@ export const initiatePayment = createServerFn({ method: "POST" })
     switch (chosen) {
       case "payu": {
         const { buildPayUOrder } = await import("@/lib/payments/payu-order.server");
-        const order = await buildPayUOrder(data.leadCode);
+        const order = await remember(await buildPayUOrder(data.leadCode, returnNonce));
         return { ...order, gateway: "payu" };
       }
       case "ccavenue": {
         const { buildCcavenueOrderForLead } = await import(
           "@/lib/payments/ccavenue-order.server"
         );
-        const order = await buildCcavenueOrderForLead(data.leadCode);
+        const order = await remember(await buildCcavenueOrderForLead(data.leadCode, returnNonce));
         return { ...order, gateway: "ccavenue" };
       }
       case "cashfree": {
         const { buildCashfreeOrder } = await import("@/lib/payments/cashfree-order.server");
-        const order = await buildCashfreeOrder(data.leadCode);
+        const order = await remember(await buildCashfreeOrder(data.leadCode, returnNonce));
         return { ...order, gateway: "cashfree" };
       }
       case "razorpay":

@@ -3,7 +3,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { assertRole } from "@/lib/audit";
 
-const Input = z.object({ leadCode: z.string().trim().min(3).max(80) });
+const Input = z.object({ leadCode: z.string().trim().min(3).max(80), accessToken: z.string().trim().min(10).max(200) });
 
 /**
  * Public summary used on /apply/:leadCode/summary.
@@ -14,7 +14,6 @@ export const getApplicationSummary = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => Input.parse(i))
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    console.log("[getApplicationSummary] code:", data.leadCode);
     const code = data.leadCode.trim();
     const cols = "id, lead_code, name, email, mobile, service, base_amount, gst_amount, total_amount, status, lead_status_v2, service_id";
 
@@ -37,8 +36,8 @@ export const getApplicationSummary = createServerFn({ method: "POST" })
       if (error) throw new Error(error.message);
       lead = byLead;
     }
-    if (!lead) throw new Error("Application not found");
-
+    const { assertCustomerAccess } = await import("@/lib/security/customer-access.server");
+    await assertCustomerAccess(data.accessToken, lead?.id ?? null, "summary", code);
 
     // Fetch service description separately
     let serviceDescription = "";
@@ -125,6 +124,7 @@ export const getApplicationSummary = createServerFn({ method: "POST" })
 
 const UpdateContact = z.object({
   leadCode: z.string().trim().min(3).max(80),
+  accessToken: z.string().trim().min(10).max(200),
   name: z.string().trim().min(2).max(120),
   email: z.string().trim().email().max(160),
   mobile: z.string().trim().regex(/^[6-9]\d{9}$/, "Enter a valid 10-digit Indian mobile number"),
@@ -143,6 +143,10 @@ export const updateLeadContact = createServerFn({ method: "POST" })
       .select("id, status, email, mobile")
       .eq("lead_code", data.leadCode)
       .maybeSingle();
+    {
+      const { assertCustomerAccess } = await import("@/lib/security/customer-access.server");
+      await assertCustomerAccess(data.accessToken, lead?.id ?? null, "contact_update", data.leadCode);
+    }
     if (!lead) throw new Error("Application not found");
     if (lead.status === "payment_successful" || lead.status === "completed") {
       throw new Error("Details can't be changed after payment.");

@@ -12,6 +12,7 @@ import { OrderAssignmentHistoryTab } from "@/components/admin/workspace/OrderAss
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
+import { mintCustomerLink } from "@/lib/security/customer-access.functions";
 import { cn } from "@/lib/utils";
 import { CallButton } from "@/components/admin/telephony/CallButton";
 
@@ -564,9 +565,8 @@ export function WorkspaceShell(p: Props) {
                   <button
                     type="button"
                     onClick={async () => {
-                      const origin = typeof window !== "undefined" ? window.location.origin : "https://udyamadhar.in";
-                      const link = `${origin}/onboarding/${encodeURIComponent(cLeadCode)}`;
                       try {
+                        const { url: link } = await mintCustomerLink({ data: { leadCode: cLeadCode, kind: "form" } });
                         await navigator.clipboard.writeText(link);
                         toast.success(`Form link copied for ${cLeadCode}!`);
                       } catch {
@@ -586,11 +586,14 @@ export function WorkspaceShell(p: Props) {
                 <TooltipTrigger asChild>
                   <button
                     type="button"
-                    onClick={() => {
-                      const origin = typeof window !== "undefined" ? window.location.origin : "https://udyamadhar.in";
-                      const link = `${origin}/payment/${encodeURIComponent(cLeadCode)}`;
-                      navigator.clipboard.writeText(link);
-                      toast.success(`Payment link copied for ${cLeadCode}!`);
+                    onClick={async () => {
+                      try {
+                        const { url: link } = await mintCustomerLink({ data: { leadCode: cLeadCode, kind: "payment" } });
+                        await navigator.clipboard.writeText(link);
+                        toast.success(`Secure payment link copied for ${cLeadCode}!`);
+                      } catch {
+                        toast.error("Failed to copy payment link");
+                      }
                     }}
                     className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold border border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100 transition-colors"
                   >

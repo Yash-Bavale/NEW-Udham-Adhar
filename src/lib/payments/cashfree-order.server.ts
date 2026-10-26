@@ -6,7 +6,7 @@
  * We create the order via API, then redirect the user to Cashfree's
  * hosted checkout page using the payment_session_id.
  */
-export async function buildCashfreeOrder(leadCodeInput: string) {
+export async function buildCashfreeOrder(leadCodeInput: string, returnNonce?: string) {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const {
     buildCashfreeOrderId,
@@ -123,7 +123,7 @@ export async function buildCashfreeOrder(leadCodeInput: string) {
   // 10) Build Cashfree order via REST API
   const origin =
     process.env.APP_BASE_URL || process.env.PUBLIC_SITE_URL || "https://udyamadhar.in";
-  const returnUrl = `${origin}/api/public/webhooks/cashfree?order_id={order_id}`;
+  const returnUrl = `${origin}/api/public/webhooks/cashfree?order_id={order_id}${returnNonce ? `&r=${encodeURIComponent(returnNonce)}` : ""}`;
   const notifyUrl = `${origin}/api/public/webhooks/cashfree`;
 
   const phone = String(lead.mobile ?? "").replace(/\D/g, "").slice(-10) || "9999999999";

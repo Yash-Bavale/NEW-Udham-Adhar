@@ -1,3 +1,4 @@
+import { CustomerRefGate, useCustomerLeadCode } from "@/components/site/CustomerRefGate";
 import { useEffect, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
@@ -5,6 +6,8 @@ import { Loader2, Clock, AlertTriangle } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { getApplicationSummary } from "@/lib/payments/gateways.functions";
+import { useAccessToken } from "@/lib/security/customer-access-browser";
+import { SecureLinkNotice } from "@/components/site/SecureLinkNotice";
 import { trackEvent } from "@/lib/analytics/track";
 
 const PAID_STATUSES = new Set(["payment_successful", "under_process", "completed"]);
@@ -14,13 +17,15 @@ export const Route = createFileRoute("/payment-pending/$leadCode")({
     meta: [
       { title: "Confirming Payment — Business Help Services" },
       { name: "robots", content: "noindex,nofollow" },
+      { name: "referrer", content: "no-referrer" },
     ],
   }),
-  component: PendingPage,
+  component: PendingPageGated,
 });
 
 function PendingPage() {
-  const { leadCode } = Route.useParams();
+  const leadCode = useCustomerLeadCode();
+  const accessToken = useAccessToken(leadCode, ["co", "ob"]);
   const navigate = useNavigate();
   const getSummary = useServerFn(getApplicationSummary);
   const [elapsed, setElapsed] = useState(0);
@@ -32,13 +37,14 @@ function PendingPage() {
 
   // Poll for payment confirmation
   useEffect(() => {
+    if (!accessToken) return;
     let cancelled = false;
     let attempt = 0;
 
     const poll = async () => {
       while (!cancelled) {
         try {
-          const res = await getSummary({ data: { leadCode } });
+          const res = await getSummary({ data: { leadCode, accessToken } });
           if (cancelled) return;
           const isPaid = !!res?.lead?.payment || PAID_STATUSES.has(res?.lead?.status);
           if (isPaid) {
@@ -59,7 +65,9 @@ function PendingPage() {
     };
     poll();
     return () => { cancelled = true; };
-  }, [leadCode, getSummary, navigate]);
+  }, [leadCode, getSummary, navigate, accessToken]);
+
+  if (accessToken === null) return <SecureLinkNotice leadCode={leadCode} />;
 
   return (
     <div className="min-h-[80vh] flex items-center justify-center p-4 bg-gradient-to-b from-amber-50/40 to-slate-50">
@@ -121,5 +129,13 @@ function PendingPage() {
         </Card>
       </div>
     </div>
+  );
+}
+
+function PendingPageGated() {
+  return (
+    <CustomerRefGate>
+      <PendingPage />
+    </CustomerRefGate>
   );
 }

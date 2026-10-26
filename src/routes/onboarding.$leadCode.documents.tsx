@@ -1,3 +1,4 @@
+import { CustomerRefGate, useCustomerLeadCode } from "@/components/site/CustomerRefGate";
 import { useEffect } from "react";
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
@@ -5,6 +6,8 @@ import { useQuery } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { getOnboarding } from "@/lib/onboarding/onboarding.functions";
+import { useOnboardingAccess } from "@/hooks/useOnboardingAccess";
+import { SecureLinkNotice } from "@/components/site/SecureLinkNotice";
 import { OnboardingShell } from "@/components/onboarding/OnboardingShell";
 import { DocumentUploader } from "@/components/onboarding/DocumentUploader";
 
@@ -13,19 +16,23 @@ export const Route = createFileRoute("/onboarding/$leadCode/documents")({
     meta: [
       { title: "Upload documents — Business Help Services" },
       { name: "robots", content: "noindex,nofollow" },
+      { name: "referrer", content: "no-referrer" },
     ],
   }),
-  component: DocsPage,
+  component: DocsPageGated,
 });
 
 function DocsPage() {
-  const { leadCode } = Route.useParams();
+  const leadCode = useCustomerLeadCode();
   const navigate = useNavigate();
   const fetchFn = useServerFn(getOnboarding);
 
-  const { data, isLoading, refetch } = useQuery({
-    queryKey: ["onboarding", leadCode],
-    queryFn: () => fetchFn({ data: { leadCode } }),
+  const accessToken = useOnboardingAccess(leadCode);
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: ["onboarding", leadCode, accessToken],
+    queryFn: () => fetchFn({ data: { leadCode, accessToken: accessToken as string } }),
+    enabled: !!accessToken,
+    retry: false,
   });
 
   const hasNoDocuments = data ? (data.schema.documents?.length ?? 0) === 0 : false;
@@ -35,7 +42,8 @@ function DocsPage() {
     navigate({ to: "/onboarding/$leadCode/done", params: { leadCode }, replace: true });
   }, [hasNoDocuments, leadCode, navigate]);
 
-  if (isLoading) {
+  if (accessToken === null || isError) return <SecureLinkNotice leadCode={leadCode} />;
+  if (accessToken === undefined || isLoading) {
     return (
       <div className="mx-auto max-w-3xl px-4 py-20 text-center">
         <Loader2 className="w-6 h-6 animate-spin mx-auto text-muted-foreground" />
@@ -119,5 +127,13 @@ function DocsPage() {
         </button>
       </div>
     </OnboardingShell>
+  );
+}
+
+function DocsPageGated() {
+  return (
+    <CustomerRefGate>
+      <DocsPage />
+    </CustomerRefGate>
   );
 }

@@ -961,7 +961,7 @@ function AddLeadDialog({
         language: lead.language ?? f.language,
         service: lead.service ?? f.service,
         lead_source: lead.lead_source ?? f.lead_source,
-        website_id: lead.website_id ?? f.website_id,
+        website_id: isAdminUser ? (lead.website_id ?? f.website_id) : f.website_id,
         base_amount: Number(lead.base_amount ?? f.base_amount) || 0,
         gst_amount: Number(lead.gst_amount ?? f.gst_amount) || 0,
         total_amount: Number(lead.total_amount ?? f.total_amount) || 0,
@@ -1001,19 +1001,22 @@ function AddLeadDialog({
     enabled: open,
   });
 
-  // Filter services by selected website; show all if no website selected
+  // Admins can pick services from any website; other staff only see Udyam Aadhar services.
+  const dialogRole = useRole();
+  const isAdminUser = dialogRole.hasAny(["super_admin", "admin"]);
   const filteredServices = useMemo(() => {
-    const rows = ((servicesData?.rows ?? []) as any[]).filter(
-      (s: any) => isVisibleService(s)
+    const rows = ((servicesData?.rows ?? []) as any[]).filter((s: any) =>
+      isAdminUser ? s?.is_active !== false : isVisibleService(s)
     );
     if (!form.website_id) return rows;
-    return rows.filter((s: any) => s.website_id === form.website_id);
-  }, [servicesData, form.website_id]);
+    return rows.filter((s: any) => (s.website_id ?? s.website?.id) === form.website_id);
+  }, [servicesData, form.website_id, isAdminUser]);
 
   const onServiceChange = (val: string) => {
     setField("service", val);
     const svc = servicesData?.rows.find((s: any) => s.service_name === val);
     if (svc) {
+      if (isAdminUser && !form.website_id && (svc.website_id ?? svc.website?.id)) setField("website_id", svc.website_id ?? svc.website?.id);
       setField("base_amount", Number(svc.base_amount) || 0);
       setField("gst_amount", Number(svc.gst_amount) || 0);
       setField("total_amount", Number(svc.total_amount) || 0);
@@ -1159,7 +1162,8 @@ function AddLeadDialog({
             </select>
           </Row>
 
-          <Row label="Website" required full>
+          {isAdminUser && (
+          <Row label="Website" full>
             <select
               value={form.website_id}
               onChange={(e) => {
@@ -1175,6 +1179,7 @@ function AddLeadDialog({
               ))}
             </select>
           </Row>
+          )}
 
           <Row label="Interested Service" required full>
             <select

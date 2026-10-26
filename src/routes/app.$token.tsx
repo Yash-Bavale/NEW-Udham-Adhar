@@ -4,6 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useEffect } from "react";
 import { SiteShell } from "@/components/site/SiteShell";
 import { resolveApplicationLink } from "@/lib/applications/links.functions";
+import { storeAccessToken } from "@/lib/security/customer-access-browser";
 
 export const Route = createFileRoute("/app/$token")({
   component: AppTokenPage,
@@ -39,6 +40,7 @@ function AppTokenPage() {
   // Auto-route certain purposes to their dedicated flow
   useEffect(() => {
     if (!data || !data.ok) return;
+    if (data.lead?.lead_code) storeAccessToken(data.lead.lead_code, data.accessToken);
     if (data.purpose === "resume" && data.lead?.lead_code) {
       navigate({ to: "/onboarding/$leadCode", params: { leadCode: data.lead.lead_code }, replace: true });
     }

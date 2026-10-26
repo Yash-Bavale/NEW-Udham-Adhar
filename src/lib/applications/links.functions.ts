@@ -64,7 +64,7 @@ export const resolveApplicationLink = createServerFn({ method: "POST" })
     const [{ data: lead }, { data: app }] = await Promise.all([
       supabaseAdmin
         .from("leads")
-        .select("id, lead_code, name, email, service, total_amount, status")
+        .select("id, lead_code, name, service, total_amount, status")
         .eq("id", link.lead_id)
         .maybeSingle(),
       link.application_id
@@ -76,8 +76,14 @@ export const resolveApplicationLink = createServerFn({ method: "POST" })
         : Promise.resolve({ data: null as null }),
     ]);
 
+    const { issueCustomerToken } = await import("@/lib/security/customer-access.server");
+    const accessToken = lead?.id
+      ? await issueCustomerToken(lead.id, link.purpose === "pay" ? "co" : "ob", { reason: `app_link_${link.purpose}` })
+      : null;
+
     return {
       ok: true as const,
+      accessToken,
       purpose: link.purpose as LinkPurpose,
       lead,
       application: app,

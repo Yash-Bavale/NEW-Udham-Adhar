@@ -415,6 +415,18 @@ export async function enqueueEmailInternal(input: {
   cc?: string | string[];
   bcc?: string | string[];
 }) {
+  // Every customer form/payment link in an outgoing email gets a fresh,
+  // scoped access token so old guessable /onboarding/<code> links stop working.
+  try {
+    const { secureCustomerLinksInText } = await import("@/lib/security/customer-access.server");
+    input = {
+      ...input,
+      bodyHtml: await secureCustomerLinksInText(input.bodyHtml, "email"),
+      bodyText: input.bodyText ? await secureCustomerLinksInText(input.bodyText, "email") : input.bodyText,
+    };
+  } catch (e) {
+    console.error("[emails] could not secure customer links", e instanceof Error ? e.message : e);
+  }
   const resolved = resolveTemplateCode(input.templateCode);
   if (resolved.drop) {
     console.warn(`[emails] dropping legacy template '${input.templateCode}' (no longer sent).`);

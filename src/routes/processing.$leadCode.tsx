@@ -1,7 +1,9 @@
+import { CustomerRefGate, useCustomerLeadCode } from "@/components/site/CustomerRefGate";
 import { useEffect, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { ShieldCheck, FileCheck2, Sparkles, CheckCircle2 } from "lucide-react";
 import { trackEvent } from "@/lib/analytics/track";
+import { captureAccessToken } from "@/lib/security/customer-access-browser";
 import { TrustBlock } from "@/components/site/TrustBlock";
 import { CountdownCard, type CountdownStep } from "@/components/site/CountdownCard";
 
@@ -10,9 +12,10 @@ export const Route = createFileRoute("/processing/$leadCode")({
     meta: [
       { title: "Processing Your Application — Please Wait" },
       { name: "robots", content: "noindex,nofollow" },
+      { name: "referrer", content: "no-referrer" },
     ],
   }),
-  component: ProcessingPage,
+  component: ProcessingPageGated,
 });
 
 const TOTAL_SECONDS = 30;
@@ -25,11 +28,12 @@ const STEPS: readonly CountdownStep[] = [
 ] as const;
 
 function ProcessingPage() {
-  const { leadCode } = Route.useParams();
+  const leadCode = useCustomerLeadCode();
   const navigate = useNavigate();
   const [elapsed, setElapsed] = useState(0);
 
   useEffect(() => {
+    captureAccessToken(leadCode);
     trackEvent("processing_viewed", {});
 
     // Fire Google Ads "Lead Form Submitted" conversion here (not on form submit)
@@ -73,5 +77,13 @@ function ProcessingPage() {
       />
       <TrustBlock />
     </div>
+  );
+}
+
+function ProcessingPageGated() {
+  return (
+    <CustomerRefGate>
+      <ProcessingPage />
+    </CustomerRefGate>
   );
 }

@@ -66,6 +66,11 @@ export const Route = createFileRoute("/api/public/v1/payments/$leadCode/status")
             .maybeSingle();
 
           const isPaid = payment?.status === "paid";
+          let nextUrl = `/payment/${lead.lead_code}`;
+          if (isPaid) {
+            const { issueCustomerToken } = await import("@/lib/security/customer-access.server");
+            nextUrl = `/onboarding/${lead.lead_code}#t=${await issueCustomerToken(lead.id, "ob", { reason: "api_v1_paid" })}`;
+          }
 
           return g.jsonOk(
             {
@@ -77,7 +82,7 @@ export const Route = createFileRoute("/api/public/v1/payments/$leadCode/status")
               amount: payment?.amount ? Number(payment.amount) : null,
               paid_at: payment?.payment_date ?? null,
               order_code: application?.application_code ?? null,
-              next_url: isPaid ? `/onboarding/${lead.lead_code}` : `/payment/${lead.lead_code}`,
+              next_url: nextUrl,
             },
             origin,
             "GET",

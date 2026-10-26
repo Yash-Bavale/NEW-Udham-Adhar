@@ -1,3 +1,4 @@
+import { CustomerRefGate, useCustomerLeadCode } from "@/components/site/CustomerRefGate";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
@@ -23,6 +24,8 @@ import {
   getApplicationSummary,
   updateLeadContact,
 } from "@/lib/payments/gateways.functions";
+import { useAccessToken, pickAccessToken } from "@/lib/security/customer-access-browser";
+import { SecureLinkNotice } from "@/components/site/SecureLinkNotice";
 import { initiatePayment, type InitiatePaymentResult } from "@/lib/payments/initiate.functions";
 import { trackEvent } from "@/lib/analytics/track";
 import { CountdownCard, type CountdownStep } from "@/components/site/CountdownCard";
@@ -48,9 +51,10 @@ export const Route = createFileRoute("/apply/$leadCode/summary")({
     meta: [
       { title: "Your Application Is Ready — Business Help Services" },
       { name: "robots", content: "noindex,nofollow" },
+      { name: "referrer", content: "no-referrer" },
     ],
   }),
-  component: SummaryPage,
+  component: SummaryPageGated,
 });
 
 // Service blurbs — shown so the user sees value in what they're paying for.
@@ -152,15 +156,18 @@ const GATEWAY_BRAND: Record<
 
 
 function SummaryPage() {
-  const { leadCode } = Route.useParams();
+  const leadCode = useCustomerLeadCode();
+  const accessToken = useAccessToken(leadCode, ["co", "ob"]);
   const navigate = useNavigate();
   const getSummary = useServerFn(getApplicationSummary);
   const updateContact = useServerFn(updateLeadContact);
   const createOrder = useServerFn(initiatePayment);
 
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ["apply.summary", leadCode],
-    queryFn: () => getSummary({ data: { leadCode } }),
+    queryKey: ["apply.summary", leadCode, accessToken],
+    queryFn: () => getSummary({ data: { leadCode, accessToken: accessToken as string } }),
+    enabled: !!accessToken,
+    retry: false,
   });
 
   const [chosen, setChosen] = useState<string | null>(null);
@@ -223,7 +230,8 @@ function SummaryPage() {
     ? SERVICE_INFO[lead.service] ?? SERVICE_INFO.default
     : SERVICE_INFO.default;
 
-  if (isLoading) {
+  if (accessToken === null || (error && !data)) return <SecureLinkNotice leadCode={leadCode} />;
+  if (accessToken === undefined || isLoading) {
     return (
       <div className="mx-auto max-w-2xl px-4 py-16 text-center text-sm text-muted-foreground">
         <Loader2 className="w-5 h-5 animate-spin mx-auto mb-2" />
@@ -266,7 +274,7 @@ function SummaryPage() {
     setPayError(null);
     trackEvent("payment_initiated", { gateway: activeGateway, leadCode });
     try {
-      const res = await createOrder({ data: { leadCode, gatewayCode: activeGateway } });
+      const res = await createOrder({ data: { leadCode, gatewayCode: activeGateway, accessToken: pickAccessToken(leadCode, ["co"]) ?? "" } });
       if (res.paymentSessionId) {
         await loadAndTriggerCashfreeCheckout(res.paymentSessionId, res.isProd);
         return;
@@ -392,7 +400,7 @@ function SummaryPage() {
                     setSavingEdit(true);
                     setEditError(null);
                     try {
-                      await updateContact({ data: payload });
+                      await updateContact({ data: { ...payload, accessToken: pickAccessToken(leadCode, ["co"]) ?? "" } });
                       await refetch();
                       setEditing(false);
                     } catch (err) {
@@ -708,3 +716,11 @@ async function loadAndTriggerCashfreeCheckout(paymentSessionId: string, isProd?:
   }
 }
 
+
+function SummaryPageGated() {
+  return (
+    <CustomerRefGate>
+      <SummaryPage />
+    </CustomerRefGate>
+  );
+}
