@@ -1,4 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { storeAccessToken } from "@/lib/security/customer-access.client";
 import { useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { createLead } from "@/lib/leads.functions";
@@ -78,6 +79,7 @@ export function LeadForm({ title = "Fill application" }: { title?: string } = {}
     try {
       const lead = await submitLead({ data: payload as never });
       trackEvent("lead_created", { service: payload.service }, { lead_id: lead.leadId ?? null });
+      storeAccessToken(lead.leadCode, lead.accessToken);
       navigate({
         to: "/processing/$leadCode",
         params: { leadCode: lead.leadCode },
