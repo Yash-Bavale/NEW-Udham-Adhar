@@ -3,6 +3,8 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { ShieldCheck, FileCheck2, Sparkles, CheckCircle2, Mail, History } from "lucide-react";
 import { getApplicationSummary } from "@/lib/payments/gateways.functions";
+import { useAccessToken, markConversionOnce } from "@/lib/security/customer-access-browser";
+import { SecureLinkNotice } from "@/components/site/SecureLinkNotice";
 import { trackEvent } from "@/lib/analytics/track";
 import { Button } from "@/components/ui/button";
 import { TrustBlock } from "@/components/site/TrustBlock";
@@ -14,6 +16,7 @@ export const Route = createFileRoute("/success/$leadCode")({
       { title: "Payment Successful — Business Help Services" },
       { name: "description", content: "Your payment was received successfully." },
       { name: "robots", content: "noindex,nofollow" },
+      { name: "referrer", content: "no-referrer" },
     ],
   }),
   component: SuccessPage,
@@ -32,6 +35,8 @@ const STEPS: readonly CountdownStep[] = [
 
 function SuccessPage() {
   const { leadCode } = Route.useParams();
+  const accessToken = useAccessToken(leadCode, ["co", "ob"]);
+  const [denied, setDenied] = useState(false);
   const navigate = useNavigate();
   const getSummary = useServerFn(getApplicationSummary);
 
@@ -40,18 +45,23 @@ function SuccessPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    trackEvent("payment_success_page_view", { leadCode });
+    if (!accessToken) return;
+    trackEvent("payment_success_page_view", {});
     let cancelled = false;
     (async () => {
       const maxAttempts = 30;
       for (let attempt = 0; attempt < maxAttempts; attempt++) {
         try {
-          const res = await getSummary({ data: { leadCode } });
+          const res = await getSummary({ data: { leadCode, accessToken } });
           if (cancelled) return;
           const isPaid = !!res?.lead?.payment || PAID_STATUSES.has(res?.lead?.status);
           if (isPaid) {
             setConfirmed(true);
             const val = Number(res?.lead?.totalAmount || 0);
+
+            // Conversions fire only after the server confirmed a verified
+            // payment for this customer's own link, and only once per order.
+            if (!markConversionOnce(leadCode)) return;
 
             // Push to GTM dataLayer — triggers "payment_success" custom event in GTM
             if (typeof window !== "undefined") {
@@ -81,6 +91,10 @@ function SuccessPage() {
           // surface real failures after several consecutive errors.
           if (cancelled) return;
           const msg = String(err?.message ?? "");
+          if (/invalid or has expired|Too many attempts/i.test(msg)) {
+            setDenied(true);
+            return;
+          }
           if (!/not found/i.test(msg) && attempt >= 5) {
             setError(msg || "Failed to load details");
             return;
@@ -92,7 +106,7 @@ function SuccessPage() {
     return () => {
       cancelled = true;
     };
-  }, [leadCode, getSummary]);
+  }, [leadCode, getSummary, accessToken]);
 
 
   // Local countdown — independent of confirmation polling.
@@ -113,6 +127,8 @@ function SuccessPage() {
       navigate({ to: "/onboarding/$leadCode", params: { leadCode }, replace: true });
     }
   }, [confirmed, elapsed, leadCode, navigate]);
+
+  if (accessToken === null || denied) return <SecureLinkNotice leadCode={leadCode} />;
 
   if (error) {
     return (

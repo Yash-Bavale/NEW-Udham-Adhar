@@ -156,12 +156,12 @@ export const Route = createFileRoute("/api/public/gst/lead")({
             console.error("[gst/lead] notify:", e);
           }
 
-          const paymentUrl = `${siteOrigin(request)}/payment/${encodeURIComponent(lead.lead_code)}`;
+          const { secureCustomerUrl } = await import("@/lib/security/customer-access.server");
+          const paymentUrl = await secureCustomerUrl(siteOrigin(request), `/payment/${encodeURIComponent(lead.lead_code)}`, lead.id, "co", "gst_lead");
 
           return new Response(
             JSON.stringify({
               ok: true,
-              leadId: lead.id,
               leadCode: lead.lead_code,
               service: service.service_name,
               baseAmount,

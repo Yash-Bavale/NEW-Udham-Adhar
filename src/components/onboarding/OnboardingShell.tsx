@@ -4,6 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { Check, Download, Loader2 } from "lucide-react";
 import { motion } from "motion/react";
 import { requestFormHelp } from "@/lib/onboarding/onboarding.functions";
+import { readAccessToken } from "@/lib/security/customer-access-browser";
 
 type Step = 1 | 2 | 3;
 
@@ -47,7 +48,7 @@ export function OnboardingShell({
     if (helpBusy) return;
     setHelpBusy(true);
     try {
-      await callHelp({ data: { leadCode } });
+      await callHelp({ data: { leadCode, accessToken: readAccessToken(leadCode, "ob") ?? "" } });
     } catch {
       // Even if logging fails, take the customer to the reassurance screen.
     }

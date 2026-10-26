@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
+import { mintCustomerLink } from "@/lib/security/customer-access.functions";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
@@ -267,11 +268,13 @@ export function FormSubmissionPanel({
       toast.error("Form link not available (missing lead code)");
       return;
     }
-    const origin =
-      typeof window !== "undefined" && window.location.origin
-        ? window.location.origin
-        : "https://udyamadhar.in";
-    const formLink = `${origin}/onboarding/${encodeURIComponent(leadCode)}`;
+    let formLink: string;
+    try {
+      formLink = (await mintCustomerLink({ data: { leadCode, kind: "form" } })).url;
+    } catch {
+      toast.error("Could not create a secure form link");
+      return;
+    }
     try {
       if (navigator?.clipboard?.writeText) {
         await navigator.clipboard.writeText(formLink);

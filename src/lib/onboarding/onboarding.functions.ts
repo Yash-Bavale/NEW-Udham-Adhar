@@ -25,6 +25,21 @@ async function loadLeadByCode(admin: any, leadCode: string) {
   return data;
 }
 
+const AccessToken = z.string().trim().min(10).max(200);
+
+/** Load a lead only after the customer's access token is verified for `scope`. */
+async function loadAuthorizedLead(admin: any, leadCode: string, token: string, scope: import("@/lib/security/customer-access-core").AccessScope) {
+  const { assertCustomerAccess, leadIdByCode } = await import("@/lib/security/customer-access.server");
+  const { GENERIC_LINK_ERROR } = await import("@/lib/security/customer-access-core");
+  const leadId = await leadIdByCode(leadCode);
+  await assertCustomerAccess(token, leadId, scope, leadCode);
+  try {
+    return await loadLeadByCode(admin, leadCode);
+  } catch {
+    throw new Error(GENERIC_LINK_ERROR);
+  }
+}
+
 
 /**
  * Resolve the correct service_code for a lead.
@@ -120,11 +135,11 @@ async function resolveServiceCode(
 
 /** Public: read everything needed to render the onboarding form. */
 export const getOnboarding = createServerFn({ method: "POST" })
-  .inputValidator((i: unknown) => z.object({ leadCode: LeadCode }).parse(i))
+  .inputValidator((i: unknown) => z.object({ leadCode: LeadCode, accessToken: AccessToken }).parse(i))
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { loadServiceSchema } = await import("@/lib/forms/schema-loader.server");
-    const lead = await loadLeadByCode(supabaseAdmin, data.leadCode);
+    const lead = await loadAuthorizedLead(supabaseAdmin, data.leadCode, data.accessToken, "onboarding");
     const serviceCode = await resolveServiceCode(supabaseAdmin, (lead as any).service_id, lead.id, lead.service);
     const schema: OnboardingSchema = await loadServiceSchema(serviceCode);
 
@@ -176,6 +191,7 @@ export const getOnboarding = createServerFn({ method: "POST" })
 
 const SubmitInput = z.object({
   leadCode: LeadCode,
+  accessToken: AccessToken,
   data: z.record(z.string().min(1).max(80), z.union([z.string().max(2000), z.number(), z.boolean(), z.null()])),
   draft: z.boolean().optional(),
 });
@@ -186,7 +202,7 @@ export const submitOnboarding = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { loadServiceSchema } = await import("@/lib/forms/schema-loader.server");
-    const lead = await loadLeadByCode(supabaseAdmin, data.leadCode);
+    const lead = await loadAuthorizedLead(supabaseAdmin, data.leadCode, data.accessToken, "onboarding");
     const serviceCode = await resolveServiceCode(supabaseAdmin, (lead as any).service_id, lead.id, lead.service);
     const schema = await loadServiceSchema(serviceCode);
 
@@ -470,6 +486,7 @@ export const submitOnboarding = createServerFn({ method: "POST" })
 
 const UploadReqInput = z.object({
   leadCode: LeadCode,
+  accessToken: AccessToken,
   docType: z.string().trim().min(1).max(60),
   fileName: z.string().trim().min(1).max(200),
   mimeType: z.string().trim().min(1).max(120),
@@ -484,7 +501,7 @@ export const requestDocumentUpload = createServerFn({ method: "POST" })
     if (!ALLOWED_DOC_MIME.includes(data.mimeType.toLowerCase())) {
       throw new Error("Unsupported file type. Use PDF, JPG, PNG or WEBP.");
     }
-    const lead = await loadLeadByCode(supabaseAdmin, data.leadCode);
+    const lead = await loadAuthorizedLead(supabaseAdmin, data.leadCode, data.accessToken, "documents");
     const ext = (data.fileName.split(".").pop() || "bin").toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 6) || "bin";
     const safeDocType = data.docType.replace(/[^a-z0-9_-]/gi, "_").slice(0, 40);
     const path = `${lead.id}/${safeDocType}-${Date.now()}.${ext}`;
@@ -500,6 +517,7 @@ export const requestDocumentUpload = createServerFn({ method: "POST" })
 
 const ConfirmInput = z.object({
   leadCode: LeadCode,
+  accessToken: AccessToken,
   docType: z.string().min(1).max(60),
   filePath: z.string().min(1).max(400),
   fileName: z.string().min(1).max(200),
@@ -512,7 +530,10 @@ export const confirmDocumentUpload = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => ConfirmInput.parse(i))
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const lead = await loadLeadByCode(supabaseAdmin, data.leadCode);
+    const lead = await loadAuthorizedLead(supabaseAdmin, data.leadCode, data.accessToken, "documents");
+    if (!data.filePath.startsWith(`${lead.id}/`) || data.filePath.includes("..")) {
+      throw new Error("Upload could not be verified. Please try again.");
+    }
 
     // Find any existing doc of same type to replace (keeps storage tidy)
     const { data: existing } = await supabaseAdmin
@@ -629,10 +650,10 @@ export const setDocumentStatus = createServerFn({ method: "POST" })
 /** Public: customer pressed "Contact our team for help" on the onboarding shell.
  *  Logs an activity so the CRM lead timeline shows the request. Best-effort. */
 export const requestFormHelp = createServerFn({ method: "POST" })
-  .inputValidator((i: unknown) => z.object({ leadCode: LeadCode }).parse(i))
+  .inputValidator((i: unknown) => z.object({ leadCode: LeadCode, accessToken: AccessToken }).parse(i))
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const lead = await loadLeadByCode(supabaseAdmin, data.leadCode);
+    const lead = await loadAuthorizedLead(supabaseAdmin, data.leadCode, data.accessToken, "help");
     await supabaseAdmin.from("activity_logs").insert({
       lead_id: lead.id,
       activity_type: "form_help_requested",

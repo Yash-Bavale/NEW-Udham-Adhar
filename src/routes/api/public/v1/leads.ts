@@ -80,7 +80,7 @@ export const Route = createFileRoute("/api/public/v1/leads")({
               expires_in: 3600,
               service: result.service,
               pricing: { ...result.pricing, currency: "INR" },
-              next_url: `/processing/${result.leadCode}`,
+              next_url: `/processing/${result.leadCode}#t=${result.accessToken}`,
             },
             origin,
           );

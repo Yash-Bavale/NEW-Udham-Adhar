@@ -128,8 +128,10 @@ export const Route = createFileRoute("/api/public/talk-to-expert")({
           // ignore email backend issues
         }
 
+        const { issueCustomerToken } = await import("@/lib/security/customer-access.server");
+        const accessToken = await issueCustomerToken(leadId, "co", { reason: "talk_to_expert" });
         return new Response(
-          JSON.stringify({ ok: true, leadId, leadCode, totalAmount: TOTAL }),
+          JSON.stringify({ ok: true, leadCode, accessToken, totalAmount: TOTAL }),
           { status: 200, headers: cors },
         );
       },

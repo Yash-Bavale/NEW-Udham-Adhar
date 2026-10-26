@@ -10,6 +10,7 @@ import { z } from "zod";
 const Input = z.object({
   leadCode: z.string().trim().min(3).max(80),
   gatewayCode: z.string().trim().min(2).max(40).optional(),
+  accessToken: z.string().trim().min(10).max(200),
 });
 
 export type InitiatePaymentResult = {
@@ -27,6 +28,10 @@ export const initiatePayment = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => Input.parse(i))
   .handler(async ({ data }): Promise<InitiatePaymentResult> => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    {
+      const { assertCustomerAccess, leadIdByCode } = await import("@/lib/security/customer-access.server");
+      await assertCustomerAccess(data.accessToken, await leadIdByCode(data.leadCode), "payment", data.leadCode);
+    }
     let chosen = (data.gatewayCode?.toLowerCase() ?? "").trim();
     if (!chosen) {
       const { data: gw } = await supabaseAdmin

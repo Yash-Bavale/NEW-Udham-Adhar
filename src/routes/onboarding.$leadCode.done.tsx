@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { z } from "zod";
 import { getOnboarding } from "@/lib/onboarding/onboarding.functions";
+import { useOnboardingAccess } from "@/hooks/useOnboardingAccess";
 
 export const Route = createFileRoute("/onboarding/$leadCode/done")({
   validateSearch: (s: Record<string, unknown>) =>
@@ -22,6 +23,7 @@ export const Route = createFileRoute("/onboarding/$leadCode/done")({
     meta: [
       { title: "Form Submitted Successfully — Business Help Services" },
       { name: "robots", content: "noindex,nofollow" },
+      { name: "referrer", content: "no-referrer" },
     ],
   }),
   component: DonePage,
@@ -32,9 +34,12 @@ function DonePage() {
   const { help } = Route.useSearch();
   const helpMode = help === 1;
   const fetchFn = useServerFn(getOnboarding);
+  const accessToken = useOnboardingAccess(leadCode);
   const { data } = useQuery({
-    queryKey: ["onboarding", leadCode],
-    queryFn: () => fetchFn({ data: { leadCode } }),
+    queryKey: ["onboarding", leadCode, accessToken],
+    queryFn: () => fetchFn({ data: { leadCode, accessToken: accessToken as string } }),
+    enabled: !!accessToken,
+    retry: false,
   });
 
   const [copied, setCopied] = useState(false);
