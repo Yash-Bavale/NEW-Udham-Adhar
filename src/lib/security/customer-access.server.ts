@@ -260,10 +260,20 @@ export function normalizeReturnOrigin(input: string | null | undefined): string 
   }
 }
 
-export async function saveReturnOrigin(paymentId: string, origin: string | null): Promise<void> {
-  if (!paymentId || !origin) return;
+export function newReturnNonce(): string {
+  const bytes = new Uint8Array(24);
+  crypto.getRandomValues(bytes);
+  return b64url(bytes);
+}
+
+/** Remember where the customer started and the secret their gateway return must carry. */
+export async function saveReturnContext(paymentId: string, origin: string | null, nonce: string): Promise<void> {
+  if (!paymentId) return;
   const db = await admin();
-  await db.from("payments").update({ return_origin: origin }).eq("id", paymentId);
+  await db
+    .from("payments")
+    .update({ return_origin: origin, return_nonce_hash: await sha256Hex(nonce) })
+    .eq("id", paymentId);
 }
 
 /**
@@ -276,22 +286,26 @@ export async function gatewayReturnRedirect(
   page: "success" | "payment-pending" | "payment-failed",
   fallbackOrigin: string,
   query?: Record<string, string>,
+  returnNonce?: string | null,
 ): Promise<Response> {
   const qs = query ? `?${new URLSearchParams(query).toString()}` : "";
   const path = `/${page}/${encodeURIComponent(leadCode)}${qs}`;
   let location = `${fallbackOrigin.replace(/\/$/, "")}${path}`;
   try {
-    const leadId = await leadIdByCode(leadCode);
-    if (leadId) {
-      const db = await admin();
-      const { data: pay } = await db
-        .from("payments")
-        .select("return_origin")
-        .eq("lead_id", leadId)
-        .not("return_origin", "is", null)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+    // Only a return carrying the secret created at checkout gets a secure link;
+    // a forged gateway post cannot mint access to someone else's order.
+    const leadId = returnNonce && returnNonce.length >= 20 ? await leadIdByCode(leadCode) : null;
+    const db = leadId ? await admin() : null;
+    const { data: pay } = db
+      ? await db
+          .from("payments")
+          .select("return_origin")
+          .eq("lead_id", leadId)
+          .eq("return_nonce_hash", await sha256Hex(returnNonce as string))
+          .limit(1)
+          .maybeSingle()
+      : { data: null };
+    if (leadId && pay) {
       const origin = normalizeReturnOrigin(pay?.return_origin) ?? fallbackOrigin;
       const kind: TokenKind = page === "success" ? "ob" : "co";
       location = await secureCustomerUrl(origin, path, leadId, kind, `gateway_${page}`);

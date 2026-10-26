@@ -219,7 +219,7 @@ function PaymentPage() {
     setPayError(null);
     trackEvent("payment_initiated", { gateway: activeGateway, leadCode });
     try {
-      const res = await createOrder({ data: { leadCode, gatewayCode: activeGateway, accessToken: pickAccessToken(leadCode, ["co"]) ?? "" } });
+      const res = await createOrder({ data: { leadCode, gatewayCode: activeGateway, accessToken: pickAccessToken(leadCode, ["co"]) ?? "", returnOrigin: window.location.origin } });
       if (res.paymentSessionId) {
         await loadAndTriggerCashfreeCheckout(res.paymentSessionId, res.isProd);
         return;

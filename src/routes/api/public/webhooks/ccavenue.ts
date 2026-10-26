@@ -67,7 +67,7 @@ export const Route = createFileRoute("/api/public/webhooks/ccavenue")({
         if (!payment) {
           console.error("[ccavenue] payment row missing", { orderId });
           return isBrowser
-            ? await redirectToPending(leadCodeFromParam || orderId)
+            ? await redirectToPending(leadCodeFromParam || orderId, returnNonce)
             : new Response("payment-not-found", { status: 200 });
         }
 
@@ -124,7 +124,7 @@ export const Route = createFileRoute("/api/public/webhooks/ccavenue")({
             console.error("[ccavenue] paid payment finalization retry failed", e);
           }
           return isBrowser
-            ? await redirectToSuccess(leadCodeFromParam || orderId)
+            ? await redirectToSuccess(leadCodeFromParam || orderId, returnNonce)
             : new Response("OK", { status: 200 });
         }
 
@@ -158,7 +158,7 @@ export const Route = createFileRoute("/api/public/webhooks/ccavenue")({
         if (paymentUpdateError) {
           console.error("[ccavenue] payment update failed", { orderId, error: paymentUpdateError });
           return isBrowser
-            ? await redirectToPending(leadCodeFromParam || orderId)
+            ? await redirectToPending(leadCodeFromParam || orderId, returnNonce)
             : new Response("payment-update-failed", { status: 200 });
         }
 
@@ -175,7 +175,7 @@ export const Route = createFileRoute("/api/public/webhooks/ccavenue")({
           }
 
           return isBrowser
-            ? await redirectToSuccess(leadCodeFromParam || orderId)
+            ? await redirectToSuccess(leadCodeFromParam || orderId, returnNonce)
             : new Response("OK", { status: 200 });
         }
 
@@ -184,12 +184,12 @@ export const Route = createFileRoute("/api/public/webhooks/ccavenue")({
             .update({ status: "payment_pending" })
             .eq("id", payment.lead_id);
           return isBrowser
-            ? await redirectToFailure(leadCodeFromParam || orderId, failureMessage || "Payment failed")
+            ? await redirectToFailure(leadCodeFromParam || orderId, failureMessage || "Payment failed", returnNonce)
             : new Response("OK", { status: 200 });
         }
 
         return isBrowser
-          ? await redirectToPending(leadCodeFromParam || orderId)
+          ? await redirectToPending(leadCodeFromParam || orderId, returnNonce)
           : new Response("OK", { status: 200 });
       },
     },
@@ -200,17 +200,17 @@ const APP_ORIGIN = process.env.APP_BASE_URL ||
   process.env.PUBLIC_SITE_URL ||
   "https://udyamadhar.in";
 
-async function redirectToSuccess(leadCode: string) {
+async function redirectToSuccess(leadCode: string, nonce?: string | null) {
   const { gatewayReturnRedirect } = await import("@/lib/security/customer-access.server");
-  return gatewayReturnRedirect(leadCode, "success", APP_ORIGIN);
+  return gatewayReturnRedirect(leadCode, "success", APP_ORIGIN, undefined, nonce);
 }
-async function redirectToPending(leadCode: string) {
+async function redirectToPending(leadCode: string, nonce?: string | null) {
   const { gatewayReturnRedirect } = await import("@/lib/security/customer-access.server");
-  return gatewayReturnRedirect(leadCode, "payment-pending", APP_ORIGIN);
+  return gatewayReturnRedirect(leadCode, "payment-pending", APP_ORIGIN, undefined, nonce);
 }
-async function redirectToFailure(leadCode: string, reason: string) {
+async function redirectToFailure(leadCode: string, reason: string, nonce?: string | null) {
   const { gatewayReturnRedirect } = await import("@/lib/security/customer-access.server");
-  return gatewayReturnRedirect(leadCode, "payment-failed", APP_ORIGIN, { reason });
+  return gatewayReturnRedirect(leadCode, "payment-failed", APP_ORIGIN, { reason }, nonce);
 }
 
 async function readFormFields(request: Request): Promise<URLSearchParams | null> {

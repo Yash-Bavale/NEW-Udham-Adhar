@@ -2,7 +2,7 @@
  * Server-only PayU order builder. Shared by createPayUOrder and
  * initiatePayment so neither has to call the other's RPC stub.
  */
-export async function buildPayUOrder(leadCodeInput: string) {
+export async function buildPayUOrder(leadCodeInput: string, returnNonce?: string) {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { PAYU_BASE_URL, buildTxnId, computeRequestHash, getPayUCreds } = await import(
     "@/lib/payments/payu.server"
@@ -115,8 +115,9 @@ export async function buildPayUOrder(leadCodeInput: string) {
 
   const origin = process.env.APP_BASE_URL || process.env.PUBLIC_SITE_URL ||
     "https://udyamadhar.in";
-  const surl = `${origin}/api/public/webhooks/payu`;
-  const furl = `${origin}/api/public/webhooks/payu`;
+  const rq = returnNonce ? `?r=${encodeURIComponent(returnNonce)}` : "";
+  const surl = `${origin}/api/public/webhooks/payu${rq}`;
+  const furl = `${origin}/api/public/webhooks/payu${rq}`;
 
   const hash = computeRequestHash({
     key, salt, txnid, amount, productinfo, firstname, email,
