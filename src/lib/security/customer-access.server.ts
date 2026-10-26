@@ -231,3 +231,73 @@ export async function secureCustomerLinksInText(text: string, reason: string): P
   }
   return out + text.slice(last);
 }
+
+// ---------------------------------------------------------------------------
+// Payment gateway returns: send the customer back to the site they started on,
+// with a fresh secure link, so they never have to request a new one.
+// ---------------------------------------------------------------------------
+
+const RETURN_HOST_SUFFIXES = [
+  "udyamadhar.in",
+  "udyamregistrations.in",
+  "businesshelpservices.com",
+  "businesshelpservices.in",
+  "lovable.app",
+];
+
+/** Only our own https sites (or localhost in dev) may be used as a return address. */
+export function normalizeReturnOrigin(input: string | null | undefined): string | null {
+  if (!input) return null;
+  try {
+    const u = new URL(input);
+    const host = u.hostname.toLowerCase();
+    if (u.protocol === "http:" && (host === "localhost" || host === "127.0.0.1")) return u.origin;
+    if (u.protocol !== "https:") return null;
+    if (host.startsWith("crm.") || host.startsWith("api.")) return null;
+    return RETURN_HOST_SUFFIXES.some((s) => host === s || host.endsWith(`.${s}`)) ? u.origin : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function saveReturnOrigin(paymentId: string, origin: string | null): Promise<void> {
+  if (!paymentId || !origin) return;
+  const db = await admin();
+  await db.from("payments").update({ return_origin: origin }).eq("id", paymentId);
+}
+
+/**
+ * Build a 303 redirect for a gateway return. Looks up the customer's starting
+ * site and attaches a fresh secure token; falls back to the bare URL (which
+ * shows the "request a link" screen) only if the customer can't be found.
+ */
+export async function gatewayReturnRedirect(
+  leadCode: string,
+  page: "success" | "payment-pending" | "payment-failed",
+  fallbackOrigin: string,
+  query?: Record<string, string>,
+): Promise<Response> {
+  const qs = query ? `?${new URLSearchParams(query).toString()}` : "";
+  const path = `/${page}/${encodeURIComponent(leadCode)}${qs}`;
+  let location = `${fallbackOrigin.replace(/\/$/, "")}${path}`;
+  try {
+    const leadId = await leadIdByCode(leadCode);
+    if (leadId) {
+      const db = await admin();
+      const { data: pay } = await db
+        .from("payments")
+        .select("return_origin")
+        .eq("lead_id", leadId)
+        .not("return_origin", "is", null)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const origin = normalizeReturnOrigin(pay?.return_origin) ?? fallbackOrigin;
+      const kind: TokenKind = page === "success" ? "ob" : "co";
+      location = await secureCustomerUrl(origin, path, leadId, kind, `gateway_${page}`);
+    }
+  } catch (e) {
+    console.error("[gateway-return] could not attach secure link", { page, error: e });
+  }
+  return new Response(null, { status: 303, headers: { Location: location, "Referrer-Policy": "no-referrer" } });
+}
