@@ -435,15 +435,17 @@ export async function coreMoveTickets({
     handleDbError(fErr, "Failed to verify destination folder");
   }
   const f: any = folder;
-  if (!f || (!f.is_shared && f.user_id !== userId)) {
-    throw new Error("Destination folder not found or unauthorized");
+  if (!f || f.user_id !== userId) {
+    throw new Error("Only the folder owner can add tickets to this folder");
   }
 
-  // 2. Remove existing folder items for these tickets
+  // 2. Remove existing items for these tickets, only from folders this user owns
+  const ownIds = await ownedFolderIds(userId);
   const { error: delErr } = await admin
     .from("support_ticket_folder_items" as any)
     .delete()
-    .in("ticket_id", ticketIds);
+    .in("ticket_id", ticketIds)
+    .in("folder_id", ownIds.length ? ownIds : [folderId]);
 
   if (delErr) {
     handleDbError(delErr, "Failed to remove tickets from previous folder");
@@ -468,18 +470,30 @@ export async function coreMoveTickets({
   return { ok: true, count: ticketIds.length, folderId };
 }
 
+async function ownedFolderIds(userId: string): Promise<string[]> {
+  const admin = await getAdmin();
+  const { data } = await admin
+    .from("support_ticket_folders" as any)
+    .select("id")
+    .eq("user_id", userId);
+  return ((data as any[]) ?? []).map((r) => r.id);
+}
+
 export async function coreRemoveTickets({
   ticketIds,
   userId,
 }: {
   ticketIds: string[];
-  userId?: string;
+  userId: string;
 }) {
   const admin = await getAdmin();
+  const ownIds = await ownedFolderIds(userId);
+  if (!ownIds.length) return { ok: true, count: 0 };
   const { error: delErr } = await admin
     .from("support_ticket_folder_items" as any)
     .delete()
-    .in("ticket_id", ticketIds);
+    .in("ticket_id", ticketIds)
+    .in("folder_id", ownIds);
 
   if (delErr) {
     handleDbError(delErr, "Failed to remove tickets from folder");
