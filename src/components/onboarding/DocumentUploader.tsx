@@ -3,6 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { motion, AnimatePresence } from "motion/react";
 import { CheckCircle2, Download, FileText, Upload, XCircle, Loader2, Clock, Image as ImageIcon } from "lucide-react";
 import { requestDocumentUpload, confirmDocumentUpload } from "@/lib/onboarding/onboarding.functions";
+import { readAccessToken } from "@/lib/security/customer-access.client";
 import { ALLOWED_DOC_MIME, MAX_DOC_SIZE_BYTES, type DocDef } from "@/lib/onboarding/schemas";
 
 type ExistingDoc = {
@@ -86,6 +87,7 @@ function DocRow({
       const { path, signedUrl } = await reqUpload({
         data: {
           leadCode,
+          accessToken: readAccessToken(leadCode, "ob") ?? "",
           docType: def.key,
           fileName: file.name,
           mimeType: file.type,
@@ -99,6 +101,7 @@ function DocRow({
       await confirm({
         data: {
           leadCode,
+          accessToken: readAccessToken(leadCode, "ob") ?? "",
           docType: def.key,
           filePath: path,
           fileName: file.name,
