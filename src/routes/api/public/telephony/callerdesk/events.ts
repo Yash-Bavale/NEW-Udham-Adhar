@@ -123,6 +123,12 @@ async function handle(request: Request): Promise<Response> {
         const { data: p } = await db.from("profiles").select("id").ilike("mobile", `%${agent}`).limit(1).maybeSingle();
         pid = p?.id ?? null;
       }
+      if (!pid && agent) {
+        // Agent number may be a browser-phone SIP login rather than a staff mobile.
+        const { data: accs } = await db.from("employee_telephony_accounts").select("employee_id")
+          .eq("provider", "callerdesk").eq("status", "active").ilike("sip_username", `%${agent}`).limit(2);
+        if (accs?.length === 1) pid = accs[0].employee_id;
+      }
       if (!pid && agentEmail && /^[^\s@]+@[^\s@]+$/.test(agentEmail)) {
         const { data: p } = await db.from("profiles").select("id").eq("email", agentEmail).limit(2);
         if (p?.length === 1) pid = p[0].id;
