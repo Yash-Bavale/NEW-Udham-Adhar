@@ -347,3 +347,59 @@ export const checkCcavenueCredentials = createServerFn({ method: "POST" })
       return { ok: false, message: e instanceof Error ? e.message : String(e) };
     }
   });
+
+// ── Admin: website-wise payment options ──
+
+export const listWebsiteGateways = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertRole(context.supabase, ["super_admin", "admin"]);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const db = supabaseAdmin as any;
+    const [sites, rules, globals, cf, cfAccts] = await Promise.all([
+      db.from("websites").select("id, name, is_active, is_primary, sort_order").order("sort_order"),
+      db.from("website_payment_gateways").select("website_id, gateway_name, is_enabled, is_default"),
+      db.from("payment_gateways").select("name, display_name, is_enabled"),
+      db.from("cashfree_website_accounts").select("website_id, account_id, is_enabled"),
+      db.from("cashfree_merchant_accounts").select("id, label, is_active"),
+    ]);
+    if (sites.error || rules.error) throw new Error("Could not load website payment options.");
+    const acct = new Map((cfAccts.data ?? []).map((a: any) => [a.id, a]));
+    return {
+      // Website names only; partner domains are never sent to the screen.
+      websites: (sites.data ?? []).map((w: any) => {
+        const map = (cf.data ?? []).find((m: any) => m.website_id === w.id && m.is_enabled);
+        const a: any = map ? acct.get(map.account_id) : null;
+        return { id: w.id, name: w.name, isActive: w.is_active, isPrimary: w.is_primary, cashfreeAccount: a?.is_active ? a.label : null };
+      }),
+      rules: rules.data ?? [],
+      globals: (globals.data ?? []).filter((g: any) => ["cashfree", "payu", "ccavenue"].includes(g.name)),
+    };
+  });
+
+const WebsiteGatewayInput = z.object({
+  websiteId: z.string().uuid(),
+  gateway: z.enum(["cashfree", "payu", "ccavenue"]),
+  isEnabled: z.boolean(),
+  isDefault: z.boolean(),
+});
+
+export const setWebsiteGateway = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => WebsiteGatewayInput.parse(i))
+  .handler(async ({ data, context }) => {
+    await assertRole(context.supabase, ["super_admin", "admin"]);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const db = supabaseAdmin as any;
+    const isDefault = data.isEnabled && data.isDefault;
+    if (isDefault) {
+      await db.from("website_payment_gateways").update({ is_default: false, updated_at: new Date().toISOString() })
+        .eq("website_id", data.websiteId).neq("gateway_name", data.gateway);
+    }
+    const { error } = await db.from("website_payment_gateways").upsert({
+      website_id: data.websiteId, gateway_name: data.gateway, is_enabled: data.isEnabled, is_default: isDefault,
+      updated_by: context.userId, updated_at: new Date().toISOString(),
+    }, { onConflict: "website_id,gateway_name" });
+    if (error) throw new Error("Could not save the payment option.");
+    return { ok: true };
+  });
