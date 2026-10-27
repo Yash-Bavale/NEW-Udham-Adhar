@@ -1192,7 +1192,9 @@ return (
     )}>
       {(isTeam ? BUCKET_CARDS.filter((b) => b.id !== "all") : (isPrivileged ? BUCKET_CARDS : BUCKET_CARDS.filter((b) => !b.adminOnly))).map((b) => {
         const active = bucket === b.id;
-        const countVal = Number((counts as any)[b.id] ?? 0);
+        const countVal = b.id === "needs_action"
+          ? Number((counts as any).needs_action ?? 0) + Number((counts as any).technical_delay ?? 0)
+          : Number((counts as any)[b.id] ?? 0);
         const IconComponent = b.icon;
 
         if (b.id === "idle_time") {

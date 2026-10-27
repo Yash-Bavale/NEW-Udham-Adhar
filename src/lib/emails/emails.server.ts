@@ -644,7 +644,7 @@ async function backfillCommonVariables(
     if (applicationId) {
       const { data } = await supabaseAdmin
         .from("applications")
-        .select("id, application_code, lead_id, customer_id, assigned_to, created_at, updated_at, closure_reason_id, closure_remarks, fulfillment_status, fulfilled_at, certificate_uploaded_at, refund_approved_at, refund_processed_at, refund_gateway_ref")
+        .select("id, application_code, lead_id, customer_id, assigned_to, created_at, updated_at, closure_reason_id, closure_remarks, fulfillment_status, fulfilled_at, certificate_uploaded_at, refund_approved_at, refund_processed_at, refund_gateway_ref, service_id, services(service_name)")
         .eq("id", applicationId)
         .maybeSingle();
       app = (data as AppRow | null) ?? null;
@@ -653,7 +653,7 @@ async function backfillCommonVariables(
     if (leadId) {
       const { data } = await supabaseAdmin
         .from("leads")
-        .select("id, lead_code, name, email, mobile, service, assigned_to, created_at")
+        .select("id, lead_code, name, email, mobile, service, service_id, assigned_to, created_at")
         .eq("id", leadId)
         .maybeSingle();
       lead = (data as LeadRow | null) ?? null;
@@ -674,7 +674,34 @@ async function backfillCommonVariables(
     if (missing("customer_name") && lead?.name) out.customer_name = lead.name;
     if (missing("customer_email") && lead?.email) out.customer_email = lead.email;
     if (missing("customer_mobile") && lead?.mobile) out.customer_mobile = lead.mobile;
-    if (missing("service_name") && lead?.service) out.service_name = lead.service;
+
+    // Resolve accurate selected service name
+    let resolvedService = (app as any)?.services?.service_name || lead?.service || null;
+    if (!resolvedService && ((app as any)?.service_id || (lead as any)?.service_id)) {
+      const svcId = (app as any)?.service_id || (lead as any)?.service_id;
+      const { data: svcRow } = await supabaseAdmin
+        .from("services")
+        .select("service_name")
+        .eq("id", svcId)
+        .maybeSingle();
+      if (svcRow?.service_name) resolvedService = svcRow.service_name;
+    }
+
+    const currentSvc = String(out.service_name || out.serviceName || "").trim().toLowerCase();
+    const isGenericService =
+      !currentSvc ||
+      currentSvc === "consultancy" ||
+      currentSvc === "consultancy service" ||
+      currentSvc === "udyam consultancy service" ||
+      currentSvc === "other consultancy";
+
+    if (resolvedService && (missing("service_name") || isGenericService)) {
+      out.service_name = resolvedService;
+      out.serviceName = resolvedService;
+    } else if (missing("service_name")) {
+      out.service_name = resolvedService || "UDYAM Registration Service";
+      out.serviceName = out.service_name;
+    }
     if (missing("customer_mobile")) out.customer_mobile = "—";
     // Order number is ALWAYS the application_code — never fall back to the lead_code.
     // Lead code is a pre-order identifier and must never appear as the order number.
@@ -1076,6 +1103,18 @@ async function cleanRefundTemplatesInDB() {
       if (/₹\s*\{\{\s*(refund_amount_formatted|refundAmountFormatted)\s*\}\}/gi.test(cleaned)) {
         cleaned = cleaned.replace(/₹\s*\{\{\s*(refund_amount_formatted|refundAmountFormatted)\s*\}\}/gi, "{{refund_amount_formatted}}");
         changed = true;
+      }
+
+      // 4. Ensure Requested Service row uses {{service_name}} instead of hardcoded text
+      const requestedServiceRowRegex = /(<tr[^>]*>\s*<td[^>]*>[^<]*Requested\s*Service[^<]*<\/td>\s*<td[^>]*>)([\s\S]*?)(<\/td>\s*<\/tr>)/gi;
+      if (requestedServiceRowRegex.test(cleaned)) {
+        cleaned = cleaned.replace(requestedServiceRowRegex, (match, prefix, content, suffix) => {
+          if (!content.includes("{{service_name}}") && !content.includes("{{serviceName}}")) {
+            changed = true;
+            return `${prefix}{{service_name}}${suffix}`;
+          }
+          return match;
+        });
       }
 
       const currentVars = Array.isArray(t.variables) ? t.variables : [];

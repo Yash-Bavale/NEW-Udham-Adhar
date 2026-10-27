@@ -233,7 +233,7 @@ async function loadOrderContext(supabase: any, orderId: string) {
 
   const { data: order, error } = await supabase
     .from("applications")
-    .select("id, lead_id, customer_id, order_status, application_code, service_id, assigned_to, workflow_status, closure_stage, refund_approved_at, refund_approved_by, refund_gateway_ref, refund_processed_at")
+    .select("id, lead_id, customer_id, order_status, application_code, service_id, assigned_to, workflow_status, closure_stage, refund_approved_at, refund_approved_by, refund_gateway_ref, refund_processed_at, services(service_name)")
     .eq("id", orderId)
     .maybeSingle();
   if (error) throw new Error(error.message);
@@ -247,20 +247,38 @@ async function loadOrderContext(supabase: any, orderId: string) {
       .maybeSingle();
     customer = c as any;
   }
-  // Fall back to the lead record when the customer profile has no email
-  // (leads are the source of truth for that specific order's recipient).
-  let lead: { email: string | null; name: string | null } | null = null;
-  if (order.lead_id && (!customer?.primary_email || !customer?.name)) {
+  // Load the lead record for contact details and service selection
+  let lead: { email: string | null; name: string | null; service?: string | null; service_id?: string | null } | null = null;
+  if (order.lead_id) {
     const { data: l } = await supabase
       .from("leads")
-      .select("email, name")
+      .select("email, name, service, service_id")
       .eq("id", order.lead_id)
       .maybeSingle();
     lead = l as any;
   }
   const recipientEmail = (customer?.primary_email ?? "").trim() || (lead?.email ?? "").trim() || null;
   const recipientName = customer?.name || lead?.name || "Customer";
-  return { order, customer, lead, recipientEmail, recipientName };
+
+  let serviceName: string | null = (order as any)?.services?.service_name || lead?.service || null;
+  if (!serviceName && (order.service_id || lead?.service_id)) {
+    const svcId = order.service_id || lead?.service_id;
+    const { data: svc } = await supabase
+      .from("services")
+      .select("service_name")
+      .eq("id", svcId)
+      .maybeSingle();
+    if (svc?.service_name) serviceName = svc.service_name;
+  }
+
+  return {
+    order: { ...order, service_name: serviceName },
+    customer,
+    lead,
+    recipientEmail,
+    recipientName,
+    serviceName,
+  };
 }
 
 /** Fire-and-forget: notify assignee (+ optional extra roles) about an order event. Never throws. */
@@ -1057,16 +1075,17 @@ export const markRefundProcessed = createServerFn({ method: "POST" })
       const cleanRefundNum = Number(data.amount).toFixed(2);
       const formattedRefundRupees = `₹${Number(data.amount).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-      emailQueued = await queueTemplateEmail(
-        "refund_processed_confirmation",
-        to,
-        {
-          customerName: name,
-          customer_name: name,
-          orderNumber: order.application_code || order.id.slice(0, 8),
-          order_number: order.application_code || order.id.slice(0, 8),
-          serviceName: (order as any).service_name || (lead as any)?.service || "Consultancy Service",
-          service_name: (order as any).service_name || (lead as any)?.service || "Consultancy Service",
+          const finalServiceName = (order as any).service_name || (lead as any)?.service || "UDYAM Registration Service";
+          emailQueued = await queueTemplateEmail(
+            "refund_processed_confirmation",
+            to,
+            {
+              customerName: name,
+              customer_name: name,
+              orderNumber: order.application_code || order.id.slice(0, 8),
+              order_number: order.application_code || order.id.slice(0, 8),
+              serviceName: finalServiceName,
+              service_name: finalServiceName,
           refundStatus: "Approved",
           refund_status: "Approved",
           refundAmount: cleanRefundNum,
