@@ -62,9 +62,11 @@ export const createPaymentLink = createServerFn({ method: "POST" })
       .limit(1)
       .maybeSingle();
 
+    const { withCheckoutToken } = await import("@/lib/security/customer-access.server");
     if (existing && (!(existing as any).expires_at || (existing as any).expires_at > nowIso)) {
       return {
         ...(existing as any),
+        payment_url: await withCheckoutToken((existing as any).payment_url, lead.id, context.userId),
         amount: Number((existing as any).amount),
         leadCode: lead.lead_code,
         isReused: true,
@@ -103,6 +105,7 @@ export const createPaymentLink = createServerFn({ method: "POST" })
 
     return {
       ...(inserted as any),
+      payment_url: await withCheckoutToken((inserted as any).payment_url, lead.id, context.userId),
       amount: Number((inserted as any).amount),
       leadCode: lead.lead_code,
       isReused: false,
@@ -257,6 +260,10 @@ export const getPaymentLinkStatusForLead = createServerFn({ method: "POST" })
       paidAmount = Number(linkRow.amount);
     }
 
+    if (!isPaid) {
+      const { withCheckoutToken } = await import("@/lib/security/customer-access.server");
+      linkRow.payment_url = await withCheckoutToken(linkRow.payment_url, data.leadId, context.userId);
+    }
     return {
       link: { ...linkRow, amount: Number(linkRow.amount) },
       paid: isPaid,

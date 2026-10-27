@@ -148,7 +148,9 @@ export const selectConsultationService = createServerFn({ method: "POST" })
       } as any);
     if (linkErr) throw new Error(linkErr.message);
 
-    return { ok: true as const, paymentUrl, txnid, amount: total };
+    const { withCheckoutToken } = await import("@/lib/security/customer-access.server");
+    const securePaymentUrl = (await withCheckoutToken(paymentUrl, lead.id, context.userId)) ?? paymentUrl;
+    return { ok: true as const, paymentUrl: securePaymentUrl, txnid, amount: total };
   });
 
 /**
