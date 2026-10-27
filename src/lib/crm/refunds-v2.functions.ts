@@ -20,15 +20,22 @@ export const refundStats = createServerFn({ method: "GET" })
     const admin = await getAdmin();
     const { data: rows } = await admin
       .from("refund_requests")
-      .select("id, status, refund_amount, processed_at, created_at");
+      .select("id, status, refund_amount, processed_at, created_at, application:applications(id, refund_processed_at, order_status)");
     const all = (rows ?? []) as Array<{
       status: string | null;
       refund_amount: number | string | null;
       processed_at: string | null;
       created_at: string | null;
+      application?: { id?: string; refund_processed_at?: string | null; order_status?: string | null } | null;
     }>;
     const num = (v: number | string | null | undefined) => (v == null ? 0 : Number(v) || 0);
-    const isProc = (r: (typeof all)[number]) => Boolean(r.processed_at || r.status === "processed");
+    const isProc = (r: (typeof all)[number]) =>
+      Boolean(
+        r.processed_at ||
+        r.status === "processed" ||
+        r.application?.refund_processed_at ||
+        r.application?.order_status === "REFUND_PROCESSED"
+      );
     const byStatus = (s: string) => all.filter((r) => !isProc(r) && (r.status ?? "pending") === s);
     const sum = (arr: typeof all) => arr.reduce((a, r) => a + num(r.refund_amount), 0);
     const now = Date.now();
@@ -50,9 +57,9 @@ export const refundStats = createServerFn({ method: "GET" })
           .filter(
             (r) =>
               isProc(r) &&
-              r.processed_at &&
-              new Date(r.processed_at).getMonth() === new Date().getMonth() &&
-              new Date(r.processed_at).getFullYear() === new Date().getFullYear(),
+              (r.processed_at || r.application?.refund_processed_at) &&
+              new Date(r.processed_at || r.application!.refund_processed_at!).getMonth() === new Date().getMonth() &&
+              new Date(r.processed_at || r.application!.refund_processed_at!).getFullYear() === new Date().getFullYear(),
           )
           .reduce((a, r) => a + num(r.refund_amount), 0),
         totalProcessed: all
@@ -93,17 +100,71 @@ export const listRefundsAdvanced = createServerFn({ method: "POST" })
       )
       .order("created_at", { ascending: false })
       .limit(data.limit);
+
     if (data.status === "processed") {
-      q = q.or("processed_at.not.is.null,status.eq.processed");
+      // In PostgREST, valid syntax is not.processed_at.is.null.
+      // Also fetch approved rows that may have been processed on the application level
+      q = q.or("not.processed_at.is.null,status.eq.processed,status.eq.approved");
     } else if (data.status === "approved") {
       q = q.eq("status", "approved").is("processed_at", null);
     } else if (data.status !== "all") {
       q = q.eq("status", data.status);
     }
-    const { data: rows, error } = await q;
+    const { data: rawRows, error } = await q;
     if (error) throw new Error(error.message);
+
+    const isProc = (r: any) =>
+      Boolean(
+        r.processed_at ||
+        r.status === "processed" ||
+        r.application?.refund_processed_at ||
+        r.application?.order_status === "REFUND_PROCESSED"
+      );
+
+    // Normalize and self-heal rows in memory & background DB sync
+    const normalizedRows = (rawRows ?? []).map((r: any) => {
+      if (isProc(r)) {
+        if (!r.processed_at && r.application?.refund_processed_at) {
+          r.processed_at = r.application.refund_processed_at;
+        }
+        if (r.status !== "processed") {
+          r.status = "processed";
+          // Self-heal in DB in background so future queries find it directly
+          Promise.resolve(
+            admin
+              .from("refund_requests")
+              .update({
+                processed_at: r.processed_at || new Date().toISOString(),
+                status: "processed",
+              } as any)
+              .eq("id", r.id)
+          ).catch((err: any) => {
+            if (String(err?.message || "").toLowerCase().includes("enum")) {
+              Promise.resolve(
+                admin
+                  .from("refund_requests")
+                  .update({
+                    processed_at: r.processed_at || new Date().toISOString(),
+                  } as any)
+                  .eq("id", r.id)
+              ).catch(() => {});
+            }
+          });
+        }
+      }
+      return r;
+    });
+
+    // Enforce mutually exclusive status filters
+    let rows = normalizedRows;
+    if (data.status === "processed") {
+      rows = normalizedRows.filter((r) => isProc(r));
+    } else if (data.status === "approved") {
+      rows = normalizedRows.filter((r) => !isProc(r) && r.status === "approved");
+    }
+
     const filtered = data.search?.trim()
-      ? (rows ?? []).filter((r: any) => {
+      ? rows.filter((r: any) => {
           const s = data.search!.toLowerCase();
           return (
             r.lead?.name?.toLowerCase().includes(s) ||
@@ -113,7 +174,7 @@ export const listRefundsAdvanced = createServerFn({ method: "POST" })
             r.reason?.toLowerCase().includes(s)
           );
         })
-      : rows ?? [];
+      : rows;
     return { rows: filtered };
   });
 

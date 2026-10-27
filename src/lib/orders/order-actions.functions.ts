@@ -1022,6 +1022,24 @@ export const markRefundProcessed = createServerFn({ method: "POST" })
       console.error("[markRefundProcessed] refund_requests update warning:", rrError);
     }
 
+    // If no row matched application_id, fallback to updating by lead_id so requests created before order link also get updated
+    if (order.lead_id) {
+      const { data: matchedApp } = await supabaseAdmin
+        .from("refund_requests")
+        .select("id")
+        .eq("application_id", data.orderId)
+        .limit(1);
+      if (!matchedApp || matchedApp.length === 0) {
+        await supabaseAdmin
+          .from("refund_requests")
+          .update({
+            ...rrPayload,
+            application_id: data.orderId,
+          } as never)
+          .eq("lead_id", order.lead_id);
+      }
+    }
+
     // 6. Stamp applications table
     await supabaseAdmin
       .from("applications")

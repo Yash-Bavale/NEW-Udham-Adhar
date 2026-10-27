@@ -258,6 +258,10 @@ function RefundsPage() {
           <div className="p-8 text-center text-sm text-muted-foreground">
             <Loader2 className="mx-auto size-4 animate-spin mb-2" /> Loading refunds…
           </div>
+        ) : list.isError ? (
+          <div className="p-8 text-center text-sm text-rose-600">
+            Failed to load refunds: {(list.error as any)?.message || "Unknown error"}.
+          </div>
         ) : (list.data?.rows ?? []).length === 0 ? (
           <div className="p-8 text-center text-sm text-muted-foreground">
             No refund requests in <b>{status}</b>.
