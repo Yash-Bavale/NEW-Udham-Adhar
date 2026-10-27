@@ -1,5 +1,7 @@
 # Project Architecture Rules
 
+- Order list reads never mutate reopen state; callback completion is scoped to the latest reopen or active scheduler cycle so historical completions cannot erase a new escalation.
+
 - Run production and preview builds with a 6 GB Node heap because the combined TanStack Start and Nitro server bundle exceeds Node's default heap limit.
 - Generate exact stored-email dispute PDFs in the authorised CRM browser, then upload the finished PDF through an authenticated server function because the deployed server has no HTML layout engine.- Employee Performance historical KPIs come only from the `get_employee_perf_stream` database function (order-level events, validated human actors, IST ranges) aggregated by `src/lib/crm/perf-engine`, because assignment custody and work credit must never be reconstructed from `applications.assigned_to`.
 - Order ownership changes go through the `assign_application` database function (row-locked, compare-and-set, server-only) so the ownership update and its `application_events` history row commit atomically with an explicit actor type.
