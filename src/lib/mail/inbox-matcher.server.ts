@@ -982,7 +982,7 @@ async function matchExistingTicket(input: {
         customerId: custId,
         leadId: null,
         status: r.status,
-        reopenCount: null,
+        reopenCount: undefined,
       };
     }
   }
@@ -1036,7 +1036,7 @@ async function matchExistingTicket(input: {
             customerId: custId,
             leadId: null,
             status: r.status,
-            reopenCount: null,
+            reopenCount: undefined,
           };
         }
       }
@@ -1073,7 +1073,7 @@ async function matchExistingTicket(input: {
           customerId: r.customer_id,
           leadId: (app as any).lead_id ?? null,
           status: r.status,
-          reopenCount: null,
+          reopenCount: undefined,
         };
       }
     }
