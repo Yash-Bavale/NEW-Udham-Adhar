@@ -16,6 +16,7 @@ import {
 import { computeOrderStage, type OrderStage } from "./computeOrderStage";
 import { istDateKey } from "@/lib/datetime";
 import { normalizeOrdersFilter, getOrdersDateRange } from "@/lib/orders/orders-filter";
+import { hasCurrentCycleCompletion } from "./callback-cycle";
 
 async function getAdmin() {
   const m = await import("@/integrations/supabase/client.server");
@@ -862,7 +863,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       let query = admin
         .from("applications")
         .select(
-          "id, application_code, fulfillment_status, application_status, order_status, created_at, assigned_to, lead_id, customer_id, service_id, form_submitted_at, certificate_uploaded_at, fulfilled_at, updated_at, workflow_status, closure_stage, closure_reason_code, refund_approved_at, refund_processed_at, technical_hold_started_at, technical_hold_kind, customer_hold_started_at, active_reason_text, workflow_delay_reason",
+          "id, application_code, fulfillment_status, application_status, order_status, created_at, assigned_to, lead_id, customer_id, service_id, form_submitted_at, certificate_uploaded_at, fulfilled_at, updated_at, reopened_at, workflow_status, closure_stage, closure_reason_code, refund_approved_at, refund_processed_at, technical_hold_started_at, technical_hold_kind, customer_hold_started_at, active_reason_text, workflow_delay_reason",
         )
         .eq("is_deleted", false);
 
@@ -1230,23 +1231,9 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       const firesAtTime = cb?.fires_at ? new Date(cb.fires_at).getTime() : 0;
       const is_due = firesAtTime > 0 && firesAtTime <= now;
 
-      // Check if order has a completed callback or completed scheduler
-      const hasCompletedCallback =
-        thisAppEvents.some((e) => {
-          const et = String(e.event_type || "").toLowerCase();
-          const note = String(e.note || "").toLowerCase();
-          return (
-            et.includes("callback_completed") ||
-            et.includes("consultation_completed") ||
-            note.includes("callback marked completed") ||
-            note.includes("call completed")
-          );
-        }) ||
-        thisAppSchedulers.some((s) => {
-          if (s.status !== "completed") return false;
-          const st = String(s.scheduler_type || "").toLowerCase();
-          return st.includes("reminder") || st.includes("callback") || st.includes("our_side");
-        });
+      const hasCompletedCallback = hasCurrentCycleCompletion(
+        a.reopened_at, cb, thisAppEvents, thisAppSchedulers,
+      );
 
       const rawIsReopened =
         (a.fulfillment_status as any) === "order_reopened" ||
@@ -1255,27 +1242,9 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         (a as any).workflow_status === "order_reopened" ||
         (a as any).workflow_status === "processing_resumed";
 
-      // If callback is completed, or if there is no active callback scheduler on the reopened order,
-      // it is no longer actively reopened or hot!
-      const is_reopened = rawIsReopened && !hasCompletedCallback && !!cb;
-
-      // Self-heal stale REOPENED row in applications table where callbacks are completed or no active scheduler
-      if (rawIsReopened && (hasCompletedCallback || !cb)) {
-        admin
-          .from("applications")
-          .update({
-            order_status: a.form_submitted_at ? "IN_PROCESSING" : "FORM_PENDING",
-            fulfillment_status: a.form_submitted_at ? "form_submitted" : "form_not_submitted",
-            workflow_status: "processing",
-            application_status: "under_process",
-            is_hot: false,
-            updated_at: new Date().toISOString(),
-          } as never)
-          .eq("id", a.id)
-          .then(({ error }: any) => {
-            if (error) console.warn("[listOrdersV2] self-heal error:", error);
-          });
-      }
+      // Reopening is actionable even without a callback. Reads must never
+      // overwrite an explicit reopen because of old completion history.
+      const is_reopened = rawIsReopened && !hasCompletedCallback;
 
       const effectiveOrderStatus = is_reopened
         ? (a as any).order_status
