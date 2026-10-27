@@ -224,9 +224,9 @@ export const ourSideDelay = createServerFn({ method: "POST" })
 
 // ─────────────────────── Shared helper: fetch order + customer ───────────────────────
 
-async function loadOrderContext(supabase: any, orderId: string) {
+async function loadOrderContext(supabase: any, orderId: string, opts: { financeVerified?: boolean } = {}) {
   const { data: { user } } = await supabase.auth.getUser();
-  if (user) {
+  if (user && !opts.financeVerified) {
     const { assertCanAccessOrder } = await import("@/lib/crm/order-auth.server");
     await assertCanAccessOrder({ orderId, userId: user.id });
   }
@@ -337,10 +337,12 @@ async function transition(
   supabase: any,
   orderId: string,
   newStatus: string,
-  extras: { reasonId?: string | null; remarks?: string | null; force?: boolean; employeeId?: string; actionType?: string } = {},
+  // financeVerified: caller already passed assertFinanceOrAdmin (refund desk works on
+  // orders assigned to sales staff, so the assignee check must not block it).
+  extras: { reasonId?: string | null; remarks?: string | null; force?: boolean; employeeId?: string; actionType?: string; financeVerified?: boolean } = {},
 ) {
   const { data: { user } } = await supabase.auth.getUser();
-  if (user) {
+  if (user && !extras.financeVerified) {
     const { assertCanAccessOrder } = await import("@/lib/crm/order-auth.server");
     await assertCanAccessOrder({ orderId, userId: user.id });
   }
@@ -725,6 +727,7 @@ export const approveRefund = createServerFn({ method: "POST" })
     await assertFinanceOrAdmin(context.supabase, context.userId);
     const updated = await transition(context.supabase, data.orderId, "REFUND_APPROVED", {
       remarks: data.adminNotes ?? null,
+      financeVerified: true,
     });
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
@@ -803,6 +806,13 @@ export const rejectRefund = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await assertFinanceOrAdmin(context.supabase, context.userId);
+    // Move order back to IN_PROCESSING first (force — REFUND_REQUESTED can't reach it
+    // normally) so a failure never leaves the refund rejected while the order is stuck.
+    const updated = await transition(context.supabase, data.orderId, "IN_PROCESSING", {
+      remarks: `Refund rejected: ${data.reason}`,
+      force: true,
+      financeVerified: true,
+    });
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     await supabaseAdmin
       .from("refund_requests")
@@ -815,11 +825,6 @@ export const rejectRefund = createServerFn({ method: "POST" })
       .eq("application_id", data.orderId)
       .in("status", ["pending", "info_needed", "escalated"]);
     await writeRefundEvent(data.orderId, "rejected", context.userId, { note: data.reason });
-    // Move order back to IN_PROCESSING (force — REFUND_REQUESTED can't reach it normally).
-    const updated = await transition(context.supabase, data.orderId, "IN_PROCESSING", {
-      remarks: `Refund rejected: ${data.reason}`,
-      force: true,
-    });
     return { ok: true, order: updated };
   });
 
@@ -919,9 +924,10 @@ export const markRefundProcessed = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await assertFinanceOrAdmin(context.supabase, context.userId);
 
-    const { order, lead, recipientEmail: to, recipientName: name } = await loadOrderContext(context.supabase, data.orderId);
+    const { order, lead, recipientEmail: to, recipientName: name } = await loadOrderContext(context.supabase, data.orderId, { financeVerified: true });
     const updated = await transition(context.supabase, data.orderId, "REFUND_PROCESSED", {
       remarks: `Refund of ₹${data.amount} processed. Ref: ${data.paymentReference}`,
+      financeVerified: true,
     });
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
