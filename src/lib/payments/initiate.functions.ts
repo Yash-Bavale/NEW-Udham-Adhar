@@ -41,13 +41,16 @@ export const initiatePayment = createServerFn({ method: "POST" })
     };
     let chosen = (data.gatewayCode?.toLowerCase() ?? "").trim();
     if (!chosen) {
-      const { data: gw } = await supabaseAdmin
+      const { data: gws } = await supabaseAdmin
         .from("payment_gateways")
-        .select("name")
+        .select("name, config")
         .eq("is_enabled", true)
-        .order("priority", { ascending: true })
-        .limit(1)
-        .maybeSingle();
+        .order("priority", { ascending: true });
+      const { data: lw } = await supabaseAdmin.from("leads").select("website_id").eq("lead_code", data.leadCode).maybeSingle();
+      const { applyWebsiteGateways } = await import("@/lib/payments/website-gateways");
+      const { websiteGatewayRules } = await import("@/lib/payments/website-gateways.server");
+      const site = applyWebsiteGateways((gws ?? []).map((g: any) => ({ name: String(g.name), isDefault: Boolean(g.config?.is_default) })), await websiteGatewayRules(lw?.website_id));
+      const gw = site.find((g) => g.isDefault) ?? null;
       if (!gw?.name) {
         throw new Error("No active payment gateway is currently enabled. Please contact support.");
       }

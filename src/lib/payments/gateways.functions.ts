@@ -15,7 +15,7 @@ export const getApplicationSummary = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const code = data.leadCode.trim();
-    const cols = "id, lead_code, name, email, mobile, service, base_amount, gst_amount, total_amount, status, lead_status_v2, service_id";
+    const cols = "id, lead_code, name, email, mobile, service, base_amount, gst_amount, total_amount, status, lead_status_v2, service_id, website_id";
 
     // Accept either a lead_code (UA-...) or an application_code (AP-...).
     let lead: any = null;
@@ -86,7 +86,7 @@ export const getApplicationSummary = createServerFn({ method: "POST" })
       .eq("is_enabled", true)
       .order("priority", { ascending: true });
 
-    const activeList = (gateways ?? []).map((g: any) => ({
+    const globalList = (gateways ?? []).map((g: any) => ({
       id: g.id,
       name: g.name,
       displayName: g.display_name,
@@ -96,6 +96,9 @@ export const getApplicationSummary = createServerFn({ method: "POST" })
       description: g.config?.description || null,
     }));
 
+    const { applyWebsiteGateways } = await import("@/lib/payments/website-gateways");
+    const { websiteGatewayRules } = await import("@/lib/payments/website-gateways.server");
+    const activeList = applyWebsiteGateways(globalList, await websiteGatewayRules(lead.website_id));
     const defaultGw = activeList.find((g) => g.isDefault) || activeList[0] || null;
 
     return {
