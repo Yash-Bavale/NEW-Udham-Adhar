@@ -5187,6 +5187,44 @@ export type Database = {
         }
         Relationships: []
       }
+      website_payment_gateways: {
+        Row: {
+          created_at: string
+          gateway_name: string
+          is_default: boolean
+          is_enabled: boolean
+          updated_at: string
+          updated_by: string | null
+          website_id: string
+        }
+        Insert: {
+          created_at?: string
+          gateway_name: string
+          is_default?: boolean
+          is_enabled?: boolean
+          updated_at?: string
+          updated_by?: string | null
+          website_id: string
+        }
+        Update: {
+          created_at?: string
+          gateway_name?: string
+          is_default?: boolean
+          is_enabled?: boolean
+          updated_at?: string
+          updated_by?: string | null
+          website_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "website_payment_gateways_website_id_fkey"
+            columns: ["website_id"]
+            isOneToOne: false
+            referencedRelation: "websites"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       websites: {
         Row: {
           allow_admin: boolean
