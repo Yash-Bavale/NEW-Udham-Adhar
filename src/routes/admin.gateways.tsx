@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { listGateways, updateGateway, checkCcavenueCredentials, uploadGatewayLogo } from "@/lib/payments/gateways.functions";
+import { listGateways, updateGateway, checkCcavenueCredentials, uploadGatewayLogo, listWebsiteGateways, setWebsiteGateway } from "@/lib/payments/gateways.functions";
 
 export const Route = createFileRoute("/admin/gateways")({ component: GatewaysPage });
 
@@ -71,6 +71,9 @@ function GatewaysPage() {
 
 
 
+      <WebsiteGatewaysCard />
+
+      <h2 className="text-lg font-semibold pt-2">All websites (master switch)</h2>
       <div className="overflow-x-auto rounded-md border bg-white">
         <table className="w-full text-sm">
           <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
@@ -280,5 +283,85 @@ function GatewayRow({
         </button>
       </td>
     </tr>
+  );
+}
+
+const SITE_GATEWAYS = [
+  { code: "cashfree", label: "Cashfree" },
+  { code: "payu", label: "PayU" },
+  { code: "ccavenue", label: "CCAvenue" },
+] as const;
+
+/** Per-website on/off and default for Cashfree, PayU and CCAvenue. */
+function WebsiteGatewaysCard() {
+  const listFn = useServerFn(listWebsiteGateways);
+  const setFn = useServerFn(setWebsiteGateway);
+  const qc = useQueryClient();
+  const { data, isLoading, error } = useQuery({ queryKey: ["admin.website-gateways"], queryFn: () => listFn() });
+  const [busy, setBusy] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  if (isLoading) return <div className="text-sm text-muted-foreground">Loading website payment options…</div>;
+  if (error || !data) return <div className="text-sm text-destructive">Could not load website payment options.</div>;
+
+  const globalOn = (g: string) => data.globals.find((x: any) => x.name === g)?.is_enabled === true;
+  const rule = (w: string, g: string) => data.rules.find((r: any) => r.website_id === w && r.gateway_name === g);
+  const enabled = (w: string, g: string) => globalOn(g) && (rule(w, g)?.is_enabled ?? true);
+  const siteDefault = (w: string) => {
+    const d = data.rules.find((r: any) => r.website_id === w && r.is_default && r.is_enabled && globalOn(r.gateway_name));
+    return d?.gateway_name ?? null;
+  };
+
+  async function save(websiteId: string, gateway: string, isEnabled: boolean, isDefault: boolean) {
+    setBusy(`${websiteId}:${gateway}`); setErr(null);
+    try { await setFn({ data: { websiteId, gateway: gateway as any, isEnabled, isDefault } }); await qc.invalidateQueries({ queryKey: ["admin.website-gateways"] }); }
+    catch (e) { setErr((e as Error).message); } finally { setBusy(null); }
+  }
+
+  return (
+    <section className="space-y-2">
+      <div>
+        <h2 className="text-lg font-semibold">Payment options by website</h2>
+        <p className="text-sm text-muted-foreground">Choose which payment options customers of each website see, and which one is pre-selected. A gateway switched off in the master list below stays off on every website.</p>
+      </div>
+      {err ? <p className="text-sm text-destructive">{err}</p> : null}
+      <div className="overflow-x-auto rounded-md border bg-card">
+        <table className="w-full text-sm">
+          <thead className="bg-muted text-left text-xs uppercase text-muted-foreground">
+            <tr>
+              <th className="p-3">Website</th>
+              {SITE_GATEWAYS.map((g) => <th key={g.code} className="p-3">{g.label}{globalOn(g.code) ? "" : " (off for all)"}</th>)}
+              <th className="p-3">Cashfree account</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.websites.map((w: any) => (
+              <tr key={w.id} className="border-t align-top">
+                <td className="p-3 font-medium">{w.name}{w.isPrimary ? <span className="ml-2 text-xs text-muted-foreground">Primary</span> : null}{!w.isActive ? <span className="ml-2 text-xs text-muted-foreground">Inactive</span> : null}</td>
+                {SITE_GATEWAYS.map((g) => {
+                  const on = enabled(w.id, g.code);
+                  const isDef = siteDefault(w.id) === g.code;
+                  const key = `${w.id}:${g.code}`;
+                  return (
+                    <td key={g.code} className="p-3 space-y-1">
+                      <label className="flex items-center gap-2">
+                        <input type="checkbox" aria-label={`${g.label} on ${w.name}`} checked={on} disabled={!globalOn(g.code) || busy === key}
+                          onChange={(e) => save(w.id, g.code, e.target.checked, e.target.checked ? isDef : false)} />
+                        <span className="text-xs">{on ? "Shown" : "Hidden"}</span>
+                      </label>
+                      <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <input type="radio" name={`default-${w.id}`} aria-label={`${g.label} default on ${w.name}`} checked={isDef} disabled={!on || busy === key}
+                          onChange={() => save(w.id, g.code, true, true)} />
+                        Pre-selected
+                      </label>
+                    </td>
+                  );
+                })}
+                <td className="p-3 text-xs">{w.cashfreeAccount ?? <span className="text-destructive">Not linked — Cashfree checkout blocked</span>}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
   );
 }

@@ -98,14 +98,20 @@ export const Route = createFileRoute("/api/public/v1/applications/summary")({
             .eq("is_enabled", true)
             .order("priority", { ascending: true });
 
-          const gatewayList = (gateways ?? []).map((row) => {
-            const config = (row.config ?? {}) as { description?: string; is_default?: boolean; logo_url?: string };
+          const { applyWebsiteGateways } = await import("@/lib/payments/website-gateways");
+          const { websiteGatewayRules } = await import("@/lib/payments/website-gateways.server");
+          const siteList = applyWebsiteGateways(
+            (gateways ?? []).map((row) => ({ row, name: String(row.name), isDefault: Boolean((row.config as any)?.is_default) })),
+            await websiteGatewayRules(lead.website_id),
+          );
+          const gatewayList = siteList.map(({ row, isDefault }) => {
+            const config = (row.config ?? {}) as { description?: string; logo_url?: string };
             return {
               code: row.name,
               name: row.display_name,
               description: config.description ?? null,
               logo_url: config.logo_url ?? null,
-              is_default: Boolean(config.is_default),
+              is_default: isDefault,
             };
           });
 

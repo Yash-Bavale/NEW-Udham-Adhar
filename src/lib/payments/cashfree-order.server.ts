@@ -35,6 +35,7 @@ export async function buildCashfreeOrder(leadCodeInput: string, returnNonce?: st
   if (!lead) throw new Error("Lead not found");
   if (!lead.lead_code) throw new Error("Lead is missing a lead code");
   const leadCode: string = lead.lead_code;
+  await (await import("@/lib/payments/website-gateways.server")).assertGatewayAllowedForWebsite((lead as any).website_id, "cashfree", "Cashfree");
 
   // 2b) Pick the merchant account strictly from the lead's stored website.
   // Fails closed (no global fallback) before any payment row is written.

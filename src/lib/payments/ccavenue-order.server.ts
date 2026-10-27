@@ -19,10 +19,11 @@ export async function buildCcavenueOrderForLead(leadCodeInput: string, returnNon
 
   const { data: lead, error: leadErr } = await supabaseAdmin
     .from("leads")
-    .select("id, lead_code, name, email, mobile, total_amount, base_amount, gst_amount, service, state, status, lead_status_v2")
+    .select("id, lead_code, website_id, name, email, mobile, total_amount, base_amount, gst_amount, service, state, status, lead_status_v2")
     .eq("lead_code", leadCodeInput)
     .maybeSingle();
   if (leadErr) throw new Error(leadErr.message);
+  if (lead) await (await import("@/lib/payments/website-gateways.server")).assertGatewayAllowedForWebsite((lead as any).website_id, "ccavenue", "CCAvenue");
   if (!lead) throw new Error("Lead not found");
   if (!lead.lead_code) throw new Error("Lead is missing a lead code");
 
