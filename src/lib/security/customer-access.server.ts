@@ -326,3 +326,19 @@ export async function gatewayReturnRedirect(
   }
   return new Response(null, { status: 303, headers: { Location: location, "Referrer-Policy": "no-referrer" } });
 }
+
+/**
+ * Staff-shared payment links (WhatsApp / copy) must carry a scoped checkout
+ * token, otherwise the payment page shows "open your secure link". Adds a fresh
+ * token to a bare stored URL; leaves already-tokenised URLs untouched.
+ */
+export async function withCheckoutToken(
+  url: string | null | undefined,
+  leadId: string,
+  createdBy?: string | null,
+): Promise<string | null> {
+  if (!url) return url ?? null;
+  if (url.includes("#t=")) return url;
+  const t = await issueCustomerToken(leadId, "co", { reason: "staff_payment_link", createdBy: createdBy ?? undefined });
+  return `${url.split("#")[0]}#t=${t}`;
+}
