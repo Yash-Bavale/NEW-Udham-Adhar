@@ -93,25 +93,54 @@ export const listRefundsAdvanced = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await requireStaff(context.supabase, context.userId);
     const admin = await getAdmin();
-    let q = admin
-      .from("refund_requests")
-      .select(
-        "id, application_id, lead_id, reason, refund_amount, refund_mode, deduction_amount, deduction_reason, gateway_ref, gateway_name, status, admin_notes, customer_notes, created_at, decided_at, processed_at, info_needed_note, escalation_note, application:applications(id, application_code, order_status, service_id, refund_processed_at), lead:leads(id, name, email, mobile, service, lead_code)",
-      )
-      .order("created_at", { ascending: false })
-      .limit(data.limit);
+    const selectFields =
+      "id, application_id, lead_id, reason, refund_amount, refund_mode, deduction_amount, deduction_reason, gateway_ref, gateway_name, status, admin_notes, customer_notes, created_at, decided_at, processed_at, info_needed_note, escalation_note, application:applications(id, application_code, order_status, service_id, refund_processed_at), lead:leads(id, name, email, mobile, service, lead_code)";
+
+    let rawRows: any[] = [];
 
     if (data.status === "processed") {
-      // In PostgREST, valid syntax is not.processed_at.is.null.
-      // Also fetch approved rows that may have been processed on the application level
-      q = q.or("not.processed_at.is.null,status.eq.processed,status.eq.approved");
-    } else if (data.status === "approved") {
-      q = q.eq("status", "approved").is("processed_at", null);
-    } else if (data.status !== "all") {
-      q = q.eq("status", data.status);
+      // In PostgREST, complex logic trees with negations fail to parse.
+      // Candidate processed rows are:
+      // 1) Rows where processed_at is not null
+      // 2) Rows where status is 'approved' (which may have been processed at the application level)
+      const [byProcessedAt, byApproved] = await Promise.all([
+        admin
+          .from("refund_requests")
+          .select(selectFields)
+          .not("processed_at", "is", null)
+          .order("created_at", { ascending: false })
+          .limit(data.limit),
+        admin
+          .from("refund_requests")
+          .select(selectFields)
+          .eq("status", "approved")
+          .order("created_at", { ascending: false })
+          .limit(data.limit),
+      ]);
+
+      if (byProcessedAt.error) throw new Error(byProcessedAt.error.message);
+      if (byApproved.error) throw new Error(byApproved.error.message);
+
+      const map = new Map<string, any>();
+      for (const r of byProcessedAt.data ?? []) map.set(r.id, r);
+      for (const r of byApproved.data ?? []) map.set(r.id, r);
+      rawRows = Array.from(map.values()).sort(
+        (a, b) => new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime(),
+      );
+    } else {
+      let q = admin
+        .from("refund_requests")
+        .select(selectFields)
+        .order("created_at", { ascending: false })
+        .limit(data.limit);
+
+      if (data.status !== "all") {
+        q = q.eq("status", data.status);
+      }
+      const { data: rowsData, error } = await q;
+      if (error) throw new Error(error.message);
+      rawRows = rowsData ?? [];
     }
-    const { data: rawRows, error } = await q;
-    if (error) throw new Error(error.message);
 
     const isProc = (r: any) =>
       Boolean(
@@ -161,6 +190,8 @@ export const listRefundsAdvanced = createServerFn({ method: "POST" })
       rows = normalizedRows.filter((r) => isProc(r));
     } else if (data.status === "approved") {
       rows = normalizedRows.filter((r) => !isProc(r) && r.status === "approved");
+    } else if (data.status !== "all") {
+      rows = normalizedRows.filter((r) => !isProc(r) && r.status === data.status);
     }
 
     const filtered = data.search?.trim()
