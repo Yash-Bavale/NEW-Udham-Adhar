@@ -401,8 +401,13 @@ export function isNeedsActionOrder(row: any): boolean {
   if (isTechnicalDelayOrder(row) || isCustomerDelayOrder(row)) return false;
 
   // 4. Exclude Form Not Submitted where form link has already been sent or awaiting customer form (Action Taken)
+  // Rule: applying any delay (Customer, Technical, Form Not Submitted) is an
+  // action taken — the order leaves Need Action until the customer submits
+  // (customer_resumed_pending) or it becomes Hot/reopened (handled above).
   if (
     Boolean(row.form_link_sent_at) ||
+    fs === "form_not_submitted" ||
+    (stage === "form_not_submitted" && os !== "REOPENED" && fs !== "order_reopened" && ws !== "order_reopened") ||
     fs === "awaiting_customer_form" ||
     fs === "waiting_for_customer_submission" ||
     fs === "form_link_sent" ||
@@ -608,7 +613,10 @@ export function isActionTakenOrder(row: any): boolean {
     row.is_callback_scheduled ||
     Boolean(row.form_link_sent_at) ||
     actionTakenStatuses.has(fs) ||
-    actionTakenStages.has(stage)
+    actionTakenStages.has(stage) ||
+    // Any applied delay (incl. Form Not Submitted Delay) = staff action taken.
+    fs === "form_not_submitted" ||
+    stage === "form_not_submitted"
   );
 }
 
