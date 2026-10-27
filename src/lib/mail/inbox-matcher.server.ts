@@ -948,7 +948,7 @@ async function matchExistingTicket(input: {
   if (ticketNumber) {
     const { data } = await supabaseAdmin
       .from("support_tickets")
-      .select("id, ticket_number, ticket_email, application_id, customer_id, status, reopen_count")
+      .select("id, ticket_number, ticket_email, application_id, customer_id, status")
       .eq("ticket_number", ticketNumber)
       .maybeSingle();
 
@@ -982,7 +982,7 @@ async function matchExistingTicket(input: {
         customerId: custId,
         leadId: null,
         status: r.status,
-        reopenCount: r.reopen_count,
+        reopenCount: undefined,
       };
     }
   }
@@ -1002,7 +1002,7 @@ async function matchExistingTicket(input: {
       if (rep.ticket_id) {
         const { data: t } = await supabaseAdmin
           .from("support_tickets")
-          .select("id, ticket_number, ticket_email, application_id, customer_id, status, reopen_count")
+          .select("id, ticket_number, ticket_email, application_id, customer_id, status")
           .eq("id", rep.ticket_id)
           .maybeSingle();
 
@@ -1036,7 +1036,7 @@ async function matchExistingTicket(input: {
             customerId: custId,
             leadId: null,
             status: r.status,
-            reopenCount: r.reopen_count,
+            reopenCount: undefined,
           };
         }
       }
@@ -1056,7 +1056,7 @@ async function matchExistingTicket(input: {
       const appId = (app as { id: string }).id;
       const { data: t } = await supabaseAdmin
         .from("support_tickets")
-        .select("id, ticket_number, ticket_email, application_id, customer_id, status, reopen_count")
+        .select("id, ticket_number, ticket_email, application_id, customer_id, status")
         .eq("application_id", appId)
         .in("status", ["open", "in_progress", "waiting_customer"])
         .order("created_at", { ascending: false })
@@ -1073,7 +1073,7 @@ async function matchExistingTicket(input: {
           customerId: r.customer_id,
           leadId: (app as any).lead_id ?? null,
           status: r.status,
-          reopenCount: r.reopen_count,
+          reopenCount: undefined,
         };
       }
     }

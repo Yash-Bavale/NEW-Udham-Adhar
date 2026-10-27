@@ -1221,15 +1221,15 @@ export const getEmployeePerformanceCommandCenter = createServerFn({
       // Active employee sessions for real-time presence
       adminAny
         .from("employee_sessions")
-        .select("id, employee_id, is_active, last_heartbeat_at, last_activity_at, login_at, started_at, ended_at, status, active_seconds, idle_seconds, away_seconds, current_page, current_module, last_action_text, current_order_code")
+        .select("id, employee_id, is_active, last_heartbeat_at, last_activity_at, login_at, started_at:login_at, ended_at:logout_at, status, active_seconds, idle_seconds, away_seconds, current_page, current_module, last_action_text, current_order_code")
         .order("last_heartbeat_at", { ascending: false })
         .limit(500),
       // All employee sessions in current period
       adminAny
         .from("employee_sessions")
-        .select("id, employee_id, is_active, last_heartbeat_at, last_activity_at, login_at, started_at, ended_at, status, active_seconds, idle_seconds, away_seconds, current_page, current_module, last_action_text, current_order_code")
-        .gte("started_at", dateRange.current.start)
-        .lte("started_at", dateRange.current.end)
+        .select("id, employee_id, is_active, last_heartbeat_at, last_activity_at, login_at, started_at:login_at, ended_at:logout_at, status, active_seconds, idle_seconds, away_seconds, current_page, current_module, last_action_text, current_order_code")
+        .gte("login_at", dateRange.current.start)
+        .lte("login_at", dateRange.current.end)
         .limit(1000),
     ]);
 
@@ -1914,11 +1914,11 @@ export const getEmployeeDetailPerformance = createServerFn({
         .maybeSingle(),
       adminAny
         .from("employee_sessions")
-        .select("id, started_at, ended_at, last_heartbeat_at, last_activity_at, active_seconds, idle_seconds, away_seconds, status, is_active, current_module, current_order_id")
+        .select("id, started_at:login_at, ended_at:logout_at, last_heartbeat_at, last_activity_at, active_seconds, idle_seconds, away_seconds, status, is_active, current_module, current_order_id")
         .eq("employee_id", data.employeeId)
-        .gte("started_at", dateRange.current.start)
-        .lte("started_at", dateRange.current.end)
-        .order("started_at", { ascending: false }),
+        .gte("login_at", dateRange.current.start)
+        .lte("login_at", dateRange.current.end)
+        .order("login_at", { ascending: false }),
     ]);
 
     if (!profile) throw new Error("Employee not found");
@@ -2261,11 +2261,11 @@ export const getMyPerformanceDashboard = createServerFn({ method: "POST" })
         .limit(1000),
       adminAny
         .from("employee_sessions")
-        .select("id, started_at, ended_at, last_heartbeat_at, last_activity_at, active_seconds, idle_seconds, away_seconds, status, is_active, current_module, current_order_id")
+        .select("id, started_at:login_at, ended_at:logout_at, last_heartbeat_at, last_activity_at, active_seconds, idle_seconds, away_seconds, status, is_active, current_module, current_order_id")
         .eq("employee_id", employeeId)
-        .gte("started_at", dateRange.current.start)
-        .lte("started_at", dateRange.current.end)
-        .order("started_at", { ascending: false }),
+        .gte("login_at", dateRange.current.start)
+        .lte("login_at", dateRange.current.end)
+        .order("login_at", { ascending: false }),
     ]);
 
     const canonicalEvents = normalizeOperationalEvents({

@@ -290,6 +290,13 @@ export const changeLeadService = createServerFn({ method: "POST" })
         .select("id, txnid, payment_url, amount, status")
         .maybeSingle();
       newPaymentLink = linkData;
+      if (newPaymentLink?.payment_url) {
+        const { withCheckoutToken } = await import("@/lib/security/customer-access.server");
+        newPaymentLink = {
+          ...newPaymentLink,
+          payment_url: await withCheckoutToken(newPaymentLink.payment_url, data.leadId, context.userId),
+        };
+      }
     }
 
     // 7. Log timeline activity events
