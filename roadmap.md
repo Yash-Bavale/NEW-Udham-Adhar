@@ -1,5 +1,7 @@
 # Roadmap
 
+- [ ] Fix AP-2026-011133 ticket restart visibility in employee, Need Action, and Hot Orders queues
+
 - [x] Audit existing CallerDesk API, IVR, browser media, webhooks and deployment; implement safe confirmed gaps (190 tests pass; authorised draft save/read verified)
 - [ ] Apply IVR settings to CallerDesk — blocked: verified provider configuration API and approved real routing settings required
 - [ ] Verify real IVR routing and two-way browser audio — blocked until provider settings and authorised VPN workstation tests
