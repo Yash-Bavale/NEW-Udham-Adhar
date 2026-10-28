@@ -2097,6 +2097,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       name: string;
       email?: string;
       needsAction: number;
+      pendingOrders: number;
       latestActionAt: string | null;
       hotOrders: number;
       backlog: number;
@@ -2149,6 +2150,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
           name,
           email: p.email ?? undefined,
           needsAction: 0,
+          pendingOrders: 0,
           latestActionAt: lastAct ?? undefined,
           hotOrders: 0,
           backlog: 0,
@@ -2172,6 +2174,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
 
         entry.total++;
         if (isNeedsActionOrder(r)) entry.needsAction++;
+        if (isNeedsActionOrder(r) || isCallbackScheduledOrder(r) || isTechnicalDelayOrder(r)) entry.pendingOrders++;
         if (r.is_hot) entry.hotOrders++;
         const rowDate = istDateKey(r.created_at);
         if (isNeedsActionOrder(r) && Boolean(rowDate && rowDate < todayIst)) entry.backlog++;
