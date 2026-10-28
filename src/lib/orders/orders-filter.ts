@@ -22,6 +22,7 @@ export type OrdersFilter = {
   customDays?: string;
   sortField?: "created_at" | "stage" | "stage_journey";
   sortOrder?: "asc" | "desc";
+  viewMode?: "self" | "team";
 };
 
 export type NormalizedOrdersFilter = {
@@ -42,6 +43,7 @@ export type NormalizedOrdersFilter = {
   customDays: number | null;
   sortField: "created_at" | "stage" | "stage_journey";
   sortOrder: "asc" | "desc";
+  viewMode: "self" | "team";
 };
 
 /**
@@ -143,6 +145,7 @@ export function normalizeOrdersFilter(raw: OrdersFilter): NormalizedOrdersFilter
     customDays,
     sortField,
     sortOrder,
+    viewMode: raw.viewMode || "self",
   };
 }
 
@@ -153,6 +156,7 @@ export function getOrdersQueryKey(normalized: NormalizedOrdersFilter, page: numb
   return [
     "admin.orders.v2",
     page,
+    normalized.viewMode,
     normalized.fromIso,
     normalized.toIso,
     normalized.search,

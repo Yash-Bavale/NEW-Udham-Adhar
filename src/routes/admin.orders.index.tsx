@@ -74,7 +74,8 @@ type Bucket =
   | "pending" // Action Taken
   | "completed"
   | "closed"
-  | "exception";
+  | "exception"
+  | "pending_orders";
 
 const CLOSED_FS = new Set<string>([
   "application_rejected", "certificate_rejected", "order_closed", "cancelled",
@@ -199,6 +200,13 @@ const BUCKET_CARDS: BucketCardItem[] = [
     label: "CLOSED",
     subtitle: "Archived in range",
     icon: CheckCheck,
+  },
+  {
+    id: "pending_orders",
+    label: "PENDING ORDERS",
+    subtitle: "Action + Callback + Delay",
+    icon: Hourglass,
+    tone: "indigo",
   },
 ];
 
@@ -412,9 +420,6 @@ export function OrdersListPage({ mode = "self" }: { mode?: "self" | "team" }) {
   const [dateFrom, setDateFrom] = useState<string>(savedState?.dateFrom ?? todayKey);
   const [dateTo, setDateTo] = useState<string>(savedState?.dateTo ?? todayKey);
   const [bucket, setBucket] = useState<Bucket>(() => {
-    if (isTeam) {
-      return (savedState?.bucket && savedState.bucket !== "all") ? (savedState.bucket as Bucket) : "needs_action";
-    }
     return savedState?.bucket ?? (isPrivileged ? "all" : "needs_action");
   });
   const [pendingAge, setPendingAge] = useState<PendingAge>(savedState?.pendingAge ?? "any");
@@ -669,6 +674,7 @@ export function OrdersListPage({ mode = "self" }: { mode?: "self" | "team" }) {
     technical_delay: 0,
     customer_delay: 0,
     totalAll: 0,
+    pending_orders: 0,
   };
   const ageBuckets = data?.ageBuckets ?? { d1: 0, d2: 0, d3: 0, d7: 0, older: 0 };
 
@@ -802,7 +808,7 @@ const groups = useMemo(() => {
 }, [rows, bucket]);
 
 const hotRows = useMemo(() => {
-  return bucket === "needs_action" ? rows.filter((r) => r.is_hot) : [];
+  return (bucket === "needs_action" || bucket === "pending_orders") ? rows.filter((r) => r.is_hot) : [];
 }, [rows, bucket]);
 
   const isFilterActive =
@@ -1187,14 +1193,12 @@ return (
     <div className={cn(
       "grid gap-2 w-full",
       isPrivileged && !isTeam
-        ? "grid-cols-2 sm:grid-cols-3 md:grid-cols-6 lg:grid-cols-11"
-        : "grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-10"
+        ? "grid-cols-2 sm:grid-cols-3 md:grid-cols-6 lg:grid-cols-12"
+        : "grid-cols-2 sm:grid-cols-3 md:grid-cols-6 lg:grid-cols-11"
     )}>
       {(isTeam ? BUCKET_CARDS.filter((b) => b.id !== "all") : (isPrivileged ? BUCKET_CARDS : BUCKET_CARDS.filter((b) => !b.adminOnly))).map((b) => {
         const active = bucket === b.id;
-        const countVal = b.id === "needs_action"
-          ? Number((counts as any).needs_action ?? 0) + Number((counts as any).technical_delay ?? 0)
-          : Number((counts as any)[b.id] ?? 0);
+        const countVal = Number((counts as any)[b.id] ?? 0);
         const IconComponent = b.icon;
 
         if (b.id === "idle_time") {
@@ -1291,6 +1295,14 @@ return (
           iconCls = "text-slate-500";
           countCls = "text-slate-800";
           subtitleCls = "text-slate-500";
+        } else if (b.id === "pending_orders") {
+          cardContainerCls = active
+            ? "bg-purple-100 border-purple-500 text-purple-950 shadow-sm ring-2 ring-purple-300"
+            : "bg-purple-50/70 border-purple-200/90 text-purple-950 hover:bg-purple-100/60 hover:border-purple-300";
+          headerCls = "text-purple-700 font-bold";
+          iconCls = "text-purple-600";
+          countCls = "text-purple-950";
+          subtitleCls = "text-purple-700/80";
         } else if (active) {
           cardContainerCls = "bg-slate-900 text-white border-slate-900 shadow-sm";
           headerCls = "text-slate-300";

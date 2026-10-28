@@ -854,6 +854,13 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         });
     }
 
+    if (!isAdmin) {
+      // Employees and managers can only see current situation (today in IST)
+      const todayKey = istDateKey(new Date());
+      data.dateFrom = todayKey;
+      data.dateTo = todayKey;
+    }
+
     const normalized = normalizeOrdersFilter(data);
 
     let matchingLeadIds: string[] | null = null;
@@ -1040,10 +1047,11 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       return {
         rows: [],
         total: 0,
-        counts: { all: 0, needs_action: 0, pending: 0, completed: 0, closed: 0, exception: 0, actionRequired: 0, processed: 0, reminders: 0, hot_orders: 0, technical_delay: 0, customer_delay: 0, totalAll: 0 },
+        counts: { all: 0, needs_action: 0, pending: 0, completed: 0, closed: 0, exception: 0, actionRequired: 0, processed: 0, reminders: 0, hot_orders: 0, technical_delay: 0, customer_delay: 0, totalAll: 0, pending_orders: 0 },
         ageBuckets: { d1: 0, d2: 0, d3: 0, d7: 0, older: 0 },
         page: data.page,
         pageSize: data.pageSize,
+        teamBreakdown: [],
       };
     }
 
@@ -1889,6 +1897,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       actionRequired: 0,
       processed: 0,
       totalAll: 0,
+      pending_orders: 0,
     };
     const ageBuckets = { d1: 0, d2: 0, d3: 0, d7: 0, older: 0 };
 
@@ -1953,12 +1962,21 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       return isNeedsActionOrder(r) && Boolean(rowDate && rowDate < todayIst);
     }).length;
 
+    // Pending Orders: combined total of Needs Action + Callback Scheduled + Technical Delay
+    counts.pending_orders = baseFilteredRows.filter((r) =>
+      isNeedsActionOrder(r) || isCallbackScheduledOrder(r) || isTechnicalDelayOrder(r)
+    ).length;
+
     // 3. Apply bucket tab filter to obtain the table rows (guarantee 100% exact match with counts)
     let filtered = baseFilteredRows;
     const bucket = normalized.bucket || "all";
 
     if (bucket === "needs_action") {
       filtered = filtered.filter((r) => isNeedsActionOrder(r));
+    } else if (bucket === "pending_orders") {
+      filtered = filtered.filter((r) =>
+        isNeedsActionOrder(r) || isCallbackScheduledOrder(r) || isTechnicalDelayOrder(r)
+      );
     } else if (bucket === "hot_orders") {
       filtered = filtered.filter((r) => r.is_hot);
     } else if (bucket === "reminders") {
@@ -1985,7 +2003,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       filtered = filtered.filter((r) => r.in_range_created);
     }
 
-    if (bucket === "needs_action" && (!normalized.sortField || normalized.sortField === "created_at")) {
+    if ((bucket === "needs_action" || bucket === "pending_orders") && (!normalized.sortField || normalized.sortField === "created_at")) {
       // Hot orders on TOP (oldest hot first), then regular orders (newest created first)
       filtered.sort((a, b) => {
         if (a.is_hot && !b.is_hot) return -1;

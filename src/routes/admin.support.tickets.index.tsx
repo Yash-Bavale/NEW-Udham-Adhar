@@ -498,12 +498,21 @@ function SupportTicketsOperationsPage() {
   });
 
   const queryPayload = useMemo(() => {
+    const isCustomView = viewMode === "folder" || viewMode === "starred";
+
     let effectiveStatus: TicketStatus | undefined = undefined;
     let effectiveStatuses: TicketStatus[] | undefined = undefined;
     let effectiveRespState: ResponseState = "all";
     let effectiveDateFrom: string | undefined = dateFrom || undefined;
+    let effectiveDateTo: string | undefined = dateTo || undefined;
 
-    if (bucket === "all") {
+    if (isCustomView) {
+      effectiveStatuses = undefined;
+      effectiveStatus = undefined;
+      effectiveRespState = "all";
+      effectiveDateFrom = datePreset === "custom" ? (dateFrom || undefined) : undefined;
+      effectiveDateTo = datePreset === "custom" ? (dateTo || undefined) : undefined;
+    } else if (bucket === "all") {
       effectiveStatuses = undefined;
       effectiveStatus = undefined;
       effectiveRespState = "all";
@@ -539,20 +548,20 @@ function SupportTicketsOperationsPage() {
       page,
       pageSize,
       q: debouncedSearch,
-      bucket,
+      bucket: isCustomView ? "all" : bucket,
       status: effectiveStatus,
-      statuses: effectiveStatuses,
+      statuses: isCustomView ? undefined : effectiveStatuses,
       responseState: effectiveRespState,
       priority: priorityFilter === "all" ? undefined : (priorityFilter as TicketPriority),
       assignedTo: assignedTo === "all" ? undefined : assignedTo,
       serviceId: serviceId === "all" ? undefined : serviceId,
       stage: stageFilter === "all" ? undefined : stageFilter,
       dateFrom: effectiveDateFrom,
-      dateTo: dateTo || undefined,
+      dateTo: effectiveDateTo,
       sort: sortField,
       scope: "all" as const,
     };
-  }, [page, pageSize, debouncedSearch, bucket, statusFilter, responseStateFilter, priorityFilter, assignedTo, serviceId, stageFilter, dateFrom, dateTo, sortField, viewMode, activeFolderId]);
+  }, [page, pageSize, debouncedSearch, bucket, statusFilter, responseStateFilter, priorityFilter, assignedTo, serviceId, stageFilter, dateFrom, dateTo, datePreset, sortField, viewMode, activeFolderId]);
 
   const { data, isLoading, isFetching } = useQuery({
     queryKey: ["support-tickets-ops", queryPayload],
@@ -847,7 +856,7 @@ function SupportTicketsOperationsPage() {
       {/* ── 2. Clickable KPI Stat Cards (All Tickets, Need Action, Backlog, Reopened, Refund, Closed) ─────── */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 pt-1">
         {BUCKETS.map((b) => {
-          const active = bucket === b.id;
+          const active = viewMode === "all" && bucket === b.id;
           let count = 0;
           let subBadge = "";
 
@@ -924,6 +933,8 @@ function SupportTicketsOperationsPage() {
               key={b.id}
               type="button"
               onClick={() => {
+                setViewMode("all");
+                setActiveFolderId(null);
                 setBucket(b.id);
                 setStatusFilter("all");
                 setResponseStateFilter("all");

@@ -104,8 +104,9 @@ export const listTickets = createServerFn({ method: "POST" })
     }
 
     // Filter by bucket if specified
+    const isFolderOrStarred = Boolean(data.folderId || data.isStarred);
     let bucketTicketIds: string[] | null = null;
-    if (data.bucket === "reopened") {
+    if (!isFolderOrStarred && data.bucket === "reopened") {
       const { data: replies } = await admin
         .from("ticket_replies")
         .select("ticket_id")
@@ -114,7 +115,7 @@ export const listTickets = createServerFn({ method: "POST" })
       if (bucketTicketIds.length === 0) {
         return { tickets: [], total: 0, page: data.page, pageSize: data.pageSize };
       }
-    } else if (data.bucket === "refund") {
+    } else if (!isFolderOrStarred && data.bucket === "refund") {
       const { data: replies } = await admin
         .from("ticket_replies")
         .select("ticket_id")
@@ -176,11 +177,11 @@ export const listTickets = createServerFn({ method: "POST" })
     }
 
     // Status filter
-    if (data.bucket === "backlog") {
+    if (!isFolderOrStarred && data.bucket === "backlog") {
       q = q.not("status", "in", '("resolved","closed")').lt("created_at", todayStartUtc);
-    } else if (data.bucket === "need_action" || data.bucket === "open") {
+    } else if (!isFolderOrStarred && (data.bucket === "need_action" || data.bucket === "open")) {
       q = q.not("status", "in", '("resolved","closed")');
-    } else if (data.bucket === "closed" || data.bucket === "refund") {
+    } else if (!isFolderOrStarred && (data.bucket === "closed" || data.bucket === "refund")) {
       q = q.in("status", ["resolved", "closed"]);
     } else if (data.status) {
       q = q.eq("status", data.status);
@@ -199,7 +200,7 @@ export const listTickets = createServerFn({ method: "POST" })
     }
 
     // Date range filter
-    if (data.bucket !== "backlog") {
+    if (!isFolderOrStarred && data.bucket !== "backlog") {
       if (data.dateFrom) {
         const fromIso = data.dateFrom.includes("T") ? data.dateFrom : `${data.dateFrom}T00:00:00+05:30`;
         const dateField = data.bucket === "closed" ? "closed_at" : "created_at";
@@ -209,6 +210,15 @@ export const listTickets = createServerFn({ method: "POST" })
         const toIso = data.dateTo.includes("T") ? data.dateTo : `${data.dateTo}T23:59:59+05:30`;
         const dateField = data.bucket === "closed" ? "closed_at" : "created_at";
         q = q.lte(dateField, new Date(toIso).toISOString());
+      }
+    } else if (isFolderOrStarred) {
+      if (data.dateFrom) {
+        const fromIso = data.dateFrom.includes("T") ? data.dateFrom : `${data.dateFrom}T00:00:00+05:30`;
+        q = q.gte("created_at", new Date(fromIso).toISOString());
+      }
+      if (data.dateTo) {
+        const toIso = data.dateTo.includes("T") ? data.dateTo : `${data.dateTo}T23:59:59+05:30`;
+        q = q.lte("created_at", new Date(toIso).toISOString());
       }
     }
 
