@@ -39,6 +39,29 @@ export function selectAccountForWebsite(
   return mapping.account;
 }
 
+export interface StoredCashfreeCreds {
+  clientId: string;
+  clientSecret: string;
+  mode: "production" | "sandbox";
+}
+
+/** Credentials saved from the admin screen (decrypted on the server). Mode is always explicit. */
+export function credsFromStored(account: CashfreeAccountRow, stored: StoredCashfreeCreds): CashfreeCreds {
+  const clientId = stored.clientId.trim();
+  const clientSecret = stored.clientSecret.trim();
+  if (!clientId || !clientSecret) {
+    throw new CashfreeRoutingError(`Cashfree account ${account.account_key} has no credentials configured.`);
+  }
+  const isProd = stored.mode === "production";
+  return {
+    accountId: account.id,
+    clientId,
+    clientSecret,
+    isProd,
+    apiUrl: isProd ? "https://api.cashfree.com/pg" : "https://sandbox.cashfree.com/pg",
+  };
+}
+
 export function credsFromEnv(
   account: CashfreeAccountRow,
   env: Record<string, string | undefined>,
