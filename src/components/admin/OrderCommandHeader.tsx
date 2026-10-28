@@ -3,6 +3,7 @@ import { ExternalLink, AlertCircle, Clock } from "lucide-react";
 import { STAGE_META, STAGE_BADGE_CLASS, type OrderStage } from "@/lib/crm/computeOrderStage";
 import { formatIST, relativeIST } from "@/lib/datetime";
 import { useFinancialVisibility } from "@/hooks/useFinancialVisibility";
+import { useDashboardPrivacy } from "@/hooks/useDashboardPrivacy";
 
 interface StaffOption {
   id: string;
@@ -35,6 +36,7 @@ export function OrderCommandHeader({
   leadId, hideAmount,
 }: Props) {
   const { formatINR } = useFinancialVisibility();
+  const { isPrivacyEnabled } = useDashboardPrivacy();
   const meta = STAGE_META[stage];
   const isException = meta.side === "exception";
   const priority = paymentStatus === "Paid" && (stage === "form_submitted" || stage === "under_review")
@@ -126,7 +128,7 @@ export function OrderCommandHeader({
           {!hideAmount && (
             <Meta label="Total">
               <span className="font-semibold text-sm" style={{ color: "var(--admin-fg)" }}>
-                {formatINR(total)}
+                {isPrivacyEnabled ? "₹••••" : formatINR(total)}
               </span>
             </Meta>
           )}

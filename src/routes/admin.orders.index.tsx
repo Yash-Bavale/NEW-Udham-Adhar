@@ -2205,6 +2205,7 @@ function OrderCardMobile({
   const meta = STAGE_META[stage];
   const actionStatus = getOrderActionStatus(order);
   const { formatINR } = useFinancialVisibility();
+  const { isPrivacyEnabled } = useDashboardPrivacy();
 
   const isCompletedView = bucket === "completed";
   const isClosedView = bucket === "closed";
@@ -2285,7 +2286,7 @@ function OrderCardMobile({
         </div>
         {!hideMoney && (
           <span className="font-semibold text-slate-900 text-sm">
-            {formatINR(order.total_amount)}
+            {isPrivacyEnabled ? "₹••••" : formatINR(order.total_amount)}
           </span>
         )}
       </div>
@@ -2490,6 +2491,7 @@ function OrderRow({
   const stage: OrderStage = order.stage;
   const meta = STAGE_META[stage];
   const { formatINR } = useFinancialVisibility();
+  const { isPrivacyEnabled } = useDashboardPrivacy();
 
   const isCompletedView = bucket === "completed";
   const isClosedView = bucket === "closed";
@@ -2689,7 +2691,7 @@ function OrderRow({
       {/* 8. Amount (Kept at the very end of the row) */}
       {!hideMoney && (
         <td className="px-2 py-2.5 text-right font-semibold text-slate-900 whitespace-nowrap text-[13px]">
-          {formatINR(order.total_amount)}
+          {isPrivacyEnabled ? "₹••••" : formatINR(order.total_amount)}
         </td>
       )}
     </tr>

@@ -6,58 +6,42 @@ import { cn } from "@/lib/utils";
 
 export interface DashboardPrivacyToggleProps {
   className?: string;
-  showLabel?: boolean;
 }
 
-export function DashboardPrivacyToggle({
-  className,
-  showLabel = true,
-}: DashboardPrivacyToggleProps) {
+export function DashboardPrivacyToggle({ className }: DashboardPrivacyToggleProps) {
   const { isPrivacyEnabled, togglePrivacy } = useDashboardPrivacy();
 
   return (
-    <TooltipProvider delayDuration={200}>
+    <TooltipProvider delayDuration={150}>
       <Tooltip>
         <TooltipTrigger asChild>
           <button
             type="button"
             onClick={togglePrivacy}
-            aria-label={isPrivacyEnabled ? "Show dashboard and order values" : "Hide dashboard and order values"}
+            aria-label={isPrivacyEnabled ? "Reveal dashboard and order values" : "Hide dashboard and order values"}
             aria-pressed={isPrivacyEnabled}
             className={cn(
-              "h-8 inline-flex items-center gap-1.5 px-2.5 rounded-lg border text-xs font-semibold transition-all duration-150 cursor-pointer select-none shrink-0 shadow-2xs active:scale-95",
+              "relative size-8 inline-flex items-center justify-center rounded-lg border transition-all duration-150 cursor-pointer select-none shrink-0 shadow-2xs active:scale-95",
               isPrivacyEnabled
-                ? "border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100 hover:border-amber-400 dark:border-amber-800 dark:bg-amber-950/60 dark:text-amber-200"
-                : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200",
+                ? "border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100 hover:border-amber-400 dark:border-amber-800 dark:bg-amber-950/60 dark:text-amber-200"
+                : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200",
               className
             )}
           >
             {isPrivacyEnabled ? (
               <>
-                <EyeOff className="size-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
-                {showLabel && (
-                  <span className="hidden sm:inline-block tracking-tight font-bold">
-                    Values Hidden
-                  </span>
-                )}
-                <span className="size-1.5 rounded-full bg-amber-500 animate-pulse shrink-0" />
+                <EyeOff className="size-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                <span className="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-amber-500 ring-2 ring-white dark:ring-slate-900 animate-pulse" />
               </>
             ) : (
-              <>
-                <Eye className="size-3.5 text-slate-500 dark:text-slate-400 shrink-0" />
-                {showLabel && (
-                  <span className="hidden sm:inline-block tracking-tight text-slate-600 dark:text-slate-300">
-                    Hide Values
-                  </span>
-                )}
-              </>
+              <Eye className="size-4 text-slate-500 dark:text-slate-400 shrink-0" />
             )}
           </button>
         </TooltipTrigger>
-        <TooltipContent side="bottom" align="end" className="text-xs max-w-xs text-center">
+        <TooltipContent side="bottom" align="end" className="text-xs">
           {isPrivacyEnabled
-            ? "Privacy Mode is ON — Executive dashboard and order KPI counts are hidden. Click to reveal."
-            : "Hide all executive dashboard values & order KPI counts (Privacy Mode)"}
+            ? "Values Hidden — Click to reveal"
+            : "Hide values & KPI counts"}
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>
