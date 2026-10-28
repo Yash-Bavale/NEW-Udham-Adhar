@@ -103,20 +103,6 @@ export function OrderCommandHeader({
             </span>
           </Meta>
 
-          {!hideAmount && (
-            <Meta label="Payment">
-              <PaymentChip status={paymentStatus} />
-            </Meta>
-          )}
-
-          {!hideAmount && (
-            <Meta label="Total">
-              <span className="font-semibold text-sm" style={{ color: "var(--admin-fg)" }}>
-                {formatINR(total)}
-              </span>
-            </Meta>
-          )}
-
           <Meta label="Assigned">
             <select
               value={assignedTo ?? ""}
@@ -130,6 +116,20 @@ export function OrderCommandHeader({
               ))}
             </select>
           </Meta>
+
+          {!hideAmount && (
+            <Meta label="Payment">
+              <PaymentChip status={paymentStatus} />
+            </Meta>
+          )}
+
+          {!hideAmount && (
+            <Meta label="Total">
+              <span className="font-semibold text-sm" style={{ color: "var(--admin-fg)" }}>
+                {formatINR(total)}
+              </span>
+            </Meta>
+          )}
         </div>
       </div>
     </div>

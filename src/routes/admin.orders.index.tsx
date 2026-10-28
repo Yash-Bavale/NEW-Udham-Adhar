@@ -790,7 +790,7 @@ async function handleBulkReassign(targetStaffId: string) {
 }
 
 // Base columns (Order #, Created, Customer, Service, Action Status, Stage) = 6
-// Plus Checkbox (1) + Amount (1) + Assigned (1) = 9 total columns for Admin
+// Plus Checkbox (1) + Assigned (1) + Amount (1) = 9 total columns for Admin (Amount is kept at last)
 const colCount = 6 + (isAdmin ? 2 : 0) + (hideMoney ? 0 : 1);
 
 const groups = useMemo(() => {
@@ -1544,8 +1544,8 @@ return (
                   )}
                 </div>
               </th>
-              {!hideMoney && <th className="text-right font-semibold px-3 py-2.5">Amount</th>}
               {isAdmin && <th className="text-left font-semibold px-3 py-2.5">Assigned</th>}
+              {!hideMoney && <th className="text-right font-semibold px-3 py-2.5">Amount</th>}
             </tr>
           </thead>
           <tbody>
@@ -2683,15 +2683,15 @@ function OrderRow({
         </div>
       </td>
 
-      {/* 7. Amount */}
+      {/* 7. Assigned */}
+      {isAdmin && <td className="px-2 py-2.5 text-slate-600 whitespace-nowrap text-[12px]">{order.assigned_name ?? "Unassigned"}</td>}
+
+      {/* 8. Amount (Kept at the very end of the row) */}
       {!hideMoney && (
         <td className="px-2 py-2.5 text-right font-semibold text-slate-900 whitespace-nowrap text-[13px]">
           {formatINR(order.total_amount)}
         </td>
       )}
-
-      {/* 8. Assigned */}
-      {isAdmin && <td className="px-2 py-2.5 text-slate-600 whitespace-nowrap text-[12px]">{order.assigned_name ?? "Unassigned"}</td>}
     </tr>
   );
 }
