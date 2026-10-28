@@ -119,6 +119,7 @@ export class CallerDeskWebRtcEngine {
     this.emit("config_ok");
     this.domain = cfg.sipDomain;
     try {
+      // @ts-ignore optional browser-only module
       this.sip = await import("sip.js");
       const { UserAgent, Registerer, RegistererState } = this.sip;
       const uri = UserAgent.makeURI(`sip:${cfg.extension}@${cfg.sipDomain}`);

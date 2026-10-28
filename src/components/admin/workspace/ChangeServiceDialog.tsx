@@ -117,7 +117,11 @@ function ChangeServiceDialog({
         : r.mode === "downgrade" ? `Customer overpaid by ₹${Math.abs(r.delta).toFixed(2)} (no refund per policy).`
         : `Amount unchanged.`;
       toast.success(`Service changed to ${r.newService?.service_name}. ${priceMsg}`);
+      qc.invalidateQueries({ queryKey: ["admin.order"] });
       qc.invalidateQueries({ queryKey: ["admin.order", orderId] });
+      qc.invalidateQueries({ queryKey: ["admin.formSubmission"] });
+      qc.invalidateQueries({ queryKey: ["admin.orders.v2"] });
+      qc.invalidateQueries({ queryKey: ["admin.lead.workspace"] });
       qc.invalidateQueries({ queryKey: ["admin.lead-emails"] });
       qc.invalidateQueries({ queryKey: ["admin.invoices"] });
       qc.invalidateQueries({ queryKey: ["payment-link-status", orderId] });

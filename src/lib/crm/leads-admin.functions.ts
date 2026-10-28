@@ -260,6 +260,19 @@ export const changeLeadService = createServerFn({ method: "POST" })
       })
       .eq("lead_id", data.leadId);
 
+    // 4b. Synchronize onboarding form submission to the target service schema and map common fields
+    try {
+      const { syncSubmissionForOrder } = await import("@/lib/crm/submission-sync.server");
+      await syncSubmissionForOrder({
+        admin,
+        leadId: data.leadId,
+        targetServiceId: targetSvc.id,
+        targetServiceCode: targetSvc.service_code,
+      });
+    } catch (syncErr) {
+      console.warn("Failed to synchronize submission on lead service change:", syncErr);
+    }
+
     // 5. Expire existing pending payment links for this lead
     await admin
       .from("payment_links" as any)

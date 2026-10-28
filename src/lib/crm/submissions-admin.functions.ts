@@ -260,7 +260,26 @@ export const getFormSubmissionForApplication = createServerFn({ method: "GET" })
       sub = bylead;
     }
 
-    const serviceCode = sub?.service_code ?? (service as any)?.service_code ?? null;
+    const targetServiceCode = (service as any)?.service_code ?? sub?.service_code ?? null;
+    let serviceCode = targetServiceCode;
+
+    // Auto-sync & heal submission if service changed, fields need mapping, or status was demoted
+    try {
+      const { syncSubmissionForOrder } = await import("@/lib/crm/submission-sync.server");
+      const syncRes = await syncSubmissionForOrder({
+        admin: supabaseAdmin,
+        applicationId: app.id,
+        leadId: app.lead_id,
+        targetServiceId: app.service_id,
+        targetServiceCode,
+      });
+      if (syncRes.submission) {
+        sub = syncRes.submission;
+        if (syncRes.serviceCode) serviceCode = syncRes.serviceCode;
+      }
+    } catch (syncErr) {
+      console.warn("Failed to auto-sync submission for order:", syncErr);
+    }
 
     let requiredDocs: Array<{ key: string; label: string; required: boolean }> = [];
     let activeSchema: any = null;
@@ -280,6 +299,25 @@ export const getFormSubmissionForApplication = createServerFn({ method: "GET" })
         label: String(d.label ?? d.name ?? d.key ?? ""),
         required: d.required !== false,
       }));
+
+      // Fallback to TS schemas if no custom schema row in DB
+      if (!activeSchema) {
+        const { getSchema } = await import("@/lib/onboarding/schemas");
+        const tsSchema = getSchema(serviceCode);
+        if (tsSchema) {
+          activeSchema = {
+            fields: tsSchema.fields,
+            sections: [],
+          };
+          if (!requiredDocs.length && tsSchema.documents?.length) {
+            requiredDocs = tsSchema.documents.map((d) => ({
+              key: String(d.key ?? (d as any).type ?? ""),
+              label: String(d.label ?? (d as any).name ?? d.key ?? ""),
+              required: d.required !== false,
+            }));
+          }
+        }
+      }
     }
 
     const roleList = (roles ?? []).map((r: any) => r.role);

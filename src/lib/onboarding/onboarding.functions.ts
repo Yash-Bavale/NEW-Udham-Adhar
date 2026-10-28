@@ -325,7 +325,7 @@ export const submitOnboarding = createServerFn({ method: "POST" })
     // detect terminal orders and prevent a closed order from being re-opened.
     const { data: app } = await supabaseAdmin
       .from("applications")
-      .select("id, order_status, fulfillment_status, closure_stage, workflow_status")
+      .select("id, order_status, fulfillment_status, closure_stage, workflow_status, form_status, form_submitted_at")
       .eq("lead_id", lead.id)
       .order("created_at", { ascending: false })
       .limit(1)
@@ -353,6 +353,25 @@ export const submitOnboarding = createServerFn({ method: "POST" })
     );
 
     const now = new Date().toISOString();
+
+    const { data: existingSub } = await supabaseAdmin
+      .from("onboarding_submissions")
+      .select("id, status, submitted_at")
+      .eq("lead_id", lead.id)
+      .maybeSingle();
+
+    const isAlreadySubmitted =
+      existingSub?.status === "submitted" ||
+      Boolean(app?.form_submitted_at) ||
+      app?.form_status === "submitted" ||
+      isTerminalOrder;
+
+    const targetStatus = data.draft && !isAlreadySubmitted ? "draft" : "submitted";
+    const targetSubmittedAt =
+      data.draft && !isAlreadySubmitted
+        ? null
+        : (existingSub?.submitted_at || app?.form_submitted_at || now);
+
     const { error } = await supabaseAdmin
       .from("onboarding_submissions")
       .upsert(
@@ -361,8 +380,8 @@ export const submitOnboarding = createServerFn({ method: "POST" })
           application_id: app?.id ?? null,
           service_code: serviceCode,
           form_data: mergedData,
-          status: data.draft ? "draft" : "submitted",
-          submitted_at: data.draft ? null : now,
+          status: targetStatus,
+          submitted_at: targetSubmittedAt,
         },
         { onConflict: "lead_id" },
       );

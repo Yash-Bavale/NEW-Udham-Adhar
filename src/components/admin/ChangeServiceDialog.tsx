@@ -72,6 +72,10 @@ export function ChangeServiceDialog({
     onSuccess: (res) => {
       toast.success(`Service changed to ${res.serviceName}! New payment link generated.`);
       qc.invalidateQueries({ queryKey: ["admin.lead", leadId] });
+      qc.invalidateQueries({ queryKey: ["admin.order"] });
+      qc.invalidateQueries({ queryKey: ["admin.formSubmission"] });
+      qc.invalidateQueries({ queryKey: ["admin.orders.v2"] });
+      qc.invalidateQueries({ queryKey: ["admin.lead.workspace"] });
       qc.invalidateQueries({ queryKey: ["payment-link-status", leadId] });
       qc.invalidateQueries({ queryKey: ["admin.lead-events", leadId] });
       qc.invalidateQueries({ queryKey: ["admin.lead-contact-events", leadId] });

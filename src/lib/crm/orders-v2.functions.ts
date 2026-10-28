@@ -3427,7 +3427,7 @@ export const changeOrderService = createServerFn({ method: "POST" })
 
     const { data: newSvc, error: svcErr } = await admin
       .from("services")
-      .select("id, service_name, base_amount, gst_amount, total_amount, govt_portal_url")
+      .select("id, service_code, service_name, base_amount, gst_amount, total_amount, govt_portal_url")
       .eq("id", data.newServiceId)
       .maybeSingle();
     if (svcErr) throw new Error(svcErr.message);
@@ -3471,6 +3471,20 @@ export const changeOrderService = createServerFn({ method: "POST" })
       .update({ service_id: newSvc.id } as never)
       .eq("id", app.id);
     if (appUpdErr) throw new Error(appUpdErr.message);
+
+    // Synchronize onboarding form submission to the new service schema and map common fields
+    try {
+      const { syncSubmissionForOrder } = await import("@/lib/crm/submission-sync.server");
+      await syncSubmissionForOrder({
+        admin,
+        applicationId: app.id,
+        leadId: app.lead_id,
+        targetServiceId: newSvc.id,
+        targetServiceCode: (newSvc as any).service_code,
+      });
+    } catch (syncErr) {
+      console.warn("Failed to synchronize submission on service change:", syncErr);
+    }
 
     // If a top-up is needed, record a supplementary payment_links row (staff
     // shares this with the customer). Actual charge amount handling for the

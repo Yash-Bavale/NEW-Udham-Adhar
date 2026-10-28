@@ -94,10 +94,31 @@ function OnboardingDetailsPage() {
   }
   initial.nic_activities = typeof existing.nic_activities === "string" ? existing.nic_activities : "";
   if (schemaKeys.has("applicant_name")) initial.applicant_name ||= data.lead.name ?? "";
-  // Only prefill aadhaar_mobile when the active schema actually collects it
-  // (New Udyam). Other services have their own `registered_mobile` field and
-  // should not have a stray `aadhaar_mobile` saved to form_data.
   if (schemaKeys.has("aadhaar_mobile")) initial.aadhaar_mobile ||= data.lead.mobile ?? "";
+  if (schemaKeys.has("registered_mobile")) {
+    initial.registered_mobile ||=
+      String(existing.registered_mobile ?? existing.aadhaar_mobile ?? existing.mobile ?? data.lead.mobile ?? "");
+  }
+  if (schemaKeys.has("registered_email")) {
+    initial.registered_email ||=
+      String(existing.registered_email ?? existing.email ?? data.lead.email ?? "");
+  }
+  if (schemaKeys.has("udyam_number")) {
+    initial.udyam_number ||=
+      String(existing.udyam_number ?? existing.udyam_reg_no ?? existing.uam_number ?? "");
+  }
+  if (schemaKeys.has("pan_number")) {
+    initial.pan_number ||=
+      String(existing.pan_number ?? existing.pan ?? "");
+  }
+  if (schemaKeys.has("pan_holder_name")) {
+    initial.pan_holder_name ||=
+      String(existing.pan_holder_name ?? existing.applicant_name ?? data.lead.name ?? "");
+  }
+  if (schemaKeys.has("business_name")) {
+    initial.business_name ||=
+      String(existing.business_name ?? existing.enterprise_name ?? "");
+  }
 
   // Strip UI-only `section_*` separator keys before persistence.
   const cleanPayload = (values: Record<string, unknown>): Record<string, unknown> => {
