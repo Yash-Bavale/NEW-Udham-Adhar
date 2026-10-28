@@ -38,6 +38,7 @@ import { usePermissions } from "@/hooks/usePermissions";
 import { useRealtimeTable } from "@/hooks/useRealtimeTable";
 import { usePreserveScroll, saveModuleFilterState, getModuleFilterState, clearModuleFilterState } from "@/hooks/usePreserveScroll";
 import { useFinancialVisibility } from "@/hooks/useFinancialVisibility";
+import { useDashboardPrivacy } from "@/hooks/useDashboardPrivacy";
 import { formatMobile55, cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/admin/orders/")({
@@ -286,7 +287,11 @@ function OrderIdleTimerKpiCard({
   const minutes = Math.floor(seconds / 60);
   const hours = Math.floor(minutes / 60);
 
-  const displayTime = !latestActionAt
+  const { isPrivacyEnabled } = useDashboardPrivacy();
+
+  const displayTime = isPrivacyEnabled
+    ? "••m ••s"
+    : !latestActionAt
     ? "0m 00s"
     : hours > 0
     ? `${hours}h ${String(minutes % 60).padStart(2, "0")}m ${String(seconds % 60).padStart(2, "0")}s`
@@ -327,7 +332,9 @@ function OrderIdleTimerKpiCard({
   const timerCls = isHealthy ? "text-emerald-950 font-bold" : isAttention ? "text-amber-950 font-bold" : "text-rose-950 font-bold";
   const subtitleCls = isHealthy ? "text-emerald-700/80" : isAttention ? "text-amber-700/80" : "text-rose-700/80";
 
-  const subtitleText = latestActionLabel
+  const subtitleText = isPrivacyEnabled
+    ? "Live employee timer"
+    : latestActionLabel
     ? `Since ${latestActionLabel}${latestActionOrderCode ? ` (#${latestActionOrderCode})` : ""}`
     : "Live employee timer";
 
@@ -386,6 +393,7 @@ export function OrdersListPage({ mode = "self" }: { mode?: "self" | "team" }) {
   const isPrivileged = isAdmin || isTeam;
 
   const hideMoney = role.hideMoney();
+  const { isPrivacyEnabled } = useDashboardPrivacy();
   const navigate = useNavigate();
   const qc = useQueryClient();
 
@@ -1351,11 +1359,11 @@ return (
             {/* Middle row: Count & Badge */}
             <div className="flex items-baseline gap-1.5 mt-1">
               <span className={cn("text-lg sm:text-xl font-black tracking-tight", countCls)}>
-                {countVal.toLocaleString()}
+                {isPrivacyEnabled ? "•••" : countVal.toLocaleString()}
               </span>
               {b.id === "pending" && (counts as any).pending_actions_total > countVal ? (
                 <span className="text-[9px] font-bold px-1.5 py-0.5 rounded leading-none shrink-0 bg-purple-600 text-white shadow-2xs" title={`${(counts as any).pending_actions_total} total manual actions performed across these orders`}>
-                  {(counts as any).pending_actions_total} Actions
+                  {isPrivacyEnabled ? "••• Actions" : `${(counts as any).pending_actions_total} Actions`}
                 </span>
               ) : b.badge ? (
                 <span className={cn("text-[9px] font-bold px-1.5 py-0.5 rounded leading-none shrink-0", b.badge.pillClass)}>
@@ -1369,7 +1377,9 @@ return (
               className={cn("text-[9.5px] font-medium truncate mt-1 leading-tight", subtitleCls)}
               title={b.id === "pending" && (counts as any).pending_actions_total > countVal ? `${countVal} unique orders · ${(counts as any).pending_actions_total} total actions performed` : b.subtitle}
             >
-              {b.id === "pending" && (counts as any).pending_actions_total > countVal
+              {isPrivacyEnabled && b.id === "pending"
+                ? "Pending orders"
+                : b.id === "pending" && (counts as any).pending_actions_total > countVal
                 ? `${(counts as any).pending_actions_total} Total Actions`
                 : b.subtitle}
             </div>
@@ -1745,7 +1755,7 @@ return (
     {total > pageSize && (
       <div className="flex items-center justify-between px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-xs text-slate-600 shadow-xs mt-2">
         <div>
-          Page {page} of {Math.max(1, Math.ceil(total / pageSize))} · {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, total)} of {total.toLocaleString("en-IN")}
+          Page {page} of {Math.max(1, Math.ceil(total / pageSize))} · {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, total)} of {isPrivacyEnabled ? "•••" : total.toLocaleString("en-IN")}
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -1794,6 +1804,12 @@ function EmployeeIdleTimerCell({
     const interval = setInterval(tick, 1000);
     return () => clearInterval(interval);
   }, [latestActionAt]);
+
+  const { isPrivacyEnabled } = useDashboardPrivacy();
+
+  if (isPrivacyEnabled) {
+    return <span className="text-slate-400 font-mono text-[11px]">••m</span>;
+  }
 
   if (!latestActionAt) {
     return <span className="text-slate-400 font-mono text-[11px]">—</span>;
@@ -1863,6 +1879,7 @@ function TeamWorkforceBreakdown({
   assignedTo: string;
   onSelectEmployee: (id: string) => void;
 }) {
+  const { isPrivacyEnabled } = useDashboardPrivacy();
   return (
     <div className="space-y-4">
       {/* Desktop View */}
@@ -1927,7 +1944,7 @@ function TeamWorkforceBreakdown({
                             pendingCount > 0 ? "bg-violet-100 text-violet-800 border border-violet-200" : "text-slate-400"
                           )}
                         >
-                          {pendingCount}
+                          {isPrivacyEnabled ? "•••" : pendingCount}
                         </span>
                       </td>
                       <td className="px-2 py-2.5 text-center">
@@ -1937,7 +1954,7 @@ function TeamWorkforceBreakdown({
                             member.needsAction > 0 ? "bg-rose-100 text-rose-700" : "text-slate-400"
                           )}
                         >
-                          {member.needsAction}
+                          {isPrivacyEnabled ? "•••" : member.needsAction}
                         </span>
                       </td>
                       <td className="px-2 py-2.5 text-center">
@@ -1950,7 +1967,7 @@ function TeamWorkforceBreakdown({
                             member.hotOrders > 0 ? "bg-rose-50 text-rose-700 border border-rose-200" : "text-slate-400"
                           )}
                         >
-                          {member.hotOrders}
+                          {isPrivacyEnabled ? "•••" : member.hotOrders}
                         </span>
                       </td>
                       <td className="px-2 py-2.5 text-center">
@@ -1960,7 +1977,7 @@ function TeamWorkforceBreakdown({
                             member.backlog > 0 ? "bg-amber-100 text-amber-800" : "text-slate-400"
                           )}
                         >
-                          {member.backlog}
+                          {isPrivacyEnabled ? "•••" : member.backlog}
                         </span>
                       </td>
                       <td className="px-2 py-2.5 text-center">
@@ -1970,7 +1987,7 @@ function TeamWorkforceBreakdown({
                             member.technicalDelay > 0 ? "bg-sky-50 text-sky-700 border border-sky-200" : "text-slate-400"
                           )}
                         >
-                          {member.technicalDelay}
+                          {isPrivacyEnabled ? "•••" : member.technicalDelay}
                         </span>
                       </td>
                       <td className="px-2 py-2.5 text-center">
@@ -1980,7 +1997,7 @@ function TeamWorkforceBreakdown({
                             member.callbackScheduled > 0 ? "bg-indigo-50 text-indigo-700 border border-indigo-200" : "text-slate-400"
                           )}
                         >
-                          {member.callbackScheduled}
+                          {isPrivacyEnabled ? "•••" : member.callbackScheduled}
                         </span>
                       </td>
                       <td className="px-2 py-2.5 text-center">
@@ -1990,7 +2007,7 @@ function TeamWorkforceBreakdown({
                             member.customerDelay > 0 ? "bg-amber-50 text-amber-800 border border-amber-200" : "text-slate-400"
                           )}
                         >
-                          {member.customerDelay}
+                          {isPrivacyEnabled ? "•••" : member.customerDelay}
                         </span>
                       </td>
                       <td className="px-2 py-2.5 text-center">
@@ -2000,14 +2017,14 @@ function TeamWorkforceBreakdown({
                             member.actionTaken > 0 ? "bg-amber-50 text-amber-700 font-bold" : "text-slate-400"
                           )}
                         >
-                          {member.actionTaken}
+                          {isPrivacyEnabled ? "•••" : member.actionTaken}
                         </span>
                       </td>
                       <td className="px-2 py-2.5 text-center font-bold text-emerald-600">
-                        {member.completed}
+                        {isPrivacyEnabled ? "•••" : member.completed}
                       </td>
                       <td className="px-2 py-2.5 text-center font-semibold text-slate-600">
-                        {member.closed}
+                        {isPrivacyEnabled ? "•••" : member.closed}
                       </td>
                     </tr>
                   );
@@ -2048,49 +2065,49 @@ function TeamWorkforceBreakdown({
                 <div className="grid grid-cols-6 gap-1 text-center text-xs pt-1.5 border-t border-slate-100">
                   <div className="bg-violet-50/70 p-1.5 rounded-lg border border-violet-200/60">
                     <div className="text-[9px] text-violet-700 font-bold">Pending</div>
-                    <div className="font-bold text-violet-800">{member.pendingOrders ?? (member.needsAction + member.callbackScheduled + member.technicalDelay)}</div>
+                    <div className="font-bold text-violet-800">{isPrivacyEnabled ? "•••" : (member.pendingOrders ?? (member.needsAction + member.callbackScheduled + member.technicalDelay))}</div>
                   </div>
                   <div className="bg-rose-50/70 p-1.5 rounded-lg">
                     <div className="text-[9px] text-rose-600 font-medium">Needs Action</div>
-                    <div className="font-bold text-rose-700">{member.needsAction}</div>
+                    <div className="font-bold text-rose-700">{isPrivacyEnabled ? "•••" : member.needsAction}</div>
                   </div>
                   <div className="bg-rose-50/70 p-1.5 rounded-lg">
                     <div className="text-[9px] text-rose-600 font-medium">Hot</div>
-                    <div className="font-bold text-rose-700">{member.hotOrders}</div>
+                    <div className="font-bold text-rose-700">{isPrivacyEnabled ? "•••" : member.hotOrders}</div>
                   </div>
                   <div className="bg-amber-50/70 p-1.5 rounded-lg">
                     <div className="text-[9px] text-amber-700 font-medium">Backlog</div>
-                    <div className="font-bold text-amber-800">{member.backlog}</div>
+                    <div className="font-bold text-amber-800">{isPrivacyEnabled ? "•••" : member.backlog}</div>
                   </div>
                   <div className="bg-sky-50/70 p-1.5 rounded-lg">
                     <div className="text-[9px] text-sky-700 font-medium">Tech Delay</div>
-                    <div className="font-bold text-sky-800">{member.technicalDelay}</div>
+                    <div className="font-bold text-sky-800">{isPrivacyEnabled ? "•••" : member.technicalDelay}</div>
                   </div>
                   <div className="bg-indigo-50/70 p-1.5 rounded-lg">
                     <div className="text-[9px] text-indigo-700 font-medium">Callback</div>
-                    <div className="font-bold text-indigo-800">{member.callbackScheduled}</div>
+                    <div className="font-bold text-indigo-800">{isPrivacyEnabled ? "•••" : member.callbackScheduled}</div>
                   </div>
                 </div>
                 <div className="grid grid-cols-5 gap-1 text-center text-xs">
                   <div className="bg-amber-50/70 p-1.5 rounded-lg">
                     <div className="text-[9px] text-amber-700 font-medium">Cust Delay</div>
-                    <div className="font-bold text-amber-800">{member.customerDelay}</div>
+                    <div className="font-bold text-amber-800">{isPrivacyEnabled ? "•••" : member.customerDelay}</div>
                   </div>
                   <div className="bg-amber-50/70 p-1.5 rounded-lg">
                     <div className="text-[9px] text-amber-700 font-medium">Action Taken</div>
-                    <div className="font-bold text-amber-800">{member.actionTaken}</div>
+                    <div className="font-bold text-amber-800">{isPrivacyEnabled ? "•••" : member.actionTaken}</div>
                   </div>
                   <div className="bg-emerald-50/70 p-1.5 rounded-lg">
                     <div className="text-[9px] text-emerald-700 font-medium">Completed</div>
-                    <div className="font-bold text-emerald-800">{member.completed}</div>
+                    <div className="font-bold text-emerald-800">{isPrivacyEnabled ? "•••" : member.completed}</div>
                   </div>
                   <div className="bg-slate-50 p-1.5 rounded-lg">
                     <div className="text-[9px] text-slate-600 font-medium">Closed</div>
-                    <div className="font-bold text-slate-700">{member.closed}</div>
+                    <div className="font-bold text-slate-700">{isPrivacyEnabled ? "•••" : member.closed}</div>
                   </div>
                   <div className="bg-slate-100 p-1.5 rounded-lg">
                     <div className="text-[9px] text-slate-700 font-medium">Total</div>
-                    <div className="font-bold text-slate-900">{member.total}</div>
+                    <div className="font-bold text-slate-900">{isPrivacyEnabled ? "•••" : member.total}</div>
                   </div>
                 </div>
               </div>
@@ -2734,13 +2751,14 @@ function paymentLabel(s: string): string {
 }
 
 function AgeChip({ label, n, tone = "amber" }: { label: string; n: number; tone?: "amber" | "rose" }) {
+  const { isPrivacyEnabled } = useDashboardPrivacy();
   const cls = tone === "rose"
     ? "bg-rose-100 text-rose-800 border-rose-200"
     : "bg-white text-amber-900 border-amber-200";
   return (
     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded border text-[11px] font-medium ${cls}`}>
       <span className="text-[10px] uppercase tracking-wider opacity-70">{label}</span>
-      <span className="font-semibold">{n}</span>
+      <span className="font-semibold">{isPrivacyEnabled ? "•••" : n}</span>
     </span>
   );
 }

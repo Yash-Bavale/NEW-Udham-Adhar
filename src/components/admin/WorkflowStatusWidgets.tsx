@@ -30,11 +30,14 @@ const AUTO_LABEL: Record<string, string> = {
   gov_reminder_flow: "Government reminder",
 };
 
+import { useDashboardPrivacy } from "@/hooks/useDashboardPrivacy";
+
 function StatRow({ label, value, tone }: { label: string; value: number; tone?: string }) {
+  const { isPrivacyEnabled } = useDashboardPrivacy();
   return (
     <div className="flex items-center justify-between text-sm py-1">
       <span className="text-muted-foreground">{label}</span>
-      <Badge variant="secondary" className={tone}>{value}</Badge>
+      <Badge variant="secondary" className={tone}>{isPrivacyEnabled ? "•••" : value}</Badge>
     </div>
   );
 }

@@ -59,6 +59,7 @@ import { useEmployeePresence } from "@/hooks/useEmployeePresence";
 import { TelephonyPanel } from "@/components/admin/telephony/TelephonyPanel";
 import { WebRtcPhone } from "@/components/admin/telephony/WebRtcPhone";
 import { FinancialVisibilityProvider } from "@/hooks/useFinancialVisibility";
+import { DashboardPrivacyProvider } from "@/hooks/useDashboardPrivacy";
 
 function AdminLayout() {
   const [email, setEmail] = useState<string>();
@@ -90,14 +91,16 @@ function AdminLayout() {
     );
   }, []);
   return (
-    <FinancialVisibilityProvider>
-      <AdminShell email={email}>
-        <Outlet />
-        <TelephonyPanel />
-        {/* Shows only for the authorised test account (help@businesshelpservices.in); hidden for everyone else. */}
-        <WebRtcPhone />
-      </AdminShell>
-    </FinancialVisibilityProvider>
+    <DashboardPrivacyProvider>
+      <FinancialVisibilityProvider>
+        <AdminShell email={email}>
+          <Outlet />
+          <TelephonyPanel />
+          {/* Shows only for the authorised test account (help@businesshelpservices.in); hidden for everyone else. */}
+          <WebRtcPhone />
+        </AdminShell>
+      </FinancialVisibilityProvider>
+    </DashboardPrivacyProvider>
   );
 }
 

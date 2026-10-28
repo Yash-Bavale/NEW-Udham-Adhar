@@ -36,6 +36,7 @@ import { toast } from "sonner";
 import { formatIST } from "@/lib/datetime";
 import { DateRangePicker } from "./DateRangePicker";
 import { useFinancialVisibility } from "@/hooks/useFinancialVisibility";
+import { useDashboardPrivacy } from "@/hooks/useDashboardPrivacy";
 import { cn } from "@/lib/utils";
 
 const fmtN = (n: number) => new Intl.NumberFormat("en-IN").format(n || 0);
@@ -270,6 +271,7 @@ function StatChip({
   href?: string;
 }) {
   const navigate = useNavigate();
+  const { isPrivacyEnabled } = useDashboardPrivacy();
   const cls: Record<string, string> = {
     emerald: "text-emerald-700 bg-emerald-50 hover:bg-emerald-100",
     rose: "text-rose-700 bg-rose-50 hover:bg-rose-100",
@@ -280,10 +282,11 @@ function StatChip({
     violet: "text-violet-700 bg-violet-50 hover:bg-violet-100",
     teal: "text-teal-700 bg-teal-50 hover:bg-teal-100",
   };
+  const displayVal = isPrivacyEnabled ? "•••" : (typeof value === "number" ? fmtN(value) : value);
   const body = (
     <>
       <span className="opacity-70">{label}</span>
-      <span className="font-semibold tabular-nums">{typeof value === "number" ? fmtN(value) : value}</span>
+      <span className="font-semibold tabular-nums">{displayVal}</span>
     </>
   );
   const base = `inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-medium ${cls[tone]}`;
@@ -318,7 +321,12 @@ function ModernKpi({
   action?: React.ReactNode;
 }) {
   const navigate = useNavigate();
+  const { isPrivacyEnabled } = useDashboardPrivacy();
   const t = TONE_STYLES[tone];
+  const displayVal = isPrivacyEnabled ? "•••" : value;
+  const displayFooter = isPrivacyEnabled && typeof footer === "string" && footer.includes("(")
+    ? footer.replace(/\([^)]+\)/, "(••• / •••)")
+    : footer;
   const body = (
     <div
       onClick={() => {
@@ -332,17 +340,17 @@ function ModernKpi({
     >
       <div className="flex items-center justify-between gap-2">
         <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{label}</div>
-        {delta !== undefined && <DeltaPill d={delta ?? null} />}
+        {delta !== undefined && !isPrivacyEnabled && <DeltaPill d={delta ?? null} />}
       </div>
       <div className="mt-1.5 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
           <div className={`grid size-8 shrink-0 place-items-center rounded-lg ${t.chip}`}>{icon}</div>
-          <div className={`text-2xl font-bold leading-tight tabular-nums truncate ${t.value}`}>{value}</div>
+          <div className={`text-2xl font-bold leading-tight tabular-nums truncate ${t.value}`}>{displayVal}</div>
         </div>
         {action}
       </div>
       {subs && <div className="mt-2 flex flex-wrap gap-1">{subs}</div>}
-      {footer && <div className="mt-auto pt-2 text-[10px] text-slate-500">{footer}</div>}
+      {displayFooter && <div className="mt-auto pt-2 text-[10px] text-slate-500">{displayFooter}</div>}
     </div>
   );
   return body;
@@ -523,6 +531,7 @@ const KpiGrid = memo(function KpiGrid({ data, loading, range }: { data?: Dashboa
 
 function CustomTrendTooltip({ active, payload, label }: any) {
   const { formatINR } = useFinancialVisibility();
+  const { isPrivacyEnabled } = useDashboardPrivacy();
   if (!active || !payload || !payload.length) return null;
 
   const leads = payload.find((p: any) => p.dataKey === "Leads")?.value ?? 0;
@@ -540,19 +549,19 @@ function CustomTrendTooltip({ active, payload, label }: any) {
           <span className="flex items-center gap-1.5 text-slate-600">
             <span className="size-2 rounded-sm bg-indigo-500" /> Leads
           </span>
-          <span className="font-bold font-mono text-indigo-600">{fmtN(leads)}</span>
+          <span className="font-bold font-mono text-indigo-600">{isPrivacyEnabled ? "•••" : fmtN(leads)}</span>
         </div>
         <div className="flex items-center justify-between gap-3">
           <span className="flex items-center gap-1.5 text-slate-600">
             <span className="size-2 rounded-sm bg-sky-500" /> Orders
           </span>
-          <span className="font-bold font-mono text-sky-600">{fmtN(orders)}</span>
+          <span className="font-bold font-mono text-sky-600">{isPrivacyEnabled ? "•••" : fmtN(orders)}</span>
         </div>
         <div className="flex items-center justify-between gap-3 pt-1 border-t border-slate-100">
           <span className="flex items-center gap-1.5 text-slate-700 font-semibold">
             <span className="size-2 rounded-full bg-emerald-500" /> Revenue
           </span>
-          <span className="font-extrabold font-mono text-emerald-600">{formatINR(revenue)}</span>
+          <span className="font-extrabold font-mono text-emerald-600">{isPrivacyEnabled ? "₹••••••" : formatINR(revenue)}</span>
         </div>
       </div>
     </div>
@@ -683,6 +692,7 @@ const TrendCard = memo(function TrendCard({ data, rangePreset = "today", loading
 
 const TopServicesCard = memo(function TopServicesCard({ data, loading }: { data?: DashboardTopServicesResult; loading: boolean }) {
   const { formatShortINR } = useFinancialVisibility();
+  const { isPrivacyEnabled } = useDashboardPrivacy();
   const rows = data ?? [];
   const max = Math.max(1, ...rows.map((r) => r.revenueInr));
   return (
@@ -702,7 +712,7 @@ const TopServicesCard = memo(function TopServicesCard({ data, loading }: { data?
               <div className="flex justify-between text-xs">
                 <span className="truncate pr-2 font-medium">{r.name}</span>
                 <span className="font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">
-                  {formatShortINR(r.revenueInr)}
+                  {isPrivacyEnabled ? "•••" : formatShortINR(r.revenueInr)}
                 </span>
               </div>
               <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-muted">
@@ -711,7 +721,7 @@ const TopServicesCard = memo(function TopServicesCard({ data, loading }: { data?
                   style={{ width: `${(r.revenueInr / max) * 100}%` }}
                 />
               </div>
-              <div className="mt-0.5 text-[10px] text-muted-foreground">{r.orders} orders</div>
+              <div className="mt-0.5 text-[10px] text-muted-foreground">{isPrivacyEnabled ? "••• orders" : `${r.orders} orders`}</div>
             </div>
           ))
         )}
@@ -723,6 +733,7 @@ const TopServicesCard = memo(function TopServicesCard({ data, loading }: { data?
 /* ---------------- Workflow ---------------- */
 
 const WorkflowCard = memo(function WorkflowCard({ data, loading }: { data?: DashboardSecondaryResult["workflow"]; loading: boolean }) {
+  const { isPrivacyEnabled } = useDashboardPrivacy();
   const items = [
     { label: "External Delay", value: data?.externalDelay ?? 0 },
     { label: "Waiting on Customer", value: data?.onHold ?? 0 },
@@ -743,7 +754,9 @@ const WorkflowCard = memo(function WorkflowCard({ data, loading }: { data?: Dash
           : items.map((it) => (
               <div key={it.label} className="flex items-center justify-between rounded-md px-2 py-1.5 hover:bg-muted/50">
                 <span className="text-sm text-muted-foreground">{it.label}</span>
-                <Badge variant={it.value > 0 ? "secondary" : "outline"} className="tabular-nums">{fmtN(it.value)}</Badge>
+                <Badge variant={it.value > 0 ? "secondary" : "outline"} className="tabular-nums">
+                  {isPrivacyEnabled ? "•••" : fmtN(it.value)}
+                </Badge>
               </div>
             ))}
       </CardContent>
@@ -754,6 +767,7 @@ const WorkflowCard = memo(function WorkflowCard({ data, loading }: { data?: Dash
 /* ---------------- Email queue ---------------- */
 
 const EmailQueueCard = memo(function EmailQueueCard({ data, loading }: { data?: DashboardSecondaryResult["emailQueue"]; loading: boolean }) {
+  const { isPrivacyEnabled } = useDashboardPrivacy();
   const items = [
     { label: "Queued", value: data?.queued ?? 0, tone: "default" as const },
     { label: "Processing", value: data?.processing ?? 0, tone: "default" as const },
@@ -778,7 +792,9 @@ const EmailQueueCard = memo(function EmailQueueCard({ data, loading }: { data?: 
           : items.map((it) => (
               <div key={it.label} className="flex items-center justify-between rounded-md px-2 py-1.5 hover:bg-muted/50">
                 <span className="text-sm text-muted-foreground">{it.label}</span>
-                <span className={`font-semibold tabular-nums ${tones[it.tone]}`}>{fmtN(it.value)}</span>
+                <span className={`font-semibold tabular-nums ${tones[it.tone]}`}>
+                  {isPrivacyEnabled ? "•••" : fmtN(it.value)}
+                </span>
               </div>
             ))}
       </CardContent>

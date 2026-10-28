@@ -34,6 +34,7 @@ import { useNewLeadsWatcher } from "@/hooks/useNewLeadsWatcher";
 import { NotificationsOptIn } from "@/components/admin/NotificationsOptIn";
 import { ReminderNotificationManager } from "@/components/admin/ReminderNotificationManager";
 import { clearModuleFilterState } from "@/hooks/usePreserveScroll";
+import { DashboardPrivacyToggle } from "@/components/admin/DashboardPrivacyToggle";
 import type { Module } from "@/lib/roles";
 
 type NavItem = {
@@ -488,6 +489,7 @@ function Shell({ children, email }: { children: ReactNode; email?: string }) {
           await supabase.auth.signOut({ scope: "local" });
               navigate({ to: "/admin-login" });
             }} />
+            <DashboardPrivacyToggle />
           </div>
         </header>
 
