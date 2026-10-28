@@ -820,6 +820,41 @@ export type Database = {
         }
         Relationships: []
       }
+      cashfree_account_credentials: {
+        Row: {
+          account_id: string
+          client_id: string
+          client_secret_ciphertext: string
+          mode: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          account_id: string
+          client_id: string
+          client_secret_ciphertext: string
+          mode: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          account_id?: string
+          client_id?: string
+          client_secret_ciphertext?: string
+          mode?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cashfree_account_credentials_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: true
+            referencedRelation: "cashfree_merchant_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cashfree_merchant_accounts: {
         Row: {
           account_key: string
