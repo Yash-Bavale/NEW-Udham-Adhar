@@ -205,7 +205,9 @@ function resolveEmailButtonTag(templateCode?: string | null): ButtonActionTagPro
   if (tc === "E009" || tc === "E09" || tc === "BHS_E009") return { code: "B09", label: "Reopen Order", variant: "indigo" };
   if (tc === "E010" || tc === "BHS_E010") return { code: "B10", label: "Force Close", variant: "rose" };
   if (tc === "R002" || tc === "BHS_R002") return { label: "Refund Rejected (R002)", variant: "rose" };
-  if (tc === "E012" || tc === "BHS_E012") return { label: "Refund Approved", variant: "slate" };
+  if (tc === "E012" || tc === "BHS_E012") return { label: "Change Service", variant: "blue" };
+  if (tc === "E013" || tc === "BHS_E013") return { label: "Payment Received", variant: "emerald" };
+  if (tc === "R001" || tc === "BHS_R001") return { label: "Refund Approved", variant: "slate" };
   return null;
 }
 
