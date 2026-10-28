@@ -403,3 +403,111 @@ export const setWebsiteGateway = createServerFn({ method: "POST" })
     if (error) throw new Error("Could not save the payment option.");
     return { ok: true };
   });
+
+// ── Cashfree merchant accounts (MIDs) ─────────────────────────────────────────
+// Secrets are entered once, encrypted on the server and never sent back to the screen.
+
+export const listCashfreeAccounts = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertRole(context.supabase, ["super_admin", "admin"]);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const db = supabaseAdmin as any;
+    const [accts, creds, maps] = await Promise.all([
+      db.from("cashfree_merchant_accounts").select("id, account_key, label, is_legacy, is_active, created_at").order("created_at"),
+      db.from("cashfree_account_credentials").select("account_id, client_id, mode, updated_at"),
+      db.from("cashfree_website_accounts").select("account_id, is_enabled"),
+    ]);
+    if (accts.error) throw new Error("Could not load merchant accounts.");
+    return {
+      accounts: (accts.data ?? []).map((a: any) => {
+        const c = (creds.data ?? []).find((x: any) => x.account_id === a.id);
+        const id = String(c?.client_id ?? "");
+        return {
+          id: a.id, key: a.account_key, label: a.label, isLegacy: a.is_legacy, isActive: a.is_active,
+          // Only a masked hint of the App ID; the secret key is never returned.
+          credentials: a.is_legacy ? "global" : c ? "saved" : "missing",
+          clientIdHint: c ? `${id.slice(0, 4)}…${id.slice(-4)}` : null,
+          mode: c?.mode ?? null,
+          updatedAt: c?.updated_at ?? null,
+          websites: (maps.data ?? []).filter((m: any) => m.account_id === a.id && m.is_enabled).length,
+        };
+      }),
+    };
+  });
+
+const SaveAccountInput = z.object({
+  accountId: z.string().uuid().optional(),
+  label: z.string().trim().min(2).max(80),
+  accountKey: z.string().trim().toUpperCase().regex(/^[A-Z][A-Z0-9_]{1,30}$/, "Use letters, numbers and _ only").optional(),
+  clientId: z.string().trim().min(4).max(200),
+  clientSecret: z.string().trim().min(8).max(500),
+  mode: z.enum(["production", "sandbox"]),
+});
+
+export const saveCashfreeAccount = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => SaveAccountInput.parse(i))
+  .handler(async ({ data, context }) => {
+    // Only super admins may enter or change payment secrets.
+    await assertRole(context.supabase, ["super_admin"]);
+    const { testCashfreeCreds, encryptPaymentSecret } = await import("@/lib/payments/cashfree-accounts.server");
+    const check = await testCashfreeCreds({ clientId: data.clientId, clientSecret: data.clientSecret, isProd: data.mode === "production" });
+    if (!check.ok) return { ok: false, message: check.message };
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const db = supabaseAdmin as any;
+    let accountId = data.accountId;
+    if (accountId) {
+      const { data: a } = await db.from("cashfree_merchant_accounts").select("id, is_legacy").eq("id", accountId).maybeSingle();
+      if (!a) return { ok: false, message: "Merchant account not found." };
+      if (a.is_legacy) return { ok: false, message: "The original account uses the main project keys and cannot be changed here." };
+      await db.from("cashfree_merchant_accounts").update({ label: data.label, updated_at: new Date().toISOString() }).eq("id", accountId);
+    } else {
+      if (!data.accountKey) return { ok: false, message: "Enter a short account code." };
+      const { data: created, error } = await db.from("cashfree_merchant_accounts")
+        .insert({ account_key: data.accountKey, label: data.label, is_legacy: false, is_active: true })
+        .select("id").single();
+      if (error || !created) return { ok: false, message: error?.code === "23505" ? "That account code is already used." : "Could not create the account." };
+      accountId = created.id as string;
+    }
+    const ciphertext = await encryptPaymentSecret(data.clientSecret, accountId!);
+    const { error: credErr } = await db.from("cashfree_account_credentials").upsert({
+      account_id: accountId, client_id: data.clientId, client_secret_ciphertext: ciphertext, mode: data.mode,
+      updated_by: context.userId, updated_at: new Date().toISOString(),
+    }, { onConflict: "account_id" });
+    if (credErr) return { ok: false, message: "Could not save the keys." };
+    return { ok: true, message: `${check.message} Saved securely.` };
+  });
+
+export const setCashfreeAccountActive = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({ accountId: z.string().uuid(), isActive: z.boolean() }).parse(i))
+  .handler(async ({ data, context }) => {
+    await assertRole(context.supabase, ["super_admin"]);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await (supabaseAdmin as any).from("cashfree_merchant_accounts")
+      .update({ is_active: data.isActive, updated_at: new Date().toISOString() }).eq("id", data.accountId);
+    if (error) throw new Error("Could not update the account.");
+    return { ok: true };
+  });
+
+export const setWebsiteCashfreeAccount = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({ websiteId: z.string().uuid(), accountId: z.string().uuid() }).parse(i))
+  .handler(async ({ data, context }) => {
+    await assertRole(context.supabase, ["super_admin"]);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const db = supabaseAdmin as any;
+    const { data: a } = await db.from("cashfree_merchant_accounts").select("id, is_legacy, is_active").eq("id", data.accountId).maybeSingle();
+    if (!a || !a.is_active) throw new Error("Choose an active merchant account.");
+    if (!a.is_legacy) {
+      const { data: c } = await db.from("cashfree_account_credentials").select("account_id").eq("account_id", a.id).maybeSingle();
+      if (!c) throw new Error("Add this account's keys before linking a website.");
+    }
+    const { error } = await db.from("cashfree_website_accounts").upsert({
+      website_id: data.websiteId, account_id: data.accountId, is_enabled: true, updated_at: new Date().toISOString(),
+    }, { onConflict: "website_id" });
+    if (error) throw new Error("Could not link the website.");
+    return { ok: true };
+  });
