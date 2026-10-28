@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { listGateways, updateGateway, checkCcavenueCredentials, uploadGatewayLogo, listWebsiteGateways, setWebsiteGateway, listCashfreeAccounts, saveCashfreeAccount, setCashfreeAccountActive, setWebsiteCashfreeAccount } from "@/lib/payments/gateways.functions";
+import { listGateways, updateGateway, checkCcavenueCredentials, uploadGatewayLogo, listWebsiteGateways, setWebsiteGateway, listCashfreeAccounts, setWebsiteCashfreeAccount } from "@/lib/payments/gateways.functions";
 import { MerchantAccountsCard } from "@/components/admin/MerchantAccountsCard";
 
 export const Route = createFileRoute("/admin/gateways")({ component: GatewaysPage });
