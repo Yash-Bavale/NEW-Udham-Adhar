@@ -890,6 +890,42 @@ return (
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
+        {isAdmin && (
+          <>
+            <Tabs
+              value={datePreset}
+              onValueChange={(v) => applyDatePreset(v as RangePreset)}
+            >
+              <TabsList className="h-9">
+                {RANGE_PRESETS.map((p) => (
+                  <TabsTrigger
+                    key={p.value}
+                    value={p.value}
+                    className="text-xs px-2.5"
+                  >
+                    {p.label}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </Tabs>
+
+            {datePreset === "custom" && (
+              <DateRangePicker
+                value={dateRangeValue}
+                onChange={(range) => {
+                  if (!range.from) {
+                    setDateFrom("");
+                    setDateTo("");
+                  } else {
+                    setDateFrom(istDateKey(range.from));
+                    setDateTo(range.to ? istDateKey(range.to) : istDateKey(range.from));
+                  }
+                }}
+              />
+            )}
+          </>
+        )}
+
         <Button
           variant="outline"
           size="sm"
@@ -903,11 +939,250 @@ return (
           <RefreshCw className={`size-3.5 ${isFetching && !isLoading ? "animate-spin text-indigo-600" : "text-slate-500"}`} />
           <span>Refresh</span>
         </Button>
+
+        {isAdmin && isFilterActive && (
+          <button
+            type="button"
+            onClick={resetFilters}
+            className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg text-xs font-medium border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 transition-colors"
+          >
+            <RotateCcw className="size-3.5" /> Reset Filters
+          </button>
+        )}
       </div>
     </div>
 
+    {/* Modern Filter Card for Superadmin / Admin */}
+    {isAdmin && (
+      <div className="rounded-xl border border-slate-200 bg-white p-2.5 sm:p-3 shadow-xs">
+        {/* Filters Row - All filters and sort selector in 1 single horizontal row without wrapping */}
+        <div className="flex flex-nowrap items-center gap-1.5 sm:gap-2 w-full min-w-0">
+          {/* Stage Filter */}
+          <Select value={stageFilter} onValueChange={setStageFilter}>
+            <SelectTrigger className="h-9 flex-[0.95] min-w-0 px-1.5 sm:px-2 xl:px-2.5 text-xs bg-slate-50/50 border-slate-200 [&_svg]:shrink-0">
+              <SelectValue placeholder="All Stages" />
+            </SelectTrigger>
+            <SelectContent className="max-h-[300px]">
+              {STAGE_FILTER_OPTIONS.map((st) => (
+                <SelectItem key={st.id} value={st.id}>
+                  <div className="flex items-center gap-1.5 truncate">
+                    {st.id !== "all" && (
+                      <span className={`size-2 shrink-0 rounded-full ${st.tone === "emerald" ? "bg-emerald-500" :
+                          st.tone === "amber" ? "bg-amber-500" :
+                            st.tone === "indigo" ? "bg-indigo-500" :
+                              st.tone === "violet" ? "bg-violet-500" :
+                                st.tone === "sky" ? "bg-sky-500" :
+                                  st.tone === "rose" ? "bg-rose-500" : "bg-slate-400"
+                        }`} />
+                    )}
+                    <span className="truncate">{st.label}</span>
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {/* Action Status Filter */}
+          <Select value={actionStatusFilter} onValueChange={setActionStatusFilter}>
+            <SelectTrigger className="h-9 flex-[1] min-w-0 px-1.5 sm:px-2 xl:px-2.5 text-xs bg-slate-50/50 border-slate-200 [&_svg]:shrink-0">
+              <SelectValue placeholder="Action Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Action Status</SelectItem>
+              <SelectItem value="hot_orders">🔥 Hot Orders (Call Due Now)</SelectItem>
+              <SelectItem value="scheduled_callback">⏱ Scheduled Callbacks</SelectItem>
+              <SelectItem value="action_required">Action Required (Red)</SelectItem>
+              <SelectItem value="processed">Completed / Action Taken</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {/* Services Filter */}
+          <Select value={serviceId} onValueChange={setServiceId}>
+            <SelectTrigger className="h-9 flex-[1.15] min-w-0 px-1.5 sm:px-2 xl:px-2.5 text-xs bg-slate-50/50 border-slate-200 [&_svg]:shrink-0">
+              <SelectValue placeholder="All services" />
+            </SelectTrigger>
+            <SelectContent className="max-h-[380px]">
+              <SelectItem value="all" className="font-bold text-slate-700">All services</SelectItem>
+              {groupedServices.map((g) => (
+                <SelectGroup key={g.websiteName}>
+                  <SelectLabel className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-indigo-700 bg-indigo-50/80 rounded-md my-1 flex items-center gap-1">
+                    Udyam Aadhar Services
+                  </SelectLabel>
+                  {g.services.map((s: any) => (
+                    <SelectItem key={s.id} value={s.id} className="pl-3 text-xs">
+                      {s.service_name}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {/* Payment Status Filter */}
+          <Select value={paymentStatus} onValueChange={setPaymentStatus}>
+            <SelectTrigger className="h-9 flex-[0.85] min-w-0 px-1.5 sm:px-2 xl:px-2.5 text-xs bg-slate-50/50 border-slate-200 [&_svg]:shrink-0">
+              <SelectValue placeholder="Payment status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All payments</SelectItem>
+              <SelectItem value="Paid">Paid</SelectItem>
+              <SelectItem value="Partially Paid">Partially Paid</SelectItem>
+              <SelectItem value="Pending">Pending</SelectItem>
+              <SelectItem value="Refunded">Refunded</SelectItem>
+              <SelectItem value="Failed">Failed</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {/* Fulfillment Stage Dropdown */}
+          <Select value={fulfillmentStatus} onValueChange={setFulfillmentStatus}>
+            <SelectTrigger className="h-9 flex-[1.15] min-w-0 px-1.5 sm:px-2 xl:px-2.5 text-xs bg-slate-50/50 border-slate-200 [&_svg]:shrink-0">
+              <SelectValue placeholder="Fulfillment stage" />
+            </SelectTrigger>
+            <SelectContent className="max-h-[360px]">
+              <SelectItem value="all">All Fulfillment Stages</SelectItem>
+              <SelectGroup>
+                <SelectLabel className="text-[10px] font-bold uppercase tracking-wider text-slate-400 px-2 py-1">In Progress</SelectLabel>
+                <SelectItem value="order_received">Incomplete Form</SelectItem>
+                <SelectItem value="order_reopened">Order Reopened</SelectItem>
+                <SelectItem value="form_submitted">Form Submitted</SelectItem>
+                <SelectItem value="technical_delay">Technical Delay</SelectItem>
+                <SelectItem value="customer_delay">Customer Delay</SelectItem>
+                <SelectItem value="application_submitted">Application Submitted (Govt)</SelectItem>
+                <SelectItem value="consultation_completed">Consultation Completed</SelectItem>
+              </SelectGroup>
+              <SelectGroup>
+                <SelectLabel className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 px-2 py-1">Completed</SelectLabel>
+                <SelectItem value="application_approved">Application Approved</SelectItem>
+                <SelectItem value="order_completed">Order Completed</SelectItem>
+              </SelectGroup>
+              <SelectGroup>
+                <SelectLabel className="text-[10px] font-bold uppercase tracking-wider text-rose-600 px-2 py-1">Closed / Cancelled</SelectLabel>
+                <SelectItem value="application_rejected">Application Rejected</SelectItem>
+                <SelectItem value="order_closed">Order Closed</SelectItem>
+                <SelectItem value="cancelled">Cancelled</SelectItem>
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+
+          {/* Pending Age */}
+          <div className={cn("min-w-0 flex items-center gap-1", pendingAge === "custom" ? "flex-[1.05]" : "flex-[0.8]")}>
+            <Select value={pendingAge} onValueChange={(v) => setPendingAge(v as PendingAge)}>
+              <SelectTrigger className="h-9 w-full min-w-0 px-1.5 sm:px-2 xl:px-2.5 text-xs bg-slate-50/50 border-slate-200 [&_svg]:shrink-0">
+                <SelectValue placeholder="Pending age" />
+              </SelectTrigger>
+              <SelectContent>
+                {PENDING_AGE_OPTIONS.map((o) => (
+                  <SelectItem key={o.id} value={o.id}>{o.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {pendingAge === "custom" && (
+              <Input
+                type="number"
+                min={1}
+                value={customDays}
+                onChange={(e) => setCustomDays(e.target.value)}
+                placeholder="Days"
+                className="h-9 w-12 sm:w-14 shrink-0 px-1.5 text-xs bg-slate-50/50 border-slate-200"
+              />
+            )}
+          </div>
+
+          {/* Sort Selector - Kept on the same single row */}
+          <Select
+            value={
+              sortField === "created_at"
+                ? sortOrder === "desc" ? "created_desc" : "created_asc"
+                : sortField === "stage"
+                  ? sortOrder === "asc" ? "stage_asc" : "stage_desc"
+                  : "stage_journey_asc"
+            }
+            onValueChange={(v) => {
+              if (v === "created_desc") { setSortField("created_at"); setSortOrder("desc"); }
+              else if (v === "created_asc") { setSortField("created_at"); setSortOrder("asc"); }
+              else if (v === "stage_asc") { setSortField("stage"); setSortOrder("asc"); }
+              else if (v === "stage_desc") { setSortField("stage"); setSortOrder("desc"); }
+              else if (v === "stage_journey_asc") { setSortField("stage_journey"); setSortOrder("asc"); }
+            }}
+          >
+            <SelectTrigger className="h-9 flex-[1.05] min-w-0 px-1.5 sm:px-2 xl:px-2.5 text-xs bg-slate-50/50 border-slate-200 [&_svg]:shrink-0">
+              <ArrowUpDown className="w-3.5 h-3.5 mr-1 text-slate-500 shrink-0" />
+              <SelectValue placeholder="Sort order" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="created_desc">
+                {bucket === "completed"
+                  ? "Latest Completed (Newest)"
+                  : bucket === "closed"
+                    ? "Latest Closed (Newest)"
+                    : bucket === "pending" || bucket === "idle_time"
+                      ? "Latest Action First (Newest)"
+                      : bucket === "customer_delay" || bucket === "technical_delay"
+                        ? "Latest Delay First (Newest)"
+                        : "Latest First (Newest)"}
+              </SelectItem>
+              <SelectItem value="created_asc">
+                {bucket === "completed"
+                  ? "Older Completed (Oldest)"
+                  : bucket === "closed"
+                    ? "Older Closed (Oldest)"
+                    : bucket === "pending" || bucket === "idle_time"
+                      ? "Older Action First (Oldest)"
+                      : bucket === "customer_delay" || bucket === "technical_delay"
+                        ? "Older Delay First (Oldest)"
+                        : "Older First (Oldest)"}
+              </SelectItem>
+              <SelectItem value="stage_asc">Stage (A → Z)</SelectItem>
+              <SelectItem value="stage_desc">Stage (Z → A)</SelectItem>
+              <SelectItem value="stage_journey_asc">Stage (Journey Order)</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {/* Assignees Filter (Admin & Staff) */}
+          <Select value={assignedTo} onValueChange={setAssignedTo}>
+            <SelectTrigger className="h-9 flex-[1.05] min-w-0 px-1.5 sm:px-2 xl:px-2.5 text-xs bg-slate-50/50 border-slate-200 [&_svg]:shrink-0">
+              <SelectValue placeholder="All assignees" />
+            </SelectTrigger>
+            <SelectContent className="max-h-[380px]">
+              <SelectItem value="all" className="font-bold text-slate-800">All assignees</SelectItem>
+              <SelectItem value="unassigned" className="text-slate-600">Unassigned</SelectItem>
+              
+              {activeStaffList.length > 0 && (
+                <SelectGroup>
+                  <SelectLabel className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-emerald-700 bg-emerald-50/80 rounded-md my-1 flex items-center gap-1">
+                    🟢 Active Workforce ({activeStaffList.length})
+                  </SelectLabel>
+                  {activeStaffList.map((s: any) => (
+                    <SelectItem key={s.id} value={s.id} className="pl-3 text-xs">
+                      {s.display_name || s.full_name || s.name || s.email}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              )}
+
+              {inactiveStaffList.length > 0 && (
+                <SelectGroup>
+                  <SelectLabel className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-rose-700 bg-rose-50/80 rounded-md my-1 flex items-center gap-1">
+                    ⚪ Inactive / Exited Staff ({inactiveStaffList.length})
+                  </SelectLabel>
+                  {inactiveStaffList.map((s: any) => (
+                    <SelectItem key={s.id} value={s.id} className="pl-3 text-xs text-slate-600">
+                      <div className="flex items-center justify-between gap-1.5 w-full">
+                        <span>{s.display_name || s.name || s.email}</span>
+                        <span className="text-[9px] text-rose-500 font-mono ml-1 uppercase">[{s.employment_status || "INACTIVE"}]</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              )}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+    )}
+
     {/* Pending ageing summary */}
-    {!isTeam && (bucket === "pending" || pendingAge !== "any") && (
+    {(isAdmin || !isTeam) && (bucket === "pending" || pendingAge !== "any") && (
       <div className="flex flex-wrap items-center gap-2 rounded-xl border border-amber-200 bg-amber-50/60 px-3.5 py-2 text-[11px] text-amber-900 shadow-xs">
         <span className="font-semibold uppercase tracking-wider text-[10px] text-amber-700">Pending ageing</span>
         <AgeChip label="< 1d" n={ageBuckets.d1} />
@@ -918,8 +1193,8 @@ return (
       </div>
     )}
 
-    {/* KPI Cards Row (Self Orders only) */}
-    {!isTeam && (
+    {/* KPI Cards Row (Self Orders or Admin) */}
+    {(!isTeam || isAdmin) && (
       <div className={cn(
         "grid gap-2 w-full",
         isPrivileged

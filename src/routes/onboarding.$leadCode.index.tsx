@@ -11,7 +11,6 @@ import { useOnboardingAccess } from "@/hooks/useOnboardingAccess";
 import { SecureLinkNotice } from "@/components/site/SecureLinkNotice";
 import { OnboardingShell } from "@/components/onboarding/OnboardingShell";
 import { OnboardingForm } from "@/components/onboarding/OnboardingForm";
-import { CORRECT_PAN_AADHAAR_STAGE2 } from "@/lib/onboarding/schemas";
 
 export const Route = createFileRoute("/onboarding/$leadCode/")({
   head: () => ({
@@ -35,7 +34,6 @@ function OnboardingDetailsPage() {
   const fetchFn = useServerFn(getOnboarding);
   const submitFn = useServerFn(submitOnboarding);
   const [submitting, setSubmitting] = useState(false);
-  const [stage, setStage] = useState<1 | 2>(1);
 
   const accessToken = useOnboardingAccess(leadCode);
   const { data, isLoading, isError } = useQuery({
@@ -82,8 +80,7 @@ function OnboardingDetailsPage() {
     );
   }
 
-  const isCorrectPan = isService(data.serviceCode, "correct-pan-aadhaar");
-  const activeSchema = isCorrectPan && stage === 2 ? CORRECT_PAN_AADHAAR_STAGE2 : data.schema;
+  const activeSchema = data.schema;
 
   const initial: Record<string, string> = {};
   const existing = (data.submission?.form_data ?? {}) as Record<string, unknown>;
@@ -133,9 +130,7 @@ function OnboardingDetailsPage() {
   };
 
   const hasRequiredDocs = (data.schema.documents ?? []).some((d) => d.required);
-  const hasStage2 = isCorrectPan;
   const totalSteps: 2 | 3 = hasRequiredDocs ? 3 : 2;
-  const isFinalFormStage = !hasStage2 || stage === 2;
 
   return (
     <OnboardingShell
@@ -147,36 +142,21 @@ function OnboardingDetailsPage() {
       sampleFormUrl={data.schema.sample_form_url}
       sampleFormLabel={data.schema.sample_form_label}
     >
-      {hasStage2 && (
-        <div className="mb-4 flex items-center gap-2 text-xs font-medium">
-          <span className={`px-3 py-1 rounded-full ${stage === 1 ? "bg-brand-navy text-white" : "bg-emerald-100 text-emerald-700"}`}>
-            Stage 1 — Basic Details
-          </span>
-          <span className="text-muted-foreground">→</span>
-          <span className={`px-3 py-1 rounded-full ${stage === 2 ? "bg-brand-navy text-white" : "bg-muted text-muted-foreground"}`}>
-            Stage 2 — Enterprise Details
-          </span>
-        </div>
-      )}
       <OnboardingForm
-        key={hasStage2 ? `stage-${stage}` : "single"}
+        key="single"
         schema={activeSchema}
         initial={initial}
         busy={submitting}
         submitLabel={
-          hasStage2 && stage === 1
-            ? "Save & Continue to Stage 2"
-            : hasRequiredDocs
+          hasRequiredDocs
             ? "Save & Continue"
             : "Submit Details"
         }
         submittingLabel={
-          hasStage2 && stage === 1 ? "Opening Stage 2…" : hasRequiredDocs ? "Opening next step…" : "Submitting…"
+          hasRequiredDocs ? "Opening next step…" : "Submitting…"
         }
         successMessage={
-          hasStage2 && stage === 1
-            ? "Saved. Opening Stage 2 — Enterprise details…"
-            : hasRequiredDocs
+          hasRequiredDocs
             ? "Details submitted. Continue to document upload…"
             : "Details submitted successfully. Finalising…"
         }
@@ -187,9 +167,8 @@ function OnboardingDetailsPage() {
           if (submitting) return;
           setSubmitting(true);
           try {
-            const finalSubmit = isFinalFormStage;
-            await submitFn({ data: { leadCode, accessToken: accessToken as string, data: cleanPayload(values), draft: !finalSubmit } });
-            if (finalSubmit) toast.success("Details submitted successfully");
+            await submitFn({ data: { leadCode, accessToken: accessToken as string, data: cleanPayload(values), draft: false } });
+            toast.success("Details submitted successfully");
           } catch (e) {
             const msg = e instanceof Error ? e.message : "Could not submit. Please try again.";
             toast.error(msg);
@@ -199,11 +178,6 @@ function OnboardingDetailsPage() {
         }}
         onSubmitted={async () => {
           try {
-            if (hasStage2 && stage === 1) {
-              setStage(2);
-              window.scrollTo({ top: 0, behavior: "smooth" });
-              return;
-            }
             await navigate({
               to: hasRequiredDocs
                 ? "/onboarding/$leadCode/documents"

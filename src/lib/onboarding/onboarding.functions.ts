@@ -206,26 +206,17 @@ export const submitOnboarding = createServerFn({ method: "POST" })
     const serviceCode = await resolveServiceCode(supabaseAdmin, (lead as any).service_id, lead.id, lead.service);
     const schema = await loadServiceSchema(serviceCode);
 
-    // For correct-pan-aadhaar: Stage 2 submit only carries Stage 2 values; merge
-    // with the previously-saved Stage 1 draft and validate against both schemas.
+    // Merge with any previously-saved draft values
     let mergedData: Record<string, any> = { ...data.data };
-    let validationFields = schema.fields;
-    if (!data.draft && baseServiceCode(serviceCode) === "correct-pan-aadhaar") {
-      const { data: prev } = await supabaseAdmin
-        .from("onboarding_submissions")
-        .select("form_data")
-        .eq("lead_id", lead.id)
-        .maybeSingle();
-      const prevData = (prev?.form_data ?? {}) as Record<string, any>;
-      mergedData = { ...prevData, ...mergedData };
-      const { CORRECT_PAN_AADHAAR_STAGE2 } = await import("./schemas");
-      const seen = new Set<string>();
-      validationFields = [...schema.fields, ...CORRECT_PAN_AADHAAR_STAGE2.fields].filter((f) => {
-        if (seen.has(f.key)) return false;
-        seen.add(f.key);
-        return true;
-      });
+    const { data: prev } = await supabaseAdmin
+      .from("onboarding_submissions")
+      .select("form_data")
+      .eq("lead_id", lead.id)
+      .maybeSingle();
+    if (prev?.form_data) {
+      mergedData = { ...(prev.form_data as Record<string, any>), ...mergedData };
     }
+    const validationFields = schema.fields;
 
     // Validate required fields on submit
     if (!data.draft) {
