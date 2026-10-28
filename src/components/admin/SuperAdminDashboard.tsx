@@ -572,6 +572,7 @@ function CustomTrendTooltip({ active, payload, label }: any) {
 
 const TrendCard = memo(function TrendCard({ data, rangePreset = "today", loading, className }: { data?: DashboardChartsResult; rangePreset?: RangePreset; loading: boolean; className?: string }) {
   const { formatShortINR } = useFinancialVisibility();
+  const { isPrivacyEnabled } = useDashboardPrivacy();
   const isSingleDay = rangePreset === "today" || rangePreset === "yesterday";
   const [viewMode, setViewMode] = useState<"days" | "hourly">("days");
 
@@ -664,7 +665,7 @@ const TrendCard = memo(function TrendCard({ data, rangePreset = "today", loading
                   yAxisId="left"
                   tick={{ fontSize: 11, fill: "#64748b" }}
                   stroke="#cbd5e1"
-                  tickFormatter={(v) => fmtN(Number(v))}
+                  tickFormatter={(v) => (isPrivacyEnabled ? "•••" : fmtN(Number(v)))}
                   domain={[0, (dataMax: number) => Math.ceil(Math.max(dataMax * 1.15, 10))]}
                 />
                 <YAxis
@@ -672,7 +673,7 @@ const TrendCard = memo(function TrendCard({ data, rangePreset = "today", loading
                   orientation="right"
                   tick={{ fontSize: 11, fill: "#64748b" }}
                   stroke="#cbd5e1"
-                  tickFormatter={(v) => formatShortINR(Number(v))}
+                  tickFormatter={(v) => (isPrivacyEnabled ? "•••" : formatShortINR(Number(v)))}
                   domain={[0, (dataMax: number) => Math.ceil(Math.max(dataMax * 1.15, 1000))]}
                 />
                 <Tooltip content={<CustomTrendTooltip />} />
