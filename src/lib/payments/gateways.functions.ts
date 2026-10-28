@@ -370,7 +370,7 @@ export const listWebsiteGateways = createServerFn({ method: "GET" })
       websites: (sites.data ?? []).map((w: any) => {
         const map = (cf.data ?? []).find((m: any) => m.website_id === w.id && m.is_enabled);
         const a: any = map ? acct.get(map.account_id) : null;
-        return { id: w.id, name: w.name, isActive: w.is_active, isPrimary: w.is_primary, cashfreeAccount: a?.is_active ? a.label : null };
+        return { id: w.id, name: w.name, isActive: w.is_active, isPrimary: w.is_primary, cashfreeAccount: a?.is_active ? a.label : null, cashfreeAccountId: a?.is_active ? a.id : null };
       }),
       rules: rules.data ?? [],
       globals: (globals.data ?? []).filter((g: any) => ["cashfree", "payu", "ccavenue"].includes(g.name)),

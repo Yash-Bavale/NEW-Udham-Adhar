@@ -2,7 +2,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { listGateways, updateGateway, checkCcavenueCredentials, uploadGatewayLogo, listWebsiteGateways, setWebsiteGateway } from "@/lib/payments/gateways.functions";
+import { listGateways, updateGateway, checkCcavenueCredentials, uploadGatewayLogo, listWebsiteGateways, setWebsiteGateway, listCashfreeAccounts, saveCashfreeAccount, setCashfreeAccountActive, setWebsiteCashfreeAccount } from "@/lib/payments/gateways.functions";
+import { MerchantAccountsCard } from "@/components/admin/MerchantAccountsCard";
 
 export const Route = createFileRoute("/admin/gateways")({ component: GatewaysPage });
 
@@ -68,8 +69,7 @@ function GatewaysPage() {
           <code className="font-mono">https://udyamadhar.in/api/public/webhooks/ccavenue</code>
         </p>
       </div>
-
-
+      <MerchantAccountsCard />
 
       <WebsiteGatewaysCard />
 
@@ -296,8 +296,11 @@ const SITE_GATEWAYS = [
 function WebsiteGatewaysCard() {
   const listFn = useServerFn(listWebsiteGateways);
   const setFn = useServerFn(setWebsiteGateway);
+  const linkFn = useServerFn(setWebsiteCashfreeAccount);
+  const acctFn = useServerFn(listCashfreeAccounts);
   const qc = useQueryClient();
   const { data, isLoading, error } = useQuery({ queryKey: ["admin.website-gateways"], queryFn: () => listFn() });
+  const { data: accts } = useQuery({ queryKey: ["admin.cashfree-accounts"], queryFn: () => acctFn() });
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   if (isLoading) return <div className="text-sm text-muted-foreground">Loading website payment options…</div>;
@@ -356,7 +359,26 @@ function WebsiteGatewaysCard() {
                     </td>
                   );
                 })}
-                <td className="p-3 text-xs">{w.cashfreeAccount ?? <span className="text-destructive">Not linked — Cashfree checkout blocked</span>}</td>
+                <td className="p-3 text-xs space-y-1">
+                  <select
+                    aria-label={`Cashfree account for ${w.name}`}
+                    className="w-full rounded border bg-background px-2 py-1 text-xs"
+                    value={w.cashfreeAccountId ?? ""}
+                    disabled={busy === `${w.id}:acct`}
+                    onChange={async (e) => {
+                      if (!e.target.value) return;
+                      setBusy(`${w.id}:acct`); setErr(null);
+                      try { await linkFn({ data: { websiteId: w.id, accountId: e.target.value } }); await qc.invalidateQueries({ queryKey: ["admin.website-gateways"] }); await qc.invalidateQueries({ queryKey: ["admin.cashfree-accounts"] }); }
+                      catch (er) { setErr((er as Error).message); } finally { setBusy(null); }
+                    }}
+                  >
+                    <option value="" disabled>Choose account…</option>
+                    {(accts?.accounts ?? []).filter((a: any) => a.isActive && a.credentials !== "missing").map((a: any) => (
+                      <option key={a.id} value={a.id}>{a.label}</option>
+                    ))}
+                  </select>
+                  {!w.cashfreeAccount ? <span className="text-destructive">Not linked — Cashfree checkout blocked</span> : null}
+                </td>
               </tr>
             ))}
           </tbody>
