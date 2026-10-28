@@ -65,6 +65,7 @@ const NAV: NavGroup[] = [
       { to: "/admin/orders", label: "Orders", icon: ShoppingBag, module: "orders", requireAnyRole: ALL_STAFF_ROLES },
       { to: "/admin/team-orders", label: "Team Orders", icon: Users, module: "orders", requireAnyRole: ["admin", "super_admin", "manager"] },
       { to: "/admin/tickets", label: "Support Tickets", icon: LifeBuoy, module: "tickets", requireAnyRole: SUPPORT_ROLES },
+      { to: "/admin/complaints", label: "Complaints & Contact Forms", icon: MessageSquareWarning, module: "complaints", requireAnyRole: SUPPORT_ROLES },
       { to: "/admin/employees", label: "Employees", icon: UserCog, module: "employees", requireAnyRole: ADMIN_ROLES },
     ],
   },
@@ -84,7 +85,6 @@ const NAV: NavGroup[] = [
     id: "service",
     label: "Service",
     items: [
-      { to: "/admin/complaints", label: "Complaints & Contact Forms", icon: MessageSquareWarning, module: "complaints", requireAnyRole: SUPPORT_ROLES },
       { to: "/admin/canned-responses", label: "Canned Responses", icon: LifeBuoy, module: "tickets", requireAnyRole: SUPPORT_ROLES },
       { to: "/admin/quarantine", label: "Email Quarantine", icon: Mail, module: "tickets", requireAnyRole: SUPPORT_ROLES },
       { to: "/admin/websites", label: "Websites", icon: Globe, requireAnyRole: ADMIN_ROLES },
