@@ -373,7 +373,7 @@ function WebsiteGatewaysCard() {
                     }}
                   >
                     <option value="" disabled>Choose account…</option>
-                    {(accts?.accounts ?? []).filter((a: any) => a.isActive && a.credentials !== "missing").map((a: any) => (
+                    {(accts?.accounts ?? []).filter((a: any) => (a.isActive && a.credentials !== "missing") || a.id === w.cashfreeAccountId).map((a: any) => (
                       <option key={a.id} value={a.id}>{a.label}</option>
                     ))}
                   </select>
