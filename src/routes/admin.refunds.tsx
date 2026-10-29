@@ -23,6 +23,9 @@ import {
   Receipt,
   Activity,
   PenLine,
+  Copy,
+  Check,
+  CreditCard,
 } from "lucide-react";
 import {
   listRefundsAdvanced,
@@ -65,7 +68,7 @@ const STATUS_TABS: { id: Status; label: string }[] = [
   { id: "info_needed", label: "Info Needed" },
   { id: "escalated", label: "Escalated" },
   { id: "approved", label: "Approved" },
-  { id: "processed", label: "Processed" },
+  { id: "processed", label: "Completed" },
   { id: "rejected", label: "Rejected" },
   { id: "all", label: "All" },
 ];
@@ -93,6 +96,28 @@ function relativeTime(iso: string | null | undefined) {
   const h = Math.floor(m / 60);
   if (h < 48) return `${h}h ago`;
   return `${Math.floor(h / 24)}d ago`;
+}
+
+function CopyButton({ text, label }: { text: string; label?: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        navigator.clipboard.writeText(text);
+        setCopied(true);
+        toast.success(label ? `${label} copied` : "Copied to clipboard");
+        setTimeout(() => setCopied(false), 2000);
+      }}
+      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors border border-slate-200 shrink-0 cursor-pointer"
+      title={`Copy ${label || "text"}`}
+    >
+      {copied ? <Check className="size-2.5 text-emerald-600" /> : <Copy className="size-2.5 text-slate-500" />}
+      <span>{copied ? "Copied" : "Copy"}</span>
+    </button>
+  );
 }
 
 function KpiCard({
@@ -199,9 +224,9 @@ function RefundsPage() {
         />
         <KpiCard
           icon={Wallet}
-          label="Processed"
+          label="Completed"
           value={totals?.processed ?? "—"}
-          sub={`${inr(amounts?.processedThisMonth)} this month`}
+          sub={`${totals?.all ? Math.round(((totals.processed || 0) / totals.all) * 100) : 0}% completed · ${inr(amounts?.processedThisMonth)} this month`}
           tone="success"
         />
         <KpiCard
@@ -276,8 +301,16 @@ function RefundsPage() {
               }`}
             >
               <div className="col-span-2">
-                <div className="font-mono text-xs">{r.application?.application_code ?? "—"}</div>
-                <div className="text-[10px] text-muted-foreground">{r.lead?.service ?? ""}</div>
+                <div className="font-mono text-xs font-semibold">{r.application?.application_code ?? "—"}</div>
+                <div className="text-[10px] text-muted-foreground truncate">{r.lead?.service ?? ""}</div>
+                {r.payment?.transaction_id && (
+                  <div className="mt-1 flex items-center gap-1">
+                    <span className="font-mono text-[10px] text-slate-700 bg-slate-100 px-1 py-0.5 rounded border border-slate-200 truncate max-w-[110px]" title={r.payment.transaction_id}>
+                      {r.payment.transaction_id}
+                    </span>
+                    <CopyButton text={r.payment.transaction_id} label="Txn ID" />
+                  </div>
+                )}
               </div>
               <div className="col-span-3">
                 <div className="font-medium truncate">{r.lead?.name ?? "—"}</div>
@@ -296,7 +329,7 @@ function RefundsPage() {
                     TONE[r.processed_at || r.status === "processed" || r.application?.refund_processed_at ? "processed" : r.status ?? "pending"]
                   }`}
                 >
-                  {r.processed_at || r.status === "processed" || r.application?.refund_processed_at ? "Processed" : (r.status ?? "pending").replace("_", " ")}
+                  {r.processed_at || r.status === "processed" || r.application?.refund_processed_at ? "Completed" : (r.status ?? "pending").replace("_", " ")}
                 </span>
               </div>
               <div className="col-span-1 text-right">
@@ -422,6 +455,9 @@ function RefundDetailDrawer({
   const [gatewayName, setGatewayName] = useState<string>("");
   const [noteInput, setNoteInput] = useState("");
 
+  const paidPayments = payments.filter((p) => Number(p.amount) > 0 && p.status !== "failed" && p.status !== "cancelled");
+  const primaryPayment = paidPayments[0] ?? payments[0] ?? null;
+
   useEffect(() => {
     if (req) {
       setAmount(req.refund_amount ? String(req.refund_amount) : String(refundable || ""));
@@ -482,7 +518,7 @@ function RefundDetailDrawer({
           gatewayName: gatewayName || undefined,
         },
       }),
-    onSuccess: () => { toast.success("Refund processed & customer notified"); refresh(); },
+    onSuccess: () => { toast.success("Refund completed & customer notified"); refresh(); },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Failed"),
   });
   const addNote = useMutation({
@@ -525,7 +561,7 @@ function RefundDetailDrawer({
                       TONE[isProcessed ? "processed" : activeStatus]
                     }`}
                   >
-                    {isProcessed ? "Processed" : activeStatus.replace("_", " ")}
+                    {isProcessed ? "Completed" : activeStatus.replace("_", " ")}
                   </span>
                   <button onClick={onClose} className="rounded-md border px-2 py-1 text-xs">Close</button>
                 </div>
@@ -572,6 +608,74 @@ function RefundDetailDrawer({
 
             {/* Body */}
             <div className="p-5 space-y-5">
+              {/* Highlighted Transaction Details (Always visible, specially prominent for approved/review) */}
+              {primaryPayment && (
+                <div className="rounded-xl border-2 border-amber-300 bg-amber-50/80 p-4 space-y-3 shadow-2xs">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="p-1.5 rounded-lg bg-amber-200/80 text-amber-900">
+                        <CreditCard className="size-4" />
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold text-amber-950 uppercase tracking-wide">
+                          Payment Transaction Details
+                        </div>
+                        <div className="text-[11px] text-amber-800">
+                          {activeStatus === "approved"
+                            ? "Use transaction ID to issue refund via payment gateway"
+                            : "Original transaction recorded for this order"}
+                        </div>
+                      </div>
+                    </div>
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-300">
+                      {primaryPayment.status || "Paid"}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 text-xs">
+                    <div className="bg-white/90 p-2 rounded-lg border border-amber-200/90 shadow-2xs">
+                      <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">Gateway</div>
+                      <div className="font-bold text-slate-900 mt-0.5 capitalize truncate">
+                        {primaryPayment.gateway_name || req.gateway_name || "—"}
+                      </div>
+                    </div>
+                    <div className="bg-white/90 p-2 rounded-lg border border-amber-200/90 shadow-2xs">
+                      <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">Amount Paid</div>
+                      <div className="font-bold text-emerald-700 mt-0.5">
+                        {inr(primaryPayment.amount)}
+                      </div>
+                    </div>
+                    <div className="bg-white/90 p-2 rounded-lg border border-amber-200/90 shadow-2xs">
+                      <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">Payment Date</div>
+                      <div className="font-medium text-slate-800 mt-0.5 text-[11px] truncate">
+                        {fmtDate(primaryPayment.payment_date || primaryPayment.created_at)}
+                      </div>
+                    </div>
+                    <div className="bg-white/90 p-2 rounded-lg border border-amber-200/90 shadow-2xs">
+                      <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">Refundable Bal</div>
+                      <div className="font-bold text-slate-900 mt-0.5">
+                        {inr(refundable)}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Transaction ID with Copy Button */}
+                  <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 rounded-lg bg-white border border-amber-200 shadow-2xs">
+                    <div className="min-w-0 flex-1">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">
+                        Transaction ID / Payment Ref
+                      </span>
+                      <span className="font-mono font-bold text-sm text-slate-900 truncate block select-all">
+                        {primaryPayment.transaction_id || "—"}
+                      </span>
+                    </div>
+                    {primaryPayment.transaction_id && (
+                      <CopyButton text={primaryPayment.transaction_id} label="Transaction ID" />
+                    )}
+                  </div>
+                </div>
+              )}
+
               {tab === "activity" && (
                 <div>
                   <div className="text-sm font-semibold mb-3">Timeline</div>
@@ -642,7 +746,7 @@ function RefundDetailDrawer({
                     <Row label="Customer notes" value={req.customer_notes ?? "—"} />
                     <Row label="Requested at" value={fmtDate(req.created_at)} />
                     <Row label="Decided at" value={fmtDate(req.decided_at)} />
-                    <Row label="Processed at" value={fmtDate(req.processed_at)} />
+                    <Row label="Completed at" value={fmtDate(req.processed_at)} />
                     {req.gateway_ref && <Row label="Gateway ref" value={req.gateway_ref} />}
                     {req.gateway_name && <Row label="Gateway" value={req.gateway_name} />}
                     {req.deduction_amount && (
@@ -670,11 +774,18 @@ function RefundDetailDrawer({
                         <div className="p-3 text-xs text-muted-foreground text-center">No payments on this order.</div>
                       )}
                       {payments.map((p) => (
-                        <div key={p.id} className="grid grid-cols-6 gap-2 border-b px-2 py-1.5 text-xs">
+                        <div key={p.id} className="grid grid-cols-6 gap-2 border-b px-2 py-2 text-xs items-center hover:bg-muted/20">
                           <div>{fmtDate(p.payment_date ?? p.created_at)}</div>
-                          <div>{p.gateway_name ?? "—"}</div>
-                          <div className="font-mono truncate">{p.transaction_id ?? "—"}</div>
-                          <div className={`text-right font-medium ${Number(p.amount) < 0 ? "text-rose-600" : ""}`}>
+                          <div className="font-medium capitalize">{p.gateway_name ?? "—"}</div>
+                          <div className="flex items-center gap-1 min-w-0">
+                            <span className="font-mono truncate font-semibold" title={p.transaction_id ?? "—"}>
+                              {p.transaction_id ?? "—"}
+                            </span>
+                            {p.transaction_id && (
+                              <CopyButton text={p.transaction_id} label="Txn ID" />
+                            )}
+                          </div>
+                          <div className={`text-right font-bold ${Number(p.amount) < 0 ? "text-rose-600" : "text-emerald-700"}`}>
                             {inr(p.amount)}
                           </div>
                           <div className="capitalize">{p.status}</div>
@@ -759,7 +870,24 @@ function RefundDetailDrawer({
                 )}
 
                 {activeStatus === "approved" && !isProcessed && (
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                  <div className="space-y-2.5">
+                    {primaryPayment && (
+                      <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-xs shadow-2xs">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <CreditCard className="size-3.5 text-amber-700 shrink-0" />
+                          <span className="font-bold text-amber-950 uppercase text-[10px]">Orig Payment:</span>
+                          <span className="capitalize font-semibold text-slate-800">{primaryPayment.gateway_name || req.gateway_name || "—"}</span>
+                          <span className="text-slate-300">·</span>
+                          <span className="font-bold text-emerald-700">{inr(primaryPayment.amount)}</span>
+                          <span className="text-slate-300">·</span>
+                          <span className="font-mono font-bold text-slate-900">{primaryPayment.transaction_id || "—"}</span>
+                        </div>
+                        {primaryPayment.transaction_id && (
+                          <CopyButton text={primaryPayment.transaction_id} label="Transaction ID" />
+                        )}
+                      </div>
+                    )}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                     <div>
                       <label className="text-[10px] text-muted-foreground uppercase">Payout amount (₹)</label>
                       <input
@@ -794,7 +922,8 @@ function RefundDetailDrawer({
                       />
                     </div>
                   </div>
-                )}
+                </div>
+              )}
 
                 {(activeStatus === "pending" || activeStatus === "info_needed" || activeStatus === "escalated") && (
                   <div>
@@ -854,7 +983,7 @@ function RefundDetailDrawer({
                       className="inline-flex items-center gap-2 rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground disabled:opacity-50"
                     >
                       {process.isPending ? <Loader2 className="size-3 animate-spin" /> : <Send className="size-3" />}
-                      Mark Processed & Notify Customer
+                      Mark Completed & Notify Customer
                     </button>
                   )}
                 </div>

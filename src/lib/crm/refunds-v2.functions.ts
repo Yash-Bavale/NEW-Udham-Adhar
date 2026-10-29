@@ -206,7 +206,32 @@ export const listRefundsAdvanced = createServerFn({ method: "POST" })
           );
         })
       : rows;
-    return { rows: filtered };
+    const finalRows = filtered;
+    const appIds = Array.from(new Set(finalRows.map((r: any) => r.application_id).filter(Boolean)));
+    const paymentMap = new Map<string, { transaction_id: string | null; gateway_name: string | null; amount: number }>();
+    if (appIds.length > 0) {
+      const { data: pays } = await admin
+        .from("payments")
+        .select("application_id, transaction_id, gateway_name, amount, status")
+        .in("application_id", appIds)
+        .order("created_at", { ascending: false });
+      for (const p of (pays ?? []) as Array<{ application_id: string | null; transaction_id: string | null; gateway_name: string | null; amount: number; status: string }>) {
+        if (p.application_id && !paymentMap.has(p.application_id) && Number(p.amount) > 0) {
+          paymentMap.set(p.application_id, {
+            transaction_id: p.transaction_id ?? null,
+            gateway_name: p.gateway_name ?? null,
+            amount: Number(p.amount) || 0,
+          });
+        }
+      }
+    }
+
+    const rowsWithPayment = finalRows.map((r: any) => ({
+      ...r,
+      payment: paymentMap.get(r.application_id) ?? null,
+    }));
+
+    return { rows: rowsWithPayment };
   });
 
 /** Full detail for a single refund request: joined data + payments on the order + event timeline. */
