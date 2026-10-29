@@ -1252,27 +1252,15 @@ export const reopenOrder = createServerFn({ method: "POST" })
       console.warn("[reopenOrder] hot order scheduler insert warning:", schedErr);
     }
 
-    // 4. If order was assigned to an inactive/exited employee (or unassigned), instantly assign to an active operations employee
+    // 4. Auto-reassign to active operations employee if assignee is inactive, unassigned, or in pool with toggle OFF
     try {
-      let isAssigneeActive = false;
-      const assignedToId = preApp.assigned_to;
-      if (assignedToId) {
-        const { data: assigneeProf } = await (supabaseAdmin
-          .from("profiles" as any) as any)
-          .select("id, is_active, employment_status")
-          .eq("id", assignedToId)
-          .maybeSingle();
-        isAssigneeActive = (assigneeProf as any)?.is_active !== false && ((assigneeProf as any)?.employment_status === "ACTIVE" || !(assigneeProf as any)?.employment_status);
-      }
-      if (!isAssigneeActive) {
-        const { assignOrderToNextEligibleEmployee } = await import("@/lib/crm/assignment-engine.server");
-        await assignOrderToNextEligibleEmployee({
-          orderId: data.orderId,
-          changeType: assignedToId ? "AUTO_TERMINATED" : "AUTO_INITIAL_POOL",
-          reason: assignedToId ? "Order reopened: Previous assignee is inactive/exited" : "Order reopened: Assigned to active pool staff",
-          actorId: context.userId,
-        });
-      }
+      const { ensureActiveAssigneeForReopenedOrder } = await import("@/lib/crm/assignment-engine.server");
+      await ensureActiveAssigneeForReopenedOrder({
+        orderId: data.orderId,
+        actorId: context.userId,
+        origin: "order_reopen",
+        currentAssigneeId: preApp.assigned_to,
+      });
     } catch (assignErr) {
       console.warn("[reopenOrder] auto-reassign warning:", assignErr);
     }

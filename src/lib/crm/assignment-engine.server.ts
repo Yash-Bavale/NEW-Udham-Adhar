@@ -930,6 +930,148 @@ export async function assignOrderToNextEligibleEmployee(params: {
 }
 
 /**
+ * Ensures a reopened order has an active, enabled operations assignee.
+ * If the current assignee is:
+ *  - unassigned (null),
+ *  - account inactive/terminated/archived,
+ *  - or in the assignment pool with toggle OFF (is_active = false / auto_assign_enabled = false),
+ * it automatically reassigns the order to the next eligible active operations employee with the lowest workload.
+ */
+export async function ensureActiveAssigneeForReopenedOrder(params: {
+  orderId: string;
+  actorId?: string | null;
+  origin?: "ticket_restart" | "ticket_hot" | "order_reopen";
+  ticketNumber?: string | null;
+  currentAssigneeId?: string | null;
+}): Promise<{
+  reassigned: boolean;
+  previousAssigneeId?: string | null;
+  newEmployeeId?: string | null;
+  reason?: string;
+  error?: string;
+}> {
+  const { orderId, actorId, origin = "order_reopen", ticketNumber } = params;
+
+  let assignedToId = params.currentAssigneeId;
+  if (assignedToId === undefined) {
+    const { data: app, error: appErr } = await (supabaseAdmin as any)
+      .from("applications")
+      .select("id, assigned_to")
+      .eq("id", orderId)
+      .maybeSingle();
+
+    if (appErr || !app) {
+      return { reassigned: false, error: appErr?.message || "Order not found" };
+    }
+    assignedToId = app.assigned_to ? String(app.assigned_to) : null;
+  }
+
+  const ticketRef = ticketNumber ? `Ticket #${ticketNumber}` : "Support Ticket";
+
+  // Case 1: Unassigned -> assign to active pool staff
+  if (!assignedToId) {
+    const reason =
+      origin === "ticket_hot"
+        ? `Ticket hot escalation (${ticketRef}): Assigned to active pool staff`
+        : origin === "ticket_restart"
+          ? `Order restarted from ${ticketRef}: Assigned to active pool staff`
+          : "Order reopened: Assigned to active pool staff";
+
+    const res = await assignOrderToNextEligibleEmployee({
+      orderId,
+      changeType: "AUTO_INITIAL_POOL",
+      reason,
+      actorId,
+    });
+    return {
+      reassigned: res.success,
+      previousAssigneeId: null,
+      newEmployeeId: res.newEmployeeId,
+      reason,
+      error: res.error,
+    };
+  }
+
+  // Case 2: Assigned -> check account status & assignment pool toggle
+  const [profRes, poolRes] = await Promise.all([
+    (supabaseAdmin as any)
+      .from("profiles")
+      .select("id, is_active, employment_status, auto_assign_enabled")
+      .eq("id", assignedToId)
+      .maybeSingle(),
+    (supabaseAdmin as any)
+      .from("assignment_pool")
+      .select("id, is_active")
+      .eq("user_id", assignedToId),
+  ]);
+
+  const prof = profRes.data;
+  const isAccountActive =
+    prof?.is_active !== false &&
+    ((prof as any)?.employment_status === "ACTIVE" || !(prof as any)?.employment_status);
+
+  // 2a. Account is inactive or terminated/archived
+  if (!isAccountActive) {
+    const reason =
+      origin === "ticket_hot"
+        ? `Ticket hot escalation (${ticketRef}): Previous assignee was inactive/exited`
+        : origin === "ticket_restart"
+          ? `Order restarted from ${ticketRef}: Previous assignee was inactive/exited`
+          : "Order reopened: Previous assignee was inactive/exited";
+
+    const res = await assignOrderToNextEligibleEmployee({
+      orderId,
+      changeType: "AUTO_TERMINATED",
+      reason,
+      actorId,
+    });
+    return {
+      reassigned: res.success,
+      previousAssigneeId: assignedToId,
+      newEmployeeId: res.newEmployeeId,
+      reason,
+      error: res.error,
+    };
+  }
+
+  // 2b. In pool but toggle is OFF (disabled)
+  const poolRows: Array<{ id: string; is_active: boolean }> = poolRes.data ?? [];
+  const isInPool = poolRows.length > 0;
+  const hasActivePoolRow = poolRows.some((r) => r.is_active === true);
+  const isPoolDisabled = (isInPool && !hasActivePoolRow) || (isInPool && prof?.auto_assign_enabled === false);
+
+  if (isPoolDisabled) {
+    const reason =
+      origin === "ticket_hot"
+        ? `Ticket hot escalation (${ticketRef}): Previous assignee is in pool but toggle is OFF (disabled)`
+        : origin === "ticket_restart"
+          ? `Order restarted from ${ticketRef}: Previous assignee is in pool but toggle is OFF (disabled)`
+          : "Order reopened: Previous assignee is in pool but toggle is OFF (disabled)";
+
+    const res = await assignOrderToNextEligibleEmployee({
+      orderId,
+      changeType: "AUTO_DISABLED",
+      reason,
+      actorId,
+    });
+    return {
+      reassigned: res.success,
+      previousAssigneeId: assignedToId,
+      newEmployeeId: res.newEmployeeId,
+      reason,
+      error: res.error,
+    };
+  }
+
+  // Assignee is active and enabled
+  return {
+    reassigned: false,
+    previousAssigneeId: assignedToId,
+    newEmployeeId: assignedToId,
+  };
+}
+
+/**
  * 6. Automatic Order Reassignment Engine for Unavailable Employees
  * Finds action-required orders belonging to an unavailable employee and redistributes them.
  */

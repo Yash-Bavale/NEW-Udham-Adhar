@@ -911,33 +911,14 @@ export const closeTicketRestartT001 = createServerFn({ method: "POST" })
         } as never);
       }
 
-      // If order was assigned to an inactive/exited employee (or unassigned), instantly assign to an active operations employee
-      const { data: currentApp } = await supabaseAdmin
-        .from("applications")
-        .select("id, assigned_to")
-        .eq("id", ticket.application_id)
-        .maybeSingle();
-
-      let isAssigneeActive = false;
-      const assignedToId = (currentApp as any)?.assigned_to;
-      if (assignedToId) {
-        const { data: assigneeProf } = await (supabaseAdmin
-          .from("profiles" as any) as any)
-          .select("id, is_active, employment_status")
-          .eq("id", assignedToId)
-          .maybeSingle();
-        isAssigneeActive = (assigneeProf as any)?.is_active !== false && ((assigneeProf as any)?.employment_status === "ACTIVE" || !(assigneeProf as any)?.employment_status);
-      }
-
-      if (!isAssigneeActive) {
-        const { assignOrderToNextEligibleEmployee } = await import("@/lib/crm/assignment-engine.server");
-        await assignOrderToNextEligibleEmployee({
-          orderId: ticket.application_id,
-          changeType: assignedToId ? "AUTO_TERMINATED" : "AUTO_INITIAL_POOL",
-          reason: assignedToId ? "Order reopened from ticket: Previous assignee was inactive/exited" : "Order reopened from ticket: Assigned to active pool staff",
-          actorId: context.userId,
-        });
-      }
+      // If order was assigned to an inactive/exited employee, unassigned, or in pool with toggle OFF, assign to active operations staff
+      const { ensureActiveAssigneeForReopenedOrder } = await import("@/lib/crm/assignment-engine.server");
+      await ensureActiveAssigneeForReopenedOrder({
+        orderId: ticket.application_id,
+        actorId: context.userId,
+        origin: "ticket_restart",
+        ticketNumber: ticket.ticket_number ?? null,
+      });
     } catch (evtErr) {
       console.warn("[restartOrderFromTicket] timeline/scheduler log warning:", evtErr);
     }
@@ -1328,27 +1309,16 @@ export const makeOrderHotFromTicket = createServerFn({ method: "POST" })
       throw new Error(`Failed to set hot priority: ${error.message}`);
     }
 
-    // 4. Auto-reassign to active operations employee if assignee is inactive or unassigned
+    // 4. Auto-reassign to active operations employee if assignee is inactive, unassigned, or in pool with toggle OFF
     try {
-      let isAssigneeActive = false;
-      const assignedToId = preApp.assigned_to;
-      if (assignedToId) {
-        const { data: assigneeProf } = await (admin
-          .from("profiles" as any) as any)
-          .select("id, is_active, employment_status")
-          .eq("id", assignedToId)
-          .maybeSingle();
-        isAssigneeActive = (assigneeProf as any)?.is_active !== false && ((assigneeProf as any)?.employment_status === "ACTIVE" || !(assigneeProf as any)?.employment_status);
-      }
-      if (!isAssigneeActive) {
-        const { assignOrderToNextEligibleEmployee } = await import("@/lib/crm/assignment-engine.server");
-        await assignOrderToNextEligibleEmployee({
-          orderId: targetOrderId,
-          changeType: assignedToId ? "AUTO_TERMINATED" : "AUTO_INITIAL_POOL",
-          reason: assignedToId ? "Ticket hot escalation: Previous assignee was inactive/exited" : "Ticket hot escalation: Assigned to active pool staff",
-          actorId: context.userId,
-        });
-      }
+      const { ensureActiveAssigneeForReopenedOrder } = await import("@/lib/crm/assignment-engine.server");
+      await ensureActiveAssigneeForReopenedOrder({
+        orderId: targetOrderId,
+        actorId: context.userId,
+        origin: "ticket_hot",
+        ticketNumber: ticketNumber || null,
+        currentAssigneeId: preApp.assigned_to,
+      });
     } catch (assignErr) {
       console.warn("[makeOrderHotFromTicket] auto-reassign warning:", assignErr);
     }
