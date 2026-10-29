@@ -1,5 +1,7 @@
 # Roadmap
 
+- [ ] Fix Cashfree checkout availability for websites without a ready explicit merchant-account mapping; verify shared summaries/default selection and existing admin setup
+
 - [x] Fix AP-2026-011133 ticket restart visibility — 20 tests pass; signed-in Hot Orders, Need Action, and Zeenat assignee-filtered list verified; publish pending
 
 - [x] Audit existing CallerDesk API, IVR, browser media, webhooks and deployment; implement safe confirmed gaps (190 tests pass; authorised draft save/read verified)
