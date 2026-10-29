@@ -1,6 +1,6 @@
 # Roadmap
 
-- [ ] Fix Cashfree checkout availability for websites without a ready explicit merchant-account mapping; verify shared summaries/default selection and existing admin setup
+- [x] Fix Cashfree checkout availability for websites without a ready explicit merchant-account mapping — 33 tests passed; existing account selectors verified signed-in; no live payment or publishing
 
 - [x] Fix AP-2026-011133 ticket restart visibility — 20 tests pass; signed-in Hot Orders, Need Action, and Zeenat assignee-filtered list verified; publish pending
 
