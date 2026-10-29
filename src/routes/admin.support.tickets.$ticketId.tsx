@@ -117,6 +117,142 @@ function formatBytes(bytes?: number | null) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+interface StageDateInfo {
+  label: string;
+  timestamp: string | null;
+}
+
+function getOrderStageTimestamp(
+  stage: OrderStage | null | undefined,
+  app: any,
+  events?: any[],
+  ticket?: any
+): StageDateInfo | null {
+  if (!app?.id && !ticket?.id) return null;
+
+  const appEvents = Array.isArray(events) ? events : [];
+
+  switch (stage) {
+    case "closed": {
+      const closeEv = appEvents.find((e: any) => {
+        const et = String(e.event_type || "").toLowerCase();
+        const nv = String(e.new_value || "").toLowerCase();
+        const note = String(e.note || "").toLowerCase();
+        return (
+          et === "order_closed" ||
+          et === "workflow_closed" ||
+          nv.includes("close") ||
+          nv.includes("cancel") ||
+          note.includes("closed")
+        );
+      });
+      const ts = closeEv?.created_at || app?.updated_at || ticket?.closed_at || app?.created_at || null;
+      return { label: "Closed At", timestamp: ts };
+    }
+
+    case "completed": {
+      const compEv = appEvents.find((e: any) => {
+        const et = String(e.event_type || "").toLowerCase();
+        const nv = String(e.new_value || "").toLowerCase();
+        return (
+          et === "order_completed" ||
+          et === "application_completed" ||
+          et === "certificate_uploaded" ||
+          et === "certificate_delivered" ||
+          nv === "completed" ||
+          nv === "order_completed"
+        );
+      });
+      const ts =
+        app?.fulfilled_at ||
+        app?.certificate_uploaded_at ||
+        compEv?.created_at ||
+        app?.updated_at ||
+        app?.created_at ||
+        null;
+      return { label: "Completed At", timestamp: ts };
+    }
+
+    case "customer_delay": {
+      const custEv = appEvents.find((e: any) => {
+        const et = String(e.event_type || "").toLowerCase();
+        const nv = String(e.new_value || "").toLowerCase();
+        return et.includes("customer_delay") || nv.includes("customer_delay");
+      });
+      const ts = app?.customer_hold_started_at || custEv?.created_at || app?.updated_at || null;
+      return { label: "Customer Delay At", timestamp: ts };
+    }
+
+    case "technical_delay": {
+      const techEv = appEvents.find((e: any) => {
+        const et = String(e.event_type || "").toLowerCase();
+        const nv = String(e.new_value || "").toLowerCase();
+        return et.includes("technical_delay") || nv.includes("technical_delay");
+      });
+      const ts = app?.technical_hold_started_at || techEv?.created_at || app?.updated_at || null;
+      return { label: "Tech Delay At", timestamp: ts };
+    }
+
+    case "order_reopened": {
+      const reopenEv = appEvents.find((e: any) => {
+        const et = String(e.event_type || "").toLowerCase();
+        const nv = String(e.new_value || "").toLowerCase();
+        return et.includes("reopened") || nv.includes("reopened");
+      });
+      const ts = app?.reopened_at || reopenEv?.created_at || app?.updated_at || null;
+      return { label: "Reopened At", timestamp: ts };
+    }
+
+    case "form_submitted": {
+      return {
+        label: "Form Submitted At",
+        timestamp: app?.form_submitted_at || app?.updated_at || null,
+      };
+    }
+
+    case "refunded": {
+      return {
+        label: "Refunded At",
+        timestamp: app?.refund_processed_at || app?.refund_approved_at || app?.updated_at || null,
+      };
+    }
+
+    case "refund_requested": {
+      return {
+        label: "Refund Requested At",
+        timestamp: app?.refund_requested_at || app?.updated_at || null,
+      };
+    }
+
+    case "certificate_ready": {
+      return {
+        label: "Cert Ready At",
+        timestamp: app?.certificate_uploaded_at || app?.updated_at || null,
+      };
+    }
+
+    case "consultation_completed": {
+      const consultEv = appEvents.find((e: any) =>
+        String(e.event_type || "").toLowerCase().includes("consultation")
+      );
+      return {
+        label: "Consultation At",
+        timestamp: consultEv?.created_at || app?.updated_at || null,
+      };
+    }
+
+    default: {
+      const latestEv = appEvents[0];
+      const ts = latestEv?.created_at || app?.updated_at || null;
+      if (ts) {
+        return { label: "Latest Action", timestamp: ts };
+      }
+      return null;
+    }
+  }
+}
+
+
 // ── unified message type ───────────────────────────────────
 
 export type MsgAttachment = {
@@ -815,7 +951,9 @@ function TicketWorkspace() {
     const lead = app?.leads ?? (t?.customers ? { name: t.customers.name, email: t.customers.primary_email, mobile: t.customers.primary_mobile } : null);
     const orderStage = app?.id ? computeOrderStage(lead, app) : null;
     const stageLabel = orderStage ? STAGE_META[orderStage].label : (app.fulfillment_status ? app.fulfillment_status.replace(/_/g, " ") : "Processing");
-    const details = `<p><strong>Order No:</strong> ${app.application_code || "—"}</p><p><strong>Service:</strong> ${serviceName}</p><p><strong>Order Date:</strong> ${ist(app.created_at || t.created_at)}</p><p><strong>Order Stage:</strong> ${stageLabel}</p>`;
+    const stageDate = getOrderStageTimestamp(orderStage, app, data?.events, t);
+    const stageDateHtml = stageDate?.timestamp ? `<p><strong>${stageDate.label}:</strong> ${ist(stageDate.timestamp)}</p>` : "";
+    const details = `<p><strong>Order No:</strong> ${app.application_code || "—"}</p><p><strong>Service:</strong> ${serviceName}</p><p><strong>Order Date:</strong> ${ist(app.created_at || t.created_at)}</p><p><strong>Order Stage:</strong> ${stageLabel}</p>${stageDateHtml}`;
 
     if (composerRef.current) {
       composerRef.current.focus();
@@ -1728,6 +1866,21 @@ function TicketWorkspace() {
                   );
                 })()}
               </div>
+
+              {(() => {
+                const lead = app.leads ?? (ticket.customers ? { name: ticket.customers.name, email: ticket.customers.primary_email, mobile: ticket.customers.primary_mobile } : null);
+                const orderStage = computeOrderStage(lead, app);
+                const stageDate = getOrderStageTimestamp(orderStage, app, data?.events, ticket);
+                if (!stageDate?.timestamp) return null;
+                return (
+                  <div className="flex items-center justify-between gap-2 py-0.5">
+                    <span className="text-slate-500 text-[11px]">{stageDate.label}</span>
+                    <span className="text-slate-700 text-right text-[11px] font-medium">
+                      {ist(stageDate.timestamp)}
+                    </span>
+                  </div>
+                );
+              })()}
 
               <div className="flex items-center justify-between gap-2 py-0.5">
                 <span className="text-slate-500 text-[11px]">Order Assignee</span>
