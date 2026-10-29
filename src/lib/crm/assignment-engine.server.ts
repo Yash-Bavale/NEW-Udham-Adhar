@@ -612,8 +612,9 @@ export async function calculateStaffWorkloads(): Promise<StaffWorkloadSummary[]>
     const cb = activeSchedulersByApp.get(String(app.id));
     const firesAt = cb?.fires_at ? new Date(cb.fires_at).getTime() : 0;
     const isDue = firesAt > 0 && firesAt <= nowMs;
+    const hasFutureCallback = Boolean(cb && firesAt > nowMs);
     const isReopened = stage === "order_reopened" || fs === "order_reopened";
-    const isHot = isDue || isReopened;
+    const isHot = isDue || (isReopened && !hasFutureCallback);
     const isTechDelay = stage === "technical_delay" || fs === "technical_delay";
 
     const counts = workloadByEmp.get(uid)!;

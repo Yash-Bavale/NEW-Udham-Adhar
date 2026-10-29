@@ -383,19 +383,19 @@ const NEEDS_ACTION_STAGES: OrderStage[] = ["lead_received", "payment_done", "for
 export function isNeedsActionOrder(row: any): boolean {
   if (row.is_terminal) return false;
   if (row.customer_resumed_pending) return true;
-  // Hot = callback came due or order reopened → needs staff action now,
-  // regardless of actions taken before it became hot.
+
+  // 1. Exclude orders that already have an active scheduled callback in the future (they belong in Call Back Scheduled)
+  if (row.is_callback_scheduled || (row.callback_reminder && !row.callback_reminder.is_due)) return false;
+
+  // Hot = callback came due or order reopened without a future callback → needs staff action now
   if (row.is_hot) return true;
   const fs = String(row.fulfillment_status ?? "").toLowerCase();
   const stage = String(row.stage ?? "").toLowerCase();
   const os = String(row.order_status ?? "").toUpperCase();
   const ws = String(row.workflow_status ?? "").toLowerCase();
 
-  // 1. Exclude terminal states (completed / closed)
+  // 2. Exclude terminal states (completed / closed)
   if (stage === "completed" || stage === "closed" || COMPLETED_FS.has(fs) || CLOSED_FS.has(fs)) return false;
-
-  // 2. Exclude orders that already have an active scheduled callback (they belong in Call Back Scheduled)
-  if (row.is_callback_scheduled || (row.callback_reminder && !row.callback_reminder.is_due)) return false;
 
   // 3. Exclude Technical Delay and Customer Delay (they belong in their dedicated tabs / Action Taken)
   if (isTechnicalDelayOrder(row) || isCustomerDelayOrder(row)) return false;
@@ -1301,7 +1301,8 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
           (Boolean((a as any).closure_stage) && (a as any).closure_stage !== "none")
         );
 
-      const is_hot = !isTerminal && !hasCompletedCallback && (is_due || is_reopened);
+      const has_future_callback = !isTerminal && Boolean(cb && firesAtTime > now);
+      const is_hot = !isTerminal && !hasCompletedCallback && (is_due || (is_reopened && !has_future_callback));
       let hot_started_at: string | null = null;
       if (is_hot) {
         if (is_reopened) {
@@ -1314,7 +1315,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         }
       }
 
-      const is_callback_scheduled = !isTerminal && !is_hot && !!cb && firesAtTime > now;
+      const is_callback_scheduled = has_future_callback;
       const callback_reminder = !isTerminal && cb
         ? {
             id: cb.id,

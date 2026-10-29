@@ -58,13 +58,14 @@ export function buildQueueRow(a: any, lead: any, paidAt: string | null, cb: any,
     term(a.application_status) || term(a.order_status) || term(a.workflow_status) ||
     (Boolean(a.closure_stage) && a.closure_stage !== "none")
   );
-  const is_hot = !is_terminal && (is_due || is_reopened);
+  const has_future_callback = !is_terminal && Boolean(cb && firesAt > now);
+  const is_hot = !is_terminal && (is_due || (is_reopened && !has_future_callback));
   return {
     ...a,
     stage,
     is_terminal,
     is_hot,
-    is_callback_scheduled: !is_terminal && !is_hot && !!cb && firesAt > now,
+    is_callback_scheduled: has_future_callback,
     callback_reminder: !is_terminal && cb
       ? { id: cb.id, fires_at: cb.fires_at, is_due, remarks, scheduler_type: cb.scheduler_type, created_at: cb.created_at }
       : null,
