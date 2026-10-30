@@ -2186,13 +2186,20 @@ export const getMyPerformanceDashboard = createServerFn({ method: "POST" })
           .default("today"),
         customStart: z.string().optional(),
         customEnd: z.string().optional(),
+        employeeId: z.string().optional(),
       })
       .parse(i),
   )
   .handler(async ({ data, context }) => {
-    const employeeId = context.userId;
     const admin = await getAdmin();
     const adminAny = await getAdminAny();
+    const { getStaffRoleInfo } = await import("@/lib/crm/order-auth.server");
+    const staffInfo = await getStaffRoleInfo(admin, context.userId);
+    const canViewOthers = staffInfo.isAdmin || staffInfo.isManager;
+    const employeeId =
+      canViewOthers && data.employeeId && data.employeeId !== "all" && data.employeeId !== "unassigned"
+        ? data.employeeId
+        : context.userId;
     const dateRange = resolveDateRange(
       data.dateFilter,
       data.customStart,

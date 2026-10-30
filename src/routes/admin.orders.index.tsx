@@ -398,18 +398,6 @@ export function OrdersListPage({ mode = "self" }: { mode?: "self" | "team" }) {
   const navigate = useNavigate();
   const qc = useQueryClient();
 
-  const { data: myPerfData } = useQuery({
-    queryKey: ["employee.my-performance", "today"],
-    queryFn: () => getMyPerfFn({ data: { dateFilter: "today" } }),
-    refetchInterval: 15_000,
-    staleTime: 10_000,
-  });
-
-  const actionMetrics = (myPerfData as any)?.actionResponseMetrics;
-  const latestActionAt = actionMetrics?.latestActionAt;
-  const latestActionLabel = actionMetrics?.latestActionLabel;
-  const latestActionOrderCode = actionMetrics?.latestActionOrderCode;
-
   const storageKey = isTeam ? "admin.team-orders" : "admin.orders";
   const savedState = useMemo(() => getModuleFilterState(storageKey), [storageKey]);
 
@@ -423,13 +411,30 @@ export function OrdersListPage({ mode = "self" }: { mode?: "self" | "team" }) {
   const [fulfillmentStatus, setFulfillmentStatus] = useState<string>(savedState?.fulfillmentStatus ?? "all");
   const [serviceId, setServiceId] = useState<string>(savedState?.serviceId ?? "all");
   const [assignedTo, setAssignedTo] = useState<string>(savedState?.assignedTo ?? "all");
+
+  const selectedEmployeeId = canManageOrders && assignedTo && assignedTo !== "all" && assignedTo !== "unassigned"
+    ? assignedTo
+    : undefined;
+
+  const { data: myPerfData } = useQuery({
+    queryKey: ["employee.my-performance", "today", selectedEmployeeId ?? "self"],
+    queryFn: () => getMyPerfFn({ data: { dateFilter: "today", employeeId: selectedEmployeeId } }),
+    refetchInterval: 15_000,
+    staleTime: 10_000,
+  });
+
+  const actionMetrics = (myPerfData as any)?.actionResponseMetrics;
+  const latestActionAt = actionMetrics?.latestActionAt;
+  const latestActionLabel = actionMetrics?.latestActionLabel;
+  const latestActionOrderCode = actionMetrics?.latestActionOrderCode;
   const [paymentStatus, setPaymentStatus] = useState<string>(savedState?.paymentStatus ?? "all");
   const [actionStatusFilter, setActionStatusFilter] = useState<string>(savedState?.actionStatusFilter ?? "all");
   const [stageFilter, setStageFilter] = useState<string>(savedState?.stageFilter ?? "all");
   const [dateFrom, setDateFrom] = useState<string>(savedState?.dateFrom ?? todayKey);
   const [dateTo, setDateTo] = useState<string>(savedState?.dateTo ?? todayKey);
   const [bucket, setBucket] = useState<Bucket>(() => {
-    return savedState?.bucket ?? (isPrivileged ? "all" : "needs_action");
+    if (!isAdmin && savedState?.bucket === "all") return "needs_action";
+    return savedState?.bucket ?? (isAdmin ? "all" : "needs_action");
   });
   const [pendingAge, setPendingAge] = useState<PendingAge>(savedState?.pendingAge ?? "any");
   const [customDays, setCustomDays] = useState<string>(savedState?.customDays ?? "");
@@ -627,17 +632,18 @@ export function OrdersListPage({ mode = "self" }: { mode?: "self" | "team" }) {
     fulfillmentStatus: fulfillmentStatus === "all" ? undefined : fulfillmentStatus,
     serviceId: serviceId === "all" ? undefined : serviceId,
     assignedTo: assignedTo === "all" ? undefined : assignedTo,
-    paymentStatus: paymentStatus === "all" ? undefined : paymentStatus,
-    dateFrom: dateFrom || undefined,
-    dateTo: dateTo || undefined,
-    bucket: bucket || (isTeam ? "all" : (isPrivileged ? "all" : "needs_action")),
+    paymentStatus: (!isAdmin || paymentStatus === "all") ? undefined : paymentStatus,
+    dateFrom: (!isAdmin ? todayKey : dateFrom) || undefined,
+    dateTo: (!isAdmin ? todayKey : dateTo) || undefined,
+    bucket: (!isAdmin && bucket === "all") ? "needs_action" : (bucket || (isAdmin ? "all" : "needs_action")),
     stage: stageFilter === "all" ? undefined : stageFilter,
     actionStatus: actionStatusFilter || "all",
-    pendingAge: pendingAge === "any" ? undefined : pendingAge,
-    customDays: customDays || undefined,
+    pendingAge: (!isAdmin || pendingAge === "any") ? undefined : pendingAge,
+    customDays: (!isAdmin ? undefined : customDays) || undefined,
     sortField,
     sortOrder,
-  }), [page, pageSize, mode, isTeam, isPrivileged, fulfillmentStatus, serviceId, assignedTo, paymentStatus, dateFrom, dateTo, bucket, stageFilter, actionStatusFilter, pendingAge, customDays, sortField, sortOrder]);
+    search: routeSearch.search || undefined,
+  }), [page, pageSize, mode, isAdmin, todayKey, fulfillmentStatus, serviceId, assignedTo, paymentStatus, dateFrom, dateTo, bucket, stageFilter, actionStatusFilter, pendingAge, customDays, sortField, sortOrder, routeSearch.search]);
 
   const normalizedFilter = useMemo(() => normalizeOrdersFilter(queryPayload), [queryPayload]);
 
@@ -831,28 +837,28 @@ export function OrdersListPage({ mode = "self" }: { mode?: "self" | "team" }) {
     fulfillmentStatus !== "all" ||
     serviceId !== "all" ||
     assignedTo !== "all" ||
-    paymentStatus !== "all" ||
+    (isAdmin && paymentStatus !== "all") ||
     actionStatusFilter !== "all" ||
     stageFilter !== "all" ||
-    datePreset !== "today" ||
-    (dateFrom !== "" && dateFrom !== todayKey) ||
-    (dateTo !== "" && dateTo !== todayKey) ||
-    pendingAge !== "any" ||
-    bucket !== (isPrivileged ? "all" : "needs_action");
+    (isAdmin && (datePreset !== "today" || (dateFrom !== "" && dateFrom !== todayKey) || (dateTo !== "" && dateTo !== todayKey))) ||
+    (isAdmin && pendingAge !== "any") ||
+    bucket !== (isAdmin ? "all" : "needs_action");
 
   const resetFilters = () => {
     setFulfillmentStatus("all");
     setServiceId("all");
     setAssignedTo("all");
-    setPaymentStatus("all");
+    if (isAdmin) {
+      setPaymentStatus("all");
+      applyDatePreset("today");
+      setPendingAge("any");
+      setCustomDays("");
+    }
     setActionStatusFilter("all");
     setStageFilter("all");
-    applyDatePreset("today");
-    setPendingAge("any");
-    setCustomDays("");
     setSortField("created_at");
     setSortOrder("desc");
-    setBucket(isPrivileged ? "all" : "needs_action");
+    setBucket(isAdmin ? "all" : "needs_action");
     setPage(1);
   };
 
@@ -906,7 +912,7 @@ export function OrdersListPage({ mode = "self" }: { mode?: "self" | "team" }) {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {(!isTeam ? canManageOrders : isAdmin) && (
+          {isAdmin && (
             <>
               <Tabs
                 value={datePreset}
@@ -1034,20 +1040,22 @@ export function OrdersListPage({ mode = "self" }: { mode?: "self" | "team" }) {
               </SelectContent>
             </Select>
 
-            {/* Payment Status Filter */}
-            <Select value={paymentStatus} onValueChange={setPaymentStatus}>
-              <SelectTrigger className="h-9 flex-[0.85] min-w-0 px-1.5 sm:px-2 xl:px-2.5 text-xs bg-slate-50/50 border-slate-200 [&_svg]:shrink-0">
-                <SelectValue placeholder="Payment status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All payments</SelectItem>
-                <SelectItem value="Paid">Paid</SelectItem>
-                <SelectItem value="Partially Paid">Partially Paid</SelectItem>
-                <SelectItem value="Pending">Pending</SelectItem>
-                <SelectItem value="Refunded">Refunded</SelectItem>
-                <SelectItem value="Failed">Failed</SelectItem>
-              </SelectContent>
-            </Select>
+            {/* Payment Status Filter (Admin only) */}
+            {isAdmin && (
+              <Select value={paymentStatus} onValueChange={setPaymentStatus}>
+                <SelectTrigger className="h-9 flex-[0.85] min-w-0 px-1.5 sm:px-2 xl:px-2.5 text-xs bg-slate-50/50 border-slate-200 [&_svg]:shrink-0">
+                  <SelectValue placeholder="Payment status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All payments</SelectItem>
+                  <SelectItem value="Paid">Paid</SelectItem>
+                  <SelectItem value="Partially Paid">Partially Paid</SelectItem>
+                  <SelectItem value="Pending">Pending</SelectItem>
+                  <SelectItem value="Refunded">Refunded</SelectItem>
+                  <SelectItem value="Failed">Failed</SelectItem>
+                </SelectContent>
+              </Select>
+            )}
 
             {/* Fulfillment Stage Dropdown */}
             <Select value={fulfillmentStatus} onValueChange={setFulfillmentStatus}>
@@ -1080,29 +1088,31 @@ export function OrdersListPage({ mode = "self" }: { mode?: "self" | "team" }) {
               </SelectContent>
             </Select>
 
-            {/* Pending Age */}
-            <div className={cn("min-w-0 flex items-center gap-1", pendingAge === "custom" ? "flex-[1.05]" : "flex-[0.8]")}>
-              <Select value={pendingAge} onValueChange={(v) => setPendingAge(v as PendingAge)}>
-                <SelectTrigger className="h-9 w-full min-w-0 px-1.5 sm:px-2 xl:px-2.5 text-xs bg-slate-50/50 border-slate-200 [&_svg]:shrink-0">
-                  <SelectValue placeholder="Pending age" />
-                </SelectTrigger>
-                <SelectContent>
-                  {PENDING_AGE_OPTIONS.map((o) => (
-                    <SelectItem key={o.id} value={o.id}>{o.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {pendingAge === "custom" && (
-                <Input
-                  type="number"
-                  min={1}
-                  value={customDays}
-                  onChange={(e) => setCustomDays(e.target.value)}
-                  placeholder="Days"
-                  className="h-9 w-12 sm:w-14 shrink-0 px-1.5 text-xs bg-slate-50/50 border-slate-200"
-                />
-              )}
-            </div>
+            {/* Pending Age (Admin only) */}
+            {isAdmin && (
+              <div className={cn("min-w-0 flex items-center gap-1", pendingAge === "custom" ? "flex-[1.05]" : "flex-[0.8]")}>
+                <Select value={pendingAge} onValueChange={(v) => setPendingAge(v as PendingAge)}>
+                  <SelectTrigger className="h-9 w-full min-w-0 px-1.5 sm:px-2 xl:px-2.5 text-xs bg-slate-50/50 border-slate-200 [&_svg]:shrink-0">
+                    <SelectValue placeholder="Pending age" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PENDING_AGE_OPTIONS.map((o) => (
+                      <SelectItem key={o.id} value={o.id}>{o.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {pendingAge === "custom" && (
+                  <Input
+                    type="number"
+                    min={1}
+                    value={customDays}
+                    onChange={(e) => setCustomDays(e.target.value)}
+                    placeholder="Days"
+                    className="h-9 w-12 sm:w-14 shrink-0 px-1.5 text-xs bg-slate-50/50 border-slate-200"
+                  />
+                )}
+              </div>
+            )}
 
             {/* Sort Selector - Kept on the same single row */}
             <Select
@@ -1213,11 +1223,11 @@ export function OrdersListPage({ mode = "self" }: { mode?: "self" | "team" }) {
       {(!isTeam || isAdmin) && (
         <div className={cn(
           "grid gap-2 w-full",
-          isPrivileged
+          isAdmin
             ? "grid-cols-2 sm:grid-cols-3 md:grid-cols-6 lg:grid-cols-12"
             : "grid-cols-2 sm:grid-cols-3 md:grid-cols-6 lg:grid-cols-11"
         )}>
-          {(isPrivileged ? BUCKET_CARDS : BUCKET_CARDS.filter((b) => !b.adminOnly)).map((b) => {
+          {(isAdmin ? BUCKET_CARDS : BUCKET_CARDS.filter((b) => !b.adminOnly)).map((b) => {
             const active = bucket === b.id;
             const countVal = Number((counts as any)[b.id] ?? 0);
             const IconComponent = b.icon;
@@ -2199,6 +2209,31 @@ function OrderActionHistoryBadge({ order }: { order: any }) {
   );
 }
 
+function renderCustomerName(customerName: string | null | undefined, isRestricted?: boolean) {
+  if (!customerName || !customerName.trim()) return "—";
+  const trimmed = customerName.trim();
+  if (!isRestricted) return trimmed;
+
+  const firstSpaceIdx = trimmed.indexOf(" ");
+  if (firstSpaceIdx === -1) {
+    return trimmed;
+  }
+
+  const firstName = trimmed.slice(0, firstSpaceIdx);
+  const secondName = trimmed.slice(firstSpaceIdx + 1).trim();
+
+  return (
+    <span className="inline-flex items-center">
+      <span>{firstName}</span>
+      {secondName ? (
+        <span className="blur-[4px] select-none pointer-events-none opacity-60 inline-block ml-1">
+          {secondName}
+        </span>
+      ) : null}
+    </span>
+  );
+}
+
 function OrderCardMobile({
   order,
   bucket,
@@ -2314,7 +2349,7 @@ function OrderCardMobile({
 
       <div className="flex items-center justify-between text-xs text-slate-500 border-b border-slate-100 pb-2">
         <div>
-          <span className="font-medium text-slate-900">{order.customer_name ?? "—"}</span>
+          <span className="font-medium text-slate-900">{renderCustomerName(order.customer_name, isRestricted)}</span>
           {!isRestricted && order.customer_mobile && <span className="ml-1.5 text-slate-500">({order.customer_mobile})</span>}
         </div>
         <div className="text-[11px] text-slate-400">
@@ -2625,7 +2660,7 @@ function OrderRow({
 
       {/* 3. Customer */}
       <td className="px-2 py-2.5 min-w-[160px]">
-        <div className="font-medium text-slate-900 leading-tight text-[13px]">{order.customer_name ?? "—"}</div>
+        <div className="font-medium text-slate-900 leading-tight text-[13px]">{renderCustomerName(order.customer_name, isRestricted)}</div>
         {!isRestricted && order.customer_mobile && (
           <div className="text-[11px] text-slate-500 mt-0.5">{formatMobile55(order.customer_mobile)}</div>
         )}

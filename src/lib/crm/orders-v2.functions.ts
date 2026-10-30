@@ -1865,10 +1865,10 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         baseFilteredRows = baseFilteredRows.filter((r) => r.in_range_callback_scheduled);
       }
     }
-    if (normalized.paymentStatus) {
+    if (isAdmin && normalized.paymentStatus) {
       baseFilteredRows = baseFilteredRows.filter((r) => r.payment_status === normalized.paymentStatus);
     }
-    if (normalized.pendingAge) {
+    if (isAdmin && normalized.pendingAge) {
       let days = 0;
       if (normalized.pendingAge === "custom" && normalized.customDays) {
         days = normalized.customDays || 0;
@@ -1970,7 +1970,8 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
 
     // 3. Apply bucket tab filter to obtain the table rows (guarantee 100% exact match with counts)
     let filtered = baseFilteredRows;
-    const bucket = normalized.bucket || "all";
+    const rawBucket = normalized.bucket || "all";
+    const bucket = (!isAdmin && rawBucket === "all") ? "needs_action" : rawBucket;
 
     if (bucket === "needs_action") {
       filtered = filtered.filter((r) => isNeedsActionOrder(r));

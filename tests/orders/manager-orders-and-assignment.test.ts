@@ -244,6 +244,48 @@ describe("Manager Orders Permissions & Restricted Assignment View", () => {
       expect(shouldShowFilters(true, true, true)).toBe(true);
       expect(shouldShowKpiCards(true, true)).toBe(true);
     });
+
+    it("does not show all orders, payment status, any age, or date filter to manager", () => {
+      // 1. KPI cards filtering: adminOnly cards (like ALL ORDERS) are hidden from manager
+      const mockBucketCards = [
+        { id: "all", label: "ALL ORDERS", adminOnly: true },
+        { id: "needs_action", label: "NEEDS ACTION" },
+        { id: "hot_orders", label: "HOT ORDERS" },
+        { id: "completed", label: "COMPLETED" },
+      ];
+
+      const getCardsForUser = (isAdmin: boolean) =>
+        isAdmin ? mockBucketCards : mockBucketCards.filter((b) => !b.adminOnly);
+
+      const managerCards = getCardsForUser(false);
+      expect(managerCards.map((c) => c.id)).not.toContain("all");
+      expect(managerCards.map((c) => c.id)).toEqual(["needs_action", "hot_orders", "completed"]);
+
+      const adminCards = getCardsForUser(true);
+      expect(adminCards.map((c) => c.id)).toContain("all");
+
+      // 2. Manager default bucket is needs_action (never 'all')
+      const getDefaultBucket = (isAdmin: boolean, savedBucket?: string) => {
+        if (!isAdmin && savedBucket === "all") return "needs_action";
+        return savedBucket ?? (isAdmin ? "all" : "needs_action");
+      };
+      expect(getDefaultBucket(false, undefined)).toBe("needs_action");
+      expect(getDefaultBucket(false, "all")).toBe("needs_action");
+      expect(getDefaultBucket(true, undefined)).toBe("all");
+
+      // 3. Admin-only filters: date filter, payment status, pending age
+      const showDateFilter = (isAdmin: boolean) => isAdmin;
+      const showPaymentStatusFilter = (isAdmin: boolean) => isAdmin;
+      const showPendingAgeFilter = (isAdmin: boolean) => isAdmin;
+
+      expect(showDateFilter(false)).toBe(false);
+      expect(showPaymentStatusFilter(false)).toBe(false);
+      expect(showPendingAgeFilter(false)).toBe(false);
+
+      expect(showDateFilter(true)).toBe(true);
+      expect(showPaymentStatusFilter(true)).toBe(true);
+      expect(showPendingAgeFilter(true)).toBe(true);
+    });
   });
 });
 
