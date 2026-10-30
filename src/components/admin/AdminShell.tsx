@@ -489,7 +489,7 @@ function Shell({ children, email }: { children: ReactNode; email?: string }) {
           await supabase.auth.signOut({ scope: "local" });
               navigate({ to: "/admin-login" });
             }} />
-            <DashboardPrivacyToggle />
+            {isAdminUser && <DashboardPrivacyToggle />}
           </div>
         </header>
 

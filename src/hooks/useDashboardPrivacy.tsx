@@ -1,4 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useMemo, useCallback, type ReactNode } from "react";
+import { useRole } from "@/hooks/useRole";
+import { usePermissions } from "@/hooks/usePermissions";
 
 const STORAGE_KEY = "crm_dashboard_privacy_mode";
 export const DASHBOARD_PRIVACY_MASK = "•••";
@@ -85,7 +87,12 @@ export function DashboardPrivacyProvider({ children }: { children: ReactNode }) 
 
 export function useDashboardPrivacy(): DashboardPrivacyContextValue {
   const ctx = useContext(DashboardPrivacyContext);
-  if (!ctx) {
+  const role = useRole();
+  const userPerms = usePermissions();
+  const isSuperAdmin = role.has("super_admin") || role.has("super");
+  const isAdminUser = isSuperAdmin || role.has("admin") || Boolean(userPerms.perms?.isAdmin);
+
+  if (!ctx || (!role.loading && !isAdminUser)) {
     return {
       isPrivacyEnabled: false,
       togglePrivacy: () => {},

@@ -2,6 +2,8 @@ import React from "react";
 import { Eye, EyeOff } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useDashboardPrivacy } from "@/hooks/useDashboardPrivacy";
+import { useRole } from "@/hooks/useRole";
+import { usePermissions } from "@/hooks/usePermissions";
 import { cn } from "@/lib/utils";
 
 export interface DashboardPrivacyToggleProps {
@@ -10,6 +12,14 @@ export interface DashboardPrivacyToggleProps {
 
 export function DashboardPrivacyToggle({ className }: DashboardPrivacyToggleProps) {
   const { isPrivacyEnabled, togglePrivacy } = useDashboardPrivacy();
+  const role = useRole();
+  const userPerms = usePermissions();
+  const isSuperAdmin = role.has("super_admin") || role.has("super");
+  const isAdminUser = isSuperAdmin || role.has("admin") || Boolean(userPerms.perms?.isAdmin);
+
+  if (!isAdminUser) {
+    return null;
+  }
 
   return (
     <TooltipProvider delayDuration={150}>
