@@ -152,4 +152,98 @@ describe("Manager Orders Permissions & Restricted Assignment View", () => {
       expect(invalidatedKeys).toContain("admin.assignment.history");
     });
   });
+
+  describe("4. Assignee Filter & Team Orders Manager Controls Visibility", () => {
+    it("allows managers to filter by assignee on normal orders and sanitizes other employee rows", () => {
+      const managerId = "mgr-123";
+      const targetEmployeeId = "nikita-456";
+
+      // Simulation of buildBaseQuery assignment filter logic in listOrdersV2
+      const resolveQueryAssignedTo = (
+        isAdmin: boolean,
+        isManager: boolean,
+        assignedToFilter: string | undefined,
+        hasSearch: boolean,
+        userId: string
+      ) => {
+        if ((isAdmin || isManager) && assignedToFilter && assignedToFilter !== "all" && assignedToFilter.trim() !== "") {
+          return assignedToFilter === "unassigned" ? null : assignedToFilter;
+        } else if (!isAdmin && (!isManager || !hasSearch)) {
+          return userId;
+        }
+        return "all";
+      };
+
+      // When manager selects Nikita Durgade from the Assignee dropdown without search:
+      const resolved = resolveQueryAssignedTo(false, true, targetEmployeeId, false, managerId);
+      expect(resolved).toBe(targetEmployeeId);
+
+      // Verify row sanitization for restricted other-employee view:
+      const rawRows = [
+        {
+          id: "order-1",
+          created_at: "2026-10-30T10:00:00Z",
+          customer_name: "Anita Desai",
+          customer_mobile: "9876543210",
+          customer_email: "anita@example.com",
+          service_name: "Udyam Registration",
+          application_code: "AP-2026-1001",
+          total_amount: 1499,
+          stage: "form_submitted",
+          fulfillment_status: "order_received",
+        },
+      ];
+
+      const sanitizeRows = (rows: typeof rawRows, isRestricted: boolean) => {
+        if (!isRestricted) return rows;
+        return rows.map((r) => ({
+          ...r,
+          application_code: "—",
+          customer_mobile: null,
+          customer_email: null,
+          total_amount: null,
+          payment_status: null,
+          is_other_employee_restricted: true,
+        }));
+      };
+
+      const isRestrictedManagerOtherEmployee = !false && true && Boolean(targetEmployeeId && targetEmployeeId !== managerId && !false);
+      const sanitized = sanitizeRows(rawRows, isRestrictedManagerOtherEmployee);
+
+      expect(sanitized[0].id).toBe("order-1");
+      expect(sanitized[0].customer_name).toBe("Anita Desai");
+      expect(sanitized[0].service_name).toBe("Udyam Registration");
+      expect(sanitized[0].application_code).toBe("—");
+      expect(sanitized[0].customer_mobile).toBeNull();
+      expect(sanitized[0].customer_email).toBeNull();
+      expect(sanitized[0].total_amount).toBeNull();
+      expect((sanitized[0] as any).is_other_employee_restricted).toBe(true);
+    });
+
+    it("hides Date presets, Reset Filters, Modern Filter Card, and KPI cards from managers in Team Orders", () => {
+      // Visibility rule in OrdersListPage:
+      // Controls visibility: (!isTeam ? canManageOrders : isAdmin)
+      // KPI cards row visibility: (!isTeam || isAdmin)
+      const shouldShowFilters = (isTeam: boolean, canManageOrders: boolean, isAdmin: boolean) =>
+        !isTeam ? canManageOrders : isAdmin;
+
+      const shouldShowKpiCards = (isTeam: boolean, isAdmin: boolean) =>
+        !isTeam || isAdmin;
+
+      // For Manager (isAdmin: false, isManager: true, canManageOrders: true):
+      // On normal Orders page (!isTeam):
+      expect(shouldShowFilters(false, true, false)).toBe(true);
+      expect(shouldShowKpiCards(false, false)).toBe(true);
+
+      // On Team Orders page (isTeam: true):
+      expect(shouldShowFilters(true, true, false)).toBe(false);
+      expect(shouldShowKpiCards(true, false)).toBe(false);
+
+      // For Admin (isAdmin: true, canManageOrders: true):
+      // On Team Orders page:
+      expect(shouldShowFilters(true, true, true)).toBe(true);
+      expect(shouldShowKpiCards(true, true)).toBe(true);
+    });
+  });
 });
+

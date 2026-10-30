@@ -16,6 +16,7 @@ export function useRole() {
   const roles = data?.roles ?? [];
 
   return {
+    userId: data?.userId ?? null,
     loading: isLoading,
     roles,
     displayName: data?.displayName ?? null,

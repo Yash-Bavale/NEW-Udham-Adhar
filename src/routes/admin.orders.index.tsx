@@ -292,10 +292,10 @@ function OrderIdleTimerKpiCard({
   const displayTime = isPrivacyEnabled
     ? "••m ••s"
     : !latestActionAt
-    ? "0m 00s"
-    : hours > 0
-    ? `${hours}h ${String(minutes % 60).padStart(2, "0")}m ${String(seconds % 60).padStart(2, "0")}s`
-    : `${minutes}m ${String(seconds % 60).padStart(2, "0")}s`;
+      ? "0m 00s"
+      : hours > 0
+        ? `${hours}h ${String(minutes % 60).padStart(2, "0")}m ${String(seconds % 60).padStart(2, "0")}s`
+        : `${minutes}m ${String(seconds % 60).padStart(2, "0")}s`;
 
   const isHealthy = !latestActionAt || minutes < 15;
   const isAttention = Boolean(latestActionAt && minutes >= 15 && minutes < 60);
@@ -304,28 +304,28 @@ function OrderIdleTimerKpiCard({
   const toneCls = isHealthy
     ? "bg-emerald-600 text-white font-bold"
     : isAttention
-    ? "bg-amber-600 text-white font-bold"
-    : "bg-rose-600 text-white font-bold";
+      ? "bg-amber-600 text-white font-bold"
+      : "bg-rose-600 text-white font-bold";
 
   const statusText = !latestActionAt
     ? "Ready"
     : isHealthy
-    ? "Active"
-    : isAttention
-    ? "Idle"
-    : "Away";
+      ? "Active"
+      : isAttention
+        ? "Idle"
+        : "Away";
 
   const containerBg = isActive
     ? isHealthy
       ? "bg-emerald-50 border-emerald-500 text-emerald-950 shadow-sm ring-2 ring-emerald-300"
       : isAttention
-      ? "bg-amber-50 border-amber-500 text-amber-950 shadow-sm ring-2 ring-amber-300"
-      : "bg-rose-50 border-rose-500 text-rose-950 shadow-sm ring-2 ring-rose-300"
+        ? "bg-amber-50 border-amber-500 text-amber-950 shadow-sm ring-2 ring-amber-300"
+        : "bg-rose-50 border-rose-500 text-rose-950 shadow-sm ring-2 ring-rose-300"
     : isHealthy
-    ? "bg-emerald-50/50 border-emerald-200/90 text-emerald-950 hover:bg-emerald-50 hover:border-emerald-300"
-    : isAttention
-    ? "bg-amber-50/50 border-amber-200/90 text-amber-950 hover:bg-amber-50 hover:border-amber-300"
-    : "bg-rose-50/50 border-rose-200/90 text-rose-950 hover:bg-rose-50 hover:border-rose-300";
+      ? "bg-emerald-50/50 border-emerald-200/90 text-emerald-950 hover:bg-emerald-50 hover:border-emerald-300"
+      : isAttention
+        ? "bg-amber-50/50 border-amber-200/90 text-amber-950 hover:bg-amber-50 hover:border-amber-300"
+        : "bg-rose-50/50 border-rose-200/90 text-rose-950 hover:bg-rose-50 hover:border-rose-300";
 
   const headerCls = isHealthy ? "text-emerald-700 font-bold" : isAttention ? "text-amber-800 font-bold" : "text-rose-700 font-bold";
   const iconCls = isHealthy ? "text-emerald-600" : isAttention ? "text-amber-700" : "text-rose-600";
@@ -335,8 +335,8 @@ function OrderIdleTimerKpiCard({
   const subtitleText = isPrivacyEnabled
     ? "Live employee timer"
     : latestActionLabel
-    ? `Since ${latestActionLabel}${latestActionOrderCode ? ` (#${latestActionOrderCode})` : ""}`
-    : "Live employee timer";
+      ? `Since ${latestActionLabel}${latestActionOrderCode ? ` (#${latestActionOrderCode})` : ""}`
+      : "Live employee timer";
 
   return (
     <button
@@ -687,138 +687,145 @@ export function OrdersListPage({ mode = "self" }: { mode?: "self" | "team" }) {
   };
   const ageBuckets = data?.ageBuckets ?? { d1: 0, d2: 0, d3: 0, d7: 0, older: 0 };
 
-// Preserve scroll position when navigating back from order detail view
-usePreserveScroll(storageKey, !isLoading);
+  // Preserve scroll position when navigating back from order detail view
+  usePreserveScroll(storageKey, !isLoading);
 
-// Real-time subscription with debouncing to prevent spamming queries
-const invalidateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-const scheduleDebouncedInvalidation = useCallback(() => {
-  if (invalidateTimeoutRef.current) {
-    clearTimeout(invalidateTimeoutRef.current);
-  }
-  invalidateTimeoutRef.current = setTimeout(() => {
-    invalidateTimeoutRef.current = null;
-    qc.invalidateQueries({ queryKey: ["admin.orders.v2"] });
-  }, 6000);
-}, [qc]);
-
-useEffect(() => {
-  return () => {
+  // Real-time subscription with debouncing to prevent spamming queries
+  const invalidateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const scheduleDebouncedInvalidation = useCallback(() => {
     if (invalidateTimeoutRef.current) {
       clearTimeout(invalidateTimeoutRef.current);
     }
-  };
-}, []);
+    invalidateTimeoutRef.current = setTimeout(() => {
+      invalidateTimeoutRef.current = null;
+      qc.invalidateQueries({ queryKey: ["admin.orders.v2"] });
+    }, 6000);
+  }, [qc]);
 
-useRealtimeTable("applications", scheduleDebouncedInvalidation);
-useRealtimeTable("payments", scheduleDebouncedInvalidation);
-useRealtimeTable("order_schedulers", scheduleDebouncedInvalidation);
-useRealtimeTable("order_callback_history", scheduleDebouncedInvalidation);
-useRealtimeTable("assignment_pool", () => {
-  qc.invalidateQueries({ queryKey: ["admin.staff.assignment"] });
-  scheduleDebouncedInvalidation();
-});
+  useEffect(() => {
+    return () => {
+      if (invalidateTimeoutRef.current) {
+        clearTimeout(invalidateTimeoutRef.current);
+      }
+    };
+  }, []);
 
-// Background prefetch for next page — only after the current page has finished loading,
-// so it never competes with the request the user is waiting on.
-useEffect(() => {
-  if (isFetching || !data) return;
-  const totalPages = Math.ceil(total / pageSize);
-  if (page >= totalPages) return;
-  const t = setTimeout(() => {
-    const nextPagePayload = { ...queryPayload, page: page + 1 };
-    qc.prefetchQuery({
-      queryKey: getOrdersQueryKey(normalizedFilter, page + 1),
-      queryFn: () => listFn({ data: nextPagePayload }),
-      staleTime: 30 * 1000,
-    });
-  }, 1500);
-  return () => clearTimeout(t);
-}, [isFetching, data, page, total, queryPayload, normalizedFilter, qc, listFn, pageSize]);
+  useRealtimeTable("applications", scheduleDebouncedInvalidation);
+  useRealtimeTable("payments", scheduleDebouncedInvalidation);
+  useRealtimeTable("order_schedulers", scheduleDebouncedInvalidation);
+  useRealtimeTable("order_callback_history", scheduleDebouncedInvalidation);
+  useRealtimeTable("assignment_pool", () => {
+    qc.invalidateQueries({ queryKey: ["admin.staff.assignment"] });
+    scheduleDebouncedInvalidation();
+  });
 
-const bulkAssignFn = useServerFn(bulkAssignOrders);
-const autoDistributeFn = useServerFn(autoDistributeSelectedOrders);
-const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
-const [assigningBusy, setAssigningBusy] = useState(false);
+  // Background prefetch for next page — only after the current page has finished loading,
+  // so it never competes with the request the user is waiting on.
+  useEffect(() => {
+    if (isFetching || !data) return;
+    const totalPages = Math.ceil(total / pageSize);
+    if (page >= totalPages) return;
+    const t = setTimeout(() => {
+      const nextPagePayload = { ...queryPayload, page: page + 1 };
+      qc.prefetchQuery({
+        queryKey: getOrdersQueryKey(normalizedFilter, page + 1),
+        queryFn: () => listFn({ data: nextPagePayload }),
+        staleTime: 30 * 1000,
+      });
+    }, 1500);
+    return () => clearTimeout(t);
+  }, [isFetching, data, page, total, queryPayload, normalizedFilter, qc, listFn, pageSize]);
 
-async function handleAutoDistribute() {
-  if (!selectedOrderIds.length) return;
-  setAssigningBusy(true);
-  try {
-    const res = await autoDistributeFn({
-      data: {
-        applicationIds: selectedOrderIds,
-        reason: "Equally distributed by Admin across active staff",
-      },
-    });
-    if (res.success) {
-      toast.success(res.summaryMessage || `Equally distributed ${res.distributedCount} order(s)!`);
+  const bulkAssignFn = useServerFn(bulkAssignOrders);
+  const autoDistributeFn = useServerFn(autoDistributeSelectedOrders);
+  const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
+  const [assigningBusy, setAssigningBusy] = useState(false);
+
+  async function handleAutoDistribute() {
+    if (!selectedOrderIds.length) return;
+    setAssigningBusy(true);
+    try {
+      const res = await autoDistributeFn({
+        data: {
+          applicationIds: selectedOrderIds,
+          reason: "Equally distributed by Admin across active staff",
+        },
+      });
+      if (res.success) {
+        toast.success(res.summaryMessage || `Equally distributed ${res.distributedCount} order(s)!`);
+        setSelectedOrderIds([]);
+        qc.invalidateQueries({ queryKey: ["admin.orders.v2"] });
+        qc.invalidateQueries({ queryKey: ["admin.assignment.metrics"] });
+        qc.invalidateQueries({ queryKey: ["admin.assignment.history"] });
+      } else {
+        toast.error(res.summaryMessage || "Failed to distribute orders");
+      }
+    } catch (e) {
+      toast.error((e as Error).message || "Failed to auto-distribute orders");
+    } finally {
+      setAssigningBusy(false);
+    }
+  }
+
+  async function handleBulkReassign(targetStaffId: string) {
+    if (!selectedOrderIds.length) return;
+    if (targetStaffId === "auto_distribute") {
+      return handleAutoDistribute();
+    }
+    setAssigningBusy(true);
+    try {
+      const assignedTo = targetStaffId === "unassign" ? null : targetStaffId;
+      await bulkAssignFn({ data: { applicationIds: selectedOrderIds, assignedTo } });
+      const staffObj = assignStaffProfiles.find((s: any) => s.id === targetStaffId);
+      const name = targetStaffId === "unassign" ? "Unassigned" : (staffObj?.display_name || staffObj?.name || staffObj?.email || "staff");
+      toast.success(`Successfully reassigned ${selectedOrderIds.length} order(s) to ${name}`);
       setSelectedOrderIds([]);
       qc.invalidateQueries({ queryKey: ["admin.orders.v2"] });
       qc.invalidateQueries({ queryKey: ["admin.assignment.metrics"] });
       qc.invalidateQueries({ queryKey: ["admin.assignment.history"] });
-    } else {
-      toast.error(res.summaryMessage || "Failed to distribute orders");
+    } catch (e) {
+      toast.error((e as Error).message || "Failed to reassign orders");
+    } finally {
+      setAssigningBusy(false);
     }
-  } catch (e) {
-    toast.error((e as Error).message || "Failed to auto-distribute orders");
-  } finally {
-    setAssigningBusy(false);
-  }
-}
-
-async function handleBulkReassign(targetStaffId: string) {
-  if (!selectedOrderIds.length) return;
-  if (targetStaffId === "auto_distribute") {
-    return handleAutoDistribute();
-  }
-  setAssigningBusy(true);
-  try {
-    const assignedTo = targetStaffId === "unassign" ? null : targetStaffId;
-    await bulkAssignFn({ data: { applicationIds: selectedOrderIds, assignedTo } });
-    const staffObj = assignStaffProfiles.find((s: any) => s.id === targetStaffId);
-    const name = targetStaffId === "unassign" ? "Unassigned" : (staffObj?.display_name || staffObj?.name || staffObj?.email || "staff");
-    toast.success(`Successfully reassigned ${selectedOrderIds.length} order(s) to ${name}`);
-    setSelectedOrderIds([]);
-    qc.invalidateQueries({ queryKey: ["admin.orders.v2"] });
-    qc.invalidateQueries({ queryKey: ["admin.assignment.metrics"] });
-    qc.invalidateQueries({ queryKey: ["admin.assignment.history"] });
-  } catch (e) {
-    toast.error((e as Error).message || "Failed to reassign orders");
-  } finally {
-    setAssigningBusy(false);
-  }
-}
-
-// Base columns (Order #, Created, Customer, Service, Action Status, Stage) = 6
-// Plus Checkbox (1) + Assigned (1) + Amount (1) = 9 total columns for Admin/Manager (Amount is kept at last)
-const colCount = 6 + (canManageOrders ? 2 : 0) + (hideMoney ? 0 : 1);
-
-const groups = useMemo(() => {
-  const g = new Map<string, any[]>();
-  const list = bucket === "needs_action" ? rows.filter((r) => !r.is_hot) : rows;
-
-  for (const r of list) {
-    const rawKey =
-      bucket === "completed"
-        ? (r.completed_at || r.created_at)
-        : bucket === "closed"
-          ? (r.closed_at || r.created_at)
-          : bucket === "pending"
-            ? (r.latest_action_at || r.created_at)
-            : r.created_at;
-    const key = istDateKey(rawKey) || "Unknown";
-    const arr = g.get(key) ?? [];
-    arr.push(r);
-    g.set(key, arr);
   }
 
-  return Array.from(g.entries());
-}, [rows, bucket]);
+  const isOtherEmployeeView =
+    !isAdmin &&
+    isManager &&
+    !isTeam &&
+    Boolean(assignedTo && assignedTo !== "all" && assignedTo !== role.userId && !routeSearch.search);
 
-const hotRows = useMemo(() => {
-  return (bucket === "needs_action" || bucket === "pending_orders") ? rows.filter((r) => r.is_hot) : [];
-}, [rows, bucket]);
+  // Base columns (Order #, Created, Customer, Service, Action Status, Stage) = 6
+  // Plus Checkbox (1) + Assigned (1) + Amount (1) = 9 total columns for Admin/Manager (Amount is kept at last)
+  // Restricted other employee view: Checkbox (1) + Created (1) + Customer (1) + Service (1) + Action Status (1) + Stage (1) = 6 columns
+  const colCount = isOtherEmployeeView ? 6 : (6 + (canManageOrders ? 2 : 0) + (hideMoney ? 0 : 1));
+
+  const groups = useMemo(() => {
+    const g = new Map<string, any[]>();
+    const list = bucket === "needs_action" ? rows.filter((r) => !r.is_hot) : rows;
+
+    for (const r of list) {
+      const rawKey =
+        bucket === "completed"
+          ? (r.completed_at || r.created_at)
+          : bucket === "closed"
+            ? (r.closed_at || r.created_at)
+            : bucket === "pending"
+              ? (r.latest_action_at || r.created_at)
+              : r.created_at;
+      const key = istDateKey(rawKey) || "Unknown";
+      const arr = g.get(key) ?? [];
+      arr.push(r);
+      g.set(key, arr);
+    }
+
+    return Array.from(g.entries());
+  }, [rows, bucket]);
+
+  const hotRows = useMemo(() => {
+    return (bucket === "needs_action" || bucket === "pending_orders") ? rows.filter((r) => r.is_hot) : [];
+  }, [rows, bucket]);
 
   const isFilterActive =
     fulfillmentStatus !== "all" ||
@@ -864,924 +871,931 @@ const hotRows = useMemo(() => {
     }
   };
 
-if (!userPerms.isLoading && !userPerms.can("orders", "view")) {
-  return (
-    <div className="p-8 text-center bg-white rounded-xl border border-slate-200 space-y-3 my-6">
-      <ShieldAlert className="size-10 text-rose-500 mx-auto" />
-      <h2 className="text-lg font-bold text-slate-900">Access Denied</h2>
-      <p className="text-sm text-slate-500 max-w-md mx-auto">
-        You do not have permission to view the Orders module. Please contact your administrator if you need access.
-      </p>
-    </div>
-  );
-}
+  if (!userPerms.isLoading && !userPerms.can("orders", "view")) {
+    return (
+      <div className="p-8 text-center bg-white rounded-xl border border-slate-200 space-y-3 my-6">
+        <ShieldAlert className="size-10 text-rose-500 mx-auto" />
+        <h2 className="text-lg font-bold text-slate-900">Access Denied</h2>
+        <p className="text-sm text-slate-500 max-w-md mx-auto">
+          You do not have permission to view the Orders module. Please contact your administrator if you need access.
+        </p>
+      </div>
+    );
+  }
 
-return (
-  <div className="w-full space-y-4">
-    {/* Header & Date Range Selector */}
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-      <div>
-        <div className="flex items-center gap-2">
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-            {isTeam ? "Team Orders" : "Orders"}
-          </h1>
-          {isFetching && !isLoading && (
-            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-600 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-full animate-pulse">
-              <Loader2 className="size-3 animate-spin text-indigo-600" /> Updating…
-            </span>
+  return (
+    <div className="w-full space-y-4">
+      {/* Header & Date Range Selector */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+              {isTeam ? "Team Orders" : "Orders"}
+            </h1>
+            {isFetching && !isLoading && (
+              <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-600 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-full animate-pulse">
+                <Loader2 className="size-3 animate-spin text-indigo-600" /> Updating…
+              </span>
+            )}
+          </div>
+          {isTeam && (
+            <p className="text-xs text-slate-500 mt-0.5">
+              Workforce order counts and status breakdown across other employees.
+            </p>
           )}
         </div>
-        {isTeam && (
-          <p className="text-xs text-slate-500 mt-0.5">
-            Workforce order counts and status breakdown across other employees.
-          </p>
-        )}
-      </div>
 
-      <div className="flex flex-wrap items-center gap-2">
-        {canManageOrders && (
-          <>
-            <Tabs
-              value={datePreset}
-              onValueChange={(v) => applyDatePreset(v as RangePreset)}
-            >
-              <TabsList className="h-9">
-                {RANGE_PRESETS.map((p) => (
-                  <TabsTrigger
-                    key={p.value}
-                    value={p.value}
-                    className="text-xs px-2.5"
-                  >
-                    {p.label}
-                  </TabsTrigger>
-                ))}
-              </TabsList>
-            </Tabs>
+        <div className="flex flex-wrap items-center gap-2">
+          {(!isTeam ? canManageOrders : isAdmin) && (
+            <>
+              <Tabs
+                value={datePreset}
+                onValueChange={(v) => applyDatePreset(v as RangePreset)}
+              >
+                <TabsList className="h-9">
+                  {RANGE_PRESETS.map((p) => (
+                    <TabsTrigger
+                      key={p.value}
+                      value={p.value}
+                      className="text-xs px-2.5"
+                    >
+                      {p.label}
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+              </Tabs>
 
-            {datePreset === "custom" && (
-              <DateRangePicker
-                value={dateRangeValue}
-                onChange={(range) => {
-                  if (!range.from) {
-                    setDateFrom("");
-                    setDateTo("");
-                  } else {
-                    setDateFrom(istDateKey(range.from));
-                    setDateTo(range.to ? istDateKey(range.to) : istDateKey(range.from));
-                  }
-                }}
-              />
-            )}
-          </>
-        )}
+              {datePreset === "custom" && (
+                <DateRangePicker
+                  value={dateRangeValue}
+                  onChange={(range) => {
+                    if (!range.from) {
+                      setDateFrom("");
+                      setDateTo("");
+                    } else {
+                      setDateFrom(istDateKey(range.from));
+                      setDateTo(range.to ? istDateKey(range.to) : istDateKey(range.from));
+                    }
+                  }}
+                />
+              )}
+            </>
+          )}
 
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => {
-            qc.invalidateQueries({ queryKey: ["admin.orders.v2"] });
-            toast.success("Refreshing orders…");
-          }}
-          className="h-9 gap-1.5 text-xs text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 border-slate-200 shadow-2xs"
-          title="Refresh orders"
-        >
-          <RefreshCw className={`size-3.5 ${isFetching && !isLoading ? "animate-spin text-indigo-600" : "text-slate-500"}`} />
-          <span>Refresh</span>
-        </Button>
-
-        {canManageOrders && isFilterActive && (
-          <button
-            type="button"
-            onClick={resetFilters}
-            className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg text-xs font-medium border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 transition-colors"
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              qc.invalidateQueries({ queryKey: ["admin.orders.v2"] });
+              toast.success("Refreshing orders…");
+            }}
+            className="h-9 gap-1.5 text-xs text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 border-slate-200 shadow-2xs"
+            title="Refresh orders"
           >
-            <RotateCcw className="size-3.5" /> Reset Filters
-          </button>
-        )}
-      </div>
-    </div>
+            <RefreshCw className={`size-3.5 ${isFetching && !isLoading ? "animate-spin text-indigo-600" : "text-slate-500"}`} />
+            <span>Refresh</span>
+          </Button>
 
-    {/* Modern Filter Card for Superadmin / Admin / Manager */}
-    {canManageOrders && (
-      <div className="rounded-xl border border-slate-200 bg-white p-2.5 sm:p-3 shadow-xs">
-        {/* Filters Row - All filters and sort selector in 1 single horizontal row without wrapping */}
-        <div className="flex flex-nowrap items-center gap-1.5 sm:gap-2 w-full min-w-0">
-          {/* Stage Filter */}
-          <Select value={stageFilter} onValueChange={setStageFilter}>
-            <SelectTrigger className="h-9 flex-[0.95] min-w-0 px-1.5 sm:px-2 xl:px-2.5 text-xs bg-slate-50/50 border-slate-200 [&_svg]:shrink-0">
-              <SelectValue placeholder="All Stages" />
-            </SelectTrigger>
-            <SelectContent className="max-h-[300px]">
-              {STAGE_FILTER_OPTIONS.map((st) => (
-                <SelectItem key={st.id} value={st.id}>
-                  <div className="flex items-center gap-1.5 truncate">
-                    {st.id !== "all" && (
-                      <span className={`size-2 shrink-0 rounded-full ${st.tone === "emerald" ? "bg-emerald-500" :
+          {(!isTeam ? canManageOrders : isAdmin) && isFilterActive && (
+            <button
+              type="button"
+              onClick={resetFilters}
+              className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg text-xs font-medium border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 transition-colors"
+            >
+              <RotateCcw className="size-3.5" /> Reset Filters
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Modern Filter Card for Superadmin / Admin / Manager */}
+      {(!isTeam ? canManageOrders : isAdmin) && (
+        <div className="rounded-xl border border-slate-200 bg-white p-2.5 sm:p-3 shadow-xs">
+          {/* Filters Row - All filters and sort selector in 1 single horizontal row without wrapping */}
+          <div className="flex flex-nowrap items-center gap-1.5 sm:gap-2 w-full min-w-0">
+            {/* Stage Filter */}
+            <Select value={stageFilter} onValueChange={setStageFilter}>
+              <SelectTrigger className="h-9 flex-[0.95] min-w-0 px-1.5 sm:px-2 xl:px-2.5 text-xs bg-slate-50/50 border-slate-200 [&_svg]:shrink-0">
+                <SelectValue placeholder="All Stages" />
+              </SelectTrigger>
+              <SelectContent className="max-h-[300px]">
+                {STAGE_FILTER_OPTIONS.map((st) => (
+                  <SelectItem key={st.id} value={st.id}>
+                    <div className="flex items-center gap-1.5 truncate">
+                      {st.id !== "all" && (
+                        <span className={`size-2 shrink-0 rounded-full ${st.tone === "emerald" ? "bg-emerald-500" :
                           st.tone === "amber" ? "bg-amber-500" :
                             st.tone === "indigo" ? "bg-indigo-500" :
                               st.tone === "violet" ? "bg-violet-500" :
                                 st.tone === "sky" ? "bg-sky-500" :
                                   st.tone === "rose" ? "bg-rose-500" : "bg-slate-400"
-                        }`} />
-                    )}
-                    <span className="truncate">{st.label}</span>
-                  </div>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          {/* Action Status Filter */}
-          <Select value={actionStatusFilter} onValueChange={setActionStatusFilter}>
-            <SelectTrigger className="h-9 flex-[1] min-w-0 px-1.5 sm:px-2 xl:px-2.5 text-xs bg-slate-50/50 border-slate-200 [&_svg]:shrink-0">
-              <SelectValue placeholder="Action Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Action Status</SelectItem>
-              <SelectItem value="hot_orders">🔥 Hot Orders (Call Due Now)</SelectItem>
-              <SelectItem value="scheduled_callback">⏱ Scheduled Callbacks</SelectItem>
-              <SelectItem value="action_required">Action Required (Red)</SelectItem>
-              <SelectItem value="processed">Completed / Action Taken</SelectItem>
-            </SelectContent>
-          </Select>
-
-          {/* Services Filter */}
-          <Select value={serviceId} onValueChange={setServiceId}>
-            <SelectTrigger className="h-9 flex-[1.15] min-w-0 px-1.5 sm:px-2 xl:px-2.5 text-xs bg-slate-50/50 border-slate-200 [&_svg]:shrink-0">
-              <SelectValue placeholder="All services" />
-            </SelectTrigger>
-            <SelectContent className="max-h-[380px]">
-              <SelectItem value="all" className="font-bold text-slate-700">All services</SelectItem>
-              {groupedServices.map((g) => (
-                <SelectGroup key={g.websiteName}>
-                  <SelectLabel className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-indigo-700 bg-indigo-50/80 rounded-md my-1 flex items-center gap-1">
-                    Udyam Aadhar Services
-                  </SelectLabel>
-                  {g.services.map((s: any) => (
-                    <SelectItem key={s.id} value={s.id} className="pl-3 text-xs">
-                      {s.service_name}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              ))}
-            </SelectContent>
-          </Select>
-
-          {/* Payment Status Filter */}
-          <Select value={paymentStatus} onValueChange={setPaymentStatus}>
-            <SelectTrigger className="h-9 flex-[0.85] min-w-0 px-1.5 sm:px-2 xl:px-2.5 text-xs bg-slate-50/50 border-slate-200 [&_svg]:shrink-0">
-              <SelectValue placeholder="Payment status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All payments</SelectItem>
-              <SelectItem value="Paid">Paid</SelectItem>
-              <SelectItem value="Partially Paid">Partially Paid</SelectItem>
-              <SelectItem value="Pending">Pending</SelectItem>
-              <SelectItem value="Refunded">Refunded</SelectItem>
-              <SelectItem value="Failed">Failed</SelectItem>
-            </SelectContent>
-          </Select>
-
-          {/* Fulfillment Stage Dropdown */}
-          <Select value={fulfillmentStatus} onValueChange={setFulfillmentStatus}>
-            <SelectTrigger className="h-9 flex-[1.15] min-w-0 px-1.5 sm:px-2 xl:px-2.5 text-xs bg-slate-50/50 border-slate-200 [&_svg]:shrink-0">
-              <SelectValue placeholder="Fulfillment stage" />
-            </SelectTrigger>
-            <SelectContent className="max-h-[360px]">
-              <SelectItem value="all">All Fulfillment Stages</SelectItem>
-              <SelectGroup>
-                <SelectLabel className="text-[10px] font-bold uppercase tracking-wider text-slate-400 px-2 py-1">In Progress</SelectLabel>
-                <SelectItem value="order_received">Incomplete Form</SelectItem>
-                <SelectItem value="order_reopened">Order Reopened</SelectItem>
-                <SelectItem value="form_submitted">Form Submitted</SelectItem>
-                <SelectItem value="technical_delay">Technical Delay</SelectItem>
-                <SelectItem value="customer_delay">Customer Delay</SelectItem>
-                <SelectItem value="application_submitted">Application Submitted (Govt)</SelectItem>
-                <SelectItem value="consultation_completed">Consultation Completed</SelectItem>
-              </SelectGroup>
-              <SelectGroup>
-                <SelectLabel className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 px-2 py-1">Completed</SelectLabel>
-                <SelectItem value="application_approved">Application Approved</SelectItem>
-                <SelectItem value="order_completed">Order Completed</SelectItem>
-              </SelectGroup>
-              <SelectGroup>
-                <SelectLabel className="text-[10px] font-bold uppercase tracking-wider text-rose-600 px-2 py-1">Closed / Cancelled</SelectLabel>
-                <SelectItem value="application_rejected">Application Rejected</SelectItem>
-                <SelectItem value="order_closed">Order Closed</SelectItem>
-                <SelectItem value="cancelled">Cancelled</SelectItem>
-              </SelectGroup>
-            </SelectContent>
-          </Select>
-
-          {/* Pending Age */}
-          <div className={cn("min-w-0 flex items-center gap-1", pendingAge === "custom" ? "flex-[1.05]" : "flex-[0.8]")}>
-            <Select value={pendingAge} onValueChange={(v) => setPendingAge(v as PendingAge)}>
-              <SelectTrigger className="h-9 w-full min-w-0 px-1.5 sm:px-2 xl:px-2.5 text-xs bg-slate-50/50 border-slate-200 [&_svg]:shrink-0">
-                <SelectValue placeholder="Pending age" />
-              </SelectTrigger>
-              <SelectContent>
-                {PENDING_AGE_OPTIONS.map((o) => (
-                  <SelectItem key={o.id} value={o.id}>{o.label}</SelectItem>
+                          }`} />
+                      )}
+                      <span className="truncate">{st.label}</span>
+                    </div>
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            {pendingAge === "custom" && (
-              <Input
-                type="number"
-                min={1}
-                value={customDays}
-                onChange={(e) => setCustomDays(e.target.value)}
-                placeholder="Days"
-                className="h-9 w-12 sm:w-14 shrink-0 px-1.5 text-xs bg-slate-50/50 border-slate-200"
-              />
-            )}
+
+            {/* Action Status Filter */}
+            <Select value={actionStatusFilter} onValueChange={setActionStatusFilter}>
+              <SelectTrigger className="h-9 flex-[1] min-w-0 px-1.5 sm:px-2 xl:px-2.5 text-xs bg-slate-50/50 border-slate-200 [&_svg]:shrink-0">
+                <SelectValue placeholder="Action Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Action Status</SelectItem>
+                <SelectItem value="hot_orders">🔥 Hot Orders (Call Due Now)</SelectItem>
+                <SelectItem value="scheduled_callback">⏱ Scheduled Callbacks</SelectItem>
+                <SelectItem value="action_required">Action Required (Red)</SelectItem>
+                <SelectItem value="processed">Completed / Action Taken</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {/* Services Filter */}
+            <Select value={serviceId} onValueChange={setServiceId}>
+              <SelectTrigger className="h-9 flex-[1.15] min-w-0 px-1.5 sm:px-2 xl:px-2.5 text-xs bg-slate-50/50 border-slate-200 [&_svg]:shrink-0">
+                <SelectValue placeholder="All services" />
+              </SelectTrigger>
+              <SelectContent className="max-h-[380px]">
+                <SelectItem value="all" className="font-bold text-slate-700">All services</SelectItem>
+                {groupedServices.map((g) => (
+                  <SelectGroup key={g.websiteName}>
+                    <SelectLabel className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-indigo-700 bg-indigo-50/80 rounded-md my-1 flex items-center gap-1">
+                      Udyam Aadhar Services
+                    </SelectLabel>
+                    {g.services.map((s: any) => (
+                      <SelectItem key={s.id} value={s.id} className="pl-3 text-xs">
+                        {s.service_name}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {/* Payment Status Filter */}
+            <Select value={paymentStatus} onValueChange={setPaymentStatus}>
+              <SelectTrigger className="h-9 flex-[0.85] min-w-0 px-1.5 sm:px-2 xl:px-2.5 text-xs bg-slate-50/50 border-slate-200 [&_svg]:shrink-0">
+                <SelectValue placeholder="Payment status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All payments</SelectItem>
+                <SelectItem value="Paid">Paid</SelectItem>
+                <SelectItem value="Partially Paid">Partially Paid</SelectItem>
+                <SelectItem value="Pending">Pending</SelectItem>
+                <SelectItem value="Refunded">Refunded</SelectItem>
+                <SelectItem value="Failed">Failed</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {/* Fulfillment Stage Dropdown */}
+            <Select value={fulfillmentStatus} onValueChange={setFulfillmentStatus}>
+              <SelectTrigger className="h-9 flex-[1.15] min-w-0 px-1.5 sm:px-2 xl:px-2.5 text-xs bg-slate-50/50 border-slate-200 [&_svg]:shrink-0">
+                <SelectValue placeholder="Fulfillment stage" />
+              </SelectTrigger>
+              <SelectContent className="max-h-[360px]">
+                <SelectItem value="all">All Fulfillment Stages</SelectItem>
+                <SelectGroup>
+                  <SelectLabel className="text-[10px] font-bold uppercase tracking-wider text-slate-400 px-2 py-1">In Progress</SelectLabel>
+                  <SelectItem value="order_received">Incomplete Form</SelectItem>
+                  <SelectItem value="order_reopened">Order Reopened</SelectItem>
+                  <SelectItem value="form_submitted">Form Submitted</SelectItem>
+                  <SelectItem value="technical_delay">Technical Delay</SelectItem>
+                  <SelectItem value="customer_delay">Customer Delay</SelectItem>
+                  <SelectItem value="application_submitted">Application Submitted (Govt)</SelectItem>
+                  <SelectItem value="consultation_completed">Consultation Completed</SelectItem>
+                </SelectGroup>
+                <SelectGroup>
+                  <SelectLabel className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 px-2 py-1">Completed</SelectLabel>
+                  <SelectItem value="application_approved">Application Approved</SelectItem>
+                  <SelectItem value="order_completed">Order Completed</SelectItem>
+                </SelectGroup>
+                <SelectGroup>
+                  <SelectLabel className="text-[10px] font-bold uppercase tracking-wider text-rose-600 px-2 py-1">Closed / Cancelled</SelectLabel>
+                  <SelectItem value="application_rejected">Application Rejected</SelectItem>
+                  <SelectItem value="order_closed">Order Closed</SelectItem>
+                  <SelectItem value="cancelled">Cancelled</SelectItem>
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+
+            {/* Pending Age */}
+            <div className={cn("min-w-0 flex items-center gap-1", pendingAge === "custom" ? "flex-[1.05]" : "flex-[0.8]")}>
+              <Select value={pendingAge} onValueChange={(v) => setPendingAge(v as PendingAge)}>
+                <SelectTrigger className="h-9 w-full min-w-0 px-1.5 sm:px-2 xl:px-2.5 text-xs bg-slate-50/50 border-slate-200 [&_svg]:shrink-0">
+                  <SelectValue placeholder="Pending age" />
+                </SelectTrigger>
+                <SelectContent>
+                  {PENDING_AGE_OPTIONS.map((o) => (
+                    <SelectItem key={o.id} value={o.id}>{o.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {pendingAge === "custom" && (
+                <Input
+                  type="number"
+                  min={1}
+                  value={customDays}
+                  onChange={(e) => setCustomDays(e.target.value)}
+                  placeholder="Days"
+                  className="h-9 w-12 sm:w-14 shrink-0 px-1.5 text-xs bg-slate-50/50 border-slate-200"
+                />
+              )}
+            </div>
+
+            {/* Sort Selector - Kept on the same single row */}
+            <Select
+              value={
+                sortField === "created_at"
+                  ? sortOrder === "desc" ? "created_desc" : "created_asc"
+                  : sortField === "stage"
+                    ? sortOrder === "asc" ? "stage_asc" : "stage_desc"
+                    : "stage_journey_asc"
+              }
+              onValueChange={(v) => {
+                if (v === "created_desc") { setSortField("created_at"); setSortOrder("desc"); }
+                else if (v === "created_asc") { setSortField("created_at"); setSortOrder("asc"); }
+                else if (v === "stage_asc") { setSortField("stage"); setSortOrder("asc"); }
+                else if (v === "stage_desc") { setSortField("stage"); setSortOrder("desc"); }
+                else if (v === "stage_journey_asc") { setSortField("stage_journey"); setSortOrder("asc"); }
+              }}
+            >
+              <SelectTrigger className="h-9 flex-[1.05] min-w-0 px-1.5 sm:px-2 xl:px-2.5 text-xs bg-slate-50/50 border-slate-200 [&_svg]:shrink-0">
+                <ArrowUpDown className="w-3.5 h-3.5 mr-1 text-slate-500 shrink-0" />
+                <SelectValue placeholder="Sort order" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="created_desc">
+                  {bucket === "completed"
+                    ? "Latest Completed (Newest)"
+                    : bucket === "closed"
+                      ? "Latest Closed (Newest)"
+                      : bucket === "pending" || bucket === "idle_time"
+                        ? "Latest Action First (Newest)"
+                        : bucket === "customer_delay" || bucket === "technical_delay"
+                          ? "Latest Delay First (Newest)"
+                          : "Latest First (Newest)"}
+                </SelectItem>
+                <SelectItem value="created_asc">
+                  {bucket === "completed"
+                    ? "Older Completed (Oldest)"
+                    : bucket === "closed"
+                      ? "Older Closed (Oldest)"
+                      : bucket === "pending" || bucket === "idle_time"
+                        ? "Older Action First (Oldest)"
+                        : bucket === "customer_delay" || bucket === "technical_delay"
+                          ? "Older Delay First (Oldest)"
+                          : "Older First (Oldest)"}
+                </SelectItem>
+                <SelectItem value="stage_asc">Stage (A → Z)</SelectItem>
+                <SelectItem value="stage_desc">Stage (Z → A)</SelectItem>
+                <SelectItem value="stage_journey_asc">Stage (Journey Order)</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {/* Assignees Filter (Admin & Staff) */}
+            <Select value={assignedTo} onValueChange={setAssignedTo}>
+              <SelectTrigger className="h-9 flex-[1.05] min-w-0 px-1.5 sm:px-2 xl:px-2.5 text-xs bg-slate-50/50 border-slate-200 [&_svg]:shrink-0">
+                <SelectValue placeholder="All assignees" />
+              </SelectTrigger>
+              <SelectContent className="max-h-[380px]">
+                <SelectItem value="all" className="font-bold text-slate-800">All assignees</SelectItem>
+                <SelectItem value="unassigned" className="text-slate-600">Unassigned</SelectItem>
+
+                {activeStaffList.length > 0 && (
+                  <SelectGroup>
+                    <SelectLabel className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-emerald-700 bg-emerald-50/80 rounded-md my-1 flex items-center gap-1">
+                      🟢 Active Workforce ({activeStaffList.length})
+                    </SelectLabel>
+                    {activeStaffList.map((s: any) => (
+                      <SelectItem key={s.id} value={s.id} className="pl-3 text-xs">
+                        {s.display_name || s.full_name || s.name || s.email}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                )}
+
+                {inactiveStaffList.length > 0 && (
+                  <SelectGroup>
+                    <SelectLabel className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-rose-700 bg-rose-50/80 rounded-md my-1 flex items-center gap-1">
+                      ⚪ Inactive / Exited Staff ({inactiveStaffList.length})
+                    </SelectLabel>
+                    {inactiveStaffList.map((s: any) => (
+                      <SelectItem key={s.id} value={s.id} className="pl-3 text-xs text-slate-600">
+                        <div className="flex items-center justify-between gap-1.5 w-full">
+                          <span>{s.display_name || s.name || s.email}</span>
+                          <span className="text-[9px] text-rose-500 font-mono ml-1 uppercase">[{s.employment_status || "INACTIVE"}]</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                )}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      )}
+
+      {/* Pending ageing summary */}
+      {(isAdmin || !isTeam) && (bucket === "pending" || pendingAge !== "any") && (
+        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-amber-200 bg-amber-50/60 px-3.5 py-2 text-[11px] text-amber-900 shadow-xs">
+          <span className="font-semibold uppercase tracking-wider text-[10px] text-amber-700">Pending ageing</span>
+          <AgeChip label="< 1d" n={ageBuckets.d1} />
+          <AgeChip label="1d+" n={ageBuckets.d2} />
+          <AgeChip label="2d+" n={ageBuckets.d3} />
+          <AgeChip label="3d+" n={ageBuckets.d7} />
+          <AgeChip label="7d+" n={ageBuckets.older} tone="rose" />
+        </div>
+      )}
+
+      {/* KPI Cards Row (Self Orders or Admin/Manager) */}
+      {(!isTeam || isAdmin) && (
+        <div className={cn(
+          "grid gap-2 w-full",
+          isPrivileged
+            ? "grid-cols-2 sm:grid-cols-3 md:grid-cols-6 lg:grid-cols-12"
+            : "grid-cols-2 sm:grid-cols-3 md:grid-cols-6 lg:grid-cols-11"
+        )}>
+          {(isPrivileged ? BUCKET_CARDS : BUCKET_CARDS.filter((b) => !b.adminOnly)).map((b) => {
+            const active = bucket === b.id;
+            const countVal = Number((counts as any)[b.id] ?? 0);
+            const IconComponent = b.icon;
+
+            if (b.id === "idle_time") {
+              return (
+                <OrderIdleTimerKpiCard
+                  key="idle_time"
+                  latestActionAt={latestActionAt}
+                  latestActionLabel={latestActionLabel}
+                  latestActionOrderCode={latestActionOrderCode}
+                  isActive={active}
+                  onClick={() => {
+                    setBucket("idle_time");
+                    setPage(1);
+                  }}
+                />
+              );
+            }
+
+            let cardContainerCls = "bg-white border-slate-200 text-slate-800 hover:border-slate-300 hover:bg-slate-50/70";
+            let headerCls = "text-slate-500";
+            let iconCls = "text-slate-400";
+            let countCls = "text-slate-900";
+            let subtitleCls = "text-slate-400";
+
+            if (b.id === "needs_action") {
+              cardContainerCls = active
+                ? "bg-red-50 border-red-500 text-red-950 shadow-sm ring-2 ring-red-300"
+                : "bg-red-50/40 border-red-200/80 text-red-950 hover:bg-red-50 hover:border-red-300";
+              headerCls = "text-red-600 font-bold";
+              iconCls = "text-red-500";
+              countCls = "text-red-600";
+              subtitleCls = "text-red-500/80";
+            } else if (b.id === "hot_orders") {
+              cardContainerCls = active
+                ? "bg-rose-50 border-rose-400 text-rose-950 shadow-sm ring-2 ring-rose-300"
+                : "bg-rose-50/70 border-rose-200/90 text-rose-950 hover:bg-rose-100/70 hover:border-rose-300";
+              headerCls = "text-rose-600 font-bold";
+              iconCls = "text-rose-600";
+              countCls = "text-rose-700";
+              subtitleCls = "text-rose-500/80";
+            } else if (b.id === "reminders") {
+              cardContainerCls = active
+                ? "bg-indigo-50 border-indigo-400 text-indigo-950 shadow-sm ring-2 ring-indigo-300"
+                : "bg-indigo-50/40 border-indigo-200/90 text-indigo-950 hover:bg-indigo-50/80 hover:border-indigo-300";
+              headerCls = "text-indigo-600 font-bold";
+              iconCls = "text-indigo-600";
+              countCls = "text-indigo-950";
+              subtitleCls = "text-indigo-600/70";
+            } else if (b.id === "technical_delay") {
+              cardContainerCls = active
+                ? "bg-sky-100/80 border-sky-500 text-sky-950 shadow-sm ring-2 ring-sky-300"
+                : "bg-sky-50/60 border-sky-200/90 text-sky-950 hover:bg-sky-100/60 hover:border-sky-300";
+              headerCls = "text-sky-700 font-bold";
+              iconCls = "text-sky-600";
+              countCls = "text-sky-900";
+              subtitleCls = "text-sky-600/80";
+            } else if (b.id === "backlog") {
+              cardContainerCls = active
+                ? "bg-amber-100 border-amber-500 text-amber-950 shadow-sm ring-2 ring-amber-300"
+                : "bg-amber-50/60 border-amber-200/90 text-amber-950 hover:bg-amber-100/60 hover:border-amber-300";
+              headerCls = "text-amber-800 font-bold";
+              iconCls = "text-amber-700";
+              countCls = "text-amber-950";
+              subtitleCls = "text-amber-700/80";
+            } else if (b.id === "customer_delay") {
+              cardContainerCls = active
+                ? "bg-orange-50 border-orange-500 text-orange-950 shadow-sm ring-2 ring-orange-300"
+                : "bg-orange-50/40 border-orange-200/80 text-orange-950 hover:bg-orange-50 hover:border-orange-300";
+              headerCls = "text-orange-700 font-bold";
+              iconCls = "text-orange-600";
+              countCls = "text-orange-950";
+              subtitleCls = "text-orange-600/70";
+            } else if (b.id === "pending") {
+              cardContainerCls = active
+                ? "bg-amber-50 border-amber-500 text-amber-950 shadow-sm ring-2 ring-amber-300"
+                : "bg-amber-50/50 border-amber-200/90 text-amber-950 hover:bg-amber-100/60 hover:border-amber-300";
+              headerCls = "text-amber-700 font-bold";
+              iconCls = "text-amber-600 animate-[spin_3s_ease-in-out_infinite]";
+              countCls = "text-amber-950";
+              subtitleCls = "text-amber-600/80";
+            } else if (b.id === "completed") {
+              cardContainerCls = active
+                ? "bg-emerald-50 border-emerald-500 text-emerald-950 shadow-sm ring-2 ring-emerald-300"
+                : "bg-emerald-50/40 border-emerald-200/80 text-emerald-950 hover:bg-emerald-50 hover:border-emerald-300";
+              headerCls = "text-emerald-700 font-bold";
+              iconCls = "text-emerald-600";
+              countCls = "text-emerald-900";
+              subtitleCls = "text-emerald-600/80";
+            } else if (b.id === "closed") {
+              cardContainerCls = active
+                ? "bg-slate-200 border-slate-400 text-slate-900 shadow-sm ring-2 ring-slate-300"
+                : "bg-slate-50/60 border-slate-200 text-slate-700 hover:bg-slate-100 hover:border-slate-300";
+              headerCls = "text-slate-600 font-bold";
+              iconCls = "text-slate-500";
+              countCls = "text-slate-800";
+              subtitleCls = "text-slate-500";
+            } else if (b.id === "pending_orders") {
+              cardContainerCls = active
+                ? "bg-purple-100 border-purple-500 text-purple-950 shadow-sm ring-2 ring-purple-300"
+                : "bg-purple-50/70 border-purple-200/90 text-purple-950 hover:bg-purple-100/60 hover:border-purple-300";
+              headerCls = "text-purple-700 font-bold";
+              iconCls = "text-purple-600";
+              countCls = "text-purple-950";
+              subtitleCls = "text-purple-700/80";
+            } else if (active) {
+              cardContainerCls = "bg-slate-900 text-white border-slate-900 shadow-sm";
+              headerCls = "text-slate-300";
+              iconCls = "text-slate-300";
+              countCls = "text-white";
+              subtitleCls = "text-slate-400";
+            }
+
+            return (
+              <button
+                key={b.id}
+                type="button"
+                onClick={() => {
+                  setBucket(b.id);
+                  setPage(1);
+                }}
+                className={cn(
+                  "flex flex-col justify-between p-2.5 rounded-xl min-h-[88px] border transition-all duration-150 cursor-pointer select-none text-left group shadow-xs hover:shadow-sm",
+                  cardContainerCls
+                )}
+              >
+                {/* Top row: Label & Icon */}
+                <div className="flex items-center justify-between gap-1 w-full">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    {b.id === "hot_orders" && countVal > 0 && (
+                      <span className="relative flex h-2 w-2 shrink-0">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-600"></span>
+                      </span>
+                    )}
+                    <span
+                      className={cn("text-[10px] font-bold tracking-wider uppercase truncate", headerCls)}
+                      title={b.label}
+                    >
+                      {b.shortLabel || b.label}
+                    </span>
+                  </div>
+                  <IconComponent className={cn("w-3.5 h-3.5 shrink-0 transition-transform group-hover:scale-110", iconCls)} />
+                </div>
+
+                {/* Middle row: Count & Badge */}
+                <div className="flex items-baseline gap-1.5 mt-1">
+                  <span className={cn("text-lg sm:text-xl font-black tracking-tight", countCls)}>
+                    {isPrivacyEnabled ? "•••" : countVal.toLocaleString()}
+                  </span>
+                  {b.id === "pending" && (counts as any).pending_actions_total > countVal ? (
+                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded leading-none shrink-0 bg-purple-600 text-white shadow-2xs" title={`${(counts as any).pending_actions_total} total manual actions performed across these orders`}>
+                      {isPrivacyEnabled ? "••• Actions" : `${(counts as any).pending_actions_total} Actions`}
+                    </span>
+                  ) : b.badge ? (
+                    <span className={cn("text-[9px] font-bold px-1.5 py-0.5 rounded leading-none shrink-0", b.badge.pillClass)}>
+                      {b.badge.text}
+                    </span>
+                  ) : null}
+                </div>
+
+                {/* Bottom row: Subtitle */}
+                <div
+                  className={cn("text-[9.5px] font-medium truncate mt-1 leading-tight", subtitleCls)}
+                  title={b.id === "pending" && (counts as any).pending_actions_total > countVal ? `${countVal} unique orders · ${(counts as any).pending_actions_total} total actions performed` : b.subtitle}
+                >
+                  {isPrivacyEnabled && b.id === "pending"
+                    ? "Pending orders"
+                    : b.id === "pending" && (counts as any).pending_actions_total > countVal
+                      ? `${(counts as any).pending_actions_total} Total Actions`
+                      : b.subtitle}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Bulk Action Bar (SuperAdmin & Admin & Manager) */}
+      {canManageOrders && selectedOrderIds.length > 0 && (
+        <div className="sticky top-2 z-30 flex flex-wrap items-center justify-between gap-3 p-3 bg-slate-900 text-white rounded-xl shadow-xl border border-slate-700 animate-in fade-in slide-in-from-top-2">
+          <div className="flex items-center gap-2.5 text-sm font-medium">
+            <span className="bg-indigo-600 text-white text-xs font-bold px-2.5 py-0.5 rounded-full">
+              {selectedOrderIds.length}
+            </span>
+            <span>{selectedOrderIds.length === 1 ? "Order Selected" : "Orders Selected"}</span>
           </div>
 
-          {/* Sort Selector - Kept on the same single row */}
-          <Select
-            value={
-              sortField === "created_at"
-                ? sortOrder === "desc" ? "created_desc" : "created_asc"
-                : sortField === "stage"
-                  ? sortOrder === "asc" ? "stage_asc" : "stage_desc"
-                  : "stage_journey_asc"
-            }
-            onValueChange={(v) => {
-              if (v === "created_desc") { setSortField("created_at"); setSortOrder("desc"); }
-              else if (v === "created_asc") { setSortField("created_at"); setSortOrder("asc"); }
-              else if (v === "stage_asc") { setSortField("stage"); setSortOrder("asc"); }
-              else if (v === "stage_desc") { setSortField("stage"); setSortOrder("desc"); }
-              else if (v === "stage_journey_asc") { setSortField("stage_journey"); setSortOrder("asc"); }
-            }}
-          >
-            <SelectTrigger className="h-9 flex-[1.05] min-w-0 px-1.5 sm:px-2 xl:px-2.5 text-xs bg-slate-50/50 border-slate-200 [&_svg]:shrink-0">
-              <ArrowUpDown className="w-3.5 h-3.5 mr-1 text-slate-500 shrink-0" />
-              <SelectValue placeholder="Sort order" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="created_desc">
-                {bucket === "completed"
-                  ? "Latest Completed (Newest)"
-                  : bucket === "closed"
-                    ? "Latest Closed (Newest)"
-                    : bucket === "pending" || bucket === "idle_time"
-                      ? "Latest Action First (Newest)"
-                      : bucket === "customer_delay" || bucket === "technical_delay"
-                        ? "Latest Delay First (Newest)"
-                        : "Latest First (Newest)"}
-              </SelectItem>
-              <SelectItem value="created_asc">
-                {bucket === "completed"
-                  ? "Older Completed (Oldest)"
-                  : bucket === "closed"
-                    ? "Older Closed (Oldest)"
-                    : bucket === "pending" || bucket === "idle_time"
-                      ? "Older Action First (Oldest)"
-                      : bucket === "customer_delay" || bucket === "technical_delay"
-                        ? "Older Delay First (Oldest)"
-                        : "Older First (Oldest)"}
-              </SelectItem>
-              <SelectItem value="stage_asc">Stage (A → Z)</SelectItem>
-              <SelectItem value="stage_desc">Stage (Z → A)</SelectItem>
-              <SelectItem value="stage_journey_asc">Stage (Journey Order)</SelectItem>
-            </SelectContent>
-          </Select>
-
-          {/* Assignees Filter (Admin & Staff) */}
-          <Select value={assignedTo} onValueChange={setAssignedTo}>
-            <SelectTrigger className="h-9 flex-[1.05] min-w-0 px-1.5 sm:px-2 xl:px-2.5 text-xs bg-slate-50/50 border-slate-200 [&_svg]:shrink-0">
-              <SelectValue placeholder="All assignees" />
-            </SelectTrigger>
-            <SelectContent className="max-h-[380px]">
-              <SelectItem value="all" className="font-bold text-slate-800">All assignees</SelectItem>
-              <SelectItem value="unassigned" className="text-slate-600">Unassigned</SelectItem>
-              
-              {activeStaffList.length > 0 && (
-                <SelectGroup>
-                  <SelectLabel className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-emerald-700 bg-emerald-50/80 rounded-md my-1 flex items-center gap-1">
-                    🟢 Active Workforce ({activeStaffList.length})
-                  </SelectLabel>
-                  {activeStaffList.map((s: any) => (
-                    <SelectItem key={s.id} value={s.id} className="pl-3 text-xs">
-                      {s.display_name || s.full_name || s.name || s.email}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              )}
-
-              {inactiveStaffList.length > 0 && (
-                <SelectGroup>
-                  <SelectLabel className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-rose-700 bg-rose-50/80 rounded-md my-1 flex items-center gap-1">
-                    ⚪ Inactive / Exited Staff ({inactiveStaffList.length})
-                  </SelectLabel>
-                  {inactiveStaffList.map((s: any) => (
-                    <SelectItem key={s.id} value={s.id} className="pl-3 text-xs text-slate-600">
-                      <div className="flex items-center justify-between gap-1.5 w-full">
-                        <span>{s.display_name || s.name || s.email}</span>
-                        <span className="text-[9px] text-rose-500 font-mono ml-1 uppercase">[{s.employment_status || "INACTIVE"}]</span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              )}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-    )}
-
-    {/* Pending ageing summary */}
-    {(isAdmin || !isTeam) && (bucket === "pending" || pendingAge !== "any") && (
-      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-amber-200 bg-amber-50/60 px-3.5 py-2 text-[11px] text-amber-900 shadow-xs">
-        <span className="font-semibold uppercase tracking-wider text-[10px] text-amber-700">Pending ageing</span>
-        <AgeChip label="< 1d" n={ageBuckets.d1} />
-        <AgeChip label="1d+" n={ageBuckets.d2} />
-        <AgeChip label="2d+" n={ageBuckets.d3} />
-        <AgeChip label="3d+" n={ageBuckets.d7} />
-        <AgeChip label="7d+" n={ageBuckets.older} tone="rose" />
-      </div>
-    )}
-
-    {/* KPI Cards Row (Self Orders or Admin/Manager) */}
-    {(!isTeam || canManageOrders) && (
-      <div className={cn(
-        "grid gap-2 w-full",
-        isPrivileged
-          ? "grid-cols-2 sm:grid-cols-3 md:grid-cols-6 lg:grid-cols-12"
-          : "grid-cols-2 sm:grid-cols-3 md:grid-cols-6 lg:grid-cols-11"
-      )}>
-        {(isPrivileged ? BUCKET_CARDS : BUCKET_CARDS.filter((b) => !b.adminOnly)).map((b) => {
-        const active = bucket === b.id;
-        const countVal = Number((counts as any)[b.id] ?? 0);
-        const IconComponent = b.icon;
-
-        if (b.id === "idle_time") {
-          return (
-            <OrderIdleTimerKpiCard
-              key="idle_time"
-              latestActionAt={latestActionAt}
-              latestActionLabel={latestActionLabel}
-              latestActionOrderCode={latestActionOrderCode}
-              isActive={active}
-              onClick={() => {
-                setBucket("idle_time");
-                setPage(1);
-              }}
-            />
-          );
-        }
-
-        let cardContainerCls = "bg-white border-slate-200 text-slate-800 hover:border-slate-300 hover:bg-slate-50/70";
-        let headerCls = "text-slate-500";
-        let iconCls = "text-slate-400";
-        let countCls = "text-slate-900";
-        let subtitleCls = "text-slate-400";
-
-        if (b.id === "needs_action") {
-          cardContainerCls = active
-            ? "bg-red-50 border-red-500 text-red-950 shadow-sm ring-2 ring-red-300"
-            : "bg-red-50/40 border-red-200/80 text-red-950 hover:bg-red-50 hover:border-red-300";
-          headerCls = "text-red-600 font-bold";
-          iconCls = "text-red-500";
-          countCls = "text-red-600";
-          subtitleCls = "text-red-500/80";
-        } else if (b.id === "hot_orders") {
-          cardContainerCls = active
-            ? "bg-rose-50 border-rose-400 text-rose-950 shadow-sm ring-2 ring-rose-300"
-            : "bg-rose-50/70 border-rose-200/90 text-rose-950 hover:bg-rose-100/70 hover:border-rose-300";
-          headerCls = "text-rose-600 font-bold";
-          iconCls = "text-rose-600";
-          countCls = "text-rose-700";
-          subtitleCls = "text-rose-500/80";
-        } else if (b.id === "reminders") {
-          cardContainerCls = active
-            ? "bg-indigo-50 border-indigo-400 text-indigo-950 shadow-sm ring-2 ring-indigo-300"
-            : "bg-indigo-50/40 border-indigo-200/90 text-indigo-950 hover:bg-indigo-50/80 hover:border-indigo-300";
-          headerCls = "text-indigo-600 font-bold";
-          iconCls = "text-indigo-600";
-          countCls = "text-indigo-950";
-          subtitleCls = "text-indigo-600/70";
-        } else if (b.id === "technical_delay") {
-          cardContainerCls = active
-            ? "bg-sky-100/80 border-sky-500 text-sky-950 shadow-sm ring-2 ring-sky-300"
-            : "bg-sky-50/60 border-sky-200/90 text-sky-950 hover:bg-sky-100/60 hover:border-sky-300";
-          headerCls = "text-sky-700 font-bold";
-          iconCls = "text-sky-600";
-          countCls = "text-sky-900";
-          subtitleCls = "text-sky-600/80";
-        } else if (b.id === "backlog") {
-          cardContainerCls = active
-            ? "bg-amber-100 border-amber-500 text-amber-950 shadow-sm ring-2 ring-amber-300"
-            : "bg-amber-50/60 border-amber-200/90 text-amber-950 hover:bg-amber-100/60 hover:border-amber-300";
-          headerCls = "text-amber-800 font-bold";
-          iconCls = "text-amber-700";
-          countCls = "text-amber-950";
-          subtitleCls = "text-amber-700/80";
-        } else if (b.id === "customer_delay") {
-          cardContainerCls = active
-            ? "bg-orange-50 border-orange-500 text-orange-950 shadow-sm ring-2 ring-orange-300"
-            : "bg-orange-50/40 border-orange-200/80 text-orange-950 hover:bg-orange-50 hover:border-orange-300";
-          headerCls = "text-orange-700 font-bold";
-          iconCls = "text-orange-600";
-          countCls = "text-orange-950";
-          subtitleCls = "text-orange-600/70";
-        } else if (b.id === "pending") {
-          cardContainerCls = active
-            ? "bg-amber-50 border-amber-500 text-amber-950 shadow-sm ring-2 ring-amber-300"
-            : "bg-amber-50/50 border-amber-200/90 text-amber-950 hover:bg-amber-100/60 hover:border-amber-300";
-          headerCls = "text-amber-700 font-bold";
-          iconCls = "text-amber-600 animate-[spin_3s_ease-in-out_infinite]";
-          countCls = "text-amber-950";
-          subtitleCls = "text-amber-600/80";
-        } else if (b.id === "completed") {
-          cardContainerCls = active
-            ? "bg-emerald-50 border-emerald-500 text-emerald-950 shadow-sm ring-2 ring-emerald-300"
-            : "bg-emerald-50/40 border-emerald-200/80 text-emerald-950 hover:bg-emerald-50 hover:border-emerald-300";
-          headerCls = "text-emerald-700 font-bold";
-          iconCls = "text-emerald-600";
-          countCls = "text-emerald-900";
-          subtitleCls = "text-emerald-600/80";
-        } else if (b.id === "closed") {
-          cardContainerCls = active
-            ? "bg-slate-200 border-slate-400 text-slate-900 shadow-sm ring-2 ring-slate-300"
-            : "bg-slate-50/60 border-slate-200 text-slate-700 hover:bg-slate-100 hover:border-slate-300";
-          headerCls = "text-slate-600 font-bold";
-          iconCls = "text-slate-500";
-          countCls = "text-slate-800";
-          subtitleCls = "text-slate-500";
-        } else if (b.id === "pending_orders") {
-          cardContainerCls = active
-            ? "bg-purple-100 border-purple-500 text-purple-950 shadow-sm ring-2 ring-purple-300"
-            : "bg-purple-50/70 border-purple-200/90 text-purple-950 hover:bg-purple-100/60 hover:border-purple-300";
-          headerCls = "text-purple-700 font-bold";
-          iconCls = "text-purple-600";
-          countCls = "text-purple-950";
-          subtitleCls = "text-purple-700/80";
-        } else if (active) {
-          cardContainerCls = "bg-slate-900 text-white border-slate-900 shadow-sm";
-          headerCls = "text-slate-300";
-          iconCls = "text-slate-300";
-          countCls = "text-white";
-          subtitleCls = "text-slate-400";
-        }
-
-        return (
-          <button
-            key={b.id}
-            type="button"
-            onClick={() => {
-              setBucket(b.id);
-              setPage(1);
-            }}
-            className={cn(
-              "flex flex-col justify-between p-2.5 rounded-xl min-h-[88px] border transition-all duration-150 cursor-pointer select-none text-left group shadow-xs hover:shadow-sm",
-              cardContainerCls
-            )}
-          >
-            {/* Top row: Label & Icon */}
-            <div className="flex items-center justify-between gap-1 w-full">
-              <div className="flex items-center gap-1.5 min-w-0">
-                {b.id === "hot_orders" && countVal > 0 && (
-                  <span className="relative flex h-2 w-2 shrink-0">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-600"></span>
-                  </span>
-                )}
-                <span
-                  className={cn("text-[10px] font-bold tracking-wider uppercase truncate", headerCls)}
-                  title={b.label}
-                >
-                  {b.shortLabel || b.label}
-                </span>
-              </div>
-              <IconComponent className={cn("w-3.5 h-3.5 shrink-0 transition-transform group-hover:scale-110", iconCls)} />
-            </div>
-
-            {/* Middle row: Count & Badge */}
-            <div className="flex items-baseline gap-1.5 mt-1">
-              <span className={cn("text-lg sm:text-xl font-black tracking-tight", countCls)}>
-                {isPrivacyEnabled ? "•••" : countVal.toLocaleString()}
-              </span>
-              {b.id === "pending" && (counts as any).pending_actions_total > countVal ? (
-                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded leading-none shrink-0 bg-purple-600 text-white shadow-2xs" title={`${(counts as any).pending_actions_total} total manual actions performed across these orders`}>
-                  {isPrivacyEnabled ? "••• Actions" : `${(counts as any).pending_actions_total} Actions`}
-                </span>
-              ) : b.badge ? (
-                <span className={cn("text-[9px] font-bold px-1.5 py-0.5 rounded leading-none shrink-0", b.badge.pillClass)}>
-                  {b.badge.text}
-                </span>
-              ) : null}
-            </div>
-
-            {/* Bottom row: Subtitle */}
-            <div
-              className={cn("text-[9.5px] font-medium truncate mt-1 leading-tight", subtitleCls)}
-              title={b.id === "pending" && (counts as any).pending_actions_total > countVal ? `${countVal} unique orders · ${(counts as any).pending_actions_total} total actions performed` : b.subtitle}
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button
+              size="sm"
+              onClick={handleAutoDistribute}
+              disabled={assigningBusy}
+              className="h-8 text-xs font-bold gap-1.5 bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 text-white shadow-xs border border-indigo-400/30 transition-all duration-150 active:scale-95"
             >
-              {isPrivacyEnabled && b.id === "pending"
-                ? "Pending orders"
-                : b.id === "pending" && (counts as any).pending_actions_total > countVal
-                ? `${(counts as any).pending_actions_total} Total Actions`
-                : b.subtitle}
-            </div>
-          </button>
-        );
-      })}
-    </div>
-    )}
-
-    {/* Bulk Action Bar (SuperAdmin & Admin & Manager) */}
-    {canManageOrders && selectedOrderIds.length > 0 && (
-      <div className="sticky top-2 z-30 flex flex-wrap items-center justify-between gap-3 p-3 bg-slate-900 text-white rounded-xl shadow-xl border border-slate-700 animate-in fade-in slide-in-from-top-2">
-        <div className="flex items-center gap-2.5 text-sm font-medium">
-          <span className="bg-indigo-600 text-white text-xs font-bold px-2.5 py-0.5 rounded-full">
-            {selectedOrderIds.length}
-          </span>
-          <span>{selectedOrderIds.length === 1 ? "Order Selected" : "Orders Selected"}</span>
-        </div>
-
-        <div className="flex items-center gap-2 flex-wrap">
-          <Button
-            size="sm"
-            onClick={handleAutoDistribute}
-            disabled={assigningBusy}
-            className="h-8 text-xs font-bold gap-1.5 bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 text-white shadow-xs border border-indigo-400/30 transition-all duration-150 active:scale-95"
-          >
-            {assigningBusy ? (
-              <Loader2 className="size-3.5 animate-spin" />
-            ) : (
-              <Scale className="size-3.5" />
-            )}
-            Equally Distribute
-          </Button>
-
-          <Select onValueChange={(val) => handleBulkReassign(val)} disabled={assigningBusy}>
-            <SelectTrigger className="h-8 text-xs bg-slate-800 border-slate-700 text-white w-[190px]">
-              <UserCheck className="size-3.5 mr-1.5 text-indigo-400" />
-              <SelectValue placeholder={assigningBusy ? "Reassigning…" : "Reassign Staff…"} />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="auto_distribute" className="font-semibold text-indigo-600 dark:text-indigo-400">
-                ⚖️ Auto-Balance / Equally Distribute
-              </SelectItem>
-              <SelectItem value="unassign">❌ Unassign Order</SelectItem>
-              {activeStaffList.map((s: any) => {
-                const statusTag = s.is_on_leave
-                  ? " [🌴 On Leave]"
-                  : s.presence_status === "AVAILABLE"
-                    ? " [🟢 Online]"
-                    : s.presence_status === "IDLE"
-                      ? " [🟡 Idle]"
-                      : s.presence_status === "AWAY"
-                        ? " [🟠 Away]"
-                        : " [⚪ Offline]";
-                return (
-                  <SelectItem key={s.id} value={s.id}>
-                    👤 {s.display_name || s.name || s.email}
-                    <span className="text-[10px] opacity-75 font-mono ml-1">{statusTag}</span>
-                  </SelectItem>
-                );
-              })}
-            </SelectContent>
-          </Select>
-
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => setSelectedOrderIds([])}
-            className="h-8 text-xs text-slate-300 hover:text-white hover:bg-slate-800"
-          >
-            Clear Selection
-          </Button>
-        </div>
-      </div>
-    )}
-
-    {isTeam ? (
-      <TeamWorkforceBreakdown
-        teamBreakdown={teamBreakdown}
-        isLoading={isLoading}
-        assignedTo={assignedTo}
-        onSelectEmployee={setAssignedTo}
-      />
-    ) : (
-      <>
-        {/* Desktop Table View */}
-        <div className="hidden md:block rounded-xl border border-slate-200 bg-white overflow-hidden shadow-xs">
-      <ScrollableTable>
-        <table className="w-full text-sm min-w-[950px]">
-          <thead>
-            <tr className="text-[10px] uppercase tracking-wider text-slate-500 bg-slate-50 border-b border-slate-200">
-              {canManageOrders && (
-                <th className="w-10 px-3 py-2.5 text-center">
-                  <Checkbox
-                    checked={rows.length > 0 && selectedOrderIds.length === rows.length}
-                    onCheckedChange={(checked) =>
-                      setSelectedOrderIds(checked ? rows.map((r) => r.id) : [])
-                    }
-                    aria-label="Select all orders"
-                  />
-                </th>
+              {assigningBusy ? (
+                <Loader2 className="size-3.5 animate-spin" />
+              ) : (
+                <Scale className="size-3.5" />
               )}
-              <th className="text-left font-semibold px-3 py-2.5">Order #</th>
-              <th
-                onClick={() => handleSortToggle("created_at")}
-                className="text-left font-semibold px-3 py-2.5 cursor-pointer hover:bg-slate-100/80 transition-colors select-none group"
-                title={`Click to toggle sorting by ${
-                  bucket === "completed"
-                    ? "Completed"
-                    : bucket === "closed"
-                      ? "Closed"
-                      : bucket === "pending"
-                        ? "Last Action"
-                        : bucket === "customer_delay" || bucket === "technical_delay"
-                          ? "Delay"
-                          : "Created"
-                } time`}
-              >
-                <div className="inline-flex items-center gap-1">
-                  <span>
-                    {bucket === "completed"
-                      ? "Completed"
-                      : bucket === "closed"
-                        ? "Closed"
-                        : bucket === "pending"
-                          ? "Last Action"
-                          : bucket === "customer_delay" || bucket === "technical_delay"
-                            ? "Delayed"
-                            : "Created"}
-                  </span>
-                  {sortField === "created_at" ? (
-                    sortOrder === "desc" ? (
-                      <ArrowDown className="w-3 h-3 text-indigo-600" />
-                    ) : (
-                      <ArrowUp className="w-3 h-3 text-indigo-600" />
-                    )
-                  ) : (
-                    <ArrowUpDown className="w-3 h-3 text-slate-300 group-hover:text-slate-500" />
+              Equally Distribute
+            </Button>
+
+            <Select onValueChange={(val) => handleBulkReassign(val)} disabled={assigningBusy}>
+              <SelectTrigger className="h-8 text-xs bg-slate-800 border-slate-700 text-white w-[190px]">
+                <UserCheck className="size-3.5 mr-1.5 text-indigo-400" />
+                <SelectValue placeholder={assigningBusy ? "Reassigning…" : "Reassign Staff…"} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="auto_distribute" className="font-semibold text-indigo-600 dark:text-indigo-400">
+                  ⚖️ Auto-Balance / Equally Distribute
+                </SelectItem>
+                <SelectItem value="unassign">❌ Unassign Order</SelectItem>
+                {activeStaffList.map((s: any) => {
+                  const statusTag = s.is_on_leave
+                    ? " [🌴 On Leave]"
+                    : s.presence_status === "AVAILABLE"
+                      ? " [🟢 Online]"
+                      : s.presence_status === "IDLE"
+                        ? " [🟡 Idle]"
+                        : s.presence_status === "AWAY"
+                          ? " [🟠 Away]"
+                          : " [⚪ Offline]";
+                  return (
+                    <SelectItem key={s.id} value={s.id}>
+                      👤 {s.display_name || s.name || s.email}
+                      <span className="text-[10px] opacity-75 font-mono ml-1">{statusTag}</span>
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
+
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setSelectedOrderIds([])}
+              className="h-8 text-xs text-slate-300 hover:text-white hover:bg-slate-800"
+            >
+              Clear Selection
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {isTeam ? (
+        <TeamWorkforceBreakdown
+          teamBreakdown={teamBreakdown}
+          isLoading={isLoading}
+          assignedTo={assignedTo}
+          onSelectEmployee={setAssignedTo}
+        />
+      ) : (
+        <>
+          {/* Desktop Table View */}
+          <div className="hidden md:block rounded-xl border border-slate-200 bg-white overflow-hidden shadow-xs">
+            <ScrollableTable>
+              <table className="w-full text-sm min-w-[950px]">
+                <thead>
+                  <tr className="text-[10px] uppercase tracking-wider text-slate-500 bg-slate-50 border-b border-slate-200">
+                    {canManageOrders && (
+                      <th className="w-10 px-3 py-2.5 text-center">
+                        <Checkbox
+                          checked={rows.length > 0 && selectedOrderIds.length === rows.length}
+                          onCheckedChange={(checked) =>
+                            setSelectedOrderIds(checked ? rows.map((r) => r.id) : [])
+                          }
+                          aria-label="Select all orders"
+                        />
+                      </th>
+                    )}
+                    {!isOtherEmployeeView && <th className="text-left font-semibold px-3 py-2.5">Order #</th>}
+                    <th
+                      onClick={() => handleSortToggle("created_at")}
+                      className="text-left font-semibold px-3 py-2.5 cursor-pointer hover:bg-slate-100/80 transition-colors select-none group"
+                      title={`Click to toggle sorting by ${bucket === "completed"
+                        ? "Completed"
+                        : bucket === "closed"
+                          ? "Closed"
+                          : bucket === "pending"
+                            ? "Last Action"
+                            : bucket === "customer_delay" || bucket === "technical_delay"
+                              ? "Delay"
+                              : "Created"
+                        } time`}
+                    >
+                      <div className="inline-flex items-center gap-1">
+                        <span>
+                          {bucket === "completed"
+                            ? "Completed"
+                            : bucket === "closed"
+                              ? "Closed"
+                              : bucket === "pending"
+                                ? "Last Action"
+                                : bucket === "customer_delay" || bucket === "technical_delay"
+                                  ? "Delayed"
+                                  : "Created"}
+                        </span>
+                        {sortField === "created_at" ? (
+                          sortOrder === "desc" ? (
+                            <ArrowDown className="w-3 h-3 text-indigo-600" />
+                          ) : (
+                            <ArrowUp className="w-3 h-3 text-indigo-600" />
+                          )
+                        ) : (
+                          <ArrowUpDown className="w-3 h-3 text-slate-300 group-hover:text-slate-500" />
+                        )}
+                      </div>
+                    </th>
+                    <th className="text-left font-semibold px-3 py-2.5">{isOtherEmployeeView ? "Customer Name" : "Customer"}</th>
+                    <th className="text-left font-semibold px-3 py-2.5">Service</th>
+                    <th className="text-left font-semibold px-3 py-2.5">Action Status</th>
+                    <th
+                      onClick={() => handleSortToggle("stage")}
+                      className="text-left font-semibold px-3 py-2.5 cursor-pointer hover:bg-slate-100/80 transition-colors select-none group"
+                      title="Click to toggle sorting by Stage"
+                    >
+                      <div className="inline-flex items-center gap-1">
+                        <span>Stage</span>
+                        {sortField === "stage" ? (
+                          sortOrder === "desc" ? (
+                            <ArrowDown className="w-3 h-3 text-indigo-600" />
+                          ) : (
+                            <ArrowUp className="w-3 h-3 text-indigo-600" />
+                          )
+                        ) : sortField === "stage_journey" ? (
+                          <ArrowDown className="w-3 h-3 text-indigo-600" />
+                        ) : (
+                          <ArrowUpDown className="w-3 h-3 text-slate-300 group-hover:text-slate-500" />
+                        )}
+                      </div>
+                    </th>
+                    {!isOtherEmployeeView && canManageOrders && <th className="text-left font-semibold px-3 py-2.5">Assigned</th>}
+                    {!isOtherEmployeeView && !hideMoney && <th className="text-right font-semibold px-3 py-2.5">Amount</th>}
+                  </tr>
+                </thead>
+                <tbody>
+                  {isLoading && (
+                    <tr><td colSpan={colCount} className="px-4 py-12 text-center text-slate-500">Loading orders…</td></tr>
                   )}
-                </div>
-              </th>
-              <th className="text-left font-semibold px-3 py-2.5">Customer</th>
-              <th className="text-left font-semibold px-3 py-2.5">Service</th>
-              <th className="text-left font-semibold px-3 py-2.5">Action Status</th>
-              <th
-                onClick={() => handleSortToggle("stage")}
-                className="text-left font-semibold px-3 py-2.5 cursor-pointer hover:bg-slate-100/80 transition-colors select-none group"
-                title="Click to toggle sorting by Stage"
-              >
-                <div className="inline-flex items-center gap-1">
-                  <span>Stage</span>
-                  {sortField === "stage" ? (
-                    sortOrder === "desc" ? (
-                      <ArrowDown className="w-3 h-3 text-indigo-600" />
-                    ) : (
-                      <ArrowUp className="w-3 h-3 text-indigo-600" />
-                    )
-                  ) : sortField === "stage_journey" ? (
-                    <ArrowDown className="w-3 h-3 text-indigo-600" />
-                  ) : (
-                    <ArrowUpDown className="w-3 h-3 text-slate-300 group-hover:text-slate-500" />
+                  {!isLoading && rows.length === 0 && (
+                    <tr><td colSpan={colCount} className="px-4 py-12 text-center text-slate-500">No orders in this view.</td></tr>
                   )}
-                </div>
-              </th>
-              {canManageOrders && <th className="text-left font-semibold px-3 py-2.5">Assigned</th>}
-              {!hideMoney && <th className="text-right font-semibold px-3 py-2.5">Amount</th>}
-            </tr>
-          </thead>
-          <tbody>
-            {isLoading && (
-              <tr><td colSpan={colCount} className="px-4 py-12 text-center text-slate-500">Loading orders…</td></tr>
-            )}
-            {!isLoading && rows.length === 0 && (
-              <tr><td colSpan={colCount} className="px-4 py-12 text-center text-slate-500">No orders in this view.</td></tr>
-            )}
-            {!isLoading && bucket === "hot_orders" &&
-              rows.map((r) => (
-                <OrderRow
-                  key={r.id}
-                  order={r}
-                  bucket={bucket}
-                  hideMoney={hideMoney}
-                  isAdmin={canManageOrders}
-                  selected={selectedOrderIds.includes(r.id)}
-                  onToggleSelect={(id, checked) =>
-                    setSelectedOrderIds((prev) =>
-                      checked ? [...prev, id] : prev.filter((x) => x !== id),
-                    )
-                  }
-                  onOpen={(id) => navigate({ to: `/admin/orders/${id}` as any })}
-                />
-              ))}
-            {!isLoading && bucket === "needs_action" && (
-              <>
-                {hotRows.map((r) => (
-                  <OrderRow
-                    key={r.id}
-                    order={r}
-                    bucket={bucket}
-                    hideMoney={hideMoney}
-                    isAdmin={canManageOrders}
-                    selected={selectedOrderIds.includes(r.id)}
-                    onToggleSelect={(id, checked) =>
-                      setSelectedOrderIds((prev) =>
-                        checked ? [...prev, id] : prev.filter((x) => x !== id),
-                      )
-                    }
-                    onOpen={(id) => navigate({ to: `/admin/orders/${id}` as any })}
-                  />
-                ))}
-                {groups.map(([day, items]) => (
-                  <Fragment key={`g-${day}`}>
-                    <tr className="bg-slate-900 text-white border-b border-slate-800">
-                      <td colSpan={colCount} className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wider">
-                        {formatDayHeader(day)}
-                      </td>
-                    </tr>
-                    {items.map((r) => (
+                  {!isLoading && bucket === "hot_orders" &&
+                    rows.map((r) => (
                       <OrderRow
                         key={r.id}
                         order={r}
                         bucket={bucket}
                         hideMoney={hideMoney}
                         isAdmin={canManageOrders}
+                        isRestricted={isOtherEmployeeView}
                         selected={selectedOrderIds.includes(r.id)}
                         onToggleSelect={(id, checked) =>
                           setSelectedOrderIds((prev) =>
                             checked ? [...prev, id] : prev.filter((x) => x !== id),
                           )
                         }
-                        onOpen={(id) => navigate({ to: `/admin/orders/${id}` as any })}
+                        onOpen={isOtherEmployeeView ? () => {} : (id) => navigate({ to: `/admin/orders/${id}` as any })}
                       />
                     ))}
-                  </Fragment>
-                ))}
-              </>
-            )}
-            {!isLoading && bucket !== "hot_orders" && bucket !== "needs_action" && groups.map(([day, items]) => (
-              <Fragment key={`g-${day}`}>
-                <tr className="bg-slate-900 text-white border-b border-slate-800">
-                  <td colSpan={colCount} className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wider">
-                    {formatDayHeader(day)}
-                  </td>
-                </tr>
-                {items.map((r) => (
-                  <OrderRow
-                    key={r.id}
-                    order={r}
-                    bucket={bucket}
-                    hideMoney={hideMoney}
-                    isAdmin={canManageOrders}
-                    selected={selectedOrderIds.includes(r.id)}
-                    onToggleSelect={(id, checked) =>
-                      setSelectedOrderIds((prev) =>
-                        checked ? [...prev, id] : prev.filter((x) => x !== id),
-                      )
-                    }
-                    onOpen={(id) => navigate({ to: `/admin/orders/${id}` as any })}
-                  />
-                ))}
-              </Fragment>
-            ))}
-          </tbody>
-        </table>
-      </ScrollableTable>
-    </div>
+                  {!isLoading && bucket === "needs_action" && (
+                    <>
+                      {hotRows.map((r) => (
+                        <OrderRow
+                          key={r.id}
+                          order={r}
+                          bucket={bucket}
+                          hideMoney={hideMoney}
+                          isAdmin={canManageOrders}
+                          isRestricted={isOtherEmployeeView}
+                          selected={selectedOrderIds.includes(r.id)}
+                          onToggleSelect={(id, checked) =>
+                            setSelectedOrderIds((prev) =>
+                              checked ? [...prev, id] : prev.filter((x) => x !== id),
+                            )
+                          }
+                          onOpen={isOtherEmployeeView ? () => {} : (id) => navigate({ to: `/admin/orders/${id}` as any })}
+                        />
+                      ))}
+                      {groups.map(([day, items]) => (
+                        <Fragment key={`g-${day}`}>
+                          <tr className="bg-slate-900 text-white border-b border-slate-800">
+                            <td colSpan={colCount} className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wider">
+                              {formatDayHeader(day)}
+                            </td>
+                          </tr>
+                          {items.map((r) => (
+                            <OrderRow
+                              key={r.id}
+                              order={r}
+                              bucket={bucket}
+                              hideMoney={hideMoney}
+                              isAdmin={canManageOrders}
+                              isRestricted={isOtherEmployeeView}
+                              selected={selectedOrderIds.includes(r.id)}
+                              onToggleSelect={(id, checked) =>
+                                setSelectedOrderIds((prev) =>
+                                  checked ? [...prev, id] : prev.filter((x) => x !== id),
+                                )
+                              }
+                              onOpen={isOtherEmployeeView ? () => {} : (id) => navigate({ to: `/admin/orders/${id}` as any })}
+                            />
+                          ))}
+                        </Fragment>
+                      ))}
+                    </>
+                  )}
+                  {!isLoading && bucket !== "hot_orders" && bucket !== "needs_action" && groups.map(([day, items]) => (
+                    <Fragment key={`g-${day}`}>
+                      <tr className="bg-slate-900 text-white border-b border-slate-800">
+                        <td colSpan={colCount} className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wider">
+                          {formatDayHeader(day)}
+                        </td>
+                      </tr>
+                      {items.map((r) => (
+                        <OrderRow
+                          key={r.id}
+                          order={r}
+                          bucket={bucket}
+                          hideMoney={hideMoney}
+                          isAdmin={canManageOrders}
+                          isRestricted={isOtherEmployeeView}
+                          selected={selectedOrderIds.includes(r.id)}
+                          onToggleSelect={(id, checked) =>
+                            setSelectedOrderIds((prev) =>
+                              checked ? [...prev, id] : prev.filter((x) => x !== id),
+                            )
+                          }
+                          onOpen={isOtherEmployeeView ? () => {} : (id) => navigate({ to: `/admin/orders/${id}` as any })}
+                        />
+                      ))}
+                    </Fragment>
+                  ))}
+                </tbody>
+              </table>
+            </ScrollableTable>
+          </div>
 
-    {/* Mobile Touch-Friendly Card View */}
-    <div className="block md:hidden space-y-4">
-      {isLoading && (
-        <div className="p-8 text-center text-sm text-slate-500 bg-white rounded-xl border border-slate-200">
-          Loading orders…
-        </div>
-      )}
-      {!isLoading && rows.length === 0 && (
-        <div className="p-8 text-center text-sm text-slate-500 bg-white rounded-xl border border-slate-200">
-          No orders match the selected filters.
-        </div>
-      )}
-      {!isLoading && bucket === "hot_orders" && (
-        <div className="space-y-2.5">
-          {rows.map((r) => (
-            <OrderCardMobile
-              key={r.id}
-              order={r}
-              bucket={bucket}
-              hideMoney={hideMoney}
-              isAdmin={canManageOrders}
-              selected={selectedOrderIds.includes(r.id)}
-              onToggleSelect={(id, checked) =>
-                setSelectedOrderIds((prev) =>
-                  checked ? [...prev, id] : prev.filter((x) => x !== id),
-                )
-              }
-              onOpen={(id) => navigate({ to: `/admin/orders/${id}` as any })}
-            />
-          ))}
-        </div>
-      )}
-      {!isLoading && bucket === "needs_action" && (
-        <div className="space-y-2.5">
-          {hotRows.map((r) => (
-            <OrderCardMobile
-              key={r.id}
-              order={r}
-              bucket={bucket}
-              hideMoney={hideMoney}
-              isAdmin={canManageOrders}
-              selected={selectedOrderIds.includes(r.id)}
-              onToggleSelect={(id, checked) =>
-                setSelectedOrderIds((prev) =>
-                  checked ? [...prev, id] : prev.filter((x) => x !== id),
-                )
-              }
-              onOpen={(id) => navigate({ to: `/admin/orders/${id}` as any })}
-            />
-          ))}
-          {groups.map(([day, items]) => (
-            <div key={`m-g-${day}`} className="space-y-2">
-              <div className="sticky top-0 z-10 bg-slate-900 text-white px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider rounded-lg shadow-xs">
-                {formatDayHeader(day)}
+          {/* Mobile Touch-Friendly Card View */}
+          <div className="block md:hidden space-y-4">
+            {isLoading && (
+              <div className="p-8 text-center text-sm text-slate-500 bg-white rounded-xl border border-slate-200">
+                Loading orders…
               </div>
+            )}
+            {!isLoading && rows.length === 0 && (
+              <div className="p-8 text-center text-sm text-slate-500 bg-white rounded-xl border border-slate-200">
+                No orders match the selected filters.
+              </div>
+            )}
+            {!isLoading && bucket === "hot_orders" && (
               <div className="space-y-2.5">
-                {items.map((r) => (
+                {rows.map((r) => (
                   <OrderCardMobile
                     key={r.id}
                     order={r}
                     bucket={bucket}
                     hideMoney={hideMoney}
                     isAdmin={canManageOrders}
+                    isRestricted={isOtherEmployeeView}
                     selected={selectedOrderIds.includes(r.id)}
                     onToggleSelect={(id, checked) =>
                       setSelectedOrderIds((prev) =>
                         checked ? [...prev, id] : prev.filter((x) => x !== id),
                       )
                     }
-                    onOpen={(id) => navigate({ to: `/admin/orders/${id}` as any })}
+                    onOpen={isOtherEmployeeView ? () => {} : (id) => navigate({ to: `/admin/orders/${id}` as any })}
                   />
                 ))}
               </div>
-            </div>
-          ))}
-        </div>
-      )}
-      {!isLoading && bucket !== "hot_orders" && bucket !== "needs_action" && groups.map(([day, items]) => (
-        <div key={`m-g-${day}`} className="space-y-2">
-          <div className="sticky top-0 z-10 bg-slate-900 text-white px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider rounded-lg shadow-xs">
-            {formatDayHeader(day)}
-          </div>
-          <div className="space-y-2.5">
-            {items.map((r) => (
-              <OrderCardMobile
-                key={r.id}
-                order={r}
-                bucket={bucket}
-                hideMoney={hideMoney}
-                isAdmin={canManageOrders}
-                selected={selectedOrderIds.includes(r.id)}
-                onToggleSelect={(id, checked) =>
-                  setSelectedOrderIds((prev) =>
-                    checked ? [...prev, id] : prev.filter((x) => x !== id),
-                  )
-                }
-                onOpen={(id) => navigate({ to: `/admin/orders/${id}` as any })}
-              />
+            )}
+            {!isLoading && bucket === "needs_action" && (
+              <div className="space-y-2.5">
+                {hotRows.map((r) => (
+                  <OrderCardMobile
+                    key={r.id}
+                    order={r}
+                    bucket={bucket}
+                    hideMoney={hideMoney}
+                    isAdmin={canManageOrders}
+                    isRestricted={isOtherEmployeeView}
+                    selected={selectedOrderIds.includes(r.id)}
+                    onToggleSelect={(id, checked) =>
+                      setSelectedOrderIds((prev) =>
+                        checked ? [...prev, id] : prev.filter((x) => x !== id),
+                      )
+                    }
+                    onOpen={isOtherEmployeeView ? () => {} : (id) => navigate({ to: `/admin/orders/${id}` as any })}
+                  />
+                ))}
+                {groups.map(([day, items]) => (
+                  <div key={`m-g-${day}`} className="space-y-2">
+                    <div className="sticky top-0 z-10 bg-slate-900 text-white px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider rounded-lg shadow-xs">
+                      {formatDayHeader(day)}
+                    </div>
+                    <div className="space-y-2.5">
+                      {items.map((r) => (
+                        <OrderCardMobile
+                          key={r.id}
+                          order={r}
+                          bucket={bucket}
+                          hideMoney={hideMoney}
+                          isAdmin={canManageOrders}
+                          isRestricted={isOtherEmployeeView}
+                          selected={selectedOrderIds.includes(r.id)}
+                          onToggleSelect={(id, checked) =>
+                            setSelectedOrderIds((prev) =>
+                              checked ? [...prev, id] : prev.filter((x) => x !== id),
+                            )
+                          }
+                          onOpen={isOtherEmployeeView ? () => {} : (id) => navigate({ to: `/admin/orders/${id}` as any })}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            {!isLoading && bucket !== "hot_orders" && bucket !== "needs_action" && groups.map(([day, items]) => (
+              <div key={`m-g-${day}`} className="space-y-2">
+                <div className="sticky top-0 z-10 bg-slate-900 text-white px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider rounded-lg shadow-xs">
+                  {formatDayHeader(day)}
+                </div>
+                <div className="space-y-2.5">
+                  {items.map((r) => (
+                    <OrderCardMobile
+                      key={r.id}
+                      order={r}
+                      bucket={bucket}
+                      hideMoney={hideMoney}
+                      isAdmin={canManageOrders}
+                      isRestricted={isOtherEmployeeView}
+                      selected={selectedOrderIds.includes(r.id)}
+                      onToggleSelect={(id, checked) =>
+                        setSelectedOrderIds((prev) =>
+                          checked ? [...prev, id] : prev.filter((x) => x !== id),
+                        )
+                      }
+                      onOpen={isOtherEmployeeView ? () => {} : (id) => navigate({ to: `/admin/orders/${id}` as any })}
+                    />
+                  ))}
+                </div>
+              </div>
             ))}
           </div>
-        </div>
-      ))}
-    </div>
 
-    {/* Pagination bar (Bottom) */}
-    {total > pageSize && (
-      <div className="flex items-center justify-between px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-xs text-slate-600 shadow-xs mt-2">
-        <div>
-          Page {page} of {Math.max(1, Math.ceil(total / pageSize))} · {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, total)} of {isPrivacyEnabled ? "•••" : total.toLocaleString("en-IN")}
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
-            disabled={page <= 1 || isLoading}
-            className="inline-flex items-center gap-1 h-7 px-2.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed font-medium"
-          >
-            <ChevronLeft className="size-3.5" /> Prev
-          </button>
-          <button
-            type="button"
-            onClick={() => setPage((p) => (p * pageSize < total ? p + 1 : p))}
-            disabled={page * pageSize >= total || isLoading}
-            className="inline-flex items-center gap-1 h-7 px-2.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed font-medium"
-          >
-            Next <ChevronRight className="size-3.5" />
-          </button>
-        </div>
-      </div>
-    )}
-      </>
-    )}
-  </div>
-);
+          {/* Pagination bar (Bottom) */}
+          {total > pageSize && (
+            <div className="flex items-center justify-between px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-xs text-slate-600 shadow-xs mt-2">
+              <div>
+                Page {page} of {Math.max(1, Math.ceil(total / pageSize))} · {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, total)} of {isPrivacyEnabled ? "•••" : total.toLocaleString("en-IN")}
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page <= 1 || isLoading}
+                  className="inline-flex items-center gap-1 h-7 px-2.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed font-medium"
+                >
+                  <ChevronLeft className="size-3.5" /> Prev
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPage((p) => (p * pageSize < total ? p + 1 : p))}
+                  disabled={page * pageSize >= total || isLoading}
+                  className="inline-flex items-center gap-1 h-7 px-2.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed font-medium"
+                >
+                  Next <ChevronRight className="size-3.5" />
+                </button>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
 }
 
 function EmployeeIdleTimerCell({
@@ -1831,8 +1845,8 @@ function EmployeeIdleTimerCell({
   const badgeCls = isHealthy
     ? "bg-emerald-50 text-emerald-700 border-emerald-200"
     : isAttention
-    ? "bg-amber-50 text-amber-700 border-amber-200"
-    : "bg-rose-50 text-rose-700 border-rose-200";
+      ? "bg-amber-50 text-amber-700 border-amber-200"
+      : "bg-rose-50 text-rose-700 border-rose-200";
 
   return (
     <span
@@ -2190,6 +2204,7 @@ function OrderCardMobile({
   bucket,
   hideMoney,
   isAdmin,
+  isRestricted,
   selected,
   onToggleSelect,
   onOpen,
@@ -2198,6 +2213,7 @@ function OrderCardMobile({
   bucket?: Bucket;
   hideMoney: boolean;
   isAdmin: boolean;
+  isRestricted?: boolean;
   selected?: boolean;
   onToggleSelect?: (id: string, checked: boolean) => void;
   onOpen: (id: string) => void;
@@ -2233,16 +2249,16 @@ function OrderCardMobile({
   return (
     <div
       onClick={(e) => {
+        if (isRestricted) return;
         if ((e.target as HTMLElement).closest("input,a,button,select,textarea,label,[data-no-row-click]")) return;
         onOpen(order.id);
       }}
-      className={`p-3.5 bg-white rounded-xl border shadow-xs transition-all space-y-2.5 active:bg-slate-50 cursor-pointer ${
-        order.is_hot
-          ? "border-l-4 border-l-rose-500 bg-rose-50/25 border-rose-200"
-          : selected
-            ? "border-indigo-500 bg-indigo-50/40"
-            : "border-slate-200 hover:border-slate-300"
-      }`}
+      className={`p-3.5 bg-white rounded-xl border shadow-xs transition-all space-y-2.5 ${isRestricted ? "cursor-default" : "active:bg-slate-50 cursor-pointer"} ${order.is_hot && !isRestricted
+        ? "border-l-4 border-l-rose-500 bg-rose-50/25 border-rose-200"
+        : selected
+          ? "border-indigo-500 bg-indigo-50/40"
+          : "border-slate-200 hover:border-slate-300"
+        }`}
     >
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 flex-wrap">
@@ -2254,38 +2270,42 @@ function OrderCardMobile({
               />
             </div>
           )}
-          <span className="font-mono text-xs font-bold text-slate-900">{order.application_code}</span>
-          {order.ticket_source && (
-            <span className="inline-flex items-center gap-1 rounded bg-purple-50 text-purple-700 border border-purple-200 px-1.5 py-0.5 text-[9px] font-bold">
-              <LifeBuoy className="size-2.5 text-purple-600" />
-              {order.ticket_source.ticketNumber ? `Ticket #${order.ticket_source.ticketNumber}` : "From Ticket"}
-            </span>
-          )}
-          {order.is_hot && (
-            <span className="inline-flex items-center gap-1.5 flex-wrap">
-              <span className="inline-flex items-center gap-1 rounded bg-rose-600 px-1.5 py-0.5 text-[9px] font-black uppercase text-white shadow-xs">
-                <Flame className="size-2.5" /> HOT ORDER NOW
-              </span>
-              {(order as any).hot_started_at && (
-                <span
-                  className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-800 border border-amber-200"
-                  title={`Time since order became HOT / escalated: ${formatOrderAge(Date.now() - new Date((order as any).hot_started_at).getTime())}`}
-                >
-                  {formatOrderAge(Date.now() - new Date((order as any).hot_started_at).getTime())}
+          {!isRestricted && (
+            <>
+              <span className="font-mono text-xs font-bold text-slate-900">{order.application_code}</span>
+              {order.ticket_source && (
+                <span className="inline-flex items-center gap-1 rounded bg-purple-50 text-purple-700 border border-purple-200 px-1.5 py-0.5 text-[9px] font-bold">
+                  <LifeBuoy className="size-2.5 text-purple-600" />
+                  {order.ticket_source.ticketNumber ? `Ticket #${order.ticket_source.ticketNumber}` : "From Ticket"}
                 </span>
               )}
-            </span>
-          )}
-          {!isCompletedView && !isClosedView && !order.is_terminal && (
-            <span
-              className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-800 border border-amber-200"
-              title={`Time since order created: ${formatOrderAge(Date.now() - new Date(order.created_at).getTime())}`}
-            >
-              {formatOrderAge(Date.now() - new Date(order.created_at).getTime())}
-            </span>
+              {order.is_hot && (
+                <span className="inline-flex items-center gap-1.5 flex-wrap">
+                  <span className="inline-flex items-center gap-1 rounded bg-rose-600 px-1.5 py-0.5 text-[9px] font-black uppercase text-white shadow-xs">
+                    <Flame className="size-2.5" /> HOT ORDER NOW
+                  </span>
+                  {(order as any).hot_started_at && (
+                    <span
+                      className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-800 border border-amber-200"
+                      title={`Time since order became HOT / escalated: ${formatOrderAge(Date.now() - new Date((order as any).hot_started_at).getTime())}`}
+                    >
+                      {formatOrderAge(Date.now() - new Date((order as any).hot_started_at).getTime())}
+                    </span>
+                  )}
+                </span>
+              )}
+              {!isCompletedView && !isClosedView && !order.is_terminal && (
+                <span
+                  className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-800 border border-amber-200"
+                  title={`Time since order created: ${formatOrderAge(Date.now() - new Date(order.created_at).getTime())}`}
+                >
+                  {formatOrderAge(Date.now() - new Date(order.created_at).getTime())}
+                </span>
+              )}
+            </>
           )}
         </div>
-        {!hideMoney && (
+        {!isRestricted && !hideMoney && (
           <span className="font-semibold text-slate-900 text-sm">
             {isPrivacyEnabled ? "₹••••" : formatINR(order.total_amount)}
           </span>
@@ -2295,7 +2315,7 @@ function OrderCardMobile({
       <div className="flex items-center justify-between text-xs text-slate-500 border-b border-slate-100 pb-2">
         <div>
           <span className="font-medium text-slate-900">{order.customer_name ?? "—"}</span>
-          {order.customer_mobile && <span className="ml-1.5 text-slate-500">({order.customer_mobile})</span>}
+          {!isRestricted && order.customer_mobile && <span className="ml-1.5 text-slate-500">({order.customer_mobile})</span>}
         </div>
         <div className="text-[11px] text-slate-400">
           {formatIST(dateToShow, { dateOnly: true })} {formatIST(dateToShow, { timeOnly: true })} IST
@@ -2357,10 +2377,10 @@ function OrderCardMobile({
             {meta?.label ?? stage}
           </span>
 
-          <OrderActionHistoryBadge order={order} />
+          {!isRestricted && <OrderActionHistoryBadge order={order} />}
         </div>
 
-        {isAdmin && (
+        {!isRestricted && isAdmin && (
           <span className="text-[11px] text-slate-500 font-medium">
             {order.assigned_name ? `Assigned: ${order.assigned_name}` : "Unassigned"}
           </span>
@@ -2477,6 +2497,7 @@ function OrderRow({
   bucket,
   hideMoney,
   isAdmin,
+  isRestricted,
   selected,
   onToggleSelect,
   onOpen,
@@ -2485,6 +2506,7 @@ function OrderRow({
   bucket?: Bucket;
   hideMoney: boolean;
   isAdmin: boolean;
+  isRestricted?: boolean;
   selected?: boolean;
   onToggleSelect?: (id: string, checked: boolean) => void;
   onOpen: (id: string) => void;
@@ -2526,14 +2548,14 @@ function OrderRow({
 
   return (
     <tr
-      className={`border-t border-slate-100 hover:bg-slate-50/60 cursor-pointer ${
-        order.is_hot
-          ? "border-l-4 border-l-rose-500 bg-rose-50/30 hover:bg-rose-50/50"
-          : selected
-            ? "bg-indigo-50/40"
-            : ""
-      }`}
+      className={`border-t border-slate-100 ${isRestricted ? "" : "hover:bg-slate-50/60 cursor-pointer"} ${order.is_hot && !isRestricted
+        ? "border-l-4 border-l-rose-500 bg-rose-50/30 hover:bg-rose-50/50"
+        : selected
+          ? "bg-indigo-50/40"
+          : ""
+        }`}
       onClick={(e) => {
+        if (isRestricted) return;
         if ((e.target as HTMLElement).closest("input,a,button,select,textarea,label,[data-no-row-click]")) return;
         const sel = typeof window !== "undefined" ? window.getSelection?.() : null;
         if (sel && sel.toString().trim().length > 0) return;
@@ -2551,35 +2573,37 @@ function OrderRow({
         </td>
       )}
 
-      {/* 1. Order # */}
-      <td className="px-2 py-2.5 font-mono text-[12px] whitespace-nowrap">
-        <div className="space-y-1">
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="font-bold text-slate-900">{order.application_code}</span>
-            {order.ticket_source && (
-              <span className="inline-flex items-center gap-1 rounded bg-purple-50 text-purple-700 border border-purple-200 px-1.5 py-0.5 text-[9px] font-bold">
-                <LifeBuoy className="size-2.5 text-purple-600" />
-                {order.ticket_source.ticketNumber ? `Ticket #${order.ticket_source.ticketNumber}` : "From Ticket"}
-              </span>
-            )}
-          </div>
-          {order.is_hot && (
+      {/* 1. Order # (Hidden when restricted) */}
+      {!isRestricted && (
+        <td className="px-2 py-2.5 font-mono text-[12px] whitespace-nowrap">
+          <div className="space-y-1">
             <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="inline-flex items-center gap-1 rounded bg-rose-600 px-1.5 py-0.5 text-[9px] font-black uppercase text-white shadow-xs">
-                <Flame className="size-2.5" /> HOT ORDER NOW
-              </span>
-              {(order as any).hot_started_at && (
-                <span
-                  className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-800 border border-amber-200"
-                  title={`Time since order became HOT / escalated: ${formatOrderAge(Date.now() - new Date((order as any).hot_started_at).getTime())}`}
-                >
-                  {formatOrderAge(Date.now() - new Date((order as any).hot_started_at).getTime())}
+              <span className="font-bold text-slate-900">{order.application_code}</span>
+              {order.ticket_source && (
+                <span className="inline-flex items-center gap-1 rounded bg-purple-50 text-purple-700 border border-purple-200 px-1.5 py-0.5 text-[9px] font-bold">
+                  <LifeBuoy className="size-2.5 text-purple-600" />
+                  {order.ticket_source.ticketNumber ? `Ticket #${order.ticket_source.ticketNumber}` : "From Ticket"}
                 </span>
               )}
             </div>
-          )}
-        </div>
-      </td>
+            {order.is_hot && (
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="inline-flex items-center gap-1 rounded bg-rose-600 px-1.5 py-0.5 text-[9px] font-black uppercase text-white shadow-xs">
+                  <Flame className="size-2.5" /> HOT ORDER NOW
+                </span>
+                {(order as any).hot_started_at && (
+                  <span
+                    className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-800 border border-amber-200"
+                    title={`Time since order became HOT / escalated: ${formatOrderAge(Date.now() - new Date((order as any).hot_started_at).getTime())}`}
+                  >
+                    {formatOrderAge(Date.now() - new Date((order as any).hot_started_at).getTime())}
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+        </td>
+      )}
 
       {/* 2. Created / Completed / Closed */}
       <td className="px-2 py-2.5 text-[11px] text-slate-600 whitespace-nowrap leading-tight">
@@ -2588,7 +2612,7 @@ function OrderRow({
             <div>{formatIST(dateToShow, { dateOnly: true })}</div>
             <div className="text-slate-400">{formatIST(dateToShow, { timeOnly: true })} IST</div>
           </div>
-          {!isCompletedView && !isClosedView && !order.is_terminal && (
+          {!isRestricted && !isCompletedView && !isClosedView && !order.is_terminal && (
             <span
               className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-800 border border-amber-200"
               title={`Time since order created: ${formatOrderAge(Date.now() - new Date(order.created_at).getTime())}`}
@@ -2602,7 +2626,7 @@ function OrderRow({
       {/* 3. Customer */}
       <td className="px-2 py-2.5 min-w-[160px]">
         <div className="font-medium text-slate-900 leading-tight text-[13px]">{order.customer_name ?? "—"}</div>
-        {order.customer_mobile && (
+        {!isRestricted && order.customer_mobile && (
           <div className="text-[11px] text-slate-500 mt-0.5">{formatMobile55(order.customer_mobile)}</div>
         )}
       </td>
@@ -2658,7 +2682,7 @@ function OrderRow({
             </span>
           )}
 
-          <OrderActionHistoryBadge order={order} />
+          {!isRestricted && <OrderActionHistoryBadge order={order} />}
         </div>
       </td>
 
@@ -2668,7 +2692,7 @@ function OrderRow({
           <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium ${stageTone}`}>
             {meta?.label ?? stage}
           </span>
-          {isPendingRow(order) && (() => {
+          {!isRestricted && isPendingRow(order) && (() => {
             const d = daysSince(order.created_at);
             if (d < 1) return null;
             const tone = d >= 7 ? "bg-rose-50 text-rose-700 border-rose-200"
@@ -2686,11 +2710,11 @@ function OrderRow({
         </div>
       </td>
 
-      {/* 7. Assigned */}
-      {isAdmin && <td className="px-2 py-2.5 text-slate-600 whitespace-nowrap text-[12px]">{order.assigned_name ?? "Unassigned"}</td>}
+      {/* 7. Assigned (Hidden when restricted) */}
+      {!isRestricted && isAdmin && <td className="px-2 py-2.5 text-slate-600 whitespace-nowrap text-[12px]">{order.assigned_name ?? "Unassigned"}</td>}
 
-      {/* 8. Amount (Kept at the very end of the row) */}
-      {!hideMoney && (
+      {/* 8. Amount (Hidden when restricted, kept at the very end of the row) */}
+      {!isRestricted && !hideMoney && (
         <td className="px-2 py-2.5 text-right font-semibold text-slate-900 whitespace-nowrap text-[13px]">
           {isPrivacyEnabled ? "₹••••" : formatINR(order.total_amount)}
         </td>

@@ -901,15 +901,15 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
           query = query.neq("assigned_to", context.userId);
         }
       } else {
-        // Self orders mode
-        if (!isAdmin && (!isManager || !hasSearch)) {
-          query = query.eq("assigned_to", context.userId);
-        } else if (data.assignedTo && data.assignedTo !== "all" && data.assignedTo.trim() !== "") {
+        // Normal orders mode
+        if ((isAdmin || isManager) && data.assignedTo && data.assignedTo !== "all" && data.assignedTo.trim() !== "") {
           if (data.assignedTo === "unassigned") {
             query = query.is("assigned_to", null);
           } else {
             query = query.eq("assigned_to", data.assignedTo);
           }
+        } else if (!isAdmin && (!isManager || !hasSearch)) {
+          query = query.eq("assigned_to", context.userId);
         }
       }
 
@@ -2090,7 +2090,25 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
     const start = (page - 1) * data.pageSize;
     // In team mode: counts only are returned, individual rows are withheld.
     // In self mode: staff and managers can view their assigned order rows.
-    const rows = data.viewMode === "team" ? [] : filtered.slice(start, start + data.pageSize);
+    const rawRows = data.viewMode === "team" ? [] : filtered.slice(start, start + data.pageSize);
+
+    const hasSearch = Boolean(data.search && data.search.trim());
+    const isRestrictedManagerOtherEmployee =
+      !isAdmin &&
+      isManager &&
+      Boolean(data.assignedTo && data.assignedTo !== "all" && data.assignedTo !== context.userId && !hasSearch);
+
+    const rows = isRestrictedManagerOtherEmployee
+      ? rawRows.map((r: any) => ({
+          ...r,
+          application_code: "—",
+          customer_mobile: null,
+          customer_email: null,
+          total_amount: null,
+          payment_status: null,
+          is_other_employee_restricted: true,
+        }))
+      : rawRows;
 
     // Compute team-level breakdown for team mode (Active Workforce only)
     const teamBreakdownMap = new Map<string, {
