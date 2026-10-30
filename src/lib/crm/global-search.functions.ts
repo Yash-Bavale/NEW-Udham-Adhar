@@ -81,8 +81,10 @@ export const globalSearch = createServerFn({ method: "POST" })
       appByCodeQuery = appByCodeQuery.eq("assigned_to", userId);
     }
 
+    const canSearchLeads = leadsPerm.canView || canSearchAllLeads || ordersPerm.canView;
+
     const [l, custData, aByCode, inv, cert, comp, tickets] = await Promise.all([
-      leadsPerm.canView ? leadQuery : Promise.resolve({ data: [] }),
+      canSearchLeads ? leadQuery : Promise.resolve({ data: [] }),
       admin
         .from("customers")
         .select("id, customer_code, name, primary_email, primary_mobile, created_at")
@@ -255,24 +257,26 @@ export const globalSearch = createServerFn({ method: "POST" })
     });
 
     // 2. LEADS
-    (l.data || []).forEach((r: any) =>
-      candidateHits.push({
-        kind: "lead",
-        id: r.id,
-        name: r.name || "Lead",
-        code: r.lead_code,
-        created_at: r.created_at,
-        mobile: r.mobile || null,
-        email: r.email || null,
-        service: r.service || null,
-        stage: r.lead_status_v2 || r.status,
-        assignee: r.assigned_to ? (staffMap.get(r.assigned_to) || null) : null,
-        title: r.name || r.lead_code,
-        subtitle: [r.lead_code, r.service, r.lead_status_v2 || r.status, r.email, r.mobile].filter(Boolean).join(" · "),
-        details: `Lead Name: ${r.name ?? ""}, Code: ${r.lead_code ?? ""}, Email: ${r.email ?? ""}, Mobile: ${r.mobile ?? ""}, Service: ${r.service ?? ""}, Status: ${r.lead_status_v2 ?? r.status ?? ""}, Notes: ${r.notes ?? ""}`,
-        href: `/admin/leads/${r.id}`,
-      }),
-    );
+    if (leadsPerm.canView) {
+      (l.data || []).forEach((r: any) =>
+        candidateHits.push({
+          kind: "lead",
+          id: r.id,
+          name: r.name || "Lead",
+          code: r.lead_code,
+          created_at: r.created_at,
+          mobile: r.mobile || null,
+          email: r.email || null,
+          service: r.service || null,
+          stage: r.lead_status_v2 || r.status,
+          assignee: r.assigned_to ? (staffMap.get(r.assigned_to) || null) : null,
+          title: r.name || r.lead_code,
+          subtitle: [r.lead_code, r.service, r.lead_status_v2 || r.status, r.email, r.mobile].filter(Boolean).join(" · "),
+          details: `Lead Name: ${r.name ?? ""}, Code: ${r.lead_code ?? ""}, Email: ${r.email ?? ""}, Mobile: ${r.mobile ?? ""}, Service: ${r.service ?? ""}, Status: ${r.lead_status_v2 ?? r.status ?? ""}, Notes: ${r.notes ?? ""}`,
+          href: `/admin/leads/${r.id}`,
+        }),
+      );
+    }
 
     // 3. SUPPORT TICKETS
     (tickets.data || []).forEach((r: any) =>

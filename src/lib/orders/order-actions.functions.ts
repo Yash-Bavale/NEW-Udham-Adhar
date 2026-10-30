@@ -198,8 +198,8 @@ export const ourSideDelay = createServerFn({ method: "POST" })
         data.mode === "auto"
           ? "Recurring 2h business-time reminders started."
           : data.mode === "manual"
-          ? `Manual reminder scheduled${data.remindAt ? ` for ${new Date(data.remindAt).toLocaleString("en-IN")}` : ""}.`
-          : "30-min grace period before auto-reminders kick in.",
+            ? `Manual reminder scheduled${data.remindAt ? ` for ${new Date(data.remindAt).toLocaleString("en-IN")}` : ""}.`
+            : "30-min grace period before auto-reminders kick in.",
     });
 
     try {
@@ -360,7 +360,7 @@ async function transition(
   try {
     const { logEmployeeOrderAction } = await import("@/lib/orders/order-action-logger.server");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    
+
     let actionType: any = extras.actionType || "STATUS_CHANGED";
     if (!extras.actionType) {
       if (newStatus === "CUSTOMER_HOLD") actionType = "CUSTOMER_DELAY_ADDED";
@@ -1099,17 +1099,17 @@ export const markRefundProcessed = createServerFn({ method: "POST" })
       const cleanRefundNum = Number(data.amount).toFixed(2);
       const formattedRefundRupees = `₹${Number(data.amount).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-          const finalServiceName = (order as any).service_name || (lead as any)?.service || "UDYAM Registration Service";
-          emailQueued = await queueTemplateEmail(
-            "refund_processed_confirmation",
-            to,
-            {
-              customerName: name,
-              customer_name: name,
-              orderNumber: order.application_code || order.id.slice(0, 8),
-              order_number: order.application_code || order.id.slice(0, 8),
-              serviceName: finalServiceName,
-              service_name: finalServiceName,
+      const finalServiceName = (order as any).service_name || (lead as any)?.service || "UDYAM Registration Service";
+      emailQueued = await queueTemplateEmail(
+        "refund_processed_confirmation",
+        to,
+        {
+          customerName: name,
+          customer_name: name,
+          orderNumber: order.application_code || order.id.slice(0, 8),
+          order_number: order.application_code || order.id.slice(0, 8),
+          serviceName: finalServiceName,
+          service_name: finalServiceName,
           refundStatus: "Approved",
           refund_status: "Approved",
           refundAmount: cleanRefundNum,
@@ -1354,7 +1354,7 @@ export const reopenOrder = createServerFn({ method: "POST" })
 
         if (lead) {
           const isClosedLead = ["closed", "closed_refunded", "uninterested"].includes(String(lead.lead_status_v2 ?? "")) ||
-                               ["closed", "uninterested"].includes(String(lead.status ?? ""));
+            ["closed", "uninterested"].includes(String(lead.status ?? ""));
           if (isClosedLead) {
             const nextLeadStatus = paidPayment ? "payment_successful" : "contacted";
             await supabaseAdmin
