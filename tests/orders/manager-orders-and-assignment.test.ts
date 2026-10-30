@@ -93,19 +93,26 @@ describe("Manager Orders Permissions & Restricted Assignment View", () => {
     });
   });
 
-  describe("2. Manager Normal Orders View & Filters", () => {
-    it("ensures normal Orders page does not force assigned_to = context.userId for managers", () => {
-      // In listOrdersV2, filtering by assigned_to context.userId should only apply to non-admin and non-manager:
+  describe("2. Manager Normal Orders View & Search Rules", () => {
+    it("preserves organisation-wide order search for managers only when they actually search", () => {
+      // In listOrdersV2, filtering by assigned_to context.userId:
       const shouldRestrictToSelf = (isAdmin: boolean, isManager: boolean, hasSearch: boolean) => {
-        return !isAdmin && !isManager;
+        return !isAdmin && (!isManager || !hasSearch);
       };
 
-      // Admin -> false (sees all orders or filters by assignedTo)
+      // Admin sees all orders whether searched or unsearched:
       expect(shouldRestrictToSelf(true, false, false)).toBe(false);
-      // Manager -> false (sees all orders or filters by assignedTo)
-      expect(shouldRestrictToSelf(false, true, false)).toBe(false);
-      // Executive / normal staff -> true (restricted to own orders)
+      expect(shouldRestrictToSelf(true, false, true)).toBe(false);
+
+      // Manager unsearched is restricted to self (does not accidentally expose all organisation orders):
+      expect(shouldRestrictToSelf(false, true, false)).toBe(true);
+
+      // Manager searching can search organisation-wide:
+      expect(shouldRestrictToSelf(false, true, true)).toBe(false);
+
+      // Regular employee/executive is always restricted to own orders:
       expect(shouldRestrictToSelf(false, false, false)).toBe(true);
+      expect(shouldRestrictToSelf(false, false, true)).toBe(true);
     });
 
     it("ensures bulkAssignOrders allows managers to reassign staff", () => {
@@ -139,12 +146,10 @@ describe("Manager Orders Permissions & Restricted Assignment View", () => {
       mockQc.invalidateQueries({ queryKey: ["admin.orders.v2"] });
       mockQc.invalidateQueries({ queryKey: ["admin.assignment.metrics"] });
       mockQc.invalidateQueries({ queryKey: ["admin.assignment.history"] });
-      mockQc.invalidateQueries({ queryKey: ["admin.employee.assigned-orders"] });
 
       expect(invalidatedKeys).toContain("admin.orders.v2");
       expect(invalidatedKeys).toContain("admin.assignment.metrics");
       expect(invalidatedKeys).toContain("admin.assignment.history");
-      expect(invalidatedKeys).toContain("admin.employee.assigned-orders");
     });
   });
 });

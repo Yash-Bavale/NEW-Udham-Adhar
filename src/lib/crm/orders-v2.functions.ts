@@ -902,7 +902,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         }
       } else {
         // Self orders mode
-        if (!isAdmin && !isManager) {
+        if (!isAdmin && (!isManager || !hasSearch)) {
           query = query.eq("assigned_to", context.userId);
         } else if (data.assignedTo && data.assignedTo !== "all" && data.assignedTo.trim() !== "") {
           if (data.assignedTo === "unassigned") {
