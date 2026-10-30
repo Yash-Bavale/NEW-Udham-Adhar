@@ -411,6 +411,11 @@ export function OrdersListPage({ mode = "self" }: { mode?: "self" | "team" }) {
   const [fulfillmentStatus, setFulfillmentStatus] = useState<string>(savedState?.fulfillmentStatus ?? "all");
   const [serviceId, setServiceId] = useState<string>(savedState?.serviceId ?? "all");
   const [assignedTo, setAssignedTo] = useState<string>(() => {
+    // Team Orders must never default to the manager's own id: the team view
+    // excludes the manager's own orders, so that filter would zero every count.
+    if (isTeam) {
+      return savedState?.assignedTo && savedState.assignedTo !== role.userId ? savedState.assignedTo : "all";
+    }
     if (!isAdmin && isManager) {
       if (savedState?.assignedTo && savedState.assignedTo !== "all") {
         return savedState.assignedTo;
@@ -421,10 +426,14 @@ export function OrdersListPage({ mode = "self" }: { mode?: "self" | "team" }) {
   });
 
   useEffect(() => {
+    if (isTeam) {
+      if (role.userId && assignedTo === role.userId) setAssignedTo("all");
+      return;
+    }
     if (!isAdmin && isManager && role.userId && assignedTo === "all") {
       setAssignedTo(role.userId);
     }
-  }, [isAdmin, isManager, role.userId, assignedTo]);
+  }, [isTeam, isAdmin, isManager, role.userId, assignedTo]);
 
   const selectedEmployeeId = canManageOrders && assignedTo && assignedTo !== "all" && assignedTo !== "unassigned"
     ? assignedTo
