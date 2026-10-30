@@ -297,7 +297,7 @@ export const bulkAssignOrders = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => BulkAssignInput.parse(i))
   .handler(async ({ data, context }) => {
-    await assertRole(context.supabase, ["super_admin", "admin"]);
+    await assertRole(context.supabase, ["super_admin", "admin", "manager"]);
     const { assignOrderCanonical } = await import("./assignment-engine.server");
 
     for (const orderId of data.applicationIds) {
@@ -305,7 +305,7 @@ export const bulkAssignOrders = createServerFn({ method: "POST" })
         orderId,
         newEmployeeId: data.assignedTo,
         changeType: "MANUAL_BULK",
-        reason: `Bulk reassigned by admin (${data.applicationIds.length} orders in batch)`,
+        reason: `Bulk reassigned by operator (${data.applicationIds.length} orders in batch)`,
         source: "admin",
         actorId: context.userId,
         skipNotification: true, // We emit one batch notification below

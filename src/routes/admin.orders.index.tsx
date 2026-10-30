@@ -9,6 +9,7 @@ import { toast } from "sonner";
 
 import {
   listOrdersV2,
+  listEmployeeAssignedOrders,
   bucketOfRow,
   isPendingRow,
   isTechnicalDelayOrder,
@@ -390,7 +391,8 @@ export function OrdersListPage({ mode = "self" }: { mode?: "self" | "team" }) {
   const userPerms = usePermissions();
   const isAdmin = role.hasAny(["admin", "super_admin"]) || Boolean(userPerms.perms?.isAdmin);
   const isManager = role.has("manager");
-  const isPrivileged = isAdmin || isTeam;
+  const canManageOrders = isAdmin || isManager;
+  const isPrivileged = isAdmin || isManager || isTeam;
 
   const hideMoney = role.hideMoney();
   const { isPrivacyEnabled } = useDashboardPrivacy();
@@ -756,6 +758,7 @@ async function handleAutoDistribute() {
       qc.invalidateQueries({ queryKey: ["admin.orders.v2"] });
       qc.invalidateQueries({ queryKey: ["admin.assignment.metrics"] });
       qc.invalidateQueries({ queryKey: ["admin.assignment.history"] });
+      qc.invalidateQueries({ queryKey: ["admin.employee.assigned-orders"] });
     } else {
       toast.error(res.summaryMessage || "Failed to distribute orders");
     }
@@ -782,6 +785,7 @@ async function handleBulkReassign(targetStaffId: string) {
     qc.invalidateQueries({ queryKey: ["admin.orders.v2"] });
     qc.invalidateQueries({ queryKey: ["admin.assignment.metrics"] });
     qc.invalidateQueries({ queryKey: ["admin.assignment.history"] });
+    qc.invalidateQueries({ queryKey: ["admin.employee.assigned-orders"] });
   } catch (e) {
     toast.error((e as Error).message || "Failed to reassign orders");
   } finally {
@@ -790,8 +794,8 @@ async function handleBulkReassign(targetStaffId: string) {
 }
 
 // Base columns (Order #, Created, Customer, Service, Action Status, Stage) = 6
-// Plus Checkbox (1) + Assigned (1) + Amount (1) = 9 total columns for Admin (Amount is kept at last)
-const colCount = 6 + (isAdmin ? 2 : 0) + (hideMoney ? 0 : 1);
+// Plus Checkbox (1) + Assigned (1) + Amount (1) = 9 total columns for Admin/Manager (Amount is kept at last)
+const colCount = 6 + (canManageOrders ? 2 : 0) + (hideMoney ? 0 : 1);
 
 const groups = useMemo(() => {
   const g = new Map<string, any[]>();
@@ -898,7 +902,7 @@ return (
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        {isAdmin && (
+        {canManageOrders && (
           <>
             <Tabs
               value={datePreset}
@@ -948,7 +952,7 @@ return (
           <span>Refresh</span>
         </Button>
 
-        {isAdmin && isFilterActive && (
+        {canManageOrders && isFilterActive && (
           <button
             type="button"
             onClick={resetFilters}
@@ -960,8 +964,8 @@ return (
       </div>
     </div>
 
-    {/* Modern Filter Card for Superadmin / Admin */}
-    {isAdmin && (
+    {/* Modern Filter Card for Superadmin / Admin / Manager */}
+    {canManageOrders && (
       <div className="rounded-xl border border-slate-200 bg-white p-2.5 sm:p-3 shadow-xs">
         {/* Filters Row - All filters and sort selector in 1 single horizontal row without wrapping */}
         <div className="flex flex-nowrap items-center gap-1.5 sm:gap-2 w-full min-w-0">
@@ -1201,8 +1205,8 @@ return (
       </div>
     )}
 
-    {/* KPI Cards Row (Self Orders or Admin) */}
-    {(!isTeam || isAdmin) && (
+    {/* KPI Cards Row (Self Orders or Admin/Manager) */}
+    {(!isTeam || canManageOrders) && (
       <div className={cn(
         "grid gap-2 w-full",
         isPrivileged
@@ -1389,8 +1393,8 @@ return (
     </div>
     )}
 
-    {/* Bulk Action Bar (SuperAdmin & Admin) */}
-    {isAdmin && selectedOrderIds.length > 0 && (
+    {/* Bulk Action Bar (SuperAdmin & Admin & Manager) */}
+    {canManageOrders && selectedOrderIds.length > 0 && (
       <div className="sticky top-2 z-30 flex flex-wrap items-center justify-between gap-3 p-3 bg-slate-900 text-white rounded-xl shadow-xl border border-slate-700 animate-in fade-in slide-in-from-top-2">
         <div className="flex items-center gap-2.5 text-sm font-medium">
           <span className="bg-indigo-600 text-white text-xs font-bold px-2.5 py-0.5 rounded-full">
@@ -1471,7 +1475,7 @@ return (
         <table className="w-full text-sm min-w-[950px]">
           <thead>
             <tr className="text-[10px] uppercase tracking-wider text-slate-500 bg-slate-50 border-b border-slate-200">
-              {isAdmin && (
+              {canManageOrders && (
                 <th className="w-10 px-3 py-2.5 text-center">
                   <Checkbox
                     checked={rows.length > 0 && selectedOrderIds.length === rows.length}
@@ -1544,7 +1548,7 @@ return (
                   )}
                 </div>
               </th>
-              {isAdmin && <th className="text-left font-semibold px-3 py-2.5">Assigned</th>}
+              {canManageOrders && <th className="text-left font-semibold px-3 py-2.5">Assigned</th>}
               {!hideMoney && <th className="text-right font-semibold px-3 py-2.5">Amount</th>}
             </tr>
           </thead>
@@ -1562,7 +1566,7 @@ return (
                   order={r}
                   bucket={bucket}
                   hideMoney={hideMoney}
-                  isAdmin={isAdmin}
+                  isAdmin={canManageOrders}
                   selected={selectedOrderIds.includes(r.id)}
                   onToggleSelect={(id, checked) =>
                     setSelectedOrderIds((prev) =>
@@ -1580,7 +1584,7 @@ return (
                     order={r}
                     bucket={bucket}
                     hideMoney={hideMoney}
-                    isAdmin={isAdmin}
+                    isAdmin={canManageOrders}
                     selected={selectedOrderIds.includes(r.id)}
                     onToggleSelect={(id, checked) =>
                       setSelectedOrderIds((prev) =>
@@ -1603,7 +1607,7 @@ return (
                         order={r}
                         bucket={bucket}
                         hideMoney={hideMoney}
-                        isAdmin={isAdmin}
+                        isAdmin={canManageOrders}
                         selected={selectedOrderIds.includes(r.id)}
                         onToggleSelect={(id, checked) =>
                           setSelectedOrderIds((prev) =>
@@ -1630,7 +1634,7 @@ return (
                     order={r}
                     bucket={bucket}
                     hideMoney={hideMoney}
-                    isAdmin={isAdmin}
+                    isAdmin={canManageOrders}
                     selected={selectedOrderIds.includes(r.id)}
                     onToggleSelect={(id, checked) =>
                       setSelectedOrderIds((prev) =>
@@ -1667,7 +1671,7 @@ return (
               order={r}
               bucket={bucket}
               hideMoney={hideMoney}
-              isAdmin={isAdmin}
+              isAdmin={canManageOrders}
               selected={selectedOrderIds.includes(r.id)}
               onToggleSelect={(id, checked) =>
                 setSelectedOrderIds((prev) =>
@@ -1687,7 +1691,7 @@ return (
               order={r}
               bucket={bucket}
               hideMoney={hideMoney}
-              isAdmin={isAdmin}
+              isAdmin={canManageOrders}
               selected={selectedOrderIds.includes(r.id)}
               onToggleSelect={(id, checked) =>
                 setSelectedOrderIds((prev) =>
@@ -1709,7 +1713,7 @@ return (
                     order={r}
                     bucket={bucket}
                     hideMoney={hideMoney}
-                    isAdmin={isAdmin}
+                    isAdmin={canManageOrders}
                     selected={selectedOrderIds.includes(r.id)}
                     onToggleSelect={(id, checked) =>
                       setSelectedOrderIds((prev) =>
@@ -1736,7 +1740,7 @@ return (
                 order={r}
                 bucket={bucket}
                 hideMoney={hideMoney}
-                isAdmin={isAdmin}
+                isAdmin={canManageOrders}
                 selected={selectedOrderIds.includes(r.id)}
                 onToggleSelect={(id, checked) =>
                   setSelectedOrderIds((prev) =>
@@ -1852,6 +1856,148 @@ function EmployeeIdleTimerCell({
   );
 }
 
+function NestedEmployeeOrdersTable({
+  employeeId,
+  employeeName,
+}: {
+  employeeId: string;
+  employeeName: string;
+}) {
+  const [page, setPage] = useState(1);
+  const pageSize = 15;
+  const listFn = useServerFn(listEmployeeAssignedOrders);
+
+  const { data, isLoading, isError, error, isFetching, refetch } = useQuery({
+    queryKey: ["admin.employee.assigned-orders", employeeId, page],
+    queryFn: () => listFn({ data: { employeeId, page, pageSize } }),
+    staleTime: 30_000,
+  });
+
+  const rows = data?.orders ?? data?.rows ?? [];
+  const total = data?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+
+  const stageToneMap: Record<string, string> = {
+    emerald: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    amber: "bg-amber-50 text-amber-700 border-amber-200",
+    rose: "bg-rose-50 text-rose-700 border-rose-200",
+    slate: "bg-slate-50 text-slate-700 border-slate-200",
+    violet: "bg-violet-50 text-violet-700 border-violet-200",
+  };
+
+  const actionToneMap: Record<string, string> = {
+    red: "bg-rose-50 text-rose-700 border-rose-200",
+    green: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    blue: "bg-sky-50 text-sky-700 border-sky-200",
+    purple: "bg-purple-50 text-purple-700 border-purple-200",
+  };
+
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white shadow-2xs overflow-hidden">
+      <div className="px-3.5 py-2 bg-slate-100/70 border-b border-slate-200 flex items-center justify-between">
+        <div className="text-[11px] font-semibold text-slate-700 flex items-center gap-2">
+          <span>Assigned Orders — {employeeName}</span>
+          <span className="text-[10px] text-slate-400 font-normal">({total} total)</span>
+          {isFetching && <Loader2 className="size-3 animate-spin text-indigo-600" />}
+        </div>
+        {totalPages > 1 && (
+          <div className="flex items-center gap-1.5 text-[11px]">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={page <= 1 || isFetching}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              className="h-6 px-2 text-[10px]"
+            >
+              <ChevronLeft className="size-3 mr-0.5" /> Prev
+            </Button>
+            <span className="text-slate-500 font-mono text-[10px]">
+              {page} / {totalPages}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={page >= totalPages || isFetching}
+              onClick={() => setPage((p) => p + 1)}
+              className="h-6 px-2 text-[10px]"
+            >
+              Next <ChevronRight className="size-3 ml-0.5" />
+            </Button>
+          </div>
+        )}
+      </div>
+
+      {isLoading ? (
+        <div className="p-6 text-center text-xs text-slate-500 flex items-center justify-center gap-2">
+          <Loader2 className="size-4 animate-spin text-indigo-600" />
+          <span>Loading assigned orders…</span>
+        </div>
+      ) : isError ? (
+        <div className="p-6 text-center text-xs text-rose-600 space-y-2">
+          <div>{(error as any)?.message || "Failed to load assigned orders."}</div>
+          <Button variant="outline" size="sm" onClick={() => refetch()} className="h-6 text-[10px]">
+            Retry
+          </Button>
+        </div>
+      ) : rows.length === 0 ? (
+        <div className="p-6 text-center text-xs text-slate-500">
+          No assigned orders found for this employee.
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs">
+            <thead>
+              <tr className="border-b border-slate-200 bg-slate-50 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                <th className="px-3.5 py-2">Created</th>
+                <th className="px-3.5 py-2">Customer Name</th>
+                <th className="px-3.5 py-2">Service</th>
+                <th className="px-3.5 py-2">Action Status</th>
+                <th className="px-3.5 py-2">Stage</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {rows.map((row) => (
+                <tr key={row.id} className="hover:bg-slate-50/50">
+                  <td className="px-3.5 py-2 whitespace-nowrap text-slate-600 text-[11px]">
+                    <div>{formatIST(row.createdAt, { dateOnly: true })}</div>
+                    <div className="text-[10px] text-slate-400">{formatIST(row.createdAt, { timeOnly: true })} IST</div>
+                  </td>
+                  <td className="px-3.5 py-2 font-medium text-slate-800 text-[12px]">
+                    {row.customerName}
+                  </td>
+                  <td className="px-3.5 py-2 text-slate-600 text-[12px] whitespace-nowrap">
+                    {row.serviceName}
+                  </td>
+                  <td className="px-3.5 py-2 whitespace-nowrap">
+                    <span
+                      className={cn(
+                        "inline-flex items-center px-2 py-0.5 rounded-full text-[10.5px] font-medium border",
+                        actionToneMap[row.actionStatus.tone] ?? "bg-slate-100 text-slate-700 border-slate-200"
+                      )}
+                    >
+                      {row.actionStatus.label}
+                    </span>
+                  </td>
+                  <td className="px-3.5 py-2 whitespace-nowrap">
+                    <span
+                      className={cn(
+                        "inline-flex items-center px-2 py-0.5 rounded-full text-[10.5px] font-medium border",
+                        stageToneMap[row.stage.tone] ?? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                      )}
+                    >
+                      {row.stage.label}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function TeamWorkforceBreakdown({
   teamBreakdown,
   isLoading,
@@ -1880,6 +2026,12 @@ function TeamWorkforceBreakdown({
   onSelectEmployee: (id: string) => void;
 }) {
   const { isPrivacyEnabled } = useDashboardPrivacy();
+  const [expandedEmployeeId, setExpandedEmployeeId] = useState<string | null>(null);
+
+  const toggleExpand = (employeeId: string) => {
+    setExpandedEmployeeId((prev) => (prev === employeeId ? null : employeeId));
+  };
+
   return (
     <div className="space-y-4">
       {/* Desktop View */}
@@ -1929,104 +2081,136 @@ function TeamWorkforceBreakdown({
               {!isLoading &&
                 teamBreakdown.map((member) => {
                   const pendingCount = member.pendingOrders ?? (member.needsAction + member.callbackScheduled + member.technicalDelay);
+                  const isExpanded = expandedEmployeeId === member.employeeId;
                   return (
-                    <tr
-                      key={member.employeeId}
-                      className="hover:bg-slate-50/80 transition-colors"
-                    >
-                      <td className="px-3.5 py-2.5">
-                        <div className="font-semibold text-slate-800 whitespace-nowrap">{member.name}</div>
-                      </td>
-                      <td className="px-2 py-2.5 text-center">
-                        <span
-                          className={cn(
-                            "inline-flex items-center px-2 py-0.5 rounded-full font-bold text-xs",
-                            pendingCount > 0 ? "bg-violet-100 text-violet-800 border border-violet-200" : "text-slate-400"
-                          )}
-                        >
-                          {isPrivacyEnabled ? "•••" : pendingCount}
-                        </span>
-                      </td>
-                      <td className="px-2 py-2.5 text-center">
-                        <span
-                          className={cn(
-                            "inline-flex items-center px-2 py-0.5 rounded-full font-bold text-xs",
-                            member.needsAction > 0 ? "bg-rose-100 text-rose-700" : "text-slate-400"
-                          )}
-                        >
-                          {isPrivacyEnabled ? "•••" : member.needsAction}
-                        </span>
-                      </td>
-                      <td className="px-2 py-2.5 text-center">
-                        <EmployeeIdleTimerCell latestActionAt={member.latestActionAt} />
-                      </td>
-                      <td className="px-2 py-2.5 text-center">
-                        <span
-                          className={cn(
-                            "inline-flex items-center px-2 py-0.5 rounded-full font-bold text-xs",
-                            member.hotOrders > 0 ? "bg-rose-50 text-rose-700 border border-rose-200" : "text-slate-400"
-                          )}
-                        >
-                          {isPrivacyEnabled ? "•••" : member.hotOrders}
-                        </span>
-                      </td>
-                      <td className="px-2 py-2.5 text-center">
-                        <span
-                          className={cn(
-                            "inline-flex items-center px-2 py-0.5 rounded-full font-bold text-xs",
-                            member.backlog > 0 ? "bg-amber-100 text-amber-800" : "text-slate-400"
-                          )}
-                        >
-                          {isPrivacyEnabled ? "•••" : member.backlog}
-                        </span>
-                      </td>
-                      <td className="px-2 py-2.5 text-center">
-                        <span
-                          className={cn(
-                            "inline-flex items-center px-1.5 py-0.5 rounded-md font-semibold text-xs",
-                            member.technicalDelay > 0 ? "bg-sky-50 text-sky-700 border border-sky-200" : "text-slate-400"
-                          )}
-                        >
-                          {isPrivacyEnabled ? "•••" : member.technicalDelay}
-                        </span>
-                      </td>
-                      <td className="px-2 py-2.5 text-center">
-                        <span
-                          className={cn(
-                            "inline-flex items-center px-1.5 py-0.5 rounded-md font-semibold text-xs",
-                            member.callbackScheduled > 0 ? "bg-indigo-50 text-indigo-700 border border-indigo-200" : "text-slate-400"
-                          )}
-                        >
-                          {isPrivacyEnabled ? "•••" : member.callbackScheduled}
-                        </span>
-                      </td>
-                      <td className="px-2 py-2.5 text-center">
-                        <span
-                          className={cn(
-                            "inline-flex items-center px-1.5 py-0.5 rounded-md font-semibold text-xs",
-                            member.customerDelay > 0 ? "bg-amber-50 text-amber-800 border border-amber-200" : "text-slate-400"
-                          )}
-                        >
-                          {isPrivacyEnabled ? "•••" : member.customerDelay}
-                        </span>
-                      </td>
-                      <td className="px-2 py-2.5 text-center">
-                        <span
-                          className={cn(
-                            "inline-flex items-center px-1.5 py-0.5 rounded-md font-semibold text-xs",
-                            member.actionTaken > 0 ? "bg-amber-50 text-amber-700 font-bold" : "text-slate-400"
-                          )}
-                        >
-                          {isPrivacyEnabled ? "•••" : member.actionTaken}
-                        </span>
-                      </td>
-                      <td className="px-2 py-2.5 text-center font-bold text-emerald-600">
-                        {isPrivacyEnabled ? "•••" : member.completed}
-                      </td>
-                      <td className="px-2 py-2.5 text-center font-semibold text-slate-600">
-                        {isPrivacyEnabled ? "•••" : member.closed}
-                      </td>
-                    </tr>
+                    <Fragment key={member.employeeId}>
+                      <tr
+                        className={cn(
+                          "hover:bg-slate-50/80 transition-colors",
+                          isExpanded && "bg-indigo-50/20"
+                        )}
+                      >
+                        <td className="px-3.5 py-2.5">
+                          <button
+                            type="button"
+                            onClick={() => toggleExpand(member.employeeId)}
+                            className="inline-flex items-center gap-1.5 text-left group hover:text-indigo-600 transition-colors"
+                            aria-label={isExpanded ? `Collapse orders for ${member.name}` : `Expand orders for ${member.name}`}
+                          >
+                            <span className="p-0.5 rounded hover:bg-slate-200/60 text-slate-400 group-hover:text-indigo-600 transition-colors">
+                              <ChevronRight
+                                className={cn(
+                                  "size-3.5 transition-transform duration-150",
+                                  isExpanded && "rotate-90 text-indigo-600"
+                                )}
+                              />
+                            </span>
+                            <span className="font-semibold text-slate-800 group-hover:text-indigo-600 whitespace-nowrap">
+                              {member.name}
+                            </span>
+                          </button>
+                        </td>
+                        <td className="px-2 py-2.5 text-center">
+                          <span
+                            className={cn(
+                              "inline-flex items-center px-2 py-0.5 rounded-full font-bold text-xs",
+                              pendingCount > 0 ? "bg-violet-100 text-violet-800 border border-violet-200" : "text-slate-400"
+                            )}
+                          >
+                            {isPrivacyEnabled ? "•••" : pendingCount}
+                          </span>
+                        </td>
+                        <td className="px-2 py-2.5 text-center">
+                          <span
+                            className={cn(
+                              "inline-flex items-center px-2 py-0.5 rounded-full font-bold text-xs",
+                              member.needsAction > 0 ? "bg-rose-100 text-rose-700" : "text-slate-400"
+                            )}
+                          >
+                            {isPrivacyEnabled ? "•••" : member.needsAction}
+                          </span>
+                        </td>
+                        <td className="px-2 py-2.5 text-center">
+                          <EmployeeIdleTimerCell latestActionAt={member.latestActionAt} />
+                        </td>
+                        <td className="px-2 py-2.5 text-center">
+                          <span
+                            className={cn(
+                              "inline-flex items-center px-2 py-0.5 rounded-full font-bold text-xs",
+                              member.hotOrders > 0 ? "bg-rose-50 text-rose-700 border border-rose-200" : "text-slate-400"
+                            )}
+                          >
+                            {isPrivacyEnabled ? "•••" : member.hotOrders}
+                          </span>
+                        </td>
+                        <td className="px-2 py-2.5 text-center">
+                          <span
+                            className={cn(
+                              "inline-flex items-center px-2 py-0.5 rounded-full font-bold text-xs",
+                              member.backlog > 0 ? "bg-amber-100 text-amber-800" : "text-slate-400"
+                            )}
+                          >
+                            {isPrivacyEnabled ? "•••" : member.backlog}
+                          </span>
+                        </td>
+                        <td className="px-2 py-2.5 text-center">
+                          <span
+                            className={cn(
+                              "inline-flex items-center px-1.5 py-0.5 rounded-md font-semibold text-xs",
+                              member.technicalDelay > 0 ? "bg-sky-50 text-sky-700 border border-sky-200" : "text-slate-400"
+                            )}
+                          >
+                            {isPrivacyEnabled ? "•••" : member.technicalDelay}
+                          </span>
+                        </td>
+                        <td className="px-2 py-2.5 text-center">
+                          <span
+                            className={cn(
+                              "inline-flex items-center px-1.5 py-0.5 rounded-md font-semibold text-xs",
+                              member.callbackScheduled > 0 ? "bg-indigo-50 text-indigo-700 border border-indigo-200" : "text-slate-400"
+                            )}
+                          >
+                            {isPrivacyEnabled ? "•••" : member.callbackScheduled}
+                          </span>
+                        </td>
+                        <td className="px-2 py-2.5 text-center">
+                          <span
+                            className={cn(
+                              "inline-flex items-center px-1.5 py-0.5 rounded-md font-semibold text-xs",
+                              member.customerDelay > 0 ? "bg-amber-50 text-amber-800 border border-amber-200" : "text-slate-400"
+                            )}
+                          >
+                            {isPrivacyEnabled ? "•••" : member.customerDelay}
+                          </span>
+                        </td>
+                        <td className="px-2 py-2.5 text-center">
+                          <span
+                            className={cn(
+                              "inline-flex items-center px-1.5 py-0.5 rounded-md font-semibold text-xs",
+                              member.actionTaken > 0 ? "bg-amber-50 text-amber-700 font-bold" : "text-slate-400"
+                            )}
+                          >
+                            {isPrivacyEnabled ? "•••" : member.actionTaken}
+                          </span>
+                        </td>
+                        <td className="px-2 py-2.5 text-center font-bold text-emerald-600">
+                          {isPrivacyEnabled ? "•••" : member.completed}
+                        </td>
+                        <td className="px-2 py-2.5 text-center font-semibold text-slate-600">
+                          {isPrivacyEnabled ? "•••" : member.closed}
+                        </td>
+                      </tr>
+                      {isExpanded && (
+                        <tr className="bg-slate-50/70 border-b border-slate-200">
+                          <td colSpan={12} className="p-3">
+                            <NestedEmployeeOrdersTable
+                              employeeId={member.employeeId}
+                              employeeName={member.name}
+                            />
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
                   );
                 })}
             </tbody>
@@ -2049,6 +2233,7 @@ function TeamWorkforceBreakdown({
         )}
         {!isLoading &&
           teamBreakdown.map((member) => {
+            const isExpanded = expandedEmployeeId === member.employeeId;
             return (
               <div
                 key={member.employeeId}
@@ -2056,7 +2241,21 @@ function TeamWorkforceBreakdown({
               >
                 <div className="flex items-center justify-between gap-2">
                   <div className="min-w-0">
-                    <div className="text-sm font-semibold text-slate-800 truncate">{member.name}</div>
+                    <button
+                      type="button"
+                      onClick={() => toggleExpand(member.employeeId)}
+                      className="inline-flex items-center gap-1.5 text-left group"
+                    >
+                      <ChevronRight
+                        className={cn(
+                          "size-3.5 text-slate-400 group-hover:text-indigo-600 transition-transform duration-150",
+                          isExpanded && "rotate-90 text-indigo-600"
+                        )}
+                      />
+                      <span className="text-sm font-semibold text-slate-800 group-hover:text-indigo-600 truncate">
+                        {member.name}
+                      </span>
+                    </button>
                   </div>
                   <div className="shrink-0">
                     <EmployeeIdleTimerCell latestActionAt={member.latestActionAt} />
@@ -2110,6 +2309,31 @@ function TeamWorkforceBreakdown({
                     <div className="font-bold text-slate-900">{isPrivacyEnabled ? "•••" : member.total}</div>
                   </div>
                 </div>
+
+                <div className="pt-2 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => toggleExpand(member.employeeId)}
+                    className="w-full flex items-center justify-between text-xs text-indigo-600 hover:text-indigo-800 font-semibold py-1 transition-colors"
+                  >
+                    <span>{isExpanded ? "Hide Assigned Orders" : "View Assigned Orders"}</span>
+                    <ChevronRight
+                      className={cn(
+                        "size-3.5 transition-transform duration-150",
+                        isExpanded && "rotate-90"
+                      )}
+                    />
+                  </button>
+                </div>
+
+                {isExpanded && (
+                  <div className="pt-2 border-t border-slate-100">
+                    <NestedEmployeeOrdersTable
+                      employeeId={member.employeeId}
+                      employeeName={member.name}
+                    />
+                  </div>
+                )}
               </div>
             );
           })}
