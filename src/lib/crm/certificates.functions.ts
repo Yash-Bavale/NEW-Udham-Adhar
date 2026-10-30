@@ -147,6 +147,7 @@ export const deliverCertificate = createServerFn({ method: "POST" })
     }
 
     if (lead.email && signed.signedUrl) {
+      try {
       // Try to attach the actual file (PDF/JPG/PNG) to the email.
       let attachment: { filename: string; content_type: string; content_base64: string } | null = null;
       try {
