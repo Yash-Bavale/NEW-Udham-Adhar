@@ -9,6 +9,8 @@ import { toast } from "sonner";
 
 import {
   listOrdersV2,
+  listEmployeeAssignedOrders,
+  updateOrderAssignee,
   bucketOfRow,
   isPendingRow,
   isTechnicalDelayOrder,
@@ -1462,6 +1464,7 @@ return (
         isLoading={isLoading}
         assignedTo={assignedTo}
         onSelectEmployee={setAssignedTo}
+        staffList={activeStaffList}
       />
     ) : (
       <>
@@ -1857,6 +1860,7 @@ function TeamWorkforceBreakdown({
   isLoading,
   assignedTo,
   onSelectEmployee,
+  staffList,
 }: {
   teamBreakdown: Array<{
     employeeId: string;
@@ -1878,8 +1882,15 @@ function TeamWorkforceBreakdown({
   isLoading: boolean;
   assignedTo: string;
   onSelectEmployee: (id: string) => void;
+  staffList: any[];
 }) {
   const { isPrivacyEnabled } = useDashboardPrivacy();
+  const [expandedEmployeeId, setExpandedEmployeeId] = useState<string | null>(null);
+
+  const toggleExpand = (employeeId: string) => {
+    setExpandedEmployeeId((prev) => (prev === employeeId ? null : employeeId));
+  };
+
   return (
     <div className="space-y-4">
       {/* Desktop View */}
@@ -1929,104 +1940,137 @@ function TeamWorkforceBreakdown({
               {!isLoading &&
                 teamBreakdown.map((member) => {
                   const pendingCount = member.pendingOrders ?? (member.needsAction + member.callbackScheduled + member.technicalDelay);
+                  const isExpanded = expandedEmployeeId === member.employeeId;
                   return (
-                    <tr
-                      key={member.employeeId}
-                      className="hover:bg-slate-50/80 transition-colors"
-                    >
-                      <td className="px-3.5 py-2.5">
-                        <div className="font-semibold text-slate-800 whitespace-nowrap">{member.name}</div>
-                      </td>
-                      <td className="px-2 py-2.5 text-center">
-                        <span
-                          className={cn(
-                            "inline-flex items-center px-2 py-0.5 rounded-full font-bold text-xs",
-                            pendingCount > 0 ? "bg-violet-100 text-violet-800 border border-violet-200" : "text-slate-400"
-                          )}
-                        >
-                          {isPrivacyEnabled ? "•••" : pendingCount}
-                        </span>
-                      </td>
-                      <td className="px-2 py-2.5 text-center">
-                        <span
-                          className={cn(
-                            "inline-flex items-center px-2 py-0.5 rounded-full font-bold text-xs",
-                            member.needsAction > 0 ? "bg-rose-100 text-rose-700" : "text-slate-400"
-                          )}
-                        >
-                          {isPrivacyEnabled ? "•••" : member.needsAction}
-                        </span>
-                      </td>
-                      <td className="px-2 py-2.5 text-center">
-                        <EmployeeIdleTimerCell latestActionAt={member.latestActionAt} />
-                      </td>
-                      <td className="px-2 py-2.5 text-center">
-                        <span
-                          className={cn(
-                            "inline-flex items-center px-2 py-0.5 rounded-full font-bold text-xs",
-                            member.hotOrders > 0 ? "bg-rose-50 text-rose-700 border border-rose-200" : "text-slate-400"
-                          )}
-                        >
-                          {isPrivacyEnabled ? "•••" : member.hotOrders}
-                        </span>
-                      </td>
-                      <td className="px-2 py-2.5 text-center">
-                        <span
-                          className={cn(
-                            "inline-flex items-center px-2 py-0.5 rounded-full font-bold text-xs",
-                            member.backlog > 0 ? "bg-amber-100 text-amber-800" : "text-slate-400"
-                          )}
-                        >
-                          {isPrivacyEnabled ? "•••" : member.backlog}
-                        </span>
-                      </td>
-                      <td className="px-2 py-2.5 text-center">
-                        <span
-                          className={cn(
-                            "inline-flex items-center px-1.5 py-0.5 rounded-md font-semibold text-xs",
-                            member.technicalDelay > 0 ? "bg-sky-50 text-sky-700 border border-sky-200" : "text-slate-400"
-                          )}
-                        >
-                          {isPrivacyEnabled ? "•••" : member.technicalDelay}
-                        </span>
-                      </td>
-                      <td className="px-2 py-2.5 text-center">
-                        <span
-                          className={cn(
-                            "inline-flex items-center px-1.5 py-0.5 rounded-md font-semibold text-xs",
-                            member.callbackScheduled > 0 ? "bg-indigo-50 text-indigo-700 border border-indigo-200" : "text-slate-400"
-                          )}
-                        >
-                          {isPrivacyEnabled ? "•••" : member.callbackScheduled}
-                        </span>
-                      </td>
-                      <td className="px-2 py-2.5 text-center">
-                        <span
-                          className={cn(
-                            "inline-flex items-center px-1.5 py-0.5 rounded-md font-semibold text-xs",
-                            member.customerDelay > 0 ? "bg-amber-50 text-amber-800 border border-amber-200" : "text-slate-400"
-                          )}
-                        >
-                          {isPrivacyEnabled ? "•••" : member.customerDelay}
-                        </span>
-                      </td>
-                      <td className="px-2 py-2.5 text-center">
-                        <span
-                          className={cn(
-                            "inline-flex items-center px-1.5 py-0.5 rounded-md font-semibold text-xs",
-                            member.actionTaken > 0 ? "bg-amber-50 text-amber-700 font-bold" : "text-slate-400"
-                          )}
-                        >
-                          {isPrivacyEnabled ? "•••" : member.actionTaken}
-                        </span>
-                      </td>
-                      <td className="px-2 py-2.5 text-center font-bold text-emerald-600">
-                        {isPrivacyEnabled ? "•••" : member.completed}
-                      </td>
-                      <td className="px-2 py-2.5 text-center font-semibold text-slate-600">
-                        {isPrivacyEnabled ? "•••" : member.closed}
-                      </td>
-                    </tr>
+                    <Fragment key={member.employeeId}>
+                      <tr
+                        className={cn(
+                          "hover:bg-slate-50/80 transition-colors",
+                          isExpanded && "bg-indigo-50/20"
+                        )}
+                      >
+                        <td className="px-3.5 py-2.5">
+                          <button
+                            type="button"
+                            onClick={() => toggleExpand(member.employeeId)}
+                            className="inline-flex items-center gap-1.5 text-left group hover:text-indigo-600 transition-colors"
+                            aria-label={isExpanded ? `Collapse orders for ${member.name}` : `Expand orders for ${member.name}`}
+                          >
+                            <span className="p-0.5 rounded hover:bg-slate-200/60 text-slate-400 group-hover:text-indigo-600 transition-colors">
+                              <ChevronRight
+                                className={cn(
+                                  "size-3.5 transition-transform duration-150",
+                                  isExpanded && "rotate-90 text-indigo-600"
+                                )}
+                              />
+                            </span>
+                            <span className="font-semibold text-slate-800 group-hover:text-indigo-600 whitespace-nowrap">
+                              {member.name}
+                            </span>
+                          </button>
+                        </td>
+                        <td className="px-2 py-2.5 text-center">
+                          <span
+                            className={cn(
+                              "inline-flex items-center px-2 py-0.5 rounded-full font-bold text-xs",
+                              pendingCount > 0 ? "bg-violet-100 text-violet-800 border border-violet-200" : "text-slate-400"
+                            )}
+                          >
+                            {isPrivacyEnabled ? "•••" : pendingCount}
+                          </span>
+                        </td>
+                        <td className="px-2 py-2.5 text-center">
+                          <span
+                            className={cn(
+                              "inline-flex items-center px-2 py-0.5 rounded-full font-bold text-xs",
+                              member.needsAction > 0 ? "bg-rose-100 text-rose-700" : "text-slate-400"
+                            )}
+                          >
+                            {isPrivacyEnabled ? "•••" : member.needsAction}
+                          </span>
+                        </td>
+                        <td className="px-2 py-2.5 text-center">
+                          <EmployeeIdleTimerCell latestActionAt={member.latestActionAt} />
+                        </td>
+                        <td className="px-2 py-2.5 text-center">
+                          <span
+                            className={cn(
+                              "inline-flex items-center px-2 py-0.5 rounded-full font-bold text-xs",
+                              member.hotOrders > 0 ? "bg-rose-50 text-rose-700 border border-rose-200" : "text-slate-400"
+                            )}
+                          >
+                            {isPrivacyEnabled ? "•••" : member.hotOrders}
+                          </span>
+                        </td>
+                        <td className="px-2 py-2.5 text-center">
+                          <span
+                            className={cn(
+                              "inline-flex items-center px-2 py-0.5 rounded-full font-bold text-xs",
+                              member.backlog > 0 ? "bg-amber-100 text-amber-800" : "text-slate-400"
+                            )}
+                          >
+                            {isPrivacyEnabled ? "•••" : member.backlog}
+                          </span>
+                        </td>
+                        <td className="px-2 py-2.5 text-center">
+                          <span
+                            className={cn(
+                              "inline-flex items-center px-1.5 py-0.5 rounded-md font-semibold text-xs",
+                              member.technicalDelay > 0 ? "bg-sky-50 text-sky-700 border border-sky-200" : "text-slate-400"
+                            )}
+                          >
+                            {isPrivacyEnabled ? "•••" : member.technicalDelay}
+                          </span>
+                        </td>
+                        <td className="px-2 py-2.5 text-center">
+                          <span
+                            className={cn(
+                              "inline-flex items-center px-1.5 py-0.5 rounded-md font-semibold text-xs",
+                              member.callbackScheduled > 0 ? "bg-indigo-50 text-indigo-700 border border-indigo-200" : "text-slate-400"
+                            )}
+                          >
+                            {isPrivacyEnabled ? "•••" : member.callbackScheduled}
+                          </span>
+                        </td>
+                        <td className="px-2 py-2.5 text-center">
+                          <span
+                            className={cn(
+                              "inline-flex items-center px-1.5 py-0.5 rounded-md font-semibold text-xs",
+                              member.customerDelay > 0 ? "bg-amber-50 text-amber-800 border border-amber-200" : "text-slate-400"
+                            )}
+                          >
+                            {isPrivacyEnabled ? "•••" : member.customerDelay}
+                          </span>
+                        </td>
+                        <td className="px-2 py-2.5 text-center">
+                          <span
+                            className={cn(
+                              "inline-flex items-center px-1.5 py-0.5 rounded-md font-semibold text-xs",
+                              member.actionTaken > 0 ? "bg-amber-50 text-amber-700 font-bold" : "text-slate-400"
+                            )}
+                          >
+                            {isPrivacyEnabled ? "•••" : member.actionTaken}
+                          </span>
+                        </td>
+                        <td className="px-2 py-2.5 text-center font-bold text-emerald-600">
+                          {isPrivacyEnabled ? "•••" : member.completed}
+                        </td>
+                        <td className="px-2 py-2.5 text-center font-semibold text-slate-600">
+                          {isPrivacyEnabled ? "•••" : member.closed}
+                        </td>
+                      </tr>
+                      {isExpanded && (
+                        <tr className="bg-slate-50/70 border-b border-slate-200">
+                          <td colSpan={12} className="p-3">
+                            <NestedEmployeeOrdersTable
+                              employeeId={member.employeeId}
+                              employeeName={member.name}
+                              staffList={staffList}
+                            />
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
                   );
                 })}
             </tbody>
@@ -2049,6 +2093,7 @@ function TeamWorkforceBreakdown({
         )}
         {!isLoading &&
           teamBreakdown.map((member) => {
+            const isExpanded = expandedEmployeeId === member.employeeId;
             return (
               <div
                 key={member.employeeId}
@@ -2056,7 +2101,21 @@ function TeamWorkforceBreakdown({
               >
                 <div className="flex items-center justify-between gap-2">
                   <div className="min-w-0">
-                    <div className="text-sm font-semibold text-slate-800 truncate">{member.name}</div>
+                    <button
+                      type="button"
+                      onClick={() => toggleExpand(member.employeeId)}
+                      className="inline-flex items-center gap-1.5 text-left group"
+                    >
+                      <ChevronRight
+                        className={cn(
+                          "size-3.5 text-slate-400 group-hover:text-indigo-600 transition-transform duration-150",
+                          isExpanded && "rotate-90 text-indigo-600"
+                        )}
+                      />
+                      <span className="text-sm font-semibold text-slate-800 group-hover:text-indigo-600 truncate">
+                        {member.name}
+                      </span>
+                    </button>
                   </div>
                   <div className="shrink-0">
                     <EmployeeIdleTimerCell latestActionAt={member.latestActionAt} />
@@ -2110,10 +2169,249 @@ function TeamWorkforceBreakdown({
                     <div className="font-bold text-slate-900">{isPrivacyEnabled ? "•••" : member.total}</div>
                   </div>
                 </div>
+
+                <div className="pt-2 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => toggleExpand(member.employeeId)}
+                    className="w-full flex items-center justify-between text-xs text-indigo-600 hover:text-indigo-800 font-semibold py-1 transition-colors"
+                  >
+                    <span>{isExpanded ? "Hide Assigned Orders" : "View Assigned Orders"}</span>
+                    <ChevronRight
+                      className={cn(
+                        "size-3.5 transition-transform duration-150",
+                        isExpanded && "rotate-90"
+                      )}
+                    />
+                  </button>
+                </div>
+
+                {isExpanded && (
+                  <div className="pt-2 border-t border-slate-100">
+                    <NestedEmployeeOrdersTable
+                      employeeId={member.employeeId}
+                      employeeName={member.name}
+                      staffList={staffList}
+                    />
+                  </div>
+                )}
               </div>
             );
           })}
       </div>
+    </div>
+  );
+}
+
+function NestedEmployeeOrdersTable({
+  employeeId,
+  employeeName,
+  staffList,
+}: {
+  employeeId: string;
+  employeeName: string;
+  staffList: any[];
+}) {
+  const qc = useQueryClient();
+  const listFn = useServerFn(listEmployeeAssignedOrders);
+  const reassignFn = useServerFn(updateOrderAssignee);
+  const [page, setPage] = useState(1);
+  const pageSize = 15;
+  const [reassigningOrderId, setReassigningOrderId] = useState<string | null>(null);
+
+  const { data, isLoading, isError, error, refetch, isFetching } = useQuery({
+    queryKey: ["admin.employee.assigned-orders", employeeId, page],
+    queryFn: () => listFn({ data: { employeeId, page, pageSize } }),
+    staleTime: 30_000,
+  });
+
+  const handleReassign = async (orderId: string, targetStaffId: string) => {
+    if (!targetStaffId || targetStaffId === employeeId) return;
+    setReassigningOrderId(orderId);
+    try {
+      await reassignFn({ data: { orderId, assignedTo: targetStaffId } });
+      toast.success("Order reassigned successfully");
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ["admin.employee.assigned-orders", employeeId] }),
+        qc.invalidateQueries({ queryKey: ["orders-v2"] }),
+        qc.invalidateQueries({ queryKey: ["admin.team-orders"] }),
+      ]);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to reassign order");
+    } finally {
+      setReassigningOrderId(null);
+    }
+  };
+
+  const rows = data?.rows ?? [];
+  const total = data?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+
+  const stageToneMap: Record<string, string> = {
+    emerald: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    amber: "bg-amber-50 text-amber-700 border-amber-200",
+    rose: "bg-rose-50 text-rose-700 border-rose-200",
+    slate: "bg-slate-100 text-slate-700 border-slate-200",
+    blue: "bg-sky-50 text-sky-700 border-sky-200",
+    sky: "bg-sky-50 text-sky-700 border-sky-200",
+    indigo: "bg-indigo-50 text-indigo-700 border-indigo-200",
+    violet: "bg-violet-50 text-violet-700 border-violet-200",
+  };
+
+  const actionToneMap: Record<string, string> = {
+    red: "bg-rose-50 text-rose-700 border-rose-200",
+    green: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    blue: "bg-sky-50 text-sky-700 border-sky-200",
+    purple: "bg-purple-50 text-purple-700 border-purple-200",
+  };
+
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white shadow-2xs overflow-hidden">
+      <div className="px-3.5 py-2 bg-slate-100/70 border-b border-slate-200 flex items-center justify-between">
+        <div className="text-[11px] font-semibold text-slate-700 flex items-center gap-2">
+          <span>Assigned Orders — {employeeName}</span>
+          <span className="text-[10px] text-slate-400 font-normal">({total} total)</span>
+          {isFetching && <Loader2 className="size-3 animate-spin text-indigo-600" />}
+        </div>
+        {totalPages > 1 && (
+          <div className="flex items-center gap-1.5 text-[11px]">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={page <= 1 || isFetching}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              className="h-6 px-2 text-[10px]"
+            >
+              <ChevronLeft className="size-3 mr-0.5" /> Prev
+            </Button>
+            <span className="text-slate-500 font-mono text-[10px]">
+              {page} / {totalPages}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={page >= totalPages || isFetching}
+              onClick={() => setPage((p) => p + 1)}
+              className="h-6 px-2 text-[10px]"
+            >
+              Next <ChevronRight className="size-3 ml-0.5" />
+            </Button>
+          </div>
+        )}
+      </div>
+
+      {isLoading ? (
+        <div className="p-6 text-center text-xs text-slate-500 flex items-center justify-center gap-2">
+          <Loader2 className="size-4 animate-spin text-indigo-600" />
+          <span>Loading assigned orders…</span>
+        </div>
+      ) : isError ? (
+        <div className="p-6 text-center text-xs text-rose-600 space-y-2">
+          <div>{(error as any)?.message || "Failed to load assigned orders."}</div>
+          <Button variant="outline" size="sm" onClick={() => refetch()} className="h-6 text-[10px]">
+            Retry
+          </Button>
+        </div>
+      ) : rows.length === 0 ? (
+        <div className="p-6 text-center text-xs text-slate-500">
+          No assigned orders found for this employee.
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs">
+            <thead>
+              <tr className="border-b border-slate-200 bg-slate-50 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                <th className="px-3.5 py-2">Created</th>
+                <th className="px-3.5 py-2">Customer Name</th>
+                <th className="px-3.5 py-2">Service</th>
+                <th className="px-3.5 py-2">Action Status</th>
+                <th className="px-3.5 py-2">Stage</th>
+                <th className="px-3.5 py-2 text-right">Reassign</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {rows.map((row: any) => {
+                const isReassigning = reassigningOrderId === row.id;
+                return (
+                  <tr key={row.id} className="hover:bg-slate-50/50">
+                    <td className="px-3.5 py-2 whitespace-nowrap text-slate-600 text-[11px]">
+                      <div>{formatIST(row.createdAt, { dateOnly: true })}</div>
+                      <div className="text-[10px] text-slate-400">{formatIST(row.createdAt, { timeOnly: true })} IST</div>
+                    </td>
+                    <td className="px-3.5 py-2 font-medium text-slate-800 text-[12px]">
+                      {row.customerName}
+                    </td>
+                    <td className="px-3.5 py-2 text-slate-600 text-[12px] whitespace-nowrap">
+                      {row.serviceName}
+                    </td>
+                    <td className="px-3.5 py-2 whitespace-nowrap">
+                      <span
+                        className={cn(
+                          "inline-flex items-center px-2 py-0.5 rounded-full text-[10.5px] font-medium border",
+                          actionToneMap[row.actionStatus.tone] ?? "bg-slate-100 text-slate-700 border-slate-200"
+                        )}
+                      >
+                        {row.actionStatus.label}
+                      </span>
+                    </td>
+                    <td className="px-3.5 py-2 whitespace-nowrap">
+                      <span
+                        className={cn(
+                          "inline-flex items-center px-2 py-0.5 rounded-full text-[10.5px] font-medium border",
+                          stageToneMap[row.stage.tone] ?? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                        )}
+                      >
+                        {row.stage.label}
+                      </span>
+                    </td>
+                    <td className="px-3.5 py-2 text-right whitespace-nowrap">
+                      <div className="inline-flex items-center justify-end gap-1.5">
+                        {isReassigning ? (
+                          <div className="inline-flex items-center gap-1 text-[11px] text-slate-500">
+                            <Loader2 className="size-3 animate-spin text-indigo-600" />
+                            <span>Reassigning…</span>
+                          </div>
+                        ) : (
+                          <Select
+                            value={employeeId}
+                            onValueChange={(newAssigneeId) => handleReassign(row.id, newAssigneeId)}
+                            disabled={isReassigning}
+                          >
+                            <SelectTrigger className="h-7 w-[160px] text-[11px] bg-white border-slate-200">
+                              <SelectValue placeholder="Reassign to…" />
+                            </SelectTrigger>
+                            <SelectContent align="end" className="max-h-[220px]">
+                              <SelectGroup>
+                                <SelectLabel className="text-[10px] uppercase tracking-wider text-slate-400">Current Assignee</SelectLabel>
+                                <SelectItem value={employeeId} className="text-xs font-semibold" disabled>
+                                  {employeeName} (Current)
+                                </SelectItem>
+                              </SelectGroup>
+                              <SelectGroup>
+                                <SelectLabel className="text-[10px] uppercase tracking-wider text-slate-400">Reassign to</SelectLabel>
+                                {(staffList ?? [])
+                                  .filter((s: any) => s.id !== employeeId)
+                                  .map((s: any) => {
+                                    const sName = s.display_name || s.name || s.full_name || s.email?.split("@")[0] || "Staff";
+                                    return (
+                                      <SelectItem key={s.id} value={s.id} className="text-xs">
+                                        {sName}
+                                      </SelectItem>
+                                    );
+                                  })}
+                              </SelectGroup>
+                            </SelectContent>
+                          </Select>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
