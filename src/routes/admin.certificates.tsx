@@ -63,9 +63,11 @@ function CertificatesPage() {
   };
 
   const handleDeliver = async (id: string) => {
-    if (!confirm("Send this certificate to the customer by email?")) return;
+    const ccInput = window.prompt("Optional: Enter CC email address (leave blank to send only to registered email):");
+    if (ccInput === null) return;
+    const ccEmail = ccInput.trim() || undefined;
     try {
-      await deliverFn({ data: { certificateId: id } });
+      await deliverFn({ data: { certificateId: id, ccEmail } });
       toast.success("Delivered & emailed");
       qc.invalidateQueries({ queryKey: ["admin.certificates"] });
     } catch (e: any) { toast.error(e?.message ?? "Failed"); }
@@ -80,9 +82,11 @@ function CertificatesPage() {
 
   const handleResend = async (applicationId: string | null | undefined) => {
     if (!applicationId) { toast.error("This certificate is not linked to an order."); return; }
-    if (!confirm("Resend the certificate to the customer with a fresh download link?")) return;
+    const ccInput = window.prompt("Optional: Enter CC email address (leave blank to send only to registered email):");
+    if (ccInput === null) return;
+    const ccEmail = ccInput.trim() || undefined;
     try {
-      const res = await resendFn({ data: { orderId: applicationId } });
+      const res = await resendFn({ data: { orderId: applicationId, ccEmail } });
       toast.success(`Certificate resent to ${res.resentTo}`);
       qc.invalidateQueries({ queryKey: ["admin.certificates"] });
     } catch (e: any) { toast.error(e?.message ?? "Resend failed"); }

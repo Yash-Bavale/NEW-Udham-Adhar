@@ -27,6 +27,7 @@ export function CompletionGateDialogStandalone({
     certificateDocumentId: string;
     certificateNumber: string;
     completionNotes?: string;
+    ccEmail?: string;
   }) => Promise<void>;
 }) {
   const requestFn = useServerFn(requestOrderDocumentUpload);
@@ -36,6 +37,8 @@ export function CompletionGateDialogStandalone({
   const [file, setFile] = useState<File | null>(null);
   const [certNumber, setCertNumber] = useState("");
   const [completionNotes, setCompletionNotes] = useState("");
+  const [ccEmail, setCcEmail] = useState("");
+  const [showCc, setShowCc] = useState(false);
   const [stage, setStage] = useState<"idle" | "uploading" | "preparing" | "sending" | "success">("idle");
   const [dragOver, setDragOver] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -65,7 +68,7 @@ export function CompletionGateDialogStandalone({
 
   useEffect(() => {
     if (!open) {
-      setFile(null); setCertNumber(""); setCompletionNotes("");
+      setFile(null); setCertNumber(""); setCompletionNotes(""); setCcEmail(""); setShowCc(false);
       setStage("idle"); setDragOver(false); setError(null);
       setNumberTouched(false); setUploaded(null); setSendingConfirmed(false); setPreviewOpen(false);
     }
@@ -95,6 +98,13 @@ export function CompletionGateDialogStandalone({
     if (tooBig || invalidType) { setError(tooBig ? "File exceeds 10 MB limit." : "Choose a PDF, JPG, PNG or WEBP file."); return; }
     if (!certNumber.trim()) { setNumberTouched(true); setError("Certificate / document number is required."); return; }
     if (!recipientEmail) { setError("Customer has no email on file."); return; }
+    if (ccEmail.trim()) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(ccEmail.trim())) {
+        setError("Please enter a valid CC email address.");
+        return;
+      }
+    }
     setError(null);
     try {
       let documentId = uploaded?.file === file ? uploaded.documentId : null;
@@ -126,6 +136,7 @@ export function CompletionGateDialogStandalone({
         certificateDocumentId: documentId,
         certificateNumber: certNumber.trim(),
         completionNotes: completionNotes.trim() || undefined,
+        ccEmail: ccEmail.trim() || undefined,
       });
       setSendingConfirmed(true);
       setStage("success");
@@ -247,10 +258,62 @@ export function CompletionGateDialogStandalone({
                 <p className="text-right text-[10px] text-admin-fg-muted">{completionNotes.length}/500</p>
               </section>
 
-              <div className="flex items-center gap-3 rounded-md border border-completion-border bg-completion-soft/50 px-3 py-2 text-[11px]">
-                <Mail className="size-4 shrink-0 text-completion-primary" />
-                <div className="min-w-0 flex-1"><p className="text-admin-fg-muted">The certificate will be emailed to:</p><p className="break-all font-semibold text-admin-fg">{recipientEmail ?? "No email on file"}</p></div>
-                <Button type="button" variant="outline" size="sm" className="h-7 shrink-0 border-completion-border bg-admin-surface px-2 text-[10px] text-completion-primary" onClick={() => setPreviewOpen(true)}><Eye className="size-3" />Preview Email</Button>
+              <div className="rounded-md border border-completion-border bg-completion-soft/50 p-3 text-[11px] space-y-2">
+                <div className="flex items-center gap-3">
+                  <Mail className="size-4 shrink-0 text-completion-primary" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-admin-fg-muted">The certificate will be emailed to (To):</p>
+                    <p className="break-all font-semibold text-admin-fg">{recipientEmail ?? "No email on file"}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {!showCc && !ccEmail && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 px-2 text-[10px] text-completion-primary hover:bg-completion-soft"
+                        onClick={() => setShowCc(true)}
+                        disabled={locked}
+                      >
+                        + Add CC
+                      </Button>
+                    )}
+                    <Button type="button" variant="outline" size="sm" className="h-7 shrink-0 border-completion-border bg-admin-surface px-2 text-[10px] text-completion-primary" onClick={() => setPreviewOpen(true)}><Eye className="size-3" />Preview Email</Button>
+                  </div>
+                </div>
+
+                {(showCc || ccEmail) && (
+                  <div className="pt-2 border-t border-completion-border/60">
+                    <div className="flex items-center justify-between pb-1">
+                      <Label htmlFor="completion-cc-email" className="text-[11px] font-semibold text-admin-fg">
+                        CC Email <span className="font-normal text-admin-fg-muted">(Optional)</span>
+                      </Label>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-5 px-1.5 text-[10px] text-admin-fg-muted hover:text-admin-danger"
+                        onClick={() => { setCcEmail(""); setShowCc(false); setError(null); }}
+                        disabled={locked}
+                      >
+                        Remove CC
+                      </Button>
+                    </div>
+                    <Input
+                      id="completion-cc-email"
+                      type="email"
+                      value={ccEmail}
+                      onChange={(e) => { setCcEmail(e.target.value); setError(null); }}
+                      disabled={locked}
+                      placeholder="e.g. partner@example.com"
+                      autoComplete="off"
+                      className="h-8 text-xs border-admin-border-strong bg-admin-surface"
+                    />
+                    <p className="mt-1 text-[10px] text-admin-fg-muted">
+                      Certificate email will be sent to both the registered customer email and this CC address.
+                    </p>
+                  </div>
+                )}
               </div>
               <div className="flex items-start gap-2 rounded-md border border-admin-warn/30 bg-admin-warn/5 p-2.5 text-[11px] text-admin-fg">
                 <AlertTriangle className="mt-0.5 size-4 shrink-0 text-admin-warn" />
@@ -297,7 +360,14 @@ export function CompletionGateDialogStandalone({
       <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
         <DialogContent className="max-w-md border-admin-border bg-admin-surface text-admin-fg">
           <DialogHeader><DialogTitle>Certificate email</DialogTitle><DialogDescription>Review the details that will be sent to the customer.</DialogDescription></DialogHeader>
-          <div className="space-y-3 text-sm"><p><span className="text-admin-fg-muted">To:</span> <span className="break-all">{recipientEmail ?? "No email on file"}</span></p><p><span className="text-admin-fg-muted">Service:</span> {serviceName}</p><p><span className="text-admin-fg-muted">Certificate number:</span> {certNumber.trim() || "Not entered"}</p><p><span className="text-admin-fg-muted">Attachment:</span> {file?.name ?? "No certificate selected"}</p>{completionNotes.trim() && <p className="whitespace-pre-wrap"><span className="text-admin-fg-muted">Notes:</span> {completionNotes.trim()}</p>}</div>
+          <div className="space-y-3 text-sm">
+            <p><span className="text-admin-fg-muted">To:</span> <span className="break-all">{recipientEmail ?? "No email on file"}</span></p>
+            {ccEmail.trim() && <p><span className="text-admin-fg-muted">CC:</span> <span className="break-all">{ccEmail.trim()}</span></p>}
+            <p><span className="text-admin-fg-muted">Service:</span> {serviceName}</p>
+            <p><span className="text-admin-fg-muted">Certificate number:</span> {certNumber.trim() || "Not entered"}</p>
+            <p><span className="text-admin-fg-muted">Attachment:</span> {file?.name ?? "No certificate selected"}</p>
+            {completionNotes.trim() && <p className="whitespace-pre-wrap"><span className="text-admin-fg-muted">Notes:</span> {completionNotes.trim()}</p>}
+          </div>
           <DialogFooter><Button type="button" variant="outline" onClick={() => setPreviewOpen(false)}>Close</Button></DialogFooter>
         </DialogContent>
       </Dialog>

@@ -2750,6 +2750,14 @@ export const updateFulfillmentStatus = createServerFn({ method: "POST" })
         certificateDocumentId: z.string().uuid().optional(),
         certificateNumber: z.string().trim().min(1).max(120).optional(),
         completionNotes: z.string().trim().max(2000).optional(),
+        ccEmail: z
+          .string()
+          .trim()
+          .optional()
+          .refine(
+            (val) => !val || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val),
+            { message: "Please provide a valid CC email address." }
+          ),
       })
       .parse(i),
   )
@@ -2948,43 +2956,63 @@ export const updateFulfillmentStatus = createServerFn({ method: "POST" })
         throw new Error("Could not generate certificate download link — certificate email was not sent and order was not completed.");
       }
 
+      const normalizedCc = data.ccEmail?.trim() ? data.ccEmail.trim().toLowerCase() : undefined;
+
       if (recipientEmail && certificateUrl) {
         const completedDateFormatted = new Date().toLocaleString("en-IN", {
           timeZone: "Asia/Kolkata", day: "2-digit", month: "short", year: "numeric",
           hour: "2-digit", minute: "2-digit", hour12: true,
         });
         const { enqueueFromTemplateInternal } = await import("@/lib/emails/emails.server");
-        await enqueueFromTemplateInternal("order_completed", recipientEmail, {
-            customer_name: recipientName,
-            service_name: serviceName,
-            order_number: app.application_code ?? "",
-            certificate_number: certNumber,
-            certificate_url: certificateUrl,
-            completion_notes: completionNotes ?? "",
-            document_name: certAttachment?.filename ?? "Certificate",
-            order_code: app.application_code ?? "",
-            order_completion_date_time: completedDateFormatted,
-            order_completion_date: completedDateFormatted,
-            order_completed_date_time: completedDateFormatted,
-            order_completed_date: completedDateFormatted,
-            order_completed_at: completedDateFormatted,
-            completed_date_time: completedDateFormatted,
-            completed_date: completedDateFormatted,
-            completed_at: completedDateFormatted,
-            completion_date_time: completedDateFormatted,
-            completion_date: completedDateFormatted,
-            completion_at: completedDateFormatted,
-          }, {
-            toName: recipientName,
-            leadId: app.lead_id,
-            applicationId: data.orderId,
-            attachments: certAttachment
-              ? [{ filename: certAttachment.filename, content_type: certAttachment.content_type, content_base64: certAttachment.content_base64 }]
-              : undefined,
-            requireImmediateSuccess: true,
-            allowDuplicate: true,
-            trigger: "manual",
-          });
+        try {
+          await enqueueFromTemplateInternal("order_completed", recipientEmail, {
+              customer_name: recipientName,
+              service_name: serviceName,
+              order_number: app.application_code ?? "",
+              certificate_number: certNumber,
+              certificate_url: certificateUrl,
+              completion_notes: completionNotes ?? "",
+              document_name: certAttachment?.filename ?? "Certificate",
+              order_code: app.application_code ?? "",
+              order_completion_date_time: completedDateFormatted,
+              order_completion_date: completedDateFormatted,
+              order_completed_date_time: completedDateFormatted,
+              order_completed_date: completedDateFormatted,
+              order_completed_at: completedDateFormatted,
+              completed_date_time: completedDateFormatted,
+              completed_date: completedDateFormatted,
+              completed_at: completedDateFormatted,
+              completion_date_time: completedDateFormatted,
+              completion_date: completedDateFormatted,
+              completion_at: completedDateFormatted,
+            }, {
+              toName: recipientName,
+              leadId: app.lead_id,
+              applicationId: data.orderId,
+              cc: normalizedCc,
+              attachments: certAttachment
+                ? [{ filename: certAttachment.filename, content_type: certAttachment.content_type, content_base64: certAttachment.content_base64 }]
+                : undefined,
+              requireImmediateSuccess: true,
+              allowDuplicate: true,
+              trigger: "manual",
+            });
+        } catch (sendErr: any) {
+          const failMessage = sendErr?.message || "Failed to submit certificate email";
+          console.error("[orders-v2.updateFulfillmentStatus] Certificate email sending failed:", sendErr);
+          await admin.from("application_events").insert({
+            application_id: data.orderId,
+            lead_id: app.lead_id,
+            customer_id: app.customer_id ?? null,
+            event_type: "certificate_send_failed",
+            new_value: "failed",
+            note: `Certificate email submission failed for registered email ${recipientEmail}${normalizedCc ? `, with CC to ${normalizedCc}` : ""}. Error: ${failMessage}`,
+            created_by: context.userId,
+            staff_name,
+            staff_role,
+          } as never);
+          throw new Error(`Certificate email submission failed: ${failMessage}. The order was not marked completed.`);
+        }
       }
 
       // Mark application completed only after certificate email send succeeds.
@@ -3055,17 +3083,20 @@ export const updateFulfillmentStatus = createServerFn({ method: "POST" })
 
 
       const isReissue = current === "completed" || current === "order_completed" || isReopened;
+      const historyNote = normalizedCc
+        ? `Certificate email sent successfully to the registered email ${recipientEmail}, with CC to ${normalizedCc}.${completionNotes ? ` Notes: ${completionNotes}` : ""}`
+        : ((isReissue ? "Certificate re-issued / resent. " : "Application completed. ") +
+          `Certificate ${certNumber}` +
+          ` sent to ${recipientEmail}` +
+          (completionNotes ? `. Notes: ${completionNotes}` : "."));
+
       await admin.from("application_events").insert({
         application_id: data.orderId,
         lead_id: app.lead_id,
         customer_id: app.customer_id ?? null,
         event_type: isReissue ? "certificate_reissued" : "application_completed",
         new_value: "completed",
-        note:
-          (isReissue ? "Certificate re-issued / resent. " : "Application completed. ") +
-          `Certificate ${certNumber}` +
-          ` sent to ${recipientEmail}` +
-          (completionNotes ? `. Notes: ${completionNotes}` : "."),
+        note: historyNote,
         created_by: context.userId,
         staff_name,
         staff_role,
@@ -3118,12 +3149,18 @@ export const updateFulfillmentStatus = createServerFn({ method: "POST" })
 export const resendOrderCertificate = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) =>
-    z.object({ orderId: z.string().uuid() }).parse(i),
+    z.object({
+      orderId: z.string().uuid(),
+      ccEmail: z.string().trim().email("Invalid CC email address").optional().or(z.literal("")).nullable(),
+    }).parse(i),
   )
   .handler(async ({ data, context }) => {
     const admin = await getAdmin();
     const { assertCanAccessOrder } = await import("@/lib/crm/order-auth.server");
     await assertCanAccessOrder({ orderId: data.orderId, userId: context.userId, admin });
+
+    const normalizedCc = data.ccEmail?.trim() ? data.ccEmail.trim().toLowerCase() : undefined;
+    const { staff_name, staff_role } = await getStaff(context.userId);
 
     const { data: cert, error: certErr } = await admin
       .from("certificates")
@@ -3187,7 +3224,7 @@ export const resendOrderCertificate = createServerFn({ method: "POST" })
       throw new Error("No email address on file for this customer — cannot resend certificate.");
     }
 
-    {
+    try {
       const appAny = app as any;
       const completedDateFormatted = new Date(appAny?.fulfilled_at ?? appAny?.updated_at ?? new Date()).toLocaleString("en-IN", {
         timeZone: "Asia/Kolkata", day: "2-digit", month: "short", year: "numeric",
@@ -3218,6 +3255,7 @@ export const resendOrderCertificate = createServerFn({ method: "POST" })
           toName: recipientName,
           leadId: cert.lead_id,
           applicationId: data.orderId,
+          cc: normalizedCc,
           attachments: resendAttachment
             ? [{ filename: resendAttachment.filename, content_type: resendAttachment.content_type, content_base64: resendAttachment.content_base64 }]
             : undefined,
@@ -3225,6 +3263,21 @@ export const resendOrderCertificate = createServerFn({ method: "POST" })
           allowDuplicate: true,
           trigger: "manual",
         });
+    } catch (sendErr: any) {
+      const failMessage = sendErr?.message || "Failed to submit certificate email";
+      console.error("[orders-v2.resendOrderCertificate] Certificate email sending failed:", sendErr);
+      await admin.from("application_events").insert({
+        application_id: data.orderId,
+        lead_id: cert.lead_id,
+        customer_id: cert.customer_id ?? null,
+        event_type: "certificate_resend_failed",
+        new_value: "failed",
+        note: `Certificate email resend submission failed for registered email ${recipientEmail}${normalizedCc ? `, with CC to ${normalizedCc}` : ""}. Error: ${failMessage}`,
+        created_by: context.userId,
+        staff_name,
+        staff_role,
+      } as never);
+      throw new Error(`Failed to resend certificate email: ${failMessage}`);
     }
 
     await admin
@@ -3232,14 +3285,16 @@ export const resendOrderCertificate = createServerFn({ method: "POST" })
       .update({ delivered_at: new Date().toISOString() } as never)
       .eq("id", cert.id);
 
+    const historyNote = normalizedCc
+      ? `Certificate email sent successfully to the registered email ${recipientEmail}, with CC to ${normalizedCc}.`
+      : `Certificate ${cert.certificate_number ?? ""} resent to ${recipientEmail}.`;
 
-    const { staff_name, staff_role } = await getStaff(context.userId);
     await admin.from("application_events").insert({
       application_id: data.orderId,
       lead_id: cert.lead_id,
       customer_id: cert.customer_id ?? null,
       event_type: "certificate_resent",
-      note: `Certificate ${cert.certificate_number ?? ""} resent to ${recipientEmail}.`,
+      note: historyNote,
       created_by: context.userId,
       staff_name,
       staff_role,

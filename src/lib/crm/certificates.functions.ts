@@ -109,9 +109,15 @@ export const uploadCertificate = createServerFn({ method: "POST" })
 
 export const deliverCertificate = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator(z.object({ certificateId: z.string().uuid() }))
+  .inputValidator(
+    z.object({
+      certificateId: z.string().uuid(),
+      ccEmail: z.string().trim().email("Invalid CC email address").optional().or(z.literal("")).nullable(),
+    }),
+  )
   .handler(async ({ data, context }) => {
     const user = await assertRole(context.supabase, ["super_admin", "admin", "operations"]);
+    const normalizedCc = data.ccEmail?.trim() ? data.ccEmail.trim().toLowerCase() : undefined;
     const { data: cert } = await (await getAdmin())
       .from("certificates")
       .select("*")
@@ -262,12 +268,44 @@ export const deliverCertificate = createServerFn({ method: "POST" })
           toName: lead.name,
           leadId: lead.id,
           applicationId: app?.id ?? undefined,
+          cc: normalizedCc,
           attachments: attachment ? [attachment] : undefined,
           requireImmediateSuccess: true,
           allowDuplicate: true,
           trigger: "manual",
         },
       );
+      } catch (sendErr: any) {
+        const failMessage = sendErr?.message || "Failed to submit certificate email";
+        console.error("[deliverCertificate] Certificate email sending failed:", sendErr);
+        if (app?.id) {
+          await (await getAdmin()).from("application_events").insert({
+            application_id: app.id,
+            lead_id: cert.lead_id,
+            customer_id: cert.customer_id ?? null,
+            event_type: "certificate_send_failed",
+            new_value: "failed",
+            note: `Certificate email submission failed for registered email ${lead.email}${normalizedCc ? `, with CC to ${normalizedCc}` : ""}. Error: ${failMessage}`,
+            created_by: user.id,
+          } as never);
+        }
+        throw new Error(`Certificate email submission failed: ${failMessage}. Certificate was not marked delivered.`);
+      }
+    }
+
+    if (app?.id) {
+      const historyNote = normalizedCc
+        ? `Certificate email sent successfully to the registered email ${lead.email}, with CC to ${normalizedCc}.`
+        : `Certificate ${cert.certificate_number ?? ""} sent to ${lead.email}.`;
+
+      await (await getAdmin()).from("application_events").insert({
+        application_id: app.id,
+        lead_id: cert.lead_id,
+        customer_id: cert.customer_id ?? null,
+        event_type: "certificate_delivered",
+        note: historyNote,
+        created_by: user.id,
+      } as never);
     }
 
     await (await getAdmin())

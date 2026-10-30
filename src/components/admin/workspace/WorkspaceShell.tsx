@@ -779,6 +779,7 @@ export function WorkspaceShell(p: Props) {
                   certificateDocumentId: payload.certificateDocumentId,
                   certificateNumber: payload.certificateNumber,
                   completionNotes: payload.completionNotes,
+                  ccEmail: payload.ccEmail,
                   adminOverride: adminOverride || undefined,
                 } as any,
               });

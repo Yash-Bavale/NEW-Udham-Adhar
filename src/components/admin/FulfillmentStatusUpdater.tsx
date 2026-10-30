@@ -47,6 +47,7 @@ export function FulfillmentStatusUpdater({
     certificateDocumentId?: string;
     certificateNumber?: string;
     completionNotes?: string;
+    ccEmail?: string;
   }) => {
     if (!target) return;
     setBusy(true);
@@ -152,6 +153,7 @@ function CompletionGateDialog({
     certificateDocumentId: string;
     certificateNumber: string;
     completionNotes?: string;
+    ccEmail?: string;
   }) => void;
 }) {
   const requestFn = useServerFn(requestOrderDocumentUpload);
@@ -161,6 +163,8 @@ function CompletionGateDialog({
   const [file, setFile] = useState<File | null>(null);
   const [certNumber, setCertNumber] = useState("");
   const [completionNotes, setCompletionNotes] = useState("");
+  const [ccEmail, setCcEmail] = useState("");
+  const [showCc, setShowCc] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
 
@@ -182,7 +186,7 @@ function CompletionGateDialog({
 
   useEffect(() => {
     if (!open) {
-      setFile(null); setCertNumber(""); setCompletionNotes("");
+      setFile(null); setCertNumber(""); setCompletionNotes(""); setCcEmail(""); setShowCc(false);
       setUploading(false); setDragOver(false);
     }
   }, [open]);
@@ -202,6 +206,13 @@ function CompletionGateDialog({
     if (!recipientEmail) {
       toast.error("Customer has no email on file — cannot deliver certificate.");
       return;
+    }
+    if (ccEmail.trim()) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(ccEmail.trim())) {
+        toast.error("Please enter a valid CC email address.");
+        return;
+      }
     }
     setUploading(true);
     try {
@@ -234,6 +245,7 @@ function CompletionGateDialog({
         certificateDocumentId: documentId,
         certificateNumber: certNumber.trim(),
         completionNotes: completionNotes.trim() || undefined,
+        ccEmail: ccEmail.trim() || undefined,
       });
     } catch (e: any) {
       let msg = e?.message ?? "Upload failed";
@@ -332,12 +344,57 @@ function CompletionGateDialog({
           </div>
 
           {/* Recipient panel */}
-          <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-xs flex gap-2">
-            <Mail className="size-3.5 mt-0.5 text-slate-500 flex-shrink-0" />
-            <div className="text-slate-700">
-              <div className="font-medium">Certificate will be emailed to:</div>
-              <div className="font-mono text-slate-900">{recipientEmail ?? "— no email on file —"}</div>
+          <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-xs space-y-2">
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex gap-2">
+                <Mail className="size-3.5 mt-0.5 text-slate-500 flex-shrink-0" />
+                <div className="text-slate-700">
+                  <div className="font-medium">Certificate will be emailed to (To):</div>
+                  <div className="font-mono text-slate-900">{recipientEmail ?? "— no email on file —"}</div>
+                </div>
+              </div>
+              {!showCc && !ccEmail && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 px-2 text-[11px] text-[#1e3a5f]"
+                  onClick={() => setShowCc(true)}
+                  disabled={uploading || busy}
+                >
+                  + Add CC
+                </Button>
+              )}
             </div>
+
+            {(showCc || ccEmail) && (
+              <div className="pt-2 border-t border-slate-200 space-y-1">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="ff-cc-email" className="text-xs font-medium text-slate-700">
+                    CC Email <span className="font-normal text-slate-400">(optional)</span>
+                  </Label>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-5 px-1.5 text-[10px] text-slate-400 hover:text-red-600"
+                    onClick={() => { setCcEmail(""); setShowCc(false); }}
+                    disabled={uploading || busy}
+                  >
+                    Remove CC
+                  </Button>
+                </div>
+                <Input
+                  id="ff-cc-email"
+                  type="email"
+                  value={ccEmail}
+                  onChange={(e) => setCcEmail(e.target.value)}
+                  disabled={uploading || busy}
+                  placeholder="e.g. partner@example.com"
+                  className="h-8 text-xs bg-white"
+                />
+              </div>
+            )}
           </div>
 
           <div className="rounded-md bg-amber-50 border border-amber-200 p-2.5 text-xs text-amber-900 flex gap-2">

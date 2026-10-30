@@ -1043,6 +1043,7 @@ export function CustomerJourneyMap(p: Props) {
                 certificateDocumentId: payload.certificateDocumentId,
                 certificateNumber: payload.certificateNumber,
                 completionNotes: payload.completionNotes,
+                ccEmail: payload.ccEmail,
                 adminOverride: p.adminOverride || undefined,
               } as any,
             });
