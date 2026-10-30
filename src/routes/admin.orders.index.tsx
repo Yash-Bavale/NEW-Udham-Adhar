@@ -410,7 +410,21 @@ export function OrdersListPage({ mode = "self" }: { mode?: "self" | "team" }) {
   });
   const [fulfillmentStatus, setFulfillmentStatus] = useState<string>(savedState?.fulfillmentStatus ?? "all");
   const [serviceId, setServiceId] = useState<string>(savedState?.serviceId ?? "all");
-  const [assignedTo, setAssignedTo] = useState<string>(savedState?.assignedTo ?? "all");
+  const [assignedTo, setAssignedTo] = useState<string>(() => {
+    if (!isAdmin && isManager) {
+      if (savedState?.assignedTo && savedState.assignedTo !== "all") {
+        return savedState.assignedTo;
+      }
+      return role.userId || "all";
+    }
+    return savedState?.assignedTo ?? "all";
+  });
+
+  useEffect(() => {
+    if (!isAdmin && isManager && role.userId && assignedTo === "all") {
+      setAssignedTo(role.userId);
+    }
+  }, [isAdmin, isManager, role.userId, assignedTo]);
 
   const selectedEmployeeId = canManageOrders && assignedTo && assignedTo !== "all" && assignedTo !== "unassigned"
     ? assignedTo
@@ -591,11 +605,19 @@ export function OrdersListPage({ mode = "self" }: { mode?: "self" | "team" }) {
       }
     }
 
+    if (role.userId && !active.some((a) => a.id === role.userId)) {
+      active.push({
+        id: role.userId,
+        display_name: role.displayName || "My Profile",
+        name: role.displayName || "My Profile",
+      });
+    }
+
     active.sort((a, b) => (a.display_name || a.name || "").localeCompare(b.display_name || b.name || ""));
     inactive.sort((a, b) => (a.display_name || a.name || "").localeCompare(b.display_name || b.name || ""));
 
     return { activeStaffList: active, inactiveStaffList: inactive };
-  }, [historicalStaffData, assignStaffProfiles]);
+  }, [historicalStaffData, assignStaffProfiles, role.userId, role.displayName]);
   const { data: svcData } = useQuery({
     queryKey: ["admin.services.list"],
     queryFn: () => svcFn(),
@@ -1167,26 +1189,30 @@ export function OrdersListPage({ mode = "self" }: { mode?: "self" | "team" }) {
             {/* Assignees Filter (Admin & Staff) */}
             <Select value={assignedTo} onValueChange={setAssignedTo}>
               <SelectTrigger className="h-9 flex-[1.05] min-w-0 px-1.5 sm:px-2 xl:px-2.5 text-xs bg-slate-50/50 border-slate-200 [&_svg]:shrink-0">
-                <SelectValue placeholder="All assignees" />
+                <SelectValue placeholder={!isAdmin && isManager ? (role.displayName || "My Orders") : "All assignees"} />
               </SelectTrigger>
               <SelectContent className="max-h-[380px]">
-                <SelectItem value="all" className="font-bold text-slate-800">All assignees</SelectItem>
-                <SelectItem value="unassigned" className="text-slate-600">Unassigned</SelectItem>
+                {isAdmin && <SelectItem value="all" className="font-bold text-slate-800">All assignees</SelectItem>}
+                {isAdmin && <SelectItem value="unassigned" className="text-slate-600">Unassigned</SelectItem>}
 
                 {activeStaffList.length > 0 && (
                   <SelectGroup>
                     <SelectLabel className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-emerald-700 bg-emerald-50/80 rounded-md my-1 flex items-center gap-1">
                       🟢 Active Workforce ({activeStaffList.length})
                     </SelectLabel>
-                    {activeStaffList.map((s: any) => (
-                      <SelectItem key={s.id} value={s.id} className="pl-3 text-xs">
-                        {s.display_name || s.full_name || s.name || s.email}
-                      </SelectItem>
-                    ))}
+                    {activeStaffList.map((s: any) => {
+                      const isSelf = s.id === role.userId;
+                      return (
+                        <SelectItem key={s.id} value={s.id} className="pl-3 text-xs">
+                          {s.display_name || s.full_name || s.name || s.email}
+                          {isSelf ? " (You)" : ""}
+                        </SelectItem>
+                      );
+                    })}
                   </SelectGroup>
                 )}
 
-                {inactiveStaffList.length > 0 && (
+                {isAdmin && inactiveStaffList.length > 0 && (
                   <SelectGroup>
                     <SelectLabel className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-rose-700 bg-rose-50/80 rounded-md my-1 flex items-center gap-1">
                       ⚪ Inactive / Exited Staff ({inactiveStaffList.length})

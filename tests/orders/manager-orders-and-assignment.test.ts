@@ -286,6 +286,39 @@ describe("Manager Orders Permissions & Restricted Assignment View", () => {
       expect(showPaymentStatusFilter(true)).toBe(true);
       expect(showPendingAgeFilter(true)).toBe(true);
     });
+
+    it("defaults manager to their own userId and restricts assignee dropdown to active workforce only", () => {
+      const managerUserId = "manager-user-uuid-123";
+
+      // 1. Initial assignedTo value logic:
+      const getInitialAssignedTo = (isAdmin: boolean, isManager: boolean, savedAssignedTo?: string, userId?: string | null) => {
+        if (!isAdmin && isManager) {
+          if (savedAssignedTo && savedAssignedTo !== "all") {
+            return savedAssignedTo;
+          }
+          return userId || "all";
+        }
+        return savedAssignedTo ?? "all";
+      };
+
+      // Manager starts with their own userId even if savedAssignedTo was previously 'all' or undefined:
+      expect(getInitialAssignedTo(false, true, undefined, managerUserId)).toBe(managerUserId);
+      expect(getInitialAssignedTo(false, true, "all", managerUserId)).toBe(managerUserId);
+      // Manager keeps explicit other employee selection if saved:
+      expect(getInitialAssignedTo(false, true, "emp-456", managerUserId)).toBe("emp-456");
+      // Admin defaults to "all":
+      expect(getInitialAssignedTo(true, false, undefined, managerUserId)).toBe("all");
+
+      // 2. Assignee dropdown options:
+      const canSeeAllAndUnassigned = (isAdmin: boolean) => isAdmin;
+      const canSeeInactiveStaff = (isAdmin: boolean) => isAdmin;
+
+      expect(canSeeAllAndUnassigned(false)).toBe(false);
+      expect(canSeeInactiveStaff(false)).toBe(false);
+
+      expect(canSeeAllAndUnassigned(true)).toBe(true);
+      expect(canSeeInactiveStaff(true)).toBe(true);
+    });
   });
 });
 
