@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Loader2, UploadCloud, AlertTriangle, FileCheck2, Mail, Check, FileText, Send, CircleCheck, Info, Eye, X, ArrowRight } from "lucide-react";
+import { Loader2, UploadCloud, AlertTriangle, FileCheck2, Mail, Check, FileText, Send, CircleCheck, Info, X, ArrowRight } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -45,7 +45,6 @@ export function CompletionGateDialogStandalone({
   const [numberTouched, setNumberTouched] = useState(false);
   const [uploaded, setUploaded] = useState<{ file: File; documentId: string } | null>(null);
   const [sendingConfirmed, setSendingConfirmed] = useState(false);
-  const [previewOpen, setPreviewOpen] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -70,7 +69,7 @@ export function CompletionGateDialogStandalone({
     if (!open) {
       setFile(null); setCertNumber(""); setCompletionNotes(""); setCcEmail(""); setShowCc(false);
       setStage("idle"); setDragOver(false); setError(null);
-      setNumberTouched(false); setUploaded(null); setSendingConfirmed(false); setPreviewOpen(false);
+      setNumberTouched(false); setUploaded(null); setSendingConfirmed(false);
     }
   }, [open]);
 
@@ -278,7 +277,6 @@ export function CompletionGateDialogStandalone({
                         + Add CC
                       </Button>
                     )}
-                    <Button type="button" variant="outline" size="sm" className="h-7 shrink-0 border-completion-border bg-admin-surface px-2 text-[10px] text-completion-primary" onClick={() => setPreviewOpen(true)}><Eye className="size-3" />Preview Email</Button>
                   </div>
                 </div>
 
@@ -357,20 +355,6 @@ export function CompletionGateDialogStandalone({
           </>
         )}
       </DialogContent>
-      <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
-        <DialogContent className="max-w-md border-admin-border bg-admin-surface text-admin-fg">
-          <DialogHeader><DialogTitle>Certificate email</DialogTitle><DialogDescription>Review the details that will be sent to the customer.</DialogDescription></DialogHeader>
-          <div className="space-y-3 text-sm">
-            <p><span className="text-admin-fg-muted">To:</span> <span className="break-all">{recipientEmail ?? "No email on file"}</span></p>
-            {ccEmail.trim() && <p><span className="text-admin-fg-muted">CC:</span> <span className="break-all">{ccEmail.trim()}</span></p>}
-            <p><span className="text-admin-fg-muted">Service:</span> {serviceName}</p>
-            <p><span className="text-admin-fg-muted">Certificate number:</span> {certNumber.trim() || "Not entered"}</p>
-            <p><span className="text-admin-fg-muted">Attachment:</span> {file?.name ?? "No certificate selected"}</p>
-            {completionNotes.trim() && <p className="whitespace-pre-wrap"><span className="text-admin-fg-muted">Notes:</span> {completionNotes.trim()}</p>}
-          </div>
-          <DialogFooter><Button type="button" variant="outline" onClick={() => setPreviewOpen(false)}>Close</Button></DialogFooter>
-        </DialogContent>
-      </Dialog>
     </Dialog>
   );
 }
