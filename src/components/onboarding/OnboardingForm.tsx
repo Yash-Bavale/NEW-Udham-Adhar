@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { INDIA_STATES, PLANT_UNIT_TYPES, CHECKBOX_ON, clearHiddenFields, isFieldVisible, type FieldDef, type OnboardingSchema } from "@/lib/onboarding/schemas";
 import { INDIA_DISTRICTS } from "@/lib/onboarding/india-districts";
 import { NicCodePicker, NicCodeSection } from "./NicCodePicker";
-import { nicLabel } from "@/lib/onboarding/nic-fill";
+import { nicLabel, promoteNicActivities } from "@/lib/onboarding/nic-fill";
 import { DateInputDMY } from "@/components/ui/DateInputDMY";
 
 
@@ -196,6 +196,13 @@ export function OnboardingForm({
     if (timer.current) window.clearTimeout(timer.current);
     setErr(null);
     setSubmitSuccess(false);
+
+    // 0. If the main NIC row is empty but extra activities exist, use the first one as main.
+    const promoted = promoteNicActivities(values);
+    if (promoted !== values) {
+      setValues(promoted);
+      values = promoted;
+    }
 
     // 1. Validate required fields
     for (const f of schema.fields) {

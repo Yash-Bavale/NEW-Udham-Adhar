@@ -389,7 +389,7 @@ export function FormSubmissionPanel({
   );
 
   const sections = groupFieldsBySection(serviceCode, activeSchema);
-  const formData: Record<string, any> = submission?.form_data ?? {};
+  const formData: Record<string, any> = promoteNicActivities(submission?.form_data ?? {});
   const additionalNicActivities = parseNicActivities(typeof formData.nic_activities === "string" ? formData.nic_activities : "");
   const renderedKeys = new Set(sections.flatMap((s) => s.fields.map((f) => f.key)));
   const extras = Object.keys(formData).filter((k) => {
