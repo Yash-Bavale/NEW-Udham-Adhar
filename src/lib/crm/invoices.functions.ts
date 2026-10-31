@@ -935,3 +935,55 @@ export const getInvoiceDetail = createServerFn({ method: "POST" })
     };
   });
 
+
+/**
+ * Add/replace the customer's GSTIN on an existing invoice (same invoice number),
+ * regenerate the PDF and optionally email it again. The GSTIN snapshot drives
+ * the GSTR-1 B2B export, so the invoice moves from B2C to B2B automatically.
+ */
+export const updateInvoiceGstin = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({
+    invoiceId: z.string().uuid(),
+    gstin: z.string().trim().max(20),
+    sendEmail: z.boolean().default(true),
+  }).parse(i))
+  .handler(async ({ data, context }) => {
+    await assertRole(context.supabase, ["super_admin", "admin", "finance"]);
+    const { normalizeGstin, isValidGstin } = await import("@/lib/invoices/gstin");
+    const gstin = normalizeGstin(data.gstin);
+    if (!isValidGstin(gstin)) throw new Error("Invalid GSTIN — please check the 15-character number.");
+
+    const admin = await getAdmin();
+    const { data: inv } = await admin
+      .from("invoices").select("id, payment_id, lead_id, customer_gstin_snapshot, pdf_path")
+      .eq("id", data.invoiceId).is("cancelled_at", null).maybeSingle();
+    if (!inv?.payment_id) throw new Error("Invoice not found");
+
+    // Archive current PDF so the earlier copy stays recoverable.
+    if (inv.pdf_path) {
+      try {
+        const archivePath = `archive/${inv.pdf_path.replace(/\.pdf$/, `-${Date.now()}.pdf`)}`;
+        await admin.storage.from(BUCKET).copy(inv.pdf_path, archivePath);
+        const { data: row } = await admin.from("invoices").select("prev_pdf_paths").eq("id", inv.id).maybeSingle();
+        const arr = Array.isArray((row as any)?.prev_pdf_paths) ? (row as any).prev_pdf_paths : [];
+        await (admin as any).from("invoices").update({ prev_pdf_paths: [...arr, archivePath] }).eq("id", inv.id);
+      } catch (e) { console.error("[invoice archive] failed", e); }
+    }
+
+    await (admin as any).from("invoices").update({ customer_gstin_snapshot: gstin }).eq("id", inv.id);
+    await admin.from("leads").update({ gstin } as any).eq("id", inv.lead_id);
+
+    const actor = await loadActor(context);
+    await logInvoiceEvent(inv.id, "regenerated", {
+      reason: "customer_gstin_updated",
+      previous_gstin: inv.customer_gstin_snapshot ?? null,
+      gstin,
+    }, actor);
+    await generateAndStore(inv.payment_id, actor);
+
+    if (data.sendEmail) {
+      await resendInvoiceEmail({ data: { paymentId: inv.payment_id } } as any);
+    }
+    return { ok: true, gstin };
+  });
