@@ -11,6 +11,7 @@ import {
   listInvoicesAdmin,
   getInvoiceSignedUrl,
   regenerateInvoice,
+  updateInvoiceGstin,
   getPaymentsFilterMeta,
 } from "@/lib/crm/invoices.functions";
 
@@ -41,6 +42,7 @@ function InvoicesPage() {
   const metaFn = useServerFn(getPaymentsFilterMeta);
   const urlFn = useServerFn(getInvoiceSignedUrl);
   const regenFn = useServerFn(regenerateInvoice);
+  const gstinFn = useServerFn(updateInvoiceGstin);
 
   const [filters, setFilters] = useState({
     q: "", gstType: "", serviceId: "", from: "", to: "", page: 1,
@@ -67,6 +69,13 @@ function InvoicesPage() {
     mutationFn: (invoiceId: string) => regenFn({ data: { invoiceId } }),
     onSuccess: () => { toast.success("Invoice PDF regenerated"); refetch(); },
     onError: (e: any) => toast.error(e.message ?? "Could not regenerate"),
+  });
+
+  const gstinMut = useMutation({
+    mutationFn: (v: { invoiceId: string; gstin: string }) =>
+      gstinFn({ data: { ...v, sendEmail: true } }),
+    onSuccess: (r) => { toast.success(`GSTIN ${r.gstin} added — invoice regenerated and emailed`); refetch(); },
+    onError: (e: any) => toast.error(e.message ?? "Could not update GSTIN"),
   });
 
   const openPdf = async (invoiceId: string) => {
@@ -178,11 +187,22 @@ function InvoicesPage() {
                   ) : <span className="text-slate-400">—</span>}
                 </td>
                 <td className="px-3 py-2">
-                  <Button size="sm" variant="outline" className="h-6 text-[10px]"
-                    disabled={regen.isPending}
-                    onClick={() => regen.mutate(r.id)}>
-                    Regenerate
-                  </Button>
+                  <div className="flex gap-1">
+                    <Button size="sm" variant="outline" className="h-6 text-[10px]"
+                      disabled={regen.isPending}
+                      onClick={() => regen.mutate(r.id)}>
+                      Regenerate
+                    </Button>
+                    <Button size="sm" variant="outline" className="h-6 text-[10px]"
+                      disabled={gstinMut.isPending}
+                      title={r.customer_gstin_snapshot ? `GSTIN: ${r.customer_gstin_snapshot}` : "Add customer GSTIN"}
+                      onClick={() => {
+                        const v = window.prompt("Customer GSTIN (15 characters). The invoice will be regenerated and emailed again.", r.customer_gstin_snapshot ?? "");
+                        if (v && v.trim()) gstinMut.mutate({ invoiceId: r.id, gstin: v.trim() });
+                      }}>
+                      {r.customer_gstin_snapshot ? "Edit GSTIN" : "Add GSTIN"}
+                    </Button>
+                  </div>
                 </td>
               </tr>
             ))}
