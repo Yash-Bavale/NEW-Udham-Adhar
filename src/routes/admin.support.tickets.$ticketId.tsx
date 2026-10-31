@@ -755,7 +755,7 @@ function TicketWorkspace() {
           }
         }
         if (attachLinksHtml) {
-          finalMessage += `<div style="margin-top:16px;padding:10px 12px;background:#f8fafc;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;color:#334155">${attachLinksHtml}</div>`;
+          finalMessage += `<div data-crm-attachments="1" style="margin-top:16px;padding:10px 12px;background:#f8fafc;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;color:#334155">${attachLinksHtml}</div>`;
         }
       }
 
@@ -770,6 +770,7 @@ function TicketWorkspace() {
           armAutoclose: false,
           cc: (opts && "cc" in opts && opts.cc) ? opts.cc : (ccInput.trim() || undefined),
           bcc: (opts && "bcc" in opts && opts.bcc) ? opts.bcc : (bccInput.trim() || undefined),
+          attachments: emailAttachments.length ? emailAttachments : undefined,
         },
       });
     },
