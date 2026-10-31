@@ -335,6 +335,12 @@ const ReplyInput = z.object({
     content_base64: z.string().min(1),
     content_type: z.string().max(200),
   })).max(10).optional(),
+  storedFiles: z.array(z.object({
+    storage_path: z.string().min(1).max(500),
+    file_name: z.string().min(1).max(255),
+    mime_type: z.string().max(200),
+    file_size: z.number().int().nonnegative(),
+  })).max(10).optional(),
 });
 
 export const replyToTicket = createServerFn({ method: "POST" })
@@ -358,6 +364,27 @@ export const replyToTicket = createServerFn({ method: "POST" })
       .select("id")
       .single();
     if (repErr) throw new Error(repErr.message);
+
+    // Link staff-uploaded files to this reply so the thread shows them.
+    const ticketPrefix = `tickets/${ticket.id}/`;
+    const linkFiles = (data.storedFiles ?? []).filter((f) => f.storage_path.startsWith(ticketPrefix) && !f.storage_path.includes(".."));
+    if (linkFiles.length) {
+      try {
+        await (admin.from("ticket_reply_attachments" as never) as any).insert(
+          linkFiles.map((f) => ({
+            ticket_id: ticket.id,
+            ticket_reply_id: (replyRow as { id: string }).id,
+            file_name: f.file_name,
+            file_size: f.file_size,
+            mime_type: f.mime_type || "application/octet-stream",
+            storage_bucket: "documents",
+            storage_path: f.storage_path,
+          })),
+        );
+      } catch (e) {
+        console.warn("[replyToTicket] attachment link failed", e);
+      }
+    }
 
     if (data.isInternal) {
       return { ok: true, emailed: false, reason: "internal_note" };
