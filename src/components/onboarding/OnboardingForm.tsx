@@ -191,18 +191,14 @@ export function OnboardingForm({
   }
 
 
-  async function handle(e: React.FormEvent) {
+  const stateValues = values;
+  // If the main NIC row is empty but extra activities exist, the first one becomes the main row.
+  async function handle(e: React.FormEvent, values: Record<string, string> = promoteNicActivities(stateValues)) {
     e.preventDefault();
     if (timer.current) window.clearTimeout(timer.current);
     setErr(null);
     setSubmitSuccess(false);
-
-    // 0. If the main NIC row is empty but extra activities exist, use the first one as main.
-    const promoted = promoteNicActivities(values);
-    if (promoted !== values) {
-      setValues(promoted);
-      values = promoted;
-    }
+    if (values !== stateValues) setValues(values);
 
     // 1. Validate required fields
     for (const f of schema.fields) {
