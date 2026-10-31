@@ -2119,6 +2119,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       needsAction: number;
       pendingOrders: number;
       latestActionAt: string | null;
+      presenceAt: string | null;
       hotOrders: number;
       backlog: number;
       technicalDelay: number;
