@@ -980,16 +980,12 @@ export const updateInvoiceGstin = createServerFn({ method: "POST" })
     const actor = await loadActor(context);
     await logInvoiceEvent(inv.id, "regenerated", {
       reason: "customer_gstin_updated",
+      email_sent: false,
       previous_gstin: inv.customer_gstin_snapshot ?? null,
       gstin,
     }, actor);
     await generateAndStore(inv.payment_id, actor);
 
     // Customer email is intentionally NOT sent here; staff can use Resend later.
-    await logInvoiceEvent(inv.id, "gstin_updated", {
-      previous_gstin: inv.customer_gstin_snapshot ?? null,
-      gstin,
-      email_sent: false,
-    }, actor);
     return { ok: true, gstin };
   });
