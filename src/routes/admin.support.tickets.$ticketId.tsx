@@ -711,9 +711,18 @@ function TicketWorkspace() {
     mutationFn: async (opts?: { closeAfter?: boolean; armAutoclose?: boolean; cc?: string; bcc?: string }) => {
       let finalMessage = body.trim();
 
+      const emailAttachments: Array<{ filename: string; content_base64: string; content_type: string }> = [];
       if (attachedFiles.length > 0) {
         let attachLinksHtml = "";
         for (const item of attachedFiles) {
+          if (composeTab === "reply") {
+            try {
+              const buf = new Uint8Array(await item.file.arrayBuffer());
+              let bin = "";
+              for (let i = 0; i < buf.length; i += 0x8000) bin += String.fromCharCode(...buf.subarray(i, i + 0x8000));
+              emailAttachments.push({ filename: item.name, content_base64: btoa(bin), content_type: item.mimeType || "application/octet-stream" });
+            } catch { /* falls back to link only */ }
+          }
           try {
             const { path, token } = await getAttachmentUploadUrlFn({
               data: { ticketId, fileName: item.name, mimeType: item.mimeType },
@@ -746,7 +755,7 @@ function TicketWorkspace() {
           }
         }
         if (attachLinksHtml) {
-          finalMessage += `<div style="margin-top:16px;padding:10px 12px;background:#f8fafc;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;color:#334155">${attachLinksHtml}</div>`;
+          finalMessage += `<div data-crm-attachments="1" style="margin-top:16px;padding:10px 12px;background:#f8fafc;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;color:#334155">${attachLinksHtml}</div>`;
         }
       }
 
@@ -761,6 +770,7 @@ function TicketWorkspace() {
           armAutoclose: false,
           cc: (opts && "cc" in opts && opts.cc) ? opts.cc : (ccInput.trim() || undefined),
           bcc: (opts && "bcc" in opts && opts.bcc) ? opts.bcc : (bccInput.trim() || undefined),
+          attachments: emailAttachments.length ? emailAttachments : undefined,
         },
       });
     },
