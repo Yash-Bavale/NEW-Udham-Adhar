@@ -2163,7 +2163,8 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
 
         const name = p.display_name || p.full_name || p.email?.split("@")[0] || "Staff";
         const sess = employeeSessionsMap.get(uid);
-        const lastAct = sess?.last_activity_at || sess?.last_heartbeat_at || sess?.login_at || null;
+        // Presence (CRM tab heartbeat) is kept separate; Last Action comes only from order actions.
+        const presenceAt = sess?.last_activity_at || sess?.last_heartbeat_at || sess?.login_at || null;
 
         teamBreakdownMap.set(uid, {
           employeeId: uid,
@@ -2171,7 +2172,8 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
           email: p.email ?? undefined,
           needsAction: 0,
           pendingOrders: 0,
-          latestActionAt: lastAct ?? undefined,
+          latestActionAt: null,
+          presenceAt,
           hotOrders: 0,
           backlog: 0,
           technicalDelay: 0,
