@@ -395,6 +395,10 @@ async function resendInvoiceEmailCore(data: { paymentId: string }, context: any)
           leadId: payment.lead_id,
           applicationId: payment.application_id ?? undefined,
           attachments: [attachment],
+          // Staff-initiated resend (e.g. revised invoice after GSTIN update):
+          // bypass the once-per-order E001 guard; never used by automatic flows.
+          trigger: "manual",
+          allowDuplicate: true,
         },
       );
       if (inv?.id) {
@@ -409,6 +413,7 @@ async function resendInvoiceEmailCore(data: { paymentId: string }, context: any)
           recipient: lead.email,
           attachment: attachment.filename,
           template: "order_confirmation",
+          kind: "manual_resend",
         }, actor);
       }
 
