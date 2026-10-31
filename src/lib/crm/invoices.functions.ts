@@ -985,7 +985,7 @@ export const updateInvoiceGstin = createServerFn({ method: "POST" })
     await generateAndStore(inv.payment_id, actor);
 
     if (data.sendEmail) {
-      await resendInvoiceEmail({ data: { paymentId: inv.payment_id } } as any);
+      await resendInvoiceEmailCore({ paymentId: inv.payment_id }, context);
     }
     return { ok: true, gstin };
   });
