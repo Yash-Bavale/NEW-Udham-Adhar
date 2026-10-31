@@ -270,7 +270,13 @@ async function sendTicketAdHocReply(opts: {
   replyId: string;
   cc?: string;
   bcc?: string;
+  attachments?: Array<{ filename: string; content_base64: string; content_type: string }>;
 }) {
+  const totalB64 = (opts.attachments ?? []).reduce((n, a) => n + a.content_base64.length, 0);
+  if (totalB64 > 20 * 1024 * 1024) throw new Error("Attachments are too large to email (max ~15 MB total).");
+  const atts = opts.attachments?.length ? opts.attachments : undefined;
+  // Real files are attached, so drop the storage-link block from the email copy only.
+  if (atts) opts = { ...opts, message: opts.message.replace(/<div data-crm-attachments="1"[\s\S]*$/, "") || " " };
   const cust = await loadCustomer(opts.ticket.customer_id);
   const recipient = opts.ticket.ticket_email || cust.email;
   if (!recipient) throw new Error("Customer has no registered email address on this ticket.");
@@ -307,6 +313,7 @@ async function sendTicketAdHocReply(opts: {
     },
     allowWithoutTemplate: true,
     requireImmediateSuccess: true,
+    attachments: atts,
   });
   const queueId = (result as { queueId?: string | null } | undefined)?.queueId ?? null;
   await stampReplyEmailDelivery({ replyId: opts.replyId, queueId, inReplyTo: thread.inReplyTo });
@@ -323,6 +330,11 @@ const ReplyInput = z.object({
   armAutoclose: z.boolean().default(true),
   cc: z.string().optional(),
   bcc: z.string().optional(),
+  attachments: z.array(z.object({
+    filename: z.string().min(1).max(255),
+    content_base64: z.string().min(1),
+    content_type: z.string().max(200),
+  })).max(10).optional(),
 });
 
 export const replyToTicket = createServerFn({ method: "POST" })
@@ -432,6 +444,7 @@ export const replyToTicket = createServerFn({ method: "POST" })
         message: data.message,
         cc: data.cc,
         bcc: data.bcc,
+        attachments: data.attachments,
       });
       return { ok: true, emailed: true, recipient: result.recipient };
     } catch (e) {
