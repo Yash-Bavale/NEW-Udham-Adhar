@@ -73,8 +73,8 @@ function InvoicesPage() {
 
   const gstinMut = useMutation({
     mutationFn: (v: { invoiceId: string; gstin: string }) =>
-      gstinFn({ data: { ...v, sendEmail: true } }),
-    onSuccess: (r) => { toast.success(`GSTIN ${r.gstin} added — invoice regenerated and emailed`); refetch(); },
+      gstinFn({ data: { ...v, sendEmail: false } }),
+    onSuccess: (r) => { toast.success(`GSTIN ${r.gstin} saved — invoice regenerated (no email sent)`); refetch(); },
     onError: (e: any) => toast.error(e.message ?? "Could not update GSTIN"),
   });
 
@@ -174,6 +174,9 @@ function InvoicesPage() {
                 <td className="px-3 py-2">
                   <div className="font-medium">{r.customer_name || "—"}</div>
                   <div className="text-[10px] text-slate-500">{r.lead_code}</div>
+                  {r.customer_gstin_snapshot && (
+                    <div className="text-[10px] font-mono font-semibold text-emerald-700">GSTIN: {r.customer_gstin_snapshot}</div>
+                  )}
                 </td>
                 <td className="px-3 py-2">{r.service}</td>
                 <td className="px-3 py-2 text-slate-600">{fmtDate(r.issued_at)}</td>
@@ -197,7 +200,7 @@ function InvoicesPage() {
                       disabled={gstinMut.isPending}
                       title={r.customer_gstin_snapshot ? `GSTIN: ${r.customer_gstin_snapshot}` : "Add customer GSTIN"}
                       onClick={() => {
-                        const v = window.prompt("Customer GSTIN (15 characters). The invoice will be regenerated and emailed again.", r.customer_gstin_snapshot ?? "");
+                        const v = window.prompt("Customer GSTIN (15 characters). The invoice will be regenerated. No email will be sent.", r.customer_gstin_snapshot ?? "");
                         if (v && v.trim()) gstinMut.mutate({ invoiceId: r.id, gstin: v.trim() });
                       }}>
                       {r.customer_gstin_snapshot ? "Edit GSTIN" : "Add GSTIN"}
