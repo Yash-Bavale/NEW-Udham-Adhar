@@ -182,6 +182,7 @@ export type InvoiceData = {
   igstAmount?: number;
   sacCode?: string;
   placeOfSupply?: string | null;
+  customerGstin?: string | null;
   paymentId?: string | null;
   gatewayName: string;
   companyName?: string;

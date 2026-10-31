@@ -76,7 +76,7 @@ export async function generateAndStore(paymentId: string, actor?: { id?: string 
 
   const { data: existing } = await admin
     .from("invoices")
-    .select("id, invoice_number, pdf_path")
+    .select("id, invoice_number, pdf_path, customer_gstin_snapshot")
     .eq("payment_id", paymentId)
     .is("cancelled_at", null)
     .maybeSingle();
@@ -158,6 +158,7 @@ export async function generateAndStore(paymentId: string, actor?: { id?: string 
     igstAmount: igst,
     sacCode,
     placeOfSupply: customerState || null,
+    customerGstin: (existing ? (existing as any).customer_gstin_snapshot : lead.gstin) ?? null,
     paymentId: payment.transaction_id ?? null,
     gatewayName: payment.gateway_name,
   };
