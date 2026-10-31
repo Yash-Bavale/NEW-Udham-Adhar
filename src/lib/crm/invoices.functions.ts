@@ -676,7 +676,7 @@ export const listInvoicesAdmin = createServerFn({ method: "POST" })
     let q = admin
       .from("invoices")
       .select(
-        "id, invoice_number, issued_at, base_amount, gst_amount, total_amount, cgst_amount, sgst_amount, igst_amount, sac_code, place_of_supply, pdf_path, lead_id, application_id, payment_id",
+        "id, invoice_number, issued_at, base_amount, gst_amount, total_amount, cgst_amount, sgst_amount, igst_amount, sac_code, place_of_supply, pdf_path, lead_id, application_id, payment_id, customer_gstin_snapshot",
         { count: "exact" },
       )
       .order("issued_at", { ascending: false });
