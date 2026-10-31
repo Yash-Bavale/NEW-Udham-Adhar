@@ -283,6 +283,10 @@ export async function renderInvoicePdf(d: InvoiceData): Promise<Uint8Array> {
   drawText(page, d.customerEmail, { x: MX, y, size: 9, font: helv, color: TEXT }); y -= 11;
   drawText(page, `+91 ${d.customerMobile}`, { x: MX, y, size: 9, font: helv, color: TEXT }); y -= 11;
   drawText(page, placeOfSupply, { x: MX, y, size: 9, font: helv, color: TEXT });
+  if (d.customerGstin) {
+    y -= 11;
+    drawText(page, `GSTIN: ${d.customerGstin}`, { x: MX, y, size: 9, font: helvBold, color: TEXT });
+  }
   y -= 18;
 
   // ─── Items table header
