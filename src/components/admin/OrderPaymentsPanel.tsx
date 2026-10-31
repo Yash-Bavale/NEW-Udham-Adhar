@@ -1,15 +1,17 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { CreditCard, Download, Eye, History, Mail, Printer, RefreshCw, Replace, ShieldCheck } from "lucide-react";
+import { CreditCard, Download, Eye, History, Mail, Printer, RefreshCw, Replace, ShieldCheck, Receipt } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   getInvoiceSignedUrl,
   previewInvoice,
   regenerateInvoice,
   replaceInvoice,
   resendInvoiceEmail,
+  updateInvoiceGstin,
 } from "@/lib/crm/invoices.functions";
 import { reconcilePaymentStatus } from "@/lib/crm/payments.functions";
 import { InvoiceHistoryDrawer } from "./InvoiceHistoryDrawer";
@@ -24,6 +26,21 @@ export function OrderPaymentsPanel({ payments }: { payments: any[] }) {
   const previewFn = useServerFn(previewInvoice);
   const replaceFn = useServerFn(replaceInvoice);
   const reconcileFn = useServerFn(reconcilePaymentStatus);
+  const gstinFn = useServerFn(updateInvoiceGstin);
+  const qc = useQueryClient();
+
+  const handleGstin = async (p: any) => {
+    if (!p.invoice_id) return toast.error("Invoice not generated yet.");
+    const v = window.prompt("Customer GSTIN (15 characters). The invoice will be regenerated. No email will be sent.", p.invoice_gstin ?? "");
+    if (!v || !v.trim()) return;
+    try {
+      setBusy(`gst-${p.id}`);
+      await gstinFn({ data: { invoiceId: p.invoice_id, gstin: v.trim() } } as any);
+      toast.success("GSTIN saved and invoice regenerated. No email sent.");
+      qc.invalidateQueries({ queryKey: ["admin.order"] });
+    } catch (e: any) { toast.error(e?.message ?? "GSTIN update failed"); }
+    finally { setBusy(null); }
+  };
 
   const [busy, setBusy] = useState<string | null>(null);
   const [historyId, setHistoryId] = useState<string | null>(null);
@@ -169,7 +186,7 @@ export function OrderPaymentsPanel({ payments }: { payments: any[] }) {
                     {isRefund ? "Refund · " : isTopUp ? "Top-up · " : ""}Rs. {Math.abs(amt).toLocaleString("en-IN")}
                   </td>
                   <td className="text-slate-600 capitalize">{p.gateway_name ?? "—"}</td>
-                  <td className="font-mono text-[10px]">{p.invoice_number ?? "—"}</td>
+                  <td className="font-mono text-[10px]">{p.invoice_number ?? "—"}{p.invoice_gstin && <div className="font-semibold text-emerald-700">GSTIN: {p.invoice_gstin}</div>}</td>
                   <td className="text-slate-600">{fmtDate(p.invoice_issued_at)}</td>
                   <td>
                     {p.has_pdf
@@ -187,6 +204,7 @@ export function OrderPaymentsPanel({ payments }: { payments: any[] }) {
                         <IconBtn title="Print"       icon={Printer}  loading={busy === `pr-${p.id}`}  onClick={() => handlePrint(p)} />
                         <IconBtn title="Email again" icon={Mail}     loading={busy === `mail-${p.id}`} onClick={() => handleResend(p)} />
                         <IconBtn title="Regenerate"  icon={RefreshCw} loading={busy === `gen-${p.id}`} onClick={() => handleRegen(p)} />
+                        <IconBtn title={p.invoice_gstin ? "Edit GSTIN" : "Add GSTIN"} icon={Receipt} loading={busy === `gst-${p.id}`} disabled={!p.invoice_id} onClick={() => handleGstin(p)} />
                         <IconBtn title="Replace PDF" icon={Replace}  loading={busy === `rp-${p.invoice_id}`} disabled={!p.invoice_id} onClick={() => p.invoice_id && handleReplaceClick(p.invoice_id)} />
                         <IconBtn title="History"     icon={History}  disabled={!p.invoice_id} onClick={() => p.invoice_id && setHistoryId(p.invoice_id)} />
                       </div>

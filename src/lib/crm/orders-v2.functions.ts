@@ -2482,7 +2482,7 @@ export const getOrderDetailV2 = createServerFn({ method: "POST" })
     let payments = (paysRes.data ?? []) as any[];
     const payIds = payments.map((p) => p.id);
     const invoicePromise = payIds.length > 0
-      ? admin.from("invoices").select("id, payment_id, invoice_number, pdf_path, issued_at, last_emailed_at, email_attempts, last_email_status, delivery_status, replaced_at").in("payment_id", payIds).is("cancelled_at", null)
+      ? admin.from("invoices").select("id, payment_id, invoice_number, pdf_path, issued_at, last_emailed_at, email_attempts, last_email_status, delivery_status, replaced_at, customer_gstin_snapshot").in("payment_id", payIds).is("cancelled_at", null)
       : Promise.resolve({ data: [] });
 
     const [wfRes, invsRes] = await Promise.all([workflowPromise, invoicePromise]);
@@ -2513,6 +2513,7 @@ export const getOrderDetailV2 = createServerFn({ method: "POST" })
           invoice_last_email_status: inv?.last_email_status ?? null,
           invoice_delivery_status: inv?.delivery_status ?? null,
           invoice_replaced_at: inv?.replaced_at ?? null,
+          invoice_gstin: inv?.customer_gstin_snapshot ?? null,
           has_pdf: !!inv?.pdf_path,
         };
       });
