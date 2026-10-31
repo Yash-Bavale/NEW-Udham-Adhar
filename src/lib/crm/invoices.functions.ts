@@ -803,7 +803,7 @@ export const previewInvoice = createServerFn({ method: "POST" })
     if (!lead) throw new Error("Lead missing");
     const { data: invFull } = await admin
       .from("invoices")
-      .select("invoice_number, cgst_amount, sgst_amount, igst_amount, sac_code, place_of_supply")
+      .select("invoice_number, cgst_amount, sgst_amount, igst_amount, sac_code, place_of_supply, customer_gstin_snapshot")
       .eq("id", inv.id).single();
     let applicationCode: string | null = null;
     if (payment.application_id) {
@@ -829,6 +829,7 @@ export const previewInvoice = createServerFn({ method: "POST" })
       igstAmount: Number(invFull?.igst_amount ?? 0),
       sacCode: invFull?.sac_code ?? DEFAULT_SAC,
       placeOfSupply: invFull?.place_of_supply ?? lead.state ?? null,
+      customerGstin: (invFull as any)?.customer_gstin_snapshot ?? null,
       paymentId: payment.transaction_id ?? null,
       gatewayName: payment.gateway_name,
     });
@@ -948,7 +949,7 @@ export const updateInvoiceGstin = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => z.object({
     invoiceId: z.string().uuid(),
     gstin: z.string().trim().max(20),
-    sendEmail: z.boolean().default(true),
+    sendEmail: z.boolean().default(false),
   }).parse(i))
   .handler(async ({ data, context }) => {
     await assertRole(context.supabase, ["super_admin", "admin", "finance"]);
@@ -979,13 +980,12 @@ export const updateInvoiceGstin = createServerFn({ method: "POST" })
     const actor = await loadActor(context);
     await logInvoiceEvent(inv.id, "regenerated", {
       reason: "customer_gstin_updated",
+      email_sent: false,
       previous_gstin: inv.customer_gstin_snapshot ?? null,
       gstin,
     }, actor);
     await generateAndStore(inv.payment_id, actor);
 
-    if (data.sendEmail) {
-      await resendInvoiceEmailCore({ paymentId: inv.payment_id }, context);
-    }
+    // Customer email is intentionally NOT sent here; staff can use Resend later.
     return { ok: true, gstin };
   });
