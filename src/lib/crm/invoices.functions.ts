@@ -295,10 +295,7 @@ export async function markInvoiceEmailedByPayment(
   }
 }
 
-export const resendInvoiceEmail = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) => z.object({ paymentId: z.string().uuid() }).parse(i))
-  .handler(async ({ data, context }) => {
+async function resendInvoiceEmailCore(data: { paymentId: string }, context: any) {
     await assertRole(context.supabase, ["super_admin", "admin", "finance"]);
     const admin = await getAdmin();
     const { data: payment } = await admin
@@ -429,7 +426,12 @@ export const resendInvoiceEmail = createServerFn({ method: "POST" })
       throw e;
     }
     return { ok: true };
-  });
+}
+
+export const resendInvoiceEmail = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({ paymentId: z.string().uuid() }).parse(i))
+  .handler(async ({ data, context }) => resendInvoiceEmailCore(data, context));
 
 
 export const regenerateInvoice = createServerFn({ method: "POST" })
