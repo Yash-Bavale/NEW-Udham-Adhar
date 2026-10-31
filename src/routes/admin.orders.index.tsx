@@ -1901,7 +1901,7 @@ function EmployeeIdleTimerCell({
         "inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[11px] font-mono font-semibold border",
         badgeCls
       )}
-      title={`Last action: ${new Date(latestActionAt).toLocaleTimeString("en-IN")}`}
+      title={`${label}: ${new Date(latestActionAt).toLocaleTimeString("en-IN")}`}
     >
       <span
         className={cn(
@@ -1979,7 +1979,7 @@ function TeamWorkforceBreakdown({
             <tbody className="divide-y divide-slate-100">
               {isLoading && (
                 <tr>
-                  <td colSpan={12} className="px-4 py-12 text-center text-slate-500">
+                  <td colSpan={showPresence ? 13 : 12} className="px-4 py-12 text-center text-slate-500">
                     <Loader2 className="size-5 animate-spin mx-auto mb-2 text-indigo-600" />
                     Loading workforce counts…
                   </td>
@@ -1987,7 +1987,7 @@ function TeamWorkforceBreakdown({
               )}
               {!isLoading && teamBreakdown.length === 0 && (
                 <tr>
-                  <td colSpan={12} className="px-4 py-12 text-center text-slate-500">
+                  <td colSpan={showPresence ? 13 : 12} className="px-4 py-12 text-center text-slate-500">
                     No active employees found in this view.
                   </td>
                 </tr>
