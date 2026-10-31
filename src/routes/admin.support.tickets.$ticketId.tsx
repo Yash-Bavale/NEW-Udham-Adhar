@@ -712,6 +712,7 @@ function TicketWorkspace() {
       let finalMessage = body.trim();
 
       const emailAttachments: Array<{ filename: string; content_base64: string; content_type: string }> = [];
+      const storedFiles: Array<{ storage_path: string; file_name: string; mime_type: string; file_size: number }> = [];
       if (attachedFiles.length > 0) {
         let attachLinksHtml = "";
         for (const item of attachedFiles) {
@@ -747,6 +748,7 @@ function TicketWorkspace() {
               },
             });
 
+            storedFiles.push({ storage_path: path, file_name: item.name, mime_type: item.mimeType || "application/octet-stream", file_size: item.size });
             if (confirmed?.url) {
               attachLinksHtml += `<p style="margin:4px 0;">📎 <strong>Attachment:</strong> <a href="${confirmed.url}" target="_blank" rel="noopener noreferrer" style="color:#2563eb;text-decoration:underline;">${escapeHtml(item.name)}</a> (${formatBytes(item.size)})</p>`;
             }
@@ -771,6 +773,7 @@ function TicketWorkspace() {
           cc: (opts && "cc" in opts && opts.cc) ? opts.cc : (ccInput.trim() || undefined),
           bcc: (opts && "bcc" in opts && opts.bcc) ? opts.bcc : (bccInput.trim() || undefined),
           attachments: emailAttachments.length ? emailAttachments : undefined,
+          storedFiles: storedFiles.length ? storedFiles : undefined,
         },
       });
     },
