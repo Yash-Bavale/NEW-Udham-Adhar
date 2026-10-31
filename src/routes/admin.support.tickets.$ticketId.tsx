@@ -2763,6 +2763,38 @@ function MessageCard({
               )}
             </div>
           )}
+
+          {msg.attachments && msg.attachments.length > 0 && (
+            <div className="pt-2.5 flex flex-wrap gap-2 border-t border-slate-100 mt-2">
+              {msg.attachments.map((doc: any, idx: number) => {
+                const docName = doc.fileName || doc.file_name || "attachment";
+                const docSize = doc.fileSize || doc.file_size || doc.size_bytes || 0;
+                const isPdf = /\.pdf$/i.test(docName);
+                return (
+                  <div key={doc.id || idx} className="p-2 bg-white rounded-lg border border-slate-200 flex items-center justify-between gap-3 min-w-[220px] max-w-sm shadow-2xs">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className={`size-7 rounded border flex items-center justify-center shrink-0 font-bold text-[10px] ${isPdf ? "bg-rose-50 border-rose-200 text-rose-600" : "bg-blue-50 border-blue-200 text-blue-600"}`}>
+                        {isPdf ? "PDF" : "FILE"}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-xs font-medium text-slate-800 truncate" title={docName}>{docName}</div>
+                        <div className="text-[10px] text-slate-400">{formatBytes(docSize)}</div>
+                      </div>
+                    </div>
+                    {doc.url ? (
+                      <a href={doc.url} download={docName} target="_blank" rel="noopener noreferrer" className="p-1 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100 shrink-0" title="Download attachment">
+                        <Download className="size-3.5" />
+                      </a>
+                    ) : (
+                      <button type="button" onClick={() => onDownloadDoc(doc)} className="p-1 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100 shrink-0" title="Download attachment">
+                        <Download className="size-3.5" />
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
     </div>
