@@ -1845,8 +1845,10 @@ export function OrdersListPage({ mode = "self" }: { mode?: "self" | "team" }) {
 
 function EmployeeIdleTimerCell({
   latestActionAt,
+  label = "Last action",
 }: {
   latestActionAt?: string | null;
+  label?: string;
 }) {
   const [elapsedMs, setElapsedMs] = useState(() =>
     latestActionAt ? Math.max(0, Date.now() - new Date(latestActionAt).getTime()) : 0
@@ -1925,6 +1927,7 @@ function TeamWorkforceBreakdown({
     needsAction: number;
     pendingOrders?: number;
     latestActionAt: string | null;
+    presenceAt?: string | null;
     hotOrders: number;
     backlog: number;
     technicalDelay: number;
@@ -1940,6 +1943,8 @@ function TeamWorkforceBreakdown({
   onSelectEmployee: (id: string) => void;
 }) {
   const { isPrivacyEnabled } = useDashboardPrivacy();
+  const roleCtx = useRole();
+  const showPresence = roleCtx.has("super_admin");
   return (
     <div className="space-y-4">
       {/* Desktop View */}
@@ -1959,7 +1964,8 @@ function TeamWorkforceBreakdown({
                 <th className="px-3.5 py-2.5">Employee</th>
                 <th className="px-2 py-2.5 text-center text-violet-700">Pending Orders</th>
                 <th className="px-2 py-2.5 text-center text-rose-600">Needs Action</th>
-                <th className="px-2 py-2.5 text-center text-emerald-700">Idle Time</th>
+                <th className="px-2 py-2.5 text-center text-emerald-700">Last Action</th>
+                {showPresence && <th className="px-2 py-2.5 text-center text-sky-700">Presence</th>}
                 <th className="px-2 py-2.5 text-center text-rose-600">Hot Orders</th>
                 <th className="px-2 py-2.5 text-center text-amber-700">Backlog</th>
                 <th className="px-2 py-2.5 text-center text-sky-700">Technical Delay</th>
@@ -2020,6 +2026,11 @@ function TeamWorkforceBreakdown({
                       <td className="px-2 py-2.5 text-center">
                         <EmployeeIdleTimerCell latestActionAt={member.latestActionAt} />
                       </td>
+                      {showPresence && (
+                        <td className="px-2 py-2.5 text-center">
+                          <EmployeeIdleTimerCell latestActionAt={member.presenceAt} label="Presence" />
+                        </td>
+                      )}
                       <td className="px-2 py-2.5 text-center">
                         <span
                           className={cn(
@@ -2118,8 +2129,11 @@ function TeamWorkforceBreakdown({
                   <div className="min-w-0">
                     <div className="text-sm font-semibold text-slate-800 truncate">{member.name}</div>
                   </div>
-                  <div className="shrink-0">
+                  <div className="shrink-0 flex flex-col items-end gap-1">
                     <EmployeeIdleTimerCell latestActionAt={member.latestActionAt} />
+                    {showPresence && (
+                      <EmployeeIdleTimerCell latestActionAt={member.presenceAt} label="Presence" />
+                    )}
                   </div>
                 </div>
                 <div className="grid grid-cols-6 gap-1 text-center text-xs pt-1.5 border-t border-slate-100">
