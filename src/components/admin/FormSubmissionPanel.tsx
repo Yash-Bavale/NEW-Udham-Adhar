@@ -26,7 +26,7 @@ import {
 } from "@/lib/crm/submissions-admin.functions";
 import { getDocumentSignedUrl } from "@/lib/onboarding/onboarding.functions";
 import { getSchema, isFieldVisible } from "@/lib/onboarding/schemas";
-import { parseNicActivities } from "@/lib/onboarding/nic-fill";
+import { parseNicActivities, promoteNicActivities } from "@/lib/onboarding/nic-fill";
 import { Button } from "@/components/ui/button";
 import { formatIST, formatDateDMY } from "@/lib/datetime";
 import { useRealtimeTable } from "@/hooks/useRealtimeTable";
