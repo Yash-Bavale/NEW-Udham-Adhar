@@ -192,7 +192,8 @@ export const getOnboarding = createServerFn({ method: "POST" })
 const SubmitInput = z.object({
   leadCode: LeadCode,
   accessToken: AccessToken,
-  data: z.record(z.string().min(1).max(80), z.union([z.string().max(2000), z.number(), z.boolean(), z.null()])),
+  // List-type answers (NIC activities, plants, bank details) are JSON strings and can be long.
+  data: z.record(z.string().min(1).max(80), z.union([z.string().max(50000), z.number(), z.boolean(), z.null()])),
   draft: z.boolean().optional(),
 });
 
@@ -215,6 +216,10 @@ export const submitOnboarding = createServerFn({ method: "POST" })
       .maybeSingle();
     if (prev?.form_data) {
       mergedData = { ...(prev.form_data as Record<string, any>), ...mergedData };
+    }
+    {
+      const { promoteNicActivities } = await import("@/lib/onboarding/nic-fill");
+      mergedData = promoteNicActivities(mergedData);
     }
     const validationFields = schema.fields;
 

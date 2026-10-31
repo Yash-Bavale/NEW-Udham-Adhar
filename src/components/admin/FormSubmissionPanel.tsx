@@ -26,7 +26,7 @@ import {
 } from "@/lib/crm/submissions-admin.functions";
 import { getDocumentSignedUrl } from "@/lib/onboarding/onboarding.functions";
 import { getSchema, isFieldVisible } from "@/lib/onboarding/schemas";
-import { parseNicActivities } from "@/lib/onboarding/nic-fill";
+import { parseNicActivities, promoteNicActivities } from "@/lib/onboarding/nic-fill";
 import { Button } from "@/components/ui/button";
 import { formatIST, formatDateDMY } from "@/lib/datetime";
 import { useRealtimeTable } from "@/hooks/useRealtimeTable";
@@ -389,7 +389,7 @@ export function FormSubmissionPanel({
   );
 
   const sections = groupFieldsBySection(serviceCode, activeSchema);
-  const formData: Record<string, any> = submission?.form_data ?? {};
+  const formData: Record<string, any> = promoteNicActivities(submission?.form_data ?? {});
   const additionalNicActivities = parseNicActivities(typeof formData.nic_activities === "string" ? formData.nic_activities : "");
   const renderedKeys = new Set(sections.flatMap((s) => s.fields.map((f) => f.key)));
   const extras = Object.keys(formData).filter((k) => {

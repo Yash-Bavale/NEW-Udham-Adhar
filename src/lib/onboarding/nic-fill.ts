@@ -37,6 +37,26 @@ export function parseNicActivities(raw?: string | null): NicActivity[] {
   }
 }
 
+/**
+ * If the primary 2/4/5-digit answers are empty but extra activities exist,
+ * promote the first extra activity into the primary fields so required
+ * validation and CRM display reflect what the customer actually selected.
+ */
+export function promoteNicActivities<T extends Record<string, any>>(values: T): T {
+  const primary5 = typeof values.nic_5_digit === "string" ? values.nic_5_digit.trim() : "";
+  if (primary5) return values;
+  const extras = parseNicActivities(typeof values.nic_activities === "string" ? values.nic_activities : "");
+  if (!extras.length) return values;
+  const [first, ...rest] = extras;
+  return {
+    ...values,
+    nic_2_digit: first.nic_2_digit,
+    nic_4_digit: first.nic_4_digit,
+    nic_5_digit: first.nic_5_digit,
+    nic_activities: rest.length ? JSON.stringify(rest) : "",
+  };
+}
+
 /** Extracts numeric code (2, 4, or 5 digits) from stored value like "62 — Computer..." or "62". */
 export function extractNicCode(val?: string | null): string {
   if (!val) return "";
