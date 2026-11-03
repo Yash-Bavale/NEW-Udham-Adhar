@@ -353,7 +353,7 @@ async function resendInvoiceEmailCore(data: { paymentId: string }, context: any)
 
     const { enqueueFromTemplateInternal } = await import("@/lib/emails/emails.server");
     try {
-      await enqueueFromTemplateInternal(
+      const queued = await enqueueFromTemplateInternal(
         "order_confirmation",
         lead.email,
         {
