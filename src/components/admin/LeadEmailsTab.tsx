@@ -261,6 +261,7 @@ function EmailRow({ item }: { item: any }) {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-[11px]">
                 <MetaCell label="From" value={item.from_email || "system default"} />
                 <MetaCell label="To" value={item.to_email} />
+                <MetaCell label="CC" value={item.cc_email || "—"} />
                 <MetaCell label="Template" value={item.template_code || "—"} mono />
                 <MetaCell label="Template Match" value={item.template_exists === false ? "Missing from Email Templates" : "Matched"} />
                 <MetaCell label="Attempts" value={String(item.attempt ?? item.attempts ?? 1)} />
