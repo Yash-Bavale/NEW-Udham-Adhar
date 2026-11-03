@@ -104,17 +104,24 @@ export function LeadEmailsTab({ leadId, leadService, orderId }: { leadId: string
   const logByQueueId = new Map<string, any>();
   for (const l of (data?.logs || [])) if (l.queue_id) logByQueueId.set(l.queue_id, l);
   const dedupMap = new Map<string, any>();
+  const ccOf = (q: any): string | null => {
+    const raw = q?.variables?.__cc;
+    if (!raw) return null;
+    const list = Array.isArray(raw) ? raw : String(raw).split(/[,;\s]+/);
+    const out = list.map((s: any) => String(s).trim()).filter(Boolean);
+    return out.length ? out.join(", ") : null;
+  };
   for (const q of (data?.queue || [])) {
     const l = logByQueueId.get(q.id);
     dedupMap.set(`q:${q.id}`, l
-      ? { ...q, body_html: pick(q.body_html, l.body_html), body_text: pick(q.body_text, l.body_text) }
-      : q);
+      ? { ...q, cc_email: ccOf(q), body_html: pick(q.body_html, l.body_html), body_text: pick(q.body_text, l.body_text) }
+      : { ...q, cc_email: ccOf(q) });
   }
   for (const l of (data?.logs || [])) {
     const key = l.queue_id ? `q:${l.queue_id}` : `l:${l.id}`;
     const q = l.queue_id ? queueById.get(l.queue_id) : null;
     const merged = q
-      ? { ...l, body_html: pick(l.body_html, q.body_html), body_text: pick(l.body_text, q.body_text) }
+      ? { ...l, cc_email: ccOf(q), body_html: pick(l.body_html, q.body_html), body_text: pick(l.body_text, q.body_text) }
       : l;
     dedupMap.set(key, merged);
   }
@@ -239,7 +246,10 @@ function EmailRow({ item }: { item: any }) {
             )}
           </div>
         </TableCell>
-        <TableCell className="text-xs">{item.to_email}</TableCell>
+        <TableCell className="text-xs">
+          <div>{item.to_email}</div>
+          {item.cc_email && <div className="text-[10px] text-muted-foreground">CC: {item.cc_email}</div>}
+        </TableCell>
         <TableCell className="text-xs text-muted-foreground">
           {new Date(item.sent_at || item.created_at || Date.now()).toLocaleString("en-IN")}
         </TableCell>
@@ -251,6 +261,7 @@ function EmailRow({ item }: { item: any }) {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-[11px]">
                 <MetaCell label="From" value={item.from_email || "system default"} />
                 <MetaCell label="To" value={item.to_email} />
+                <MetaCell label="CC" value={item.cc_email || "—"} />
                 <MetaCell label="Template" value={item.template_code || "—"} mono />
                 <MetaCell label="Template Match" value={item.template_exists === false ? "Missing from Email Templates" : "Matched"} />
                 <MetaCell label="Attempts" value={String(item.attempt ?? item.attempts ?? 1)} />
