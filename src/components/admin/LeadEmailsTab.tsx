@@ -246,7 +246,10 @@ function EmailRow({ item }: { item: any }) {
             )}
           </div>
         </TableCell>
-        <TableCell className="text-xs">{item.to_email}</TableCell>
+        <TableCell className="text-xs">
+          <div>{item.to_email}</div>
+          {item.cc_email && <div className="text-[10px] text-muted-foreground">CC: {item.cc_email}</div>}
+        </TableCell>
         <TableCell className="text-xs text-muted-foreground">
           {new Date(item.sent_at || item.created_at || Date.now()).toLocaleString("en-IN")}
         </TableCell>
