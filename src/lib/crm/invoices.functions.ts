@@ -353,7 +353,7 @@ async function resendInvoiceEmailCore(data: { paymentId: string }, context: any)
 
     const { enqueueFromTemplateInternal } = await import("@/lib/emails/emails.server");
     try {
-      await enqueueFromTemplateInternal(
+      const queued = await enqueueFromTemplateInternal(
         "order_confirmation",
         lead.email,
         {
@@ -393,14 +393,17 @@ async function resendInvoiceEmailCore(data: { paymentId: string }, context: any)
         {
           toName: lead.name ?? undefined,
           leadId: payment.lead_id,
-          applicationId: payment.application_id ?? undefined,
+          // Manual resends are linked by lead only: the database's
+          // once-per-order E001 unique index (keyed on application_id)
+          // otherwise silently drops every resend after the first email.
           attachments: [attachment],
-          // Staff-initiated resend (e.g. revised invoice after GSTIN update):
-          // bypass the once-per-order E001 guard; never used by automatic flows.
           trigger: "manual",
           allowDuplicate: true,
         },
       );
+      if ((queued as any)?.skipped) {
+        throw new Error("Invoice email was blocked as a duplicate — it was NOT sent.");
+      }
       if (inv?.id) {
         const { data: cur } = await admin.from("invoices").select("email_attempts").eq("id", inv.id).maybeSingle();
         await (admin as any).from("invoices").update({
