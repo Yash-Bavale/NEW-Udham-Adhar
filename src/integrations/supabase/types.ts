@@ -5282,6 +5282,7 @@ export type Database = {
           legal_footer_line: string | null
           logo_asset_url: string | null
           name: string
+          payments_enabled: boolean
           postal_address: string | null
           primary_color: string | null
           sample_certificate_asset_url: string | null
@@ -5314,6 +5315,7 @@ export type Database = {
           legal_footer_line?: string | null
           logo_asset_url?: string | null
           name: string
+          payments_enabled?: boolean
           postal_address?: string | null
           primary_color?: string | null
           sample_certificate_asset_url?: string | null
@@ -5346,6 +5348,7 @@ export type Database = {
           legal_footer_line?: string | null
           logo_asset_url?: string | null
           name?: string
+          payments_enabled?: boolean
           postal_address?: string | null
           primary_color?: string | null
           sample_certificate_asset_url?: string | null
