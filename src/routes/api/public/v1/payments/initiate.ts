@@ -130,7 +130,11 @@ export const Route = createFileRoute("/api/public/v1/payments/initiate")({
 
           if (chosen === "cashfree") {
             const { buildCashfreeOrder } = await import("@/lib/payments/cashfree-order.server");
-            const order = await buildCashfreeOrder(input.lead_code);
+            // Send the customer back to the authorised website that started checkout.
+            const access = await import("@/lib/security/customer-access.server");
+            const returnNonce = access.newReturnNonce();
+            const order = await buildCashfreeOrder(input.lead_code, returnNonce);
+            await access.saveReturnContext(order.paymentId, access.normalizeReturnOrigin(origin), returnNonce);
             return g.jsonOk(
               {
                 gateway: "cashfree",

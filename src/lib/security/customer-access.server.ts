@@ -251,6 +251,7 @@ const RETURN_HOST_SUFFIXES = [
   "udyamregistrations.in",
   "businesshelpservices.com",
   "businesshelpservices.in",
+  "gstcertificate.in",
   "lovable.app",
 ];
 
