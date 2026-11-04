@@ -396,6 +396,22 @@ export type EmailAttachment = {
   content_type: string;
 };
 
+async function resolveOrderWebsiteDomain(applicationId?: string | null, leadId?: string | null): Promise<string | null> {
+  let websiteId: string | null = null;
+  if (applicationId) {
+    const { data } = await supabaseAdmin.from("applications").select("website_id, lead_id").eq("id", applicationId).maybeSingle();
+    websiteId = (data as any)?.website_id ?? null;
+    if (!websiteId && !leadId) leadId = (data as any)?.lead_id ?? null;
+  }
+  if (!websiteId && leadId) {
+    const { data } = await supabaseAdmin.from("leads").select("website_id").eq("id", leadId).maybeSingle();
+    websiteId = (data as any)?.website_id ?? null;
+  }
+  if (!websiteId) return null;
+  const { data: site } = await supabaseAdmin.from("websites").select("domain").eq("id", websiteId).maybeSingle();
+  return (site as any)?.domain ?? null;
+}
+
 export async function enqueueEmailInternal(input: {
   templateCode?: string | null;
   toEmail: string;
@@ -426,6 +442,20 @@ export async function enqueueEmailInternal(input: {
     };
   } catch (e) {
     console.error("[emails] could not secure customer links", e instanceof Error ? e.message : e);
+  }
+  // Footer website links follow the order's own website (e.g. gstcertificate.in).
+  try {
+    const domain = await resolveOrderWebsiteDomain(input.applicationId, input.leadId);
+    if (domain) {
+      const { applyFooterDomain } = await import("./footer-domain");
+      input = {
+        ...input,
+        bodyHtml: applyFooterDomain(input.bodyHtml, domain),
+        bodyText: input.bodyText ? applyFooterDomain(input.bodyText, domain) : input.bodyText,
+      };
+    }
+  } catch (e) {
+    console.error("[emails] footer domain resolve failed", e instanceof Error ? e.message : e);
   }
   const resolved = resolveTemplateCode(input.templateCode);
   if (resolved.drop) {
