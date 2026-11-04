@@ -128,7 +128,7 @@ export const Route = createFileRoute("/api/public/site/lead")({
               customer_id: customerId,
               website_id: site.id,
             })
-            .select("id, lead_code")
+            .select("id, lead_code, public_ref")
             .single();
           if (error || !lead?.lead_code) throw new Error(error?.message ?? "Could not save the lead");
 
@@ -154,9 +154,24 @@ export const Route = createFileRoute("/api/public/site/lead")({
             console.error("[site/lead] notify:", e);
           }
 
-          const base = process.env["APP_BASE_URL"] || new URL(request.url).origin;
+          const paymentsEnabled = site.payments_enabled !== false;
           const { secureCustomerUrl } = await import("@/lib/security/customer-access.server");
-          const paymentUrl = await secureCustomerUrl(base, `/payment/${encodeURIComponent(lead.lead_code)}`, lead.id, "co", "site_lead");
+          let paymentUrl: string;
+          let checkoutToken: string | null = null;
+          if (site.is_primary) {
+            // Primary website keeps its existing CRM-hosted checkout unchanged.
+            const base = process.env["APP_BASE_URL"] || new URL(request.url).origin;
+            paymentUrl = await secureCustomerUrl(base, `/payment/${encodeURIComponent(lead.lead_code)}`, lead.id, "co", "site_lead");
+          } else {
+            // Partner websites keep the customer on their own domain: the site's
+            // /processing page runs the timer and, when payments are on, moves
+            // on to its own checkout using the signed checkout token.
+            const g = await import("@/lib/api/v1/guard.server");
+            checkoutToken = await g.issueCheckoutToken(lead.lead_code, site.id);
+            const ref = encodeURIComponent(String(lead.public_ref ?? lead.lead_code));
+            const frag = new URLSearchParams({ lc: lead.lead_code, ct: checkoutToken, pe: paymentsEnabled ? "1" : "0" });
+            paymentUrl = `https://${site.domain}/processing?ref=${ref}#${frag.toString()}`;
+          }
           return siteJson({
             ok: true,
             success: true,
@@ -169,6 +184,10 @@ export const Route = createFileRoute("/api/public/site/lead")({
             paymentUrl,
             payment_url: paymentUrl,
             redirectUrl: paymentUrl,
+            paymentsEnabled,
+            payments_enabled: paymentsEnabled,
+            checkoutToken,
+            checkout_token: checkoutToken,
           });
         } catch (e) {
           console.error("[site/lead]", e);
