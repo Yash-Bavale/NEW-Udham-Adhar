@@ -38,7 +38,7 @@ export async function loadSite(domain: string) {
   const { data } = await supabaseAdmin
     .from("websites")
     .select(
-      "id, name, domain, brand_name, company_name, legal_entity, support_email, support_phone, whatsapp_number, business_hours, primary_color, logo_asset_url, favicon_asset_url, sample_certificate_asset_url, legal_footer_line, postal_address, gtag_id, google_site_verification, is_active",
+      "id, name, domain, brand_name, company_name, legal_entity, support_email, support_phone, whatsapp_number, business_hours, primary_color, logo_asset_url, favicon_asset_url, sample_certificate_asset_url, legal_footer_line, postal_address, gtag_id, google_site_verification, is_active, is_primary, payments_enabled",
     )
     .eq("domain", domain)
     .maybeSingle();
