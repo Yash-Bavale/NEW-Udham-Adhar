@@ -252,12 +252,15 @@ export const changeLeadService = createServerFn({ method: "POST" })
 
     if (updLeadErr) throw new Error(updLeadErr.message);
 
-    // 4. Update linked applications record instantly
+    // 4. Update linked active applications; a new service restarts as Incomplete Form
+    const { SERVICE_CHANGE_STAGE_RESET } = await import("@/lib/crm/submission-sync.server");
     await admin
       .from("applications")
       .update({
         service_id: targetSvc.id,
-      })
+        ...SERVICE_CHANGE_STAGE_RESET,
+      } as never)
+      .not("fulfillment_status", "in", "(completed,order_completed,order_closed,cancelled)")
       .eq("lead_id", data.leadId);
 
     // 4b. Synchronize onboarding form submission to the target service schema and map common fields
@@ -267,10 +270,7 @@ export const changeLeadService = createServerFn({ method: "POST" })
         admin,
         leadId: data.leadId,
         targetServiceId: targetSvc.id,
-        targetServiceCode: targetSvc.service_code,
-      });
-    } catch (syncErr) {
-      console.warn("Failed to synchronize submission on lead service change:", syncErr);
+x, syncErr);
     }
 
     // 5. Expire existing pending payment links for this lead

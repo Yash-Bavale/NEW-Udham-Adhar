@@ -10,6 +10,17 @@ export interface SyncSubmissionInput {
   resetToDraft?: boolean;
 }
 
+/** Application fields that put an order back to "Incomplete Form" after a staff service change. */
+export const SERVICE_CHANGE_STAGE_RESET = {
+  fulfillment_status: "order_received",
+  order_status: "ORDER_RECEIVED",
+  form_status: "pending",
+  form_submitted_at: null,
+  customer_hold_started_at: null,
+  technical_hold_started_at: null,
+  workflow_delay_reason: null,
+} as const;
+
 export interface SyncSubmissionResult {
   ok: boolean;
   submission: any;
