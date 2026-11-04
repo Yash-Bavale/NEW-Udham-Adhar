@@ -115,8 +115,11 @@ export const Route = createFileRoute("/api/public/v1/applications/summary")({
             };
           });
 
+          const { data: siteRow } = await supabaseAdmin.from("websites").select("payments_enabled").eq("id", lead.website_id!).maybeSingle();
+
           return g.jsonOk(
             {
+              payments_enabled: siteRow?.payments_enabled !== false,
               lead: {
                 lead_code: lead.lead_code,
                 // Masked — enough for the customer to recognise their own

@@ -61,6 +61,10 @@ export const Route = createFileRoute("/api/public/v1/payments/initiate")({
           if (!lead || lead.website_id !== claims.w) {
             return g.jsonError(404, "NOT_FOUND", "Application not found.", origin);
           }
+          const { data: siteRow } = await supabaseAdmin.from("websites").select("payments_enabled").eq("id", lead.website_id!).maybeSingle();
+          if (siteRow && siteRow.payments_enabled === false) {
+            return g.jsonError(403, "PAYMENTS_DISABLED", "Payments are currently not being accepted on this website.", origin);
+          }
 
           let chosen = (input.gateway_code ?? "").trim().toLowerCase();
           if (!chosen) {
