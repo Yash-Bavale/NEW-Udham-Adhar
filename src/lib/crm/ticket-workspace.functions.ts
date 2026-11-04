@@ -688,7 +688,11 @@ export const getTicketWorkspace = createServerFn({ method: "POST" })
     const isReopened =
       applicationData?.fulfillment_status === "order_reopened" ||
       applicationData?.order_status === "REOPENED";
-    const isHotOrder = Boolean(applicationData) && (isDue || isReopened);
+    const isFinalOrder =
+      ["completed", "closed", "cancelled"].includes(String(applicationData?.fulfillment_status ?? "").toLowerCase()) ||
+      ["COMPLETED", "CLOSED", "CANCELLED"].includes(String(applicationData?.order_status ?? "").toUpperCase()) ||
+      (Boolean(applicationData?.closure_stage) && applicationData?.closure_stage !== "none");
+    const isHotOrder = Boolean(applicationData) && !isFinalOrder && (isDue || isReopened);
 
     const appPayload = applicationData
       ? {

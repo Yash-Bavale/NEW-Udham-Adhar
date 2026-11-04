@@ -1251,12 +1251,17 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         a.reopened_at, cb, thisAppEvents, thisAppSchedulers,
       );
 
-      const rawIsReopened =
+      // A completed/closed order is final even if an old reopen flag lingers
+      // (e.g. workflow_status left as "processing_resumed" after completion).
+      const finalNow =
+        ["completed", "closed", "cancelled"].includes(String(a.fulfillment_status ?? "").toLowerCase()) ||
+        ["COMPLETED", "CLOSED", "CANCELLED"].includes(String((a as any).order_status ?? "").toUpperCase());
+      const rawIsReopened = !finalNow && (
         (a.fulfillment_status as any) === "order_reopened" ||
         (a as any).application_status === "order_reopened" ||
         (a as any).order_status === "REOPENED" ||
         (a as any).workflow_status === "order_reopened" ||
-        (a as any).workflow_status === "processing_resumed";
+        (a as any).workflow_status === "processing_resumed");
 
       // Reopening is actionable even without a callback. Reads must never
       // overwrite an explicit reopen because of old completion history.
@@ -1302,7 +1307,17 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         );
 
       const has_future_callback = !isTerminal && Boolean(cb && firesAtTime > now);
-      const is_hot = !isTerminal && !hasCompletedCallback && (is_due || (is_reopened && !has_future_callback));
+      // A real staff action taken after the order became hot (callback due time,
+      // or reopen time) resolves it, even if that action didn't stop the reminder.
+      const hotSinceMs = is_due ? firesAtTime : (is_reopened ? Date.parse((a as any).reopened_at || "") || 0 : 0);
+      const actedSinceHot = hotSinceMs > 0 && thisAppActionLogs.some((l: any) => {
+        if (!l?.employee_id) return false;
+        const t = String(l.action_type ?? "").toUpperCase();
+        if (["ORDER_OPENED", "ORDER_REOPENED", "HOT_ORDER_ADDED", "ORDER_ASSIGNED", "ORDER_REASSIGNED"].includes(t)) return false;
+        const ts = Date.parse(l.created_at || "");
+        return Number.isFinite(ts) && ts > hotSinceMs;
+      });
+      const is_hot = !isTerminal && !hasCompletedCallback && !actedSinceHot && (is_due || (is_reopened && !has_future_callback));
       let hot_started_at: string | null = null;
       if (is_hot) {
         if (is_reopened) {
