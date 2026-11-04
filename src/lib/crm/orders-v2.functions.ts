@@ -3686,21 +3686,23 @@ export const changeOrderService = createServerFn({ method: "POST" })
       .eq("id", app.lead_id);
     if (leadUpdErr) throw new Error(leadUpdErr.message);
 
+    const { SERVICE_CHANGE_STAGE_RESET, syncSubmissionForOrder } = await import("@/lib/crm/submission-sync.server");
+    // A new service starts from scratch: the order returns to Incomplete Form.
     const { error: appUpdErr } = await admin
       .from("applications")
-      .update({ service_id: newSvc.id } as never)
+      .update({ service_id: newSvc.id, ...SERVICE_CHANGE_STAGE_RESET } as never)
       .eq("id", app.id);
     if (appUpdErr) throw new Error(appUpdErr.message);
 
-    // Synchronize onboarding form submission to the new service schema and map common fields
+    // Restart the onboarding form as a draft for the new service (common contact fields kept)
     try {
-      const { syncSubmissionForOrder } = await import("@/lib/crm/submission-sync.server");
       await syncSubmissionForOrder({
         admin,
         applicationId: app.id,
         leadId: app.lead_id,
         targetServiceId: newSvc.id,
         targetServiceCode: (newSvc as any).service_code,
+        resetToDraft: true,
       });
     } catch (syncErr) {
       console.warn("Failed to synchronize submission on service change:", syncErr);
@@ -3761,11 +3763,12 @@ export const changeOrderService = createServerFn({ method: "POST" })
       event_type: "service_changed",
       old_value: (oldSvc as any)?.service_name ?? null,
       new_value: newSvc.service_name,
-      note: delta > 0.01
+      note: (delta > 0.01
         ? `Service changed. Top-up of ₹${delta.toFixed(2)} required.`
         : delta < -0.01
           ? `Service changed. Customer overpaid by ₹${Math.abs(delta).toFixed(2)} (no refund per policy).`
-          : `Service changed. Amount unchanged.`,
+          : `Service changed. Amount unchanged.`)
+        + ` Order reset to Incomplete Form (was ${stage || "unknown"}); customer must submit the new service form.`,
       created_by: context.userId,
       staff_name: profile?.display_name || profile?.email || "Staff",
       staff_role: (roleRows?.[0] as any)?.role ?? "staff",

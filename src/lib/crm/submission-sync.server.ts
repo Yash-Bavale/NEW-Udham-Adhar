@@ -6,7 +6,20 @@ export interface SyncSubmissionInput {
   leadId?: string | null;
   targetServiceId?: string | null;
   targetServiceCode?: string | null;
+  /** Service was changed by staff: restart the form as a draft for the new service. */
+  resetToDraft?: boolean;
 }
+
+/** Application fields that put an order back to "Incomplete Form" after a staff service change. */
+export const SERVICE_CHANGE_STAGE_RESET = {
+  fulfillment_status: "order_received",
+  order_status: "ORDER_RECEIVED",
+  form_status: "pending",
+  form_submitted_at: null,
+  customer_hold_started_at: null,
+  technical_hold_started_at: null,
+  workflow_delay_reason: null,
+} as const;
 
 export interface SyncSubmissionResult {
   ok: boolean;
@@ -31,6 +44,7 @@ export async function syncSubmissionForOrder({
   leadId,
   targetServiceId,
   targetServiceCode,
+  resetToDraft = false,
 }: SyncSubmissionInput): Promise<SyncSubmissionResult> {
   // 1. Resolve application
   let app: any = null;
@@ -174,22 +188,26 @@ export async function syncSubmissionForOrder({
 
   // Determine whether this submission should be in "submitted" state.
   // Never demote a completed/processed/previously submitted order to draft!
-  const isPreviouslySubmitted =
+  const isPreviouslySubmitted = !resetToDraft && (
     sub?.status === "submitted" ||
     Boolean(app?.form_submitted_at) ||
     app?.form_status === "submitted" ||
     ["completed", "order_completed", "under_review", "in_progress", "submitted_to_govt", "certificate_ready"].includes(app?.fulfillment_status ?? "") ||
     (app?.order_status ?? "").toUpperCase() === "COMPLETED" ||
     (app?.order_status ?? "").toUpperCase() === "FORM_RECEIVED" ||
-    app?.application_code === "AP-2026-017714";
+    app?.application_code === "AP-2026-017714");
 
-  const targetStatus = isPreviouslySubmitted ? "submitted" : (sub?.status ?? "draft");
-  const targetSubmittedAt = isPreviouslySubmitted
-    ? (sub?.submitted_at || app?.form_submitted_at || sub?.updated_at || new Date().toISOString())
-    : (sub?.submitted_at ?? null);
+  const targetStatus = resetToDraft ? "draft" : isPreviouslySubmitted ? "submitted" : (sub?.status ?? "draft");
+  const targetSubmittedAt = resetToDraft
+    ? null
+    : isPreviouslySubmitted
+      ? (sub?.submitted_at || app?.form_submitted_at || sub?.updated_at || new Date().toISOString())
+      : (sub?.submitted_at ?? null);
 
+  // On a staff service change only common identity/contact details carry over;
+  // every answer specific to the old service starts blank for the new form.
   const mergedFormData: Record<string, any> = {
-    ...existingFormData,
+    ...(resetToDraft ? {} : existingFormData),
     ...(resolvedApplicantName ? { applicant_name: resolvedApplicantName } : {}),
     ...(resolvedUdyamNumber ? { udyam_number: resolvedUdyamNumber } : {}),
     ...(resolvedMobile ? { registered_mobile: resolvedMobile } : {}),
@@ -210,7 +228,7 @@ export async function syncSubmissionForOrder({
       (resolvedApplicantName && !existingFormData.applicant_name) ||
       (app?.id && !sub.application_id);
 
-    if (hasCodeMismatch || hasStatusMismatch || hasDataDifference) {
+    if (resetToDraft || hasCodeMismatch || hasStatusMismatch || hasDataDifference) {
       const patch: Record<string, any> = {
         form_data: mergedFormData,
         status: targetStatus,
