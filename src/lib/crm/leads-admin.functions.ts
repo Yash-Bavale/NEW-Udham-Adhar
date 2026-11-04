@@ -270,7 +270,11 @@ export const changeLeadService = createServerFn({ method: "POST" })
         admin,
         leadId: data.leadId,
         targetServiceId: targetSvc.id,
-x, syncErr);
+        targetServiceCode: targetSvc.service_code,
+        resetToDraft: true,
+      });
+    } catch (syncErr) {
+      console.warn("Failed to synchronize submission on lead service change:", syncErr);
     }
 
     // 5. Expire existing pending payment links for this lead
