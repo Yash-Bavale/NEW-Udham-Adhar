@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { listGateways, updateGateway, checkCcavenueCredentials, uploadGatewayLogo, listWebsiteGateways, setWebsiteGateway, listCashfreeAccounts, setWebsiteCashfreeAccount } from "@/lib/payments/gateways.functions";
+import { listGateways, updateGateway, checkCcavenueCredentials, uploadGatewayLogo, listWebsiteGateways, setWebsiteGateway, setWebsitePaymentsEnabled, listCashfreeAccounts, setWebsiteCashfreeAccount } from "@/lib/payments/gateways.functions";
 import { MerchantAccountsCard } from "@/components/admin/MerchantAccountsCard";
 
 export const Route = createFileRoute("/admin/gateways")({ component: GatewaysPage });
@@ -297,6 +297,7 @@ function WebsiteGatewaysCard() {
   const listFn = useServerFn(listWebsiteGateways);
   const setFn = useServerFn(setWebsiteGateway);
   const linkFn = useServerFn(setWebsiteCashfreeAccount);
+  const payFn = useServerFn(setWebsitePaymentsEnabled);
   const acctFn = useServerFn(listCashfreeAccounts);
   const qc = useQueryClient();
   const { data, isLoading, error } = useQuery({ queryKey: ["admin.website-gateways"], queryFn: () => listFn() });
@@ -332,6 +333,7 @@ function WebsiteGatewaysCard() {
           <thead className="bg-muted text-left text-xs uppercase text-muted-foreground">
             <tr>
               <th className="p-3">Website</th>
+              <th className="p-3">Taking payments</th>
               {SITE_GATEWAYS.map((g) => <th key={g.code} className="p-3">{g.label}{globalOn(g.code) ? "" : " (off for all)"}</th>)}
               <th className="p-3">Cashfree account</th>
             </tr>
@@ -340,6 +342,17 @@ function WebsiteGatewaysCard() {
             {data.websites.map((w: any) => (
               <tr key={w.id} className="border-t align-top">
                 <td className="p-3 font-medium">{w.name}{w.isPrimary ? <span className="ml-2 text-xs text-muted-foreground">Primary</span> : null}{!w.isActive ? <span className="ml-2 text-xs text-muted-foreground">Inactive</span> : null}</td>
+                <td className="p-3">
+                  <label className="flex items-center gap-2">
+                    <input type="checkbox" aria-label={`Take payments on ${w.name}`} checked={w.paymentsEnabled} disabled={busy === `${w.id}:pay`}
+                      onChange={async (e) => {
+                        setBusy(`${w.id}:pay`); setErr(null);
+                        try { await payFn({ data: { websiteId: w.id, enabled: e.target.checked } }); await qc.invalidateQueries({ queryKey: ["admin.website-gateways"] }); }
+                        catch (er) { setErr((er as Error).message); } finally { setBusy(null); }
+                      }} />
+                    <span className="text-xs">{w.paymentsEnabled ? "On" : "Off — timer keeps loading"}</span>
+                  </label>
+                </td>
                 {SITE_GATEWAYS.map((g) => {
                   const on = enabled(w.id, g.code);
                   const isDef = siteDefault(w.id) === g.code;

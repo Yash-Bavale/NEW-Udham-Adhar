@@ -357,7 +357,7 @@ export const listWebsiteGateways = createServerFn({ method: "GET" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const db = supabaseAdmin as any;
     const [sites, rules, globals, cf, cfAccts] = await Promise.all([
-      db.from("websites").select("id, name, is_active, is_primary, sort_order").order("sort_order"),
+      db.from("websites").select("id, name, is_active, is_primary, sort_order, payments_enabled").order("sort_order"),
       db.from("website_payment_gateways").select("website_id, gateway_name, is_enabled, is_default"),
       db.from("payment_gateways").select("name, display_name, is_enabled"),
       db.from("cashfree_website_accounts").select("website_id, account_id, is_enabled"),
@@ -370,7 +370,7 @@ export const listWebsiteGateways = createServerFn({ method: "GET" })
       websites: (sites.data ?? []).map((w: any) => {
         const map = (cf.data ?? []).find((m: any) => m.website_id === w.id && m.is_enabled);
         const a: any = map ? acct.get(map.account_id) : null;
-        return { id: w.id, name: w.name, isActive: w.is_active, isPrimary: w.is_primary, cashfreeAccount: a?.is_active ? a.label : null, cashfreeAccountId: a?.is_active ? a.id : null };
+        return { id: w.id, name: w.name, isActive: w.is_active, isPrimary: w.is_primary, paymentsEnabled: w.payments_enabled !== false, cashfreeAccount: a?.is_active ? a.label : null, cashfreeAccountId: a?.is_active ? a.id : null };
       }),
       rules: rules.data ?? [],
       globals: (globals.data ?? []).filter((g: any) => ["cashfree", "payu", "ccavenue"].includes(g.name)),
@@ -401,6 +401,19 @@ export const setWebsiteGateway = createServerFn({ method: "POST" })
       updated_by: context.userId, updated_at: new Date().toISOString(),
     }, { onConflict: "website_id,gateway_name" });
     if (error) throw new Error("Could not save the payment option.");
+    return { ok: true };
+  });
+
+/** Turn payment collection on/off for one website (off = processing timer loops, checkout refused). */
+export const setWebsitePaymentsEnabled = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({ websiteId: z.string().uuid(), enabled: z.boolean() }).parse(i))
+  .handler(async ({ data, context }) => {
+    await assertRole(context.supabase, ["super_admin", "admin"]);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await (supabaseAdmin as any).from("websites")
+      .update({ payments_enabled: data.enabled }).eq("id", data.websiteId);
+    if (error) throw new Error("Could not save the payment setting.");
     return { ok: true };
   });
 
