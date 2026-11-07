@@ -768,6 +768,21 @@ function parseDateBounds(dateFrom?: string, dateTo?: string) {
   return getOrdersDateRange({ from: dateFrom, to: dateTo, timezone: "Asia/Kolkata" });
 }
 
+/** Reads every row of a query page by page (1,000 per request) so results are never truncated. */
+async function fetchAllPages<T>(
+  build: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: unknown }>,
+): Promise<{ data: T[]; error: unknown }> {
+  const PAGE = 1000;
+  const out: T[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await build(from, from + PAGE - 1);
+    if (error) return { data: out, error };
+    out.push(...(data ?? []));
+    if (!data || data.length < PAGE) break;
+  }
+  return { data: out, error: null };
+}
+
 async function fetchInChunks<T>(
   ids: string[],
   chunkSize: number,
@@ -993,7 +1008,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       (() => {
         let q = (admin
           .from("order_action_logs" as any) as any)
-          .select("order_id, action_type, new_status, new_stage, employee_id, created_at");
+          .select("id, order_id, action_type, new_status, new_stage, employee_id, employee_name, notes, created_at");
         if (normalized.fromIso) q = q.gte("created_at", normalized.fromIso);
         if (normalized.toIso) q = q.lte("created_at", normalized.toIso);
         return q.order("created_at", { ascending: false }).limit(10000);
@@ -1060,14 +1075,31 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
     // Chunked: a single .in() with thousands of ids exceeds URL limits and
     // silently returns nothing (no callbacks → no Hot / Call Back counts).
     const [eventsData, certsData, actionLogsData, globalActiveSchedulers] = await Promise.all([
-      fetchInChunks<any>(ids, 200, (chunk) =>
-        admin
-          .from("application_events")
-          .select("id, application_id, event_type, old_value, new_value, note, created_by, staff_name, staff_role, created_at")
-          .in("application_id", chunk)
-          .order("created_at", { ascending: false })
-          .limit(10000),
-      ),
+      // Events: only the selected date range (what the counts need), plus the few
+      // all-time state markers used for live Hot / reopen / resumed status.
+      // Every query is paged so nothing is silently dropped at the 1,000-row API limit.
+      (async () => {
+        const cols = "id, application_id, event_type, old_value, new_value, note, created_by, staff_name, staff_role, created_at";
+        const STATE_TYPES = ["hot_priority_escalated", "order_reopened", "customer_form_resumed", "callback_completed", "consultation_completed", "callback_scheduled"];
+        const ranged = await fetchInChunks<any>(ids, 200, (chunk) =>
+          fetchAllPages((from, to) => {
+            let q = admin.from("application_events").select(cols).in("application_id", chunk);
+            if (normalized.fromIso) q = q.gte("created_at", normalized.fromIso);
+            if (normalized.toIso) q = q.lte("created_at", normalized.toIso);
+            return q.order("created_at", { ascending: false }).order("id").range(from, to);
+          }),
+        );
+        if (!normalized.fromIso && !normalized.toIso) return ranged;
+        const state = await fetchInChunks<any>(ids, 200, (chunk) =>
+          fetchAllPages((from, to) =>
+            admin.from("application_events").select(cols)
+              .in("application_id", chunk).in("event_type", STATE_TYPES)
+              .order("created_at", { ascending: false }).order("id").range(from, to),
+          ),
+        );
+        const seen = new Set(ranged.map((e: any) => e.id));
+        return [...ranged, ...state.filter((e: any) => !seen.has(e.id))];
+      })(),
       fetchInChunks<any>(ids, 200, (chunk) =>
         admin
           .from("certificates")
@@ -1077,7 +1109,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       ),
       fetchInChunks<any>(ids, 200, (chunk) =>
         (admin.from("order_action_logs" as any) as any)
-          .select("order_id, action_type, new_status, new_stage, employee_id, created_at")
+          .select("id, order_id, action_type, new_status, new_stage, employee_id, employee_name, notes, created_at")
           .in("order_id", chunk)
           .order("created_at", { ascending: false })
           .limit(10000),
@@ -1575,7 +1607,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
 
       // Action Logs (only if created by a human staff member, never automated cron/timeout)
       for (const l of thisAppActionLogs) {
-        const staffName = l.staff_name || null;
+        const staffName = l.employee_name || l.staff_name || null;
         if (!isHumanStaff(staffName)) continue;
 
         const at = String(l.action_type || "").toUpperCase();
