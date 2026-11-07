@@ -2638,8 +2638,24 @@ export const getOrderDetailV2 = createServerFn({ method: "POST" })
         .then(() => {});
     }
 
+    // Ticket created / order reopened timestamps for the escalation banner.
+    let ticketCreatedAt: string | null = null;
+    let ticketReopenedAt: string | null = null;
+    if (isFromTicket) {
+      const tId = schedRemarks?.ticketId || activeHotSched?.ticket_id || null;
+      const tNum = schedRemarks?.ticketNumber || (ticketEvent?.note?.match(/#([A-Za-z0-9\-]+)/)?.[1]) || null;
+      if (tId || tNum) {
+        const q = admin.from("support_tickets").select("created_at").limit(1);
+        const { data: t } = await (tId ? q.eq("id", tId) : q.eq("ticket_number", tNum)).maybeSingle();
+        ticketCreatedAt = (t as any)?.created_at ?? null;
+      }
+      ticketReopenedAt = ticketEvent?.created_at || activeHotSched?.started_at || app.reopened_at || null;
+    }
+
     const ticketEscalation = isFromTicket
       ? {
+          ticketCreatedAt,
+          ticketReopenedAt,
           isEscalated: true,
           ticketNumber: schedRemarks?.ticketNumber || (ticketEvent?.note?.match(/#([A-Za-z0-9\-]+)/)?.[1]) || null,
           ticketId: schedRemarks?.ticketId || activeHotSched?.ticket_id || null,
