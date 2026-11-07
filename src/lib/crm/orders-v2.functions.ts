@@ -1008,7 +1008,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       (() => {
         let q = (admin
           .from("order_action_logs" as any) as any)
-          .select("order_id, action_type, new_status, new_stage, employee_id, created_at");
+          .select("id, order_id, action_type, new_status, new_stage, employee_id, employee_name, notes, created_at");
         if (normalized.fromIso) q = q.gte("created_at", normalized.fromIso);
         if (normalized.toIso) q = q.lte("created_at", normalized.toIso);
         return q.order("created_at", { ascending: false }).limit(10000);
@@ -1109,7 +1109,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       ),
       fetchInChunks<any>(ids, 200, (chunk) =>
         (admin.from("order_action_logs" as any) as any)
-          .select("order_id, action_type, new_status, new_stage, employee_id, created_at")
+          .select("id, order_id, action_type, new_status, new_stage, employee_id, employee_name, notes, created_at")
           .in("order_id", chunk)
           .order("created_at", { ascending: false })
           .limit(10000),
@@ -1607,7 +1607,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
 
       // Action Logs (only if created by a human staff member, never automated cron/timeout)
       for (const l of thisAppActionLogs) {
-        const staffName = l.staff_name || null;
+        const staffName = l.employee_name || l.staff_name || null;
         if (!isHumanStaff(staffName)) continue;
 
         const at = String(l.action_type || "").toUpperCase();
