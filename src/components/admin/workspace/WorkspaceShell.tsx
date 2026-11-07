@@ -693,6 +693,14 @@ export function WorkspaceShell(p: Props) {
                 <p className="text-xs text-rose-900 font-medium">
                   This order was <strong>{(p.data as any)?.ticketEscalation?.isReopened ? "reopened" : "marked Hot Priority"}</strong> from the Support Ticket system.
                 </p>
+                <div className="flex flex-wrap gap-2 text-[11px] font-semibold text-rose-900">
+                  <span className="bg-white/80 border border-rose-200 px-2 py-0.5 rounded-md">
+                    1. Ticket created: {formatIST((p.data as any)?.ticketEscalation?.ticketCreatedAt)}
+                  </span>
+                  <span className="bg-white/80 border border-rose-200 px-2 py-0.5 rounded-md">
+                    2. Order reopened: {formatIST((p.data as any)?.ticketEscalation?.ticketReopenedAt)}
+                  </span>
+                </div>
                 {(p.data as any)?.ticketEscalation?.note && (
                   <div className="text-xs bg-white/95 border border-rose-200 rounded-lg p-2.5 text-slate-800 mt-1.5 leading-relaxed shadow-2xs">
                     <span className="font-bold text-rose-900 block text-[11px] mb-0.5">Instructions from Support:</span>
