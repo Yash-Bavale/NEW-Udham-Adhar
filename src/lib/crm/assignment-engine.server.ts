@@ -1039,7 +1039,9 @@ export async function ensureActiveAssigneeForReopenedOrder(params: {
   const poolRows: Array<{ id: string; is_active: boolean }> = poolRes.data ?? [];
   const isInPool = poolRows.length > 0;
   const hasActivePoolRow = poolRows.some((r) => r.is_active === true);
-  const isPoolDisabled = (isInPool && !hasActivePoolRow) || (isInPool && prof?.auto_assign_enabled === false);
+  // The Lead Assignment toggle (assignment_pool.is_active) is the only source of truth;
+  // profiles.auto_assign_enabled can be stale and must not override an ON toggle.
+  const isPoolDisabled = isInPool && !hasActivePoolRow;
 
   if (isPoolDisabled) {
     const reason =
