@@ -1128,9 +1128,15 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
     const actionLogsRes = { data: actionLogsData };
 
     // Index all action logs, events, schedulers, and certificates per application
+    // The in-range and per-order log queries overlap; index each log id once.
     const appActionLogsMap = new Map<string, any[]>();
+    const seenActionLogIds = new Set<string>();
     for (const l of [...((inRangeActionLogsRes.data as any[]) ?? []), ...((actionLogsRes.data as any[]) ?? [])]) {
       if (l && l.order_id) {
+        if (l.id) {
+          if (seenActionLogIds.has(l.id)) continue;
+          seenActionLogIds.add(l.id);
+        }
         const arr = appActionLogsMap.get(l.order_id) ?? [];
         arr.push(l);
         appActionLogsMap.set(l.order_id, arr);
