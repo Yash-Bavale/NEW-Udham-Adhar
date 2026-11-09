@@ -830,8 +830,10 @@ export function OrdersListPage({ mode = "self" }: { mode?: "self" | "team" }) {
   const isOtherEmployeeView =
     !isAdmin &&
     isManager &&
-    !isTeam &&
     Boolean(assignedTo && assignedTo !== "all" && assignedTo !== role.userId && !routeSearch.search);
+
+  // Team Orders shows order rows only after one employee is picked.
+  const showTeamEmployeeOrders = isTeam && canManageOrders && Boolean(assignedTo && assignedTo !== "all");
 
   // Base columns (Order #, Created, Customer, Service, Action Status, Stage) = 6
   // Plus Checkbox (1) + Assigned (1) + Amount (1) = 9 total columns for Admin/Manager (Amount is kept at last)
@@ -1509,15 +1511,44 @@ export function OrdersListPage({ mode = "self" }: { mode?: "self" | "team" }) {
         </div>
       )}
 
-      {isTeam ? (
+      {isTeam && (
         <TeamWorkforceBreakdown
           teamBreakdown={teamBreakdown}
           isLoading={isLoading}
           assignedTo={assignedTo}
-          onSelectEmployee={setAssignedTo}
+          onSelectEmployee={(id) => {
+            setPage(1);
+            setSelectedOrderIds([]);
+            setAssignedTo((prev) => (prev === id ? "all" : id));
+          }}
         />
-      ) : (
+      )}
+      {isTeam && canManageOrders && !showTeamEmployeeOrders && (
+        <div className="rounded-xl border border-dashed border-slate-300 bg-white px-4 py-6 text-center text-xs text-slate-500">
+          Tap an employee above to see their orders.
+        </div>
+      )}
+      {(!isTeam || showTeamEmployeeOrders) && (
         <>
+          {isTeam && (
+            <div className="flex items-center justify-between gap-2 px-1">
+              <div className="text-xs font-semibold text-slate-700">
+                Orders of{" "}
+                {teamBreakdown.find((m) => m.employeeId === assignedTo)?.name ?? "selected employee"}
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setPage(1);
+                  setSelectedOrderIds([]);
+                  setAssignedTo("all");
+                }}
+                className="text-xs font-medium text-indigo-600 hover:underline"
+              >
+                Show whole team
+              </button>
+            </div>
+          )}
           {/* Desktop Table View */}
           <div className="hidden md:block rounded-xl border border-slate-200 bg-white overflow-hidden shadow-xs">
             <ScrollableTable>
