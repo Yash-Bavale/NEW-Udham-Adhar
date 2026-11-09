@@ -1958,7 +1958,6 @@ function TeamWorkforceBreakdown({
     needsAction: number;
     pendingOrders?: number;
     latestActionAt: string | null;
-    presenceAt?: string | null;
     hotOrders: number;
     backlog: number;
     technicalDelay: number;
@@ -1974,8 +1973,6 @@ function TeamWorkforceBreakdown({
   onSelectEmployee: (id: string) => void;
 }) {
   const { isPrivacyEnabled } = useDashboardPrivacy();
-  const roleCtx = useRole();
-  const showPresence = roleCtx.has("super_admin");
   return (
     <div className="space-y-4">
       {/* Desktop View */}
@@ -1996,7 +1993,6 @@ function TeamWorkforceBreakdown({
                 <th className="px-2 py-2.5 text-center text-violet-700">Pending Orders</th>
                 <th className="px-2 py-2.5 text-center text-rose-600">Needs Action</th>
                 <th className="px-2 py-2.5 text-center text-emerald-700">Last Action</th>
-                {showPresence && <th className="px-2 py-2.5 text-center text-sky-700">Presence</th>}
                 <th className="px-2 py-2.5 text-center text-rose-600">Hot Orders</th>
                 <th className="px-2 py-2.5 text-center text-amber-700">Backlog</th>
                 <th className="px-2 py-2.5 text-center text-sky-700">Technical Delay</th>
@@ -2010,7 +2006,7 @@ function TeamWorkforceBreakdown({
             <tbody className="divide-y divide-slate-100">
               {isLoading && (
                 <tr>
-                  <td colSpan={showPresence ? 13 : 12} className="px-4 py-12 text-center text-slate-500">
+                  <td colSpan={12} className="px-4 py-12 text-center text-slate-500">
                     <Loader2 className="size-5 animate-spin mx-auto mb-2 text-indigo-600" />
                     Loading workforce counts…
                   </td>
@@ -2018,7 +2014,7 @@ function TeamWorkforceBreakdown({
               )}
               {!isLoading && teamBreakdown.length === 0 && (
                 <tr>
-                  <td colSpan={showPresence ? 13 : 12} className="px-4 py-12 text-center text-slate-500">
+                  <td colSpan={12} className="px-4 py-12 text-center text-slate-500">
                     No active employees found in this view.
                   </td>
                 </tr>
@@ -2029,7 +2025,12 @@ function TeamWorkforceBreakdown({
                   return (
                     <tr
                       key={member.employeeId}
-                      className="hover:bg-slate-50/80 transition-colors"
+                      onClick={() => onSelectEmployee(member.employeeId)}
+                      title="Show this employee's orders"
+                      className={cn(
+                        "cursor-pointer hover:bg-slate-50/80 transition-colors",
+                        assignedTo === member.employeeId && "bg-indigo-50/70 hover:bg-indigo-50"
+                      )}
                     >
                       <td className="px-3.5 py-2.5">
                         <div className="font-semibold text-slate-800 whitespace-nowrap">{member.name}</div>
@@ -2057,11 +2058,6 @@ function TeamWorkforceBreakdown({
                       <td className="px-2 py-2.5 text-center">
                         <EmployeeIdleTimerCell latestActionAt={member.latestActionAt} />
                       </td>
-                      {showPresence && (
-                        <td className="px-2 py-2.5 text-center">
-                          <EmployeeIdleTimerCell latestActionAt={member.presenceAt} label="Presence" />
-                        </td>
-                      )}
                       <td className="px-2 py-2.5 text-center">
                         <span
                           className={cn(
@@ -2154,7 +2150,19 @@ function TeamWorkforceBreakdown({
             return (
               <div
                 key={member.employeeId}
-                className="p-3.5 rounded-xl border border-slate-200 bg-white space-y-2.5 shadow-2xs"
+                role="button"
+                tabIndex={0}
+                onClick={() => onSelectEmployee(member.employeeId)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    onSelectEmployee(member.employeeId);
+                  }
+                }}
+                className={cn(
+                  "p-3.5 rounded-xl border bg-white space-y-2.5 shadow-2xs cursor-pointer",
+                  assignedTo === member.employeeId ? "border-indigo-400 ring-1 ring-indigo-300" : "border-slate-200"
+                )}
               >
                 <div className="flex items-center justify-between gap-2">
                   <div className="min-w-0">
@@ -2162,9 +2170,6 @@ function TeamWorkforceBreakdown({
                   </div>
                   <div className="shrink-0 flex flex-col items-end gap-1">
                     <EmployeeIdleTimerCell latestActionAt={member.latestActionAt} />
-                    {showPresence && (
-                      <EmployeeIdleTimerCell latestActionAt={member.presenceAt} label="Presence" />
-                    )}
                   </div>
                 </div>
                 <div className="grid grid-cols-6 gap-1 text-center text-xs pt-1.5 border-t border-slate-100">
