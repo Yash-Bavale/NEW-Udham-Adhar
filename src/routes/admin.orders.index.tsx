@@ -833,7 +833,8 @@ export function OrdersListPage({ mode = "self" }: { mode?: "self" | "team" }) {
     Boolean(assignedTo && assignedTo !== "all" && assignedTo !== role.userId && !routeSearch.search);
 
   // Team Orders shows order rows only after one employee is picked.
-  const showTeamEmployeeOrders = isTeam && canManageOrders && Boolean(assignedTo && assignedTo !== "all");
+  // Team Orders is counts-only: order rows are never shown there.
+  const showTeamEmployeeOrders = false;
 
   // Base columns (Order #, Created, Customer, Service, Action Status, Stage) = 6
   // Plus Checkbox (1) + Assigned (1) + Amount (1) = 9 total columns for Admin/Manager (Amount is kept at last)
@@ -1523,11 +1524,6 @@ export function OrdersListPage({ mode = "self" }: { mode?: "self" | "team" }) {
           }}
         />
       )}
-      {isTeam && canManageOrders && !showTeamEmployeeOrders && (
-        <div className="rounded-xl border border-dashed border-slate-300 bg-white px-4 py-6 text-center text-xs text-slate-500">
-          Tap an employee above to see their orders.
-        </div>
-      )}
       {(!isTeam || showTeamEmployeeOrders) && (
         <>
           {isTeam && (
@@ -2025,10 +2021,8 @@ function TeamWorkforceBreakdown({
                   return (
                     <tr
                       key={member.employeeId}
-                      onClick={() => onSelectEmployee(member.employeeId)}
-                      title="Show this employee's orders"
                       className={cn(
-                        "cursor-pointer hover:bg-slate-50/80 transition-colors",
+                        "hover:bg-slate-50/80 transition-colors",
                         assignedTo === member.employeeId && "bg-indigo-50/70 hover:bg-indigo-50"
                       )}
                     >
@@ -2150,17 +2144,8 @@ function TeamWorkforceBreakdown({
             return (
               <div
                 key={member.employeeId}
-                role="button"
-                tabIndex={0}
-                onClick={() => onSelectEmployee(member.employeeId)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    onSelectEmployee(member.employeeId);
-                  }
-                }}
                 className={cn(
-                  "p-3.5 rounded-xl border bg-white space-y-2.5 shadow-2xs cursor-pointer",
+                  "p-3.5 rounded-xl border bg-white space-y-2.5 shadow-2xs",
                   assignedTo === member.employeeId ? "border-indigo-400 ring-1 ring-indigo-300" : "border-slate-200"
                 )}
               >

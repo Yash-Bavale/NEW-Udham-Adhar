@@ -2168,12 +2168,8 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
     // manager who picks one employee also gets that employee's order rows
     // (same masking rules as the Orders page below).
     // In self mode: staff and managers can view their assigned order rows.
-    const isTeamEmployeeDrilldown =
-      data.viewMode === "team" &&
-      (isAdmin || isManager) &&
-      Boolean(data.assignedTo && data.assignedTo !== "all" && data.assignedTo.trim() !== "");
-    const rawRows =
-      data.viewMode === "team" && !isTeamEmployeeDrilldown ? [] : filtered.slice(start, start + data.pageSize);
+    // Team Orders is counts-only: never return order rows in team mode.
+    const rawRows = data.viewMode === "team" ? [] : filtered.slice(start, start + data.pageSize);
 
     const hasSearch = Boolean(data.search && data.search.trim());
     const isRestrictedManagerOtherEmployee =
