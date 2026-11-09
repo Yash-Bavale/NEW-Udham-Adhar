@@ -1613,7 +1613,20 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
 
       // Action Logs (only if created by a human staff member, never automated cron/timeout)
       for (const l of thisAppActionLogs) {
-        const staffName = l.employee_name || l.staff_name || null;
+        let staffName = l.employee_name || l.staff_name || null;
+        // Older logs stored "Admin / System" even when an employee clicked the button.
+        // Recover the real actor from the matching status-change event (same order, within 10s).
+        if (!staffName || String(staffName).trim().toLowerCase() === "admin / system") {
+          const lt = new Date(l.created_at).getTime();
+          const match = thisAppEvents.find(
+            (ev: any) =>
+              ev.created_by &&
+              String(ev.event_type || "").toLowerCase() === "order_status_change" &&
+              Math.abs(new Date(ev.created_at).getTime() - lt) < 10000,
+          );
+          const actor = match ? staffMap.get(match.created_by) : null;
+          staffName = actor?.display_name || actor?.full_name || null;
+        }
         if (!isHumanStaff(staffName)) continue;
 
         const at = String(l.action_type || "").toUpperCase();
@@ -1650,6 +1663,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
           else if (at.includes("CALLBACK")) title = "Callback Scheduled";
           else if (at.includes("CLOSE")) title = "Order Closed";
           else if (at.includes("FORM")) title = "Form Link Sent";
+          else if (at === "STATUS_CHANGED" && String(l.new_status || "").toUpperCase() === "WAITING_CUSTOMER_INFO") title = "Form Link Sent";
           else if (l.action_type) title = l.action_type.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase());
 
           actionHistoryList.push({

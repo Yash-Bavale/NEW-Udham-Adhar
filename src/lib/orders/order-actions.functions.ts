@@ -376,7 +376,8 @@ async function transition(
 
     await logEmployeeOrderAction({
       orderId,
-      employeeId: extras.employeeId,
+      // Credit the signed-in staff member, not the assignee/"Admin / System" fallback.
+      employeeId: extras.employeeId ?? user?.id,
       actionType,
       newStatus,
       notes: extras.remarks ?? null,
