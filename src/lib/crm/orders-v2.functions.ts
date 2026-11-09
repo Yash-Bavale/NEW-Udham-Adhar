@@ -2164,9 +2164,16 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
     const maxPage = Math.max(1, Math.ceil(total / data.pageSize));
     const page = Math.min(Math.max(1, data.page), maxPage);
     const start = (page - 1) * data.pageSize;
-    // In team mode: counts only are returned, individual rows are withheld.
+    // In team mode: counts only are returned for the whole team; an admin or
+    // manager who picks one employee also gets that employee's order rows
+    // (same masking rules as the Orders page below).
     // In self mode: staff and managers can view their assigned order rows.
-    const rawRows = data.viewMode === "team" ? [] : filtered.slice(start, start + data.pageSize);
+    const isTeamEmployeeDrilldown =
+      data.viewMode === "team" &&
+      (isAdmin || isManager) &&
+      Boolean(data.assignedTo && data.assignedTo !== "all" && data.assignedTo.trim() !== "");
+    const rawRows =
+      data.viewMode === "team" && !isTeamEmployeeDrilldown ? [] : filtered.slice(start, start + data.pageSize);
 
     const hasSearch = Boolean(data.search && data.search.trim());
     const isRestrictedManagerOtherEmployee =
@@ -2194,7 +2201,6 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
       needsAction: number;
       pendingOrders: number;
       latestActionAt: string | null;
-      presenceAt: string | null;
       hotOrders: number;
       backlog: number;
       technicalDelay: number;
@@ -2207,23 +2213,12 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
     }>();
 
     if (data.viewMode === "team") {
-      const [{ data: profs }, { data: superAdminRoles }, { data: sessions }] = await Promise.all([
+      const [{ data: profs }, { data: superAdminRoles }] = await Promise.all([
         admin.from("profiles").select("id, full_name, display_name, email, is_active, employment_status"),
         admin.from("user_roles").select("user_id").eq("role", "super_admin"),
-        admin
-          .from("employee_sessions")
-          .select("employee_id, last_activity_at, last_heartbeat_at, login_at, status, is_active")
-          .order("last_activity_at", { ascending: false }),
       ]);
 
       const superAdminIds = new Set((superAdminRoles ?? []).map((r: any) => String(r.user_id)));
-      const employeeSessionsMap = new Map<string, any>();
-      for (const s of sessions ?? []) {
-        const empId = String(s.employee_id);
-        if (!employeeSessionsMap.has(empId)) {
-          employeeSessionsMap.set(empId, s);
-        }
-      }
 
       // 1. Pre-populate all ACTIVE workforce employees (strictly excluding deactivated/archived staff and manager self)
       for (const p of profs ?? []) {
@@ -2238,9 +2233,7 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
         if (!isAct) continue; // Exclude deactivated/archived employees
 
         const name = p.display_name || p.full_name || p.email?.split("@")[0] || "Staff";
-        const sess = employeeSessionsMap.get(uid);
-        // Presence (CRM tab heartbeat) is kept separate; Last Action comes only from order actions.
-        const presenceAt = sess?.last_activity_at || sess?.last_heartbeat_at || sess?.login_at || null;
+        // Last Action comes only from order actions (browser-tab presence was removed).
 
         teamBreakdownMap.set(uid, {
           employeeId: uid,
@@ -2249,7 +2242,6 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
           needsAction: 0,
           pendingOrders: 0,
           latestActionAt: null,
-          presenceAt,
           hotOrders: 0,
           backlog: 0,
           technicalDelay: 0,
