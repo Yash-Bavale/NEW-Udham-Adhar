@@ -1625,6 +1625,14 @@ export const listOrdersV2 = createServerFn({ method: "POST" })
           at === "ORDER_CREATED" ||
           at === "PAYMENT_RECEIVED" ||
           at === "ORDER_REOPENED" ||
+          // Assignment changes are custody moves, not work on the order.
+          at === "ORDER_REASSIGNED" ||
+          at === "ORDER_ASSIGNED" ||
+          at === "ASSIGNMENT_CHANGE" ||
+          at === "REASSIGNMENT" ||
+          at === "UNASSIGNMENT" ||
+          at === "ORDER_OPENED" ||
+          at === "HOT_ORDER_ADDED" ||
           note.includes("customer delay closed") ||
           note.includes("auto closed") ||
           note.includes("timeout") ||
