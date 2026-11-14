@@ -115,15 +115,16 @@ export async function syncTicketInboundAttachments(ticketId: string): Promise<an
             const storagePath = `support-tickets/${ticketId}/${replyId || "inbound"}/${Date.now()}_${safeFilename}`;
             const bucket = "documents";
 
-            const { error: upErr } = await admin.storage
-              .from(bucket)
-              .upload(storagePath, downloaded.buffer, {
+            try {
+              const { uploadStorageObject } = await import("@/lib/storage/s3.server");
+              await uploadStorageObject({
+                bucket: "documents",
+                path: storagePath,
+                body: downloaded.buffer,
                 contentType: downloaded.contentType || meta.contentType || "application/octet-stream",
-                upsert: true,
               });
-
-            if (upErr) {
-              console.warn("[syncTicketInboundAttachments] Upload error:", upErr.message);
+            } catch (uploadError) {
+              console.warn("[syncTicketInboundAttachments] Upload error:", uploadError);
               continue;
             }
 
@@ -575,14 +576,11 @@ export const getTicketWorkspace = createServerFn({ method: "POST" })
     await Promise.all(
       attachmentsList.map(async (att: any) => {
         try {
-          const { data: signed } = await admin.storage
-            .from(att.storage_bucket || "documents")
-            .createSignedUrl(att.storage_path, 60 * 60 * 24 * 7);
-          if (signed?.signedUrl) {
-            signedUrlMap.set(att.storage_path, signed.signedUrl);
-          }
+          const { createStorageDownloadUrl } = await import("@/lib/storage/s3.server");
+          const url = await createStorageDownloadUrl("documents", att.storage_path, 60 * 60 * 24 * 7);
+          signedUrlMap.set(att.storage_path, url);
         } catch (err) {
-          void err;
+          console.warn("[getTicketWorkspace] attachment URL signing failed:", err);
         }
       })
     );

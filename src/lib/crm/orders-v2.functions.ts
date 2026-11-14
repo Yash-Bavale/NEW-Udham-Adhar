@@ -3004,28 +3004,26 @@ export const updateFulfillmentStatus = createServerFn({ method: "POST" })
       let certificateUrl: string | null = null;
       let certAttachment: { filename: string; content_type: string; content_base64: string } | null = null;
       if (certDoc?.file_path) {
-        const { data: signed } = await admin.storage
-          .from("documents")
-          .createSignedUrl(certDoc.file_path, 60 * 60 * 24 * 7);
-        certificateUrl = signed?.signedUrl ?? null;
+        const { createStorageDownloadUrl } = await import("@/lib/storage/s3.server");
+        certificateUrl = await createStorageDownloadUrl(
+          "documents",
+          certDoc.file_path,
+          60 * 60 * 24 * 7,
+        );
 
         try {
-          const { data: blob, error: dlErr } = await admin.storage
-            .from("documents")
-            .download(certDoc.file_path);
-          if (dlErr) throw dlErr;
-          if (blob) {
-            const buf = Buffer.from(await blob.arrayBuffer());
-            if (buf.byteLength <= 9 * 1024 * 1024) {
-              const ext = (certDoc.file_name?.split(".").pop() || "pdf").toLowerCase();
-              certAttachment = {
-                filename: `${certNumber || app.application_code || "certificate"}.${ext}`,
-                content_type: certDoc.mime_type || "application/octet-stream",
-                content_base64: buf.toString("base64"),
-              };
-            } else {
-              console.warn("[certificate] attachment skipped: file >9MB", buf.byteLength);
-            }
+          const { downloadStorageObject } = await import("@/lib/storage/s3.server");
+          const bytes = await downloadStorageObject("documents", certDoc.file_path);
+          const buf = Buffer.from(bytes);
+          if (buf.byteLength <= 9 * 1024 * 1024) {
+            const ext = (certDoc.file_name?.split(".").pop() || "pdf").toLowerCase();
+            certAttachment = {
+              filename: `${certNumber || app.application_code || "certificate"}.${ext}`,
+              content_type: certDoc.mime_type || "application/octet-stream",
+              content_base64: buf.toString("base64"),
+            };
+          } else {
+            console.warn("[certificate] attachment skipped: file >9MB", buf.byteLength);
           }
         } catch (e) {
           console.warn("[certificate] attachment skipped: download failed", e);
@@ -3149,7 +3147,10 @@ export const updateFulfillmentStatus = createServerFn({ method: "POST" })
           return true;
         });
         const paths = removable.map((d: any) => d.file_path).filter(Boolean);
-        if (paths.length) await admin.storage.from("documents").remove(paths);
+        if (paths.length) {
+          const { deleteStorageObjects } = await import("@/lib/storage/s3.server");
+          await deleteStorageObjects("documents", paths);
+        }
         const ids = removable.map((d: any) => d.id).filter(Boolean);
         if (ids.length) await admin.from("documents").delete().in("id", ids);
       } catch (e) {
@@ -3256,29 +3257,27 @@ export const resendOrderCertificate = createServerFn({ method: "POST" })
     if (!cert) throw new Error("No certificate has been issued for this order yet.");
     if (!cert.file_path) throw new Error("Certificate file is missing — cannot resend.");
 
-    const { data: signed } = await admin.storage
-      .from("documents")
-      .createSignedUrl(cert.file_path, 60 * 60 * 24 * 7);
-    if (!signed?.signedUrl) throw new Error("Could not generate a fresh download link.");
+    const { createStorageDownloadUrl } = await import("@/lib/storage/s3.server");
+    const signedUrl = await createStorageDownloadUrl(
+      "documents",
+      cert.file_path,
+      60 * 60 * 24 * 7,
+    );
 
     let resendAttachment: { filename: string; content_type: string; content_base64: string } | null = null;
     try {
-      const { data: blob, error: dlErr } = await admin.storage
-        .from("documents")
-        .download(cert.file_path);
-      if (dlErr) throw dlErr;
-      if (blob) {
-        const buf = Buffer.from(await blob.arrayBuffer());
-        if (buf.byteLength <= 9 * 1024 * 1024) {
-          const ext = ((cert as any).file_name?.split(".").pop() || "pdf").toLowerCase();
-          resendAttachment = {
-            filename: `${cert.certificate_number || "certificate"}.${ext}`,
-            content_type: (cert as any).mime_type || "application/octet-stream",
-            content_base64: buf.toString("base64"),
-          };
-        } else {
-          console.warn("[certificate.resend] attachment skipped: file >9MB", buf.byteLength);
-        }
+      const { downloadStorageObject } = await import("@/lib/storage/s3.server");
+      const bytes = await downloadStorageObject("documents", cert.file_path);
+      const buf = Buffer.from(bytes);
+      if (buf.byteLength <= 9 * 1024 * 1024) {
+        const ext = ((cert as any).file_name?.split(".").pop() || "pdf").toLowerCase();
+        resendAttachment = {
+          filename: `${cert.certificate_number || "certificate"}.${ext}`,
+          content_type: (cert as any).mime_type || "application/octet-stream",
+          content_base64: buf.toString("base64"),
+        };
+      } else {
+        console.warn("[certificate.resend] attachment skipped: file >9MB", buf.byteLength);
       }
     } catch (e) {
       console.warn("[certificate.resend] attachment skipped: download failed", e);
@@ -3319,7 +3318,7 @@ export const resendOrderCertificate = createServerFn({ method: "POST" })
           service_name: serviceName,
           order_number: app?.application_code ?? "",
           certificate_number: cert.certificate_number,
-          certificate_url: signed.signedUrl,
+          certificate_url: signedUrl,
           document_name: resendAttachment?.filename ?? "Certificate",
           resend: true,
           order_completion_date_time: completedDateFormatted,
@@ -3539,9 +3538,13 @@ export const requestOrderDocumentUpload = createServerFn({ method: "POST" })
     const ext = (data.fileName.split(".").pop() || "bin").toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 6) || "bin";
     const safe = data.docType.replace(/[^a-z0-9_-]/gi, "_").slice(0, 40);
     const path = `orders/${data.orderId}/${safe}-${Date.now()}.${ext}`;
-    const { data: signed, error } = await admin.storage.from("documents").createSignedUploadUrl(path);
-    if (error || !signed) throw new Error(error?.message ?? "Could not start upload.");
-    return { path, token: signed.token, signedUrl: signed.signedUrl };
+    const { createStorageUploadUrl } = await import("@/lib/storage/s3.server");
+    const signedUrl = await createStorageUploadUrl({
+      bucket: "documents",
+      path,
+      contentType: data.mimeType,
+    });
+    return { path, signedUrl };
   });
 
 export const confirmOrderDocumentUpload = createServerFn({ method: "POST" })
@@ -3630,12 +3633,13 @@ export const getOrderDocumentSignedUrl = createServerFn({ method: "POST" })
     }
 
     try {
-      const { data: signed, error } = await admin.storage.from("documents").createSignedUrl(path, 600);
-      if (error || !signed?.signedUrl) {
-        console.error("[getOrderDocumentSignedUrl] sign failed:", error?.message);
+      const { createStorageDownloadUrl } = await import("@/lib/storage/s3.server");
+      const url = await createStorageDownloadUrl("documents", path, 600);
+      if (!url) {
+        console.error("[getOrderDocumentSignedUrl] sign failed");
         return { url: null as string | null, error: "File not found in storage" };
       }
-      return { url: signed.signedUrl as string | null, error: null as string | null };
+      return { url, error: null as string | null };
     } catch (e) {
       console.error("[getOrderDocumentSignedUrl] unexpected:", e);
       return { url: null as string | null, error: "Could not open document" };

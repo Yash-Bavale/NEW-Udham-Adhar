@@ -1,0 +1,1 @@
+import{j as o}from"./index-Bxfm10zD.js";import{W as t}from"./PageHero-Xi06GNOw.js";import e from"./service-delivery-policy-Bvny0P3q.js";const p=()=>o.jsx(t,{title:"Service Delivery Policy",html:e});export{p as component};

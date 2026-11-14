@@ -271,21 +271,16 @@ async function savePersistedTrainingMaterials(admin: any, list: TrainingMaterial
   }
 }
 
-async function attachSignedUrlIfNeeded(admin: any, item: TrainingMaterial): Promise<TrainingMaterial> {
+async function attachSignedUrlIfNeeded(item: TrainingMaterial): Promise<TrainingMaterial> {
   if (!item.document_url) return item;
 
   const docUrl = item.document_url;
   // If it's a storage path or contains /documents/
   if (docUrl.startsWith("training/") || docUrl.startsWith("documents/training/")) {
     const path = docUrl.startsWith("documents/") ? docUrl.replace(/^documents\//, "") : docUrl;
-    try {
-      const { data: signed } = await admin.storage.from("documents").createSignedUrl(path, 60 * 60 * 24 * 7);
-      if (signed?.signedUrl) {
-        return { ...item, document_url: signed.signedUrl };
-      }
-    } catch {
-      // ignore error, keep original
-    }
+    const { createStorageDownloadUrl } = await import("@/lib/storage/s3.server");
+    const documentUrl = await createStorageDownloadUrl("documents", path, 60 * 60 * 24 * 7);
+    return { ...item, document_url: documentUrl };
   }
   return item;
 }
@@ -336,7 +331,7 @@ export const listTrainingMaterials = createServerFn({ method: "POST" })
       return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
     });
 
-    const enriched = await Promise.all(result.map((m) => attachSignedUrlIfNeeded(admin, m)));
+    const enriched = await Promise.all(result.map((m) => attachSignedUrlIfNeeded(m)));
 
     return {
       materials: enriched,
@@ -366,7 +361,7 @@ export const getTrainingMaterial = createServerFn({ method: "POST" })
     if (!item) throw new Error("Training material not found");
     if (!item.is_published && !isAdmin) throw new Error("Document is currently in draft");
 
-    const enriched = await attachSignedUrlIfNeeded(admin, item);
+    const enriched = await attachSignedUrlIfNeeded(item);
     return { material: enriched, isAdmin };
   });
 
@@ -524,29 +519,28 @@ export const uploadTrainingDocument = createServerFn({ method: "POST" })
       : data.fileBase64;
     const fileBuffer = Buffer.from(base64Data, "base64");
 
-    const { error: uploadError } = await admin.storage
-      .from("documents")
-      .upload(filePath, fileBuffer, {
-        contentType: data.contentType,
-        upsert: true,
-      });
-
-    if (uploadError) {
-      console.error("Storage upload failed:", uploadError);
-      throw new Error(`Failed to upload document: ${uploadError.message}`);
-    }
+    const { uploadStorageObject } = await import("@/lib/storage/s3.server");
+    await uploadStorageObject({
+      bucket: "documents",
+      path: filePath,
+      body: fileBuffer,
+      contentType: data.contentType,
+    });
 
     // Generate signed download URL (valid for 7 days)
-    const { data: signedData } = await admin.storage
-      .from("documents")
-      .createSignedUrl(filePath, 60 * 60 * 24 * 7);
+    const { createStorageDownloadUrl } = await import("@/lib/storage/s3.server");
+    const downloadUrl = await createStorageDownloadUrl(
+      "documents",
+      filePath,
+      60 * 60 * 24 * 7,
+    );
 
     return {
       success: true,
       filePath,
       fileName: data.fileName,
       fileSizeBytes: fileBuffer.length,
-      downloadUrl: signedData?.signedUrl || filePath,
+      downloadUrl,
     };
   });
 
@@ -564,21 +558,22 @@ export const getTrainingDocUploadUrl = createServerFn({ method: "POST" })
     const ext = data.fileName.split(".").pop() || "pdf";
     const path = `training/${Date.now()}-${Math.random().toString(36).substring(2, 8)}.${ext}`;
 
-    const { data: signed, error } = await admin.storage
-      .from("documents")
-      .createSignedUploadUrl(path);
-
-    if (error) throw new Error(error.message);
-
-    const { data: signedView } = await admin.storage
-      .from("documents")
-      .createSignedUrl(path, 60 * 60 * 24 * 7);
+    const { createStorageUploadUrl, createStorageDownloadUrl } = await import("@/lib/storage/s3.server");
+    const uploadUrl = await createStorageUploadUrl({
+      bucket: "documents",
+      path,
+      contentType: data.contentType,
+    });
+    const downloadUrl = await createStorageDownloadUrl(
+      "documents",
+      path,
+      60 * 60 * 24 * 7,
+    );
 
     return {
       path,
-      uploadUrl: signed.signedUrl,
-      token: signed.token,
-      downloadUrl: signedView?.signedUrl || path,
+      uploadUrl,
+      downloadUrl,
     };
   });
 
@@ -607,13 +602,11 @@ export const getTrainingDocDownloadUrl = createServerFn({ method: "POST" })
       storagePath = target.split("/documents/")[1].split("?")[0];
     }
 
-    const { data: signed, error } = await admin.storage
-      .from("documents")
-      .createSignedUrl(storagePath, 60 * 60 * 24 * 7);
-
-    if (error || !signed?.signedUrl) {
-      return { url: target };
-    }
-
-    return { url: signed.signedUrl };
+    const { createStorageDownloadUrl } = await import("@/lib/storage/s3.server");
+    const url = await createStorageDownloadUrl(
+      "documents",
+      storagePath,
+      60 * 60 * 24 * 7,
+    );
+    return { url };
   });

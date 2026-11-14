@@ -79,10 +79,13 @@ export const uploadCertificate = createServerFn({ method: "POST" })
 
     const buffer = Uint8Array.from(atob(data.fileBase64), (c) => c.charCodeAt(0));
     const path = `certificates/${app.id}/${Date.now()}-${data.fileName}`;
-    const { error: upErr } = await (await getAdmin()).storage
-      .from("documents")
-      .upload(path, buffer, { contentType: data.mimeType, upsert: false });
-    if (upErr) throw new Error(upErr.message);
+    const { uploadStorageObject } = await import("@/lib/storage/s3.server");
+    await uploadStorageObject({
+      bucket: "documents",
+      path,
+      body: buffer,
+      contentType: data.mimeType,
+    });
 
     const { data: cert, error: insErr } = await (await getAdmin())
       .from("certificates")
@@ -135,38 +138,33 @@ export const deliverCertificate = createServerFn({ method: "POST" })
         : Promise.resolve({ data: null as any }),
     ]);
 
-    const { data: signed } = await (await getAdmin()).storage
-      .from("documents")
-      .createSignedUrl(cert.file_path, 60 * 60 * 24 * 7);
+    const { createStorageDownloadUrl } = await import("@/lib/storage/s3.server");
+    const signedUrl = await createStorageDownloadUrl(
+      "documents",
+      cert.file_path,
+      60 * 60 * 24 * 7,
+    );
 
     if (!lead?.email) {
       throw new Error("No email address on file for this customer — certificate was not delivered.");
     }
-    if (!signed?.signedUrl) {
-      throw new Error("Could not generate certificate download link — certificate was not delivered.");
-    }
-
-    if (lead.email && signed.signedUrl) {
+    if (lead.email) {
       try {
       // Try to attach the actual file (PDF/JPG/PNG) to the email.
       let attachment: { filename: string; content_type: string; content_base64: string } | null = null;
       try {
-        const { data: blob, error: dlErr } = await (await getAdmin()).storage
-          .from("documents")
-          .download(cert.file_path);
-        if (dlErr) throw dlErr;
-        if (blob) {
-          const buf = Buffer.from(await blob.arrayBuffer());
-          if (buf.byteLength <= 9 * 1024 * 1024) {
-            const ext = ((cert as any).file_name?.split(".").pop() || "pdf").toLowerCase();
-            attachment = {
-              filename: `${cert.certificate_number || app?.application_code || "certificate"}.${ext}`,
-              content_type: (cert as any).mime_type || "application/octet-stream",
-              content_base64: buf.toString("base64"),
-            };
-          } else {
-            console.warn("[certificate.deliver] attachment skipped: file >9MB", buf.byteLength);
-          }
+        const { downloadStorageObject } = await import("@/lib/storage/s3.server");
+        const bytes = await downloadStorageObject("documents", cert.file_path);
+        const buf = Buffer.from(bytes);
+        if (buf.byteLength <= 9 * 1024 * 1024) {
+          const ext = ((cert as any).file_name?.split(".").pop() || "pdf").toLowerCase();
+          attachment = {
+            filename: `${cert.certificate_number || app?.application_code || "certificate"}.${ext}`,
+            content_type: (cert as any).mime_type || "application/octet-stream",
+            content_base64: buf.toString("base64"),
+          };
+        } else {
+          console.warn("[certificate.deliver] attachment skipped: file >9MB", buf.byteLength);
         }
       } catch (e) {
         console.warn("[certificate.deliver] attachment skipped: download failed", e);
@@ -228,7 +226,7 @@ export const deliverCertificate = createServerFn({ method: "POST" })
           <p style="margin:0 0 16px 0"><strong>Team Business Help Services</strong></p>
         </td></tr>
         <tr><td style="padding:0 32px 24px 32px;text-align:center">
-          <a href="${signed.signedUrl}" style="background:#0f3460;color:#ffffff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:600;display:inline-block;font-size:14px">Download Certificate</a>
+          <a href="${signedUrl}" style="background:#0f3460;color:#ffffff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:600;display:inline-block;font-size:14px">Download Certificate</a>
           <p style="margin:10px 0 0 0;font-size:11px;color:#94a3b8">The download link is valid for 7 days. The certificate is also attached to this email.</p>
         </td></tr>
         <tr><td style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:16px 32px;font-size:12px;color:#475569;line-height:1.6">
@@ -261,7 +259,7 @@ export const deliverCertificate = createServerFn({ method: "POST" })
         completion_at: completedDateFormatted,
         certificateId: cert.id,
         certificate_number: cert.certificate_number ?? "",
-        certificate_url: signed.signedUrl,
+        certificate_url: signedUrl,
         document_name: attachment?.filename ?? "Certificate",
         order_code: app?.application_code ?? "",
       },
@@ -347,8 +345,7 @@ export const getCertificateUrl = createServerFn({ method: "GET" })
       .eq("id", data.certificateId)
       .single();
     if (!cert || !cert.file_path) throw new Error("Not found");
-    const { data: signed } = await (await getAdmin()).storage
-      .from("documents")
-      .createSignedUrl(cert.file_path, 60 * 10);
-    return { url: signed?.signedUrl };
+    const { createStorageDownloadUrl } = await import("@/lib/storage/s3.server");
+    const url = await createStorageDownloadUrl("documents", cert.file_path, 60 * 10);
+    return { url };
   });

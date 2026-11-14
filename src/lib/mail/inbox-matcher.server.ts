@@ -9,7 +9,7 @@
 //    - Alternate Sender: appends to ticket with notice, reopens if closed, NEVER quarantines.
 //    - Order Match: explicit AP/UA code -> single active order -> ambiguous active orders ('needs_review').
 //    - Unmatched / Unknown Senders: creates support ticket ('unlinked'), NEVER disappears.
-// 6. Inbound attachments saved to Supabase Storage and linked to ticket replies.
+// 6. Inbound attachments saved to private S3 storage and linked to ticket replies.
 // 7. Immutable audit trail on email_ingestion_audit_logs.
 // 8. Isolated error handling into email_processing_errors without failing the batch.
 

@@ -1,0 +1,1 @@
+import{j as t}from"./index-Bxfm10zD.js";import{W as o}from"./PageHero-Xi06GNOw.js";import e from"./payment-notice-service-acknowledgment-B9zPDK9k.js";const p=()=>t.jsx(o,{title:"Payment Notice & Service Acknowledgment",html:e,legal:!0});export{p as component};

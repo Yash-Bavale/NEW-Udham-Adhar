@@ -431,9 +431,9 @@ export const prepareDisputeEvidencePackage = createServerFn({ method: "POST" })
       .limit(1)
       .maybeSingle();
     if (!invoice?.pdf_path) throw new Error("The saved invoice PDF is not ready");
-    const { data: signed, error } = await admin.storage.from("invoices").createSignedUrl(invoice.pdf_path, 60 * 10);
-    if (error || !signed?.signedUrl) throw new Error("Could not open the saved invoice PDF");
-    return { invoiceUrl: signed.signedUrl };
+    const { createStorageDownloadUrl } = await import("@/lib/storage/s3.server");
+    const invoiceUrl = await createStorageDownloadUrl("invoices", invoice.pdf_path, 60 * 10);
+    return { invoiceUrl };
   });
 
 export const saveBrowserDisputeEvidencePackage = createServerFn({ method: "POST" })
@@ -459,8 +459,13 @@ export const saveBrowserDisputeEvidencePackage = createServerFn({ method: "POST"
     const dateStamp = now.toISOString().replace(/[-:T]/g, "").slice(0, 14);
     const fileName = `dispute-evidence-${cleanOrderCode}-${dateStamp}.pdf`;
     const storagePath = `dispute-evidence/${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, "0")}/${cleanOrderCode}/${fileName}`;
-    const { error: uploadError } = await admin.storage.from("documents").upload(storagePath, pdfBytes, { contentType: "application/pdf", upsert: true });
-    if (uploadError) throw new Error(`Failed to save dispute PDF: ${uploadError.message}`);
+    const { uploadStorageObject } = await import("@/lib/storage/s3.server");
+    await uploadStorageObject({
+      bucket: "documents",
+      path: storagePath,
+      body: pdfBytes,
+      contentType: "application/pdf",
+    });
     const itemCount = data.selectedEmailIds.length + (data.invoiceIncluded ? 1 : 0);
     const { error: recordError } = await (admin.from("dispute_evidence_records" as any) as any).insert({
       id: packageId,
@@ -478,11 +483,17 @@ export const saveBrowserDisputeEvidencePackage = createServerFn({ method: "POST"
       metadata: { disputeId: data.disputeId?.trim() || null, totalPdfBytes: pdfBytes.length, renderer: "crm-browser" },
     });
     if (recordError) {
-      await admin.storage.from("documents").remove([storagePath]);
+      try {
+        const { deleteStorageObjects } = await import("@/lib/storage/s3.server");
+        await deleteStorageObjects("documents", [storagePath]);
+      } catch (cleanupError) {
+        console.error("[dispute evidence] failed to clean up unrecorded S3 object:", cleanupError);
+      }
       throw new Error(`Failed to record dispute PDF: ${recordError.message}`);
     }
-    const { data: signed } = await admin.storage.from("documents").createSignedUrl(storagePath, 60 * 60);
-    return { success: true, recordId: packageId, signedUrl: signed?.signedUrl || null, fileName, filePath: storagePath, itemCount };
+    const { createStorageDownloadUrl } = await import("@/lib/storage/s3.server");
+    const signedUrl = await createStorageDownloadUrl("documents", storagePath, 60 * 60);
+    return { success: true, recordId: packageId, signedUrl, fileName, filePath: storagePath, itemCount };
   });
 
 /**
@@ -505,16 +516,11 @@ export const getDisputeEvidenceSignedUrl = createServerFn({ method: "POST" })
       throw new Error("Dispute evidence package not found");
     }
 
-    const { data: signed } = await admin.storage
-      .from("documents")
-      .createSignedUrl(row.file_path, 60 * 60);
-
-    if (!signed?.signedUrl) {
-      throw new Error("Failed to generate download link");
-    }
+    const { createStorageDownloadUrl } = await import("@/lib/storage/s3.server");
+    const signedUrl = await createStorageDownloadUrl("documents", row.file_path, 60 * 60);
 
     return {
-      signedUrl: signed.signedUrl,
+      signedUrl,
       fileName: row.file_name,
     };
   });
@@ -536,7 +542,8 @@ export const deleteDisputeEvidenceRecord = createServerFn({ method: "POST" })
       .maybeSingle();
 
     if (row?.file_path) {
-      await admin.storage.from("documents").remove([row.file_path]);
+      const { deleteStorageObjects } = await import("@/lib/storage/s3.server");
+      await deleteStorageObjects("documents", [row.file_path]);
     }
 
     await (admin.from("dispute_evidence_records" as any) as any)
@@ -547,7 +554,7 @@ export const deleteDisputeEvidenceRecord = createServerFn({ method: "POST" })
   });
 
 /**
- * 5. Delete all old dispute evidence packages from Supabase
+ * 5. Delete all old dispute evidence packages from private S3
  */
 export const deleteAllDisputeEvidenceRecords = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -565,7 +572,8 @@ export const deleteAllDisputeEvidenceRecords = createServerFn({ method: "POST" }
     const paths = (rows ?? []).map((r: any) => r.file_path).filter(Boolean);
 
     if (paths.length > 0) {
-      await admin.storage.from("documents").remove(paths);
+      const { deleteStorageObjects } = await import("@/lib/storage/s3.server");
+      await deleteStorageObjects("documents", paths);
     }
 
     let delQuery = admin.from("dispute_evidence_records" as any).delete();

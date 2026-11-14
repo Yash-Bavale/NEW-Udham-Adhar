@@ -1,0 +1,1 @@
+const s=o=>Math.round((Number.isFinite(o)?o:0)*100)/100;function r(o){const t=Math.max(0,Number(o)||0),n=s(t/(1+.18)),a=s(t-n);return{base:n,gst:a,total:s(t)}}function c(o){const t=Math.max(0,Number(o)||0),n=s(t*.18),a=s(t+n);return{base:s(t),gst:n,total:a}}export{c as a,r as f};

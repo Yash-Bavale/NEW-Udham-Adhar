@@ -10,6 +10,7 @@ import {
 import { getDocumentSignedUrl } from "@/lib/onboarding/onboarding.functions";
 import { requestOrderDocumentUpload, confirmOrderDocumentUpload } from "@/lib/crm/orders-v2.functions";
 import { mergeDocumentsInBrowser } from "@/lib/disputes/dispute-browser-pdf";
+import { uploadToStorageUrl } from "@/lib/storage/s3-upload.browser";
 
 export type MergeableDoc = { id: string; doc_type: string; file_name: string; mime_type?: string | null; label: string };
 
@@ -70,12 +71,10 @@ export function MergeDocumentsDialog({
       const code = String(applicationCode || applicationId.slice(0, 8)).replace(/[^a-zA-Z0-9_-]/g, "_");
       const fileName = `merged-documents-${code}.pdf`;
       const blob = new Blob([bytes as BlobPart], { type: "application/pdf" });
-      const { path, token } = await requestFn({
+      const { path, signedUrl } = await requestFn({
         data: { orderId: applicationId, docType: "merged_documents", fileName, mimeType: "application/pdf", sizeBytes: blob.size },
       });
-      const { supabase } = await import("@/integrations/supabase/client");
-      const { error } = await supabase.storage.from("documents").uploadToSignedUrl(path, token, blob, { contentType: "application/pdf", upsert: true });
-      if (error) throw error;
+      await uploadToStorageUrl(signedUrl, blob, "application/pdf");
       await confirmFn({
         data: { orderId: applicationId, docType: "merged_documents", filePath: path, fileName, mimeType: "application/pdf", sizeBytes: blob.size },
       });

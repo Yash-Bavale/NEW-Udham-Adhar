@@ -3,7 +3,7 @@ import { LEGAL_FOOTER_LINE, SITE_NAME, LEGAL_ENTITY, COMPANY_NAME, SUPPORT_EMAIL
 import { useOptionalBrand } from "@/lib/websites/brand-context";
 import { LeadForm } from "@/components/site/LeadForm";
 import { TrustBlock } from "@/components/site/TrustBlock";
-import certImg from "@/assets/udyam-sample-certificate.png.asset.json";
+const certImg = "/images/udyam-registration-certificate.png";
 
 const proseClasses =
   "p-6 md:p-10 space-y-4 text-foreground/85 text-[15px] leading-relaxed " +
@@ -118,7 +118,7 @@ export function WpPage({
             </div>
             <div className="p-6">
               <img
-                src={certImg.url}
+                src={certImg}
                 alt="Sample Udyam Adhar Certificate"
                 width={800}
                 height={1035}

@@ -14,6 +14,7 @@ import {
 import {
   requestOrderDocumentUpload, confirmOrderDocumentUpload, getOrderDocumentSignedUrl,
 } from "@/lib/crm/orders-v2.functions";
+import { uploadToStorageUrl } from "@/lib/storage/s3-upload.browser";
 
 export function OrderDocumentsPanel({
   orderId, documents, deletedAt, deletedReason, hideMoney = false,
@@ -116,17 +117,13 @@ function UploadDialog({
     if (!docType.trim()) { toast.error("Doc type required"); return; }
     setBusy(true);
     try {
-      const { path, token } = await requestFn({
+      const { path, signedUrl } = await requestFn({
         data: {
           orderId, docType: docType.trim(), fileName: file.name,
           mimeType: file.type || "application/octet-stream", sizeBytes: file.size,
         },
       });
-      const { supabase } = await import("@/integrations/supabase/client");
-      const { error } = await supabase.storage.from("documents").uploadToSignedUrl(path, token, file, {
-        contentType: file.type || undefined, upsert: true,
-      });
-      if (error) throw error;
+      await uploadToStorageUrl(signedUrl, file);
       await confirmFn({
         data: {
           orderId, docType: docType.trim(), filePath: path, fileName: file.name,

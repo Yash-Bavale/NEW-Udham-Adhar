@@ -111,6 +111,12 @@ export const Route = createFileRoute("/api/public/webhooks/cashfree")({
           .select("id, lead_id, application_id, status, amount, payment_account_id")
           .or(`transaction_id.eq.${orderId},razorpay_order_id.eq.${orderId}`)
           .maybeSingle();
+          console.log("[cashfree-return-debug]", {
+             orderId,
+              paymentFound: !!payment,
+              paymentId: payment?.id ?? null,
+              leadId: payment?.lead_id ?? null,
+            });
 
         if (!payment) {
           console.error("[cashfree-webhook] Payment row not found for orderId:", orderId);

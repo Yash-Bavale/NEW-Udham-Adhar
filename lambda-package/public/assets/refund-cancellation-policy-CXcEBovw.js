@@ -1,0 +1,1 @@
+import{j as o}from"./index-Bxfm10zD.js";import{W as t}from"./PageHero-Xi06GNOw.js";import m from"./refund-cancellation-policy-DwX04Ute.js";const i=()=>o.jsx(t,{title:"Refund & Cancellation Policy",html:m});export{i as component};

@@ -4,6 +4,7 @@
 //     componentTagger (dev-only), VITE_* env injection, @ path alias, React/TanStack dedupe,
 //     error logger plugins, and sandbox detection (port/host/strictPort).
 // You can pass additional config via defineConfig({ vite: { ... }, etc... }) if needed.
+
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 
 export default defineConfig({
@@ -12,10 +13,22 @@ export default defineConfig({
     // nitro/vite builds from this
     server: { entry: "server" },
   },
+
+  // Build for Cloudflare Workers.
+  nitro: {
+    preset: "cloudflare_module",
+    
+  },
+
   vite: {
     plugins: [],
     server: {
-      allowedHosts: ["udyamadhar.in", "www.udyamadhar.in", "udyamregistrations.in", "www.udyamregistrations.in"],
+      allowedHosts: [
+        "udyamadhar.in",
+        "www.udyamadhar.in",
+        "udyamregistrations.in",
+        "www.udyamregistrations.in",
+      ],
     },
   },
 });

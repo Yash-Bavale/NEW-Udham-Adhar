@@ -1,0 +1,1 @@
+import{j as t}from"./index-Bxfm10zD.js";import{W as o}from"./PageHero-Xi06GNOw.js";import m from"./aml-anti-fraud-policy--O_F6TNA.js";const i=()=>t.jsx(o,{title:"AML / Anti-Fraud Policy",html:m,legal:!0});export{i as component};

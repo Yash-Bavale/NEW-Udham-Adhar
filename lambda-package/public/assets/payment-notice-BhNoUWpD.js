@@ -1,0 +1,1 @@
+import{j as t}from"./index-Bxfm10zD.js";import{W as o}from"./PageHero-Xi06GNOw.js";import m from"./payment-notice-CZ8pLl--.js";const i=()=>t.jsx(o,{title:"Payment Notice",html:m});export{i as component};

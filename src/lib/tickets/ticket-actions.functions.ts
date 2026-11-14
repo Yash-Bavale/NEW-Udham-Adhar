@@ -1147,13 +1147,15 @@ export const getTicketAttachmentUploadUrl = createServerFn({ method: "POST" })
       .parse(i)
   )
   .handler(async ({ data }) => {
-    const admin = await getAdmin();
-    const ext = (data.fileName.split(".").pop() || "bin").toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 6);
     const safeName = data.fileName.replace(/[^a-z0-9._-]/gi, "_").slice(0, 50);
     const path = `tickets/${data.ticketId}/${Date.now()}_${safeName}`;
-    const { data: signed, error } = await admin.storage.from("documents").createSignedUploadUrl(path);
-    if (error || !signed) throw new Error(error?.message ?? "Could not create attachment upload URL.");
-    return { path, token: signed.token, signedUrl: signed.signedUrl };
+    const { createStorageUploadUrl } = await import("@/lib/storage/s3.server");
+    const signedUrl = await createStorageUploadUrl({
+      bucket: "documents",
+      path,
+      contentType: data.mimeType,
+    });
+    return { path, signedUrl };
   });
 
 export const confirmTicketAttachment = createServerFn({ method: "POST" })
@@ -1172,8 +1174,8 @@ export const confirmTicketAttachment = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const admin = await getAdmin();
-    const { data: signed } = await admin.storage.from("documents").createSignedUrl(data.filePath, 31536000);
-    const signedUrl = signed?.signedUrl ?? null;
+    const { createStorageDownloadUrl } = await import("@/lib/storage/s3.server");
+    const signedUrl = await createStorageDownloadUrl("documents", data.filePath, 60 * 60 * 24 * 7);
 
     if (data.applicationId) {
       try {

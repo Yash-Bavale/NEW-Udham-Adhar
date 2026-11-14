@@ -12,7 +12,6 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { AdminThemeProvider } from "@/components/admin/theme";
-import bhsLogo from "@/assets/bhs-logo.png.asset.json";
 import { cn } from "@/lib/utils";
 import { CommandPalette } from "@/components/admin/CommandPalette";
 import { useKeyboardShortcuts } from "@/components/admin/KeyboardShortcuts";
@@ -398,7 +397,7 @@ function Shell({ children, email }: { children: ReactNode; email?: string }) {
               style={{ borderColor: "var(--admin-border)" }}
             >
               <div className="flex items-center gap-2 min-w-0 flex-1">
-                <img src={bhsLogo.url} alt="Business Help Services" className="size-8 rounded-md object-contain shrink-0" />
+                <img src="/images/bhs-logo.png" alt="Business Help Services" className="size-8 rounded-md object-contain shrink-0" />
                 <div className="min-w-0 flex-1">
                   <div className="text-sm font-medium leading-tight truncate">Business Help</div>
                   <div className="text-[10px] uppercase tracking-wider" style={{ color: "var(--admin-sidebar-muted)" }}>
@@ -445,7 +444,7 @@ function Shell({ children, email }: { children: ReactNode; email?: string }) {
           </button>
           {!sidebarCollapsed && (
             <div className="flex items-center gap-2 min-w-0 flex-1">
-              <img src={bhsLogo.url} alt="Business Help Services" className="size-8 rounded-md object-contain shrink-0" />
+              <img src="/images/bhs-logo.png" alt="Business Help Services" className="size-8 rounded-md object-contain shrink-0" />
               <div className="min-w-0 flex-1">
                 <div className="text-sm font-medium leading-tight truncate">Business Help</div>
                 <div className="text-[10px] uppercase tracking-wider" style={{ color: "var(--admin-sidebar-muted)" }}>
@@ -482,14 +481,14 @@ function Shell({ children, email }: { children: ReactNode; email?: string }) {
           <div className="flex-1 max-w-2xl min-w-0">
             <GlobalSearchInput onOpenPalette={() => setPaletteOpen(true)} />
           </div>
-          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          <div className="ml-auto flex items-center gap-1.5 sm:gap-2 shrink-0">
             <NotificationsBell />
+            {isAdminUser && <DashboardPrivacyToggle />}
             <UserMenu email={email} onSignOut={async () => {
               try { window.sessionStorage.removeItem("crm_employee_session_id"); } catch { /* ignore */ }
           await supabase.auth.signOut({ scope: "local" });
               navigate({ to: "/admin-login" });
             }} />
-            {isAdminUser && <DashboardPrivacyToggle />}
           </div>
         </header>
 

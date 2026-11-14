@@ -1,3 +1,4 @@
+
 import { useEffect } from "react";
 import { UdyamRegistrationsSections, UDYAM_SERVICES_LIST } from "@/components/site/UdyamRegistrationsSections";
 import { createFileRoute, useLoaderData } from "@tanstack/react-router";
@@ -5,8 +6,8 @@ import { LeadForm } from "@/components/site/LeadForm";
 import { UserSquare2, Fingerprint, Share2, Download, ArrowRight } from "lucide-react";
 import { HomeFaqSection } from "@/components/site/HomeFaqSection";
 import { trackEvent } from "@/lib/analytics/track";
-import certImg from "@/assets/udyam-sample-certificate.png.asset.json";
-import mapImg from "@/assets/india-map.svg.asset.json";
+const certImg = "/images/udyam-registration-certificate.png";
+const mapImg = "/images/india-map.png";
 import {
   orgSchema,
   websiteSchema,
@@ -29,7 +30,6 @@ const HOMEPAGE_TITLE =
   "Udyam Registration Online | MSME Portal";
 const HOMEPAGE_DESC =
   "Apply for Udyam Registration online — new MSME registration, certificate download, Udyog Aadhaar migration and Udyam updates, with expert help.";
-
 
 const STEPS = [
   { icon: UserSquare2, label: "Fill Form & Make Payment", color: "text-brand-navy" },
@@ -61,6 +61,7 @@ export const Route = createFileRoute("/")({
         ? listContentfulSeoPages().catch(() => [] as ContentfulSeoPage[])
         : Promise.resolve([] as ContentfulSeoPage[]),
     ]);
+
     // Prefer the Contentful `faq` content type (scales past 100 entries),
     // then the landing-page faqs field, then the local fallback dataset.
     const rawFaqs = cfFaqs.length
@@ -68,13 +69,16 @@ export const Route = createFileRoute("/")({
       : cms?.faqs?.length
         ? cms.faqs.map((f) => ({ q: f.question, a: f.answer }))
         : FALLBACK_FAQS.map((f) => ({ q: f.q, a: f.a }));
+
     const seen = new Set<string>();
+
     const faqs = rawFaqs.filter((f) => {
       const key = f.q.trim().toLowerCase();
       if (!f.q.trim() || !f.a.trim() || seen.has(key)) return false;
       seen.add(key);
       return true;
     });
+
     return {
       cms,
       faqs,
@@ -84,21 +88,24 @@ export const Route = createFileRoute("/")({
       legalEntity: brand.legalEntity,
     };
   },
+
   head: ({ loaderData }) => {
     const ld = loaderData as
       | {
-        cms: ContentfulLandingPage | null;
-        faqs?: Array<{ q: string; a: string }>;
-        baseUrl?: string;
-        legalEntity?: string;
-      }
+          cms: ContentfulLandingPage | null;
+          faqs?: Array<{ q: string; a: string }>;
+          baseUrl?: string;
+          legalEntity?: string;
+        }
       | undefined;
+
     const cms = ld?.cms;
     const baseUrl = ld?.baseUrl || "https://udyamadhar.in";
     const orgName = ld?.legalEntity || "Business Help Services";
     const title = cms?.metaTitle || HOMEPAGE_TITLE;
     const desc = cms?.metaDescription || HOMEPAGE_DESC;
     const faqList = ld?.faqs ?? [];
+
     return {
       meta: [
         { title },
@@ -107,41 +114,43 @@ export const Route = createFileRoute("/")({
         { property: "og:description", content: desc },
         { property: "og:url", content: `${baseUrl}/` },
       ],
+
       links: [
         { rel: "canonical", href: `${baseUrl}/` },
         // Preload the LCP image so the browser fetches it before React mounts.
         {
           rel: "preload",
           as: "image",
-          href: certImg.url,
+          href: certImg,
           fetchPriority: "high",
         },
       ],
+
       scripts: [
         jsonLdScript(orgSchema(baseUrl)),
         jsonLdScript(faqSchema(faqList)),
         jsonLdScript(websiteSchema(baseUrl)),
         ...(baseUrl.toLowerCase().includes("udyamregistration")
           ? [
-            jsonLdScript({
-              "@context": "https://schema.org",
-              "@type": "ItemList",
-              "name": "Udyam & MSME Registration Services",
-              "itemListElement": UDYAM_SERVICES_LIST.map((srv, index) => ({
-                "@type": "ListItem",
-                "position": index + 1,
-                "name": srv.title,
-                "url": `${baseUrl}${srv.path}`,
-              })),
-            }),
-          ]
+              jsonLdScript({
+                "@context": "https://schema.org",
+                "@type": "ItemList",
+                name: "Udyam & MSME Registration Services",
+                itemListElement: UDYAM_SERVICES_LIST.map((srv, index) => ({
+                  "@type": "ListItem",
+                  position: index + 1,
+                  name: srv.title,
+                  url: `${baseUrl}${srv.path}`,
+                })),
+              }),
+            ]
           : []),
       ],
     };
   },
+
   component: HomePage,
 });
-
 
 function HomePage() {
   const { cms, faqs: faqList, seoPages } = useLoaderData({ from: "/" }) as {
@@ -149,23 +158,31 @@ function HomePage() {
     faqs: Array<{ q: string; a: string }>;
     seoPages: ContentfulSeoPage[];
   };
+
   const factsBlock = useBlockItems<{ label: string; value: string }>(
     "home.facts",
     FACTS.map(([label, value]) => ({ label, value })),
   );
+
   const brand = useBrand();
-  const certUrl = brand.sampleCertificateAssetUrl || certImg.url;
-  const heroHeading = cms?.hero?.heading || "Udyam Registration & MSME Certificate Services";
-  const heroSub = cms?.hero?.subheading ||
+  const certUrl = certImg;
+
+  const heroHeading =
+    cms?.hero?.heading || "Udyam Registration & MSME Certificate Services";
+
+  const heroSub =
+    cms?.hero?.subheading ||
     "Private consultancy & assistance for new Udyam (MSME) registration, certificate updates, downloads and Udyog Aadhaar to Udyam migration — pan-India support in English & Hindi.";
 
   const isUdyamRegistrations =
     brand.domain.toLowerCase().includes("udyamregistration") ||
-    (typeof window !== "undefined" && window.location.search.includes("site=udyamregistrations"));
+    (typeof window !== "undefined" &&
+      window.location.search.includes("site=udyamregistrations"));
 
   useEffect(() => {
     trackEvent("page_view_landing", { path: "/" });
   }, []);
+
   return (
     <>
       {/* SEO H1 — kept in DOM for crawlers, visually hidden */}
@@ -174,14 +191,15 @@ function HomePage() {
         <p>{heroSub}</p>
       </section>
 
-
       {/* Form + Sample Certificate */}
       <section className="mx-auto max-w-7xl px-4 py-6 md:py-8 grid gap-6 lg:grid-cols-2 items-start">
         <LeadForm />
+
         <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
           <div className="bg-form-header text-white text-center py-4">
             <h2 className="text-xl font-bold font-display">Sample Certificate</h2>
           </div>
+
           <div className="p-6">
             <img
               src={certUrl}
@@ -217,24 +235,27 @@ function HomePage() {
 
       <HomeFaqSection faqs={faqList} />
 
-
       {/* Process Steps */}
       <section className="bg-brand-navy/10">
         <div className="mx-auto max-w-6xl px-4 py-10 md:py-12">
           <h2 className="text-center text-2xl md:text-3xl font-bold font-display text-foreground">
             Udyam Assistance Process – Fast &amp; Simple
           </h2>
+
           <div className="mt-8 grid grid-cols-2 gap-6 md:grid-cols-4 md:gap-4 items-start">
             {STEPS.map((s, i) => {
               const Icon = s.icon;
+
               return (
                 <div key={i} className="relative flex flex-col items-center text-center">
                   <div className="w-20 h-20 md:w-24 md:h-24 rounded-full bg-white shadow-md flex items-center justify-center">
                     <Icon className={`w-9 h-9 md:w-11 md:h-11 ${s.color}`} strokeWidth={2} />
                   </div>
+
                   <p className="mt-4 font-bold text-foreground text-sm md:text-base leading-snug max-w-[12ch]">
                     {s.label}
                   </p>
+
                   {i < STEPS.length - 1 && (
                     <ArrowRight
                       className="hidden md:block absolute top-10 -right-3 w-6 h-6 text-foreground"
@@ -257,14 +278,16 @@ function HomePage() {
               A Vision on India
             </h2>
           </div>
+
           <div className="p-4 md:p-6 flex justify-center">
             <img
-              src={mapImg.url}
+              src={mapImg}
               alt="Map of India showing all states where consultancy services are provided"
               className="w-full max-w-xl h-auto"
               loading="lazy"
             />
           </div>
+
           <table className="w-full border-t border-border text-sm md:text-base">
             <tbody>
               {factsBlock.map(({ label: k, value: v }) => (

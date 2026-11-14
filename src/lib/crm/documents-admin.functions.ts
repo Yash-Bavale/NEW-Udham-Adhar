@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
-import { isUserAdmin } from "@/lib/audit";
+import { assertRole, isUserAdmin } from "@/lib/audit";
 
 export type DocRow = {
   id: string;
@@ -122,11 +122,10 @@ export const getDocumentSignedUrl = createServerFn({ method: "POST" })
   .inputValidator((i: { path: string }) => z.object({ path: z.string().min(1) }).parse(i))
   .handler(async ({ data, context }) => {
     const { supabase } = context;
-    const { data: signed, error } = await supabase.storage
-      .from("documents")
-      .createSignedUrl(data.path, 600);
-    if (error) throw new Error(error.message);
-    return { url: signed.signedUrl };
+    await assertRole(supabase, ["super_admin", "admin", "operations", "support", "accounts"]);
+    const { createStorageDownloadUrl } = await import("@/lib/storage/s3.server");
+    const url = await createStorageDownloadUrl("documents", data.path, 600);
+    return { url };
   });
 
 export const getDocumentVersions = createServerFn({ method: "GET" })

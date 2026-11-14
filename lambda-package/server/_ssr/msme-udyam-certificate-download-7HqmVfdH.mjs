@@ -1,0 +1,25 @@
+const msmeUdyamCertificateDownload = `<h2>MSME Udyam Certificate Download - Instant Online Access</h2>
+<p role="status" aria-live="polite" aria-atomic="true"></p> <ul></ul>
+
+                    <style>
+                        .htmega-form-wrapper.sid3775ea0 .wpcf7-select {
+                                appearance: none;
+                                background-image: url('https://udyamadhar.in/wp-content/plugins/ht-mega-for-elementor/assets/images/icons/select-arrow-icon.svg');
+                                background-repeat: no-repeat;
+                            }
+                    </style>
+					<h2>Sample Certificate</h2>				
+																<a href="/__l5e/assets-v1/4fb73dad-846b-4c39-879e-ee54d21d1925/udyam-sample-certificate.webp" data-elementor-open-lightbox="yes" data-elementor-lightbox-title="udyam-certificate-design-1" data-e-action-hash="#elementor-action%3Aaction%3Dlightbox%26settings%3DeyJpZCI6OTk0MSwidXJsIjoiaHR0cHM6XC9cL3VkeWFtYWRoYXIuaW5cL3dwLWNvbnRlbnRcL3VwbG9hZHNcLzIwMjZcLzA1XC91ZHlhbS1jZXJ0aWZpY2F0ZS1kZXNpZ24tMS53ZWJwIn0%3D">
+							<img width="1110" height="1595" src="/__l5e/assets-v1/4fb73dad-846b-4c39-879e-ee54d21d1925/udyam-sample-certificate.webp" alt="" srcset="/__l5e/assets-v1/4fb73dad-846b-4c39-879e-ee54d21d1925/udyam-sample-certificate.webp 1110w, /__l5e/assets-v1/4fb73dad-846b-4c39-879e-ee54d21d1925/udyam-sample-certificate.webp 209w, /__l5e/assets-v1/4fb73dad-846b-4c39-879e-ee54d21d1925/udyam-sample-certificate.webp 713w, /__l5e/assets-v1/4fb73dad-846b-4c39-879e-ee54d21d1925/udyam-sample-certificate.webp 768w, /__l5e/assets-v1/4fb73dad-846b-4c39-879e-ee54d21d1925/udyam-sample-certificate.webp 1069w" sizes="(max-width: 1110px) 100vw, 1110px" />								</a>
+		<p>Note: Sample Udyam Certificate shown for reference purposes only.</p>		
+					<h1>MSME Udyam Certificate Download - Instant Online Access</h1>				
+											<a href="/">
+						<h1>
+				MSME Udyam Certificate Download - Instant Online Access
+			</h1 > 
+									</a>
+		<p>MSME Udyam certificate download allows businesses to instantly access their official MSME certificate online after completing Udyam registration. This digitally signed certificate confirms your enterprise as a registered Micro, Small, or Medium Enterprise and serves as legal proof of your MSME status. Having the certificate enables businesses to access various government schemes, subsidies, collateral-free loans, interest subsidies, priority sector lending, and eligibility for government tenders. The download process is completely free, secure, and available 24/7 on the official Udyam portal, making it convenient for entrepreneurs, startups, and established enterprises. MSME Udyam certificate download also facilitates compliance with government requirements, helps in verifying business authenticity, and simplifies interactions with banks, financial institutions, and clients. The certificate can be stored digitally or printed for official use and supports future updates to maintain accurate enterprise information. By downloading the MSME Udyam certificate, businesses strengthen credibility, access financial incentives, and leverage opportunities for growth, expansion, and participation in government programs designed to support small and medium enterprises across India.</p>
+`;
+export {
+  msmeUdyamCertificateDownload as default
+};

@@ -20,6 +20,7 @@ import {
   updateFulfillmentStatus, requestOrderDocumentUpload, confirmOrderDocumentUpload,
   getOrderDetailV2,
 } from "@/lib/crm/orders-v2.functions";
+import { uploadToStorageUrl } from "@/lib/storage/s3-upload.browser";
 
 export function FulfillmentStatusUpdater({
   orderId, current, adminOverride = false,
@@ -216,7 +217,7 @@ function CompletionGateDialog({
     }
     setUploading(true);
     try {
-      const { path, token } = await requestFn({
+      const { path, signedUrl } = await requestFn({
         data: {
           orderId,
           docType: "certificate",
@@ -225,12 +226,7 @@ function CompletionGateDialog({
           sizeBytes: file.size,
         },
       });
-      const { supabase } = await import("@/integrations/supabase/client");
-      const { error } = await supabase.storage.from("documents").uploadToSignedUrl(path, token, file, {
-        contentType: file.type || undefined,
-        upsert: true,
-      });
-      if (error) throw error;
+      await uploadToStorageUrl(signedUrl, file);
       const { documentId } = await confirmFn({
         data: {
           orderId,

@@ -725,17 +725,15 @@ function TicketWorkspace() {
             } catch { /* falls back to link only */ }
           }
           try {
-            const { path, token } = await getAttachmentUploadUrlFn({
+            const { path, signedUrl } = await getAttachmentUploadUrlFn({
               data: { ticketId, fileName: item.name, mimeType: item.mimeType },
             });
-            const { supabase } = await import("@/integrations/supabase/client");
-            const { error: upErr } = await supabase.storage
-              .from("documents")
-              .uploadToSignedUrl(path, token, item.file, {
-                contentType: item.mimeType,
-                upsert: true,
-              });
-            if (upErr) throw upErr;
+            const { uploadToStorageUrl } = await import("@/lib/storage/s3-upload.browser");
+            await uploadToStorageUrl(
+              signedUrl,
+              item.file,
+              item.mimeType || "application/octet-stream",
+            );
 
             const confirmed = await confirmAttachmentFn({
               data: {

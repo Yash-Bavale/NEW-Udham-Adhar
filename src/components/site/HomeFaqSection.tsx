@@ -7,8 +7,7 @@ import {
 } from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import faqIllustration from "@/assets/faq-illustration.png.asset.json";
-
+const faqIllustration = "/images/help-illustration.png";
 export type HomeFaq = { q: string; a: string };
 
 const PAGE_SIZE = 10;
@@ -26,7 +25,7 @@ export function HomeFaqSection({ faqs }: { faqs: HomeFaq[] }) {
           {/* Illustration */}
           <div className="order-1 md:sticky md:top-24">
             <img
-              src={faqIllustration.url}
+              src={faqIllustration}
               alt="Two people standing beside a large question mark, illustrating frequently asked questions about Udyam registration"
               className="w-full max-w-md mx-auto h-auto"
               loading="lazy"

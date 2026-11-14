@@ -1,0 +1,10 @@
+import { j as jsxRuntimeExports } from "./_libs/react.mjs";
+const SplitErrorComponent = ({
+  error
+}) => /* @__PURE__ */ jsxRuntimeExports.jsx("main", { className: "mx-auto max-w-md px-4 py-12", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "rounded-xl border bg-card p-6 shadow-sm", children: [
+  /* @__PURE__ */ jsxRuntimeExports.jsx("h1", { className: "text-lg font-bold", children: "Authorization request failed" }),
+  /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "mt-2 text-sm text-muted-foreground", children: String(error?.message ?? error) })
+] }) });
+export {
+  SplitErrorComponent as errorComponent
+};

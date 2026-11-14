@@ -91,36 +91,29 @@ const DEFAULT_GLOBAL_SOUND_CONFIG: GlobalSoundConfig = {
 };
 
 async function readSoundConfigFromStorage(): Promise<GlobalSoundConfig | null> {
+  const { downloadStorageObject, isStorageObjectNotFound } = await import("@/lib/storage/s3.server");
+  let bytes: Uint8Array;
   try {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data, error } = await supabaseAdmin.storage
-      .from("documents")
-      .download(SOUND_CONFIG_STORAGE_PATH);
-
-    if (error || !data) return null;
-    const text = await data.text();
-    return JSON.parse(text) as GlobalSoundConfig;
-  } catch {
-    return null;
+    bytes = await downloadStorageObject("documents", SOUND_CONFIG_STORAGE_PATH);
+  } catch (error) {
+    if (isStorageObjectNotFound(error)) return null;
+    throw error;
   }
+
+  return JSON.parse(new TextDecoder().decode(bytes)) as GlobalSoundConfig;
 }
 
 async function writeSoundConfigToStorage(config: Partial<GlobalSoundConfig>): Promise<void> {
-  try {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const existing = (await readSoundConfigFromStorage()) || DEFAULT_GLOBAL_SOUND_CONFIG;
-    const merged = { ...existing, ...config };
-    const buffer = Buffer.from(JSON.stringify(merged, null, 2), "utf-8");
-
-    await supabaseAdmin.storage
-      .from("documents")
-      .upload(SOUND_CONFIG_STORAGE_PATH, buffer, {
-        contentType: "application/json",
-        upsert: true,
-      });
-  } catch (err) {
-    console.warn("[writeSoundConfigToStorage] storage config write warning:", err);
-  }
+  const existing = (await readSoundConfigFromStorage()) || DEFAULT_GLOBAL_SOUND_CONFIG;
+  const merged = { ...existing, ...config };
+  const body = new TextEncoder().encode(JSON.stringify(merged, null, 2));
+  const { uploadStorageObject } = await import("@/lib/storage/s3.server");
+  await uploadStorageObject({
+    bucket: "documents",
+    path: SOUND_CONFIG_STORAGE_PATH,
+    body,
+    contentType: "application/json",
+  });
 }
 
 export const getGlobalReminderSoundSettings = createServerFn({ method: "GET" })
@@ -256,17 +249,13 @@ export const uploadAlertAudioFile = createServerFn({ method: "POST" })
     const storagePath = `audio/${safeName}`;
 
     // Upload audio binary to 'documents' bucket
-    const { error: uploadErr } = await supabaseAdmin.storage
-      .from("documents")
-      .upload(storagePath, buffer, {
-        contentType: mimeType,
-        upsert: true,
-      });
-
-    if (uploadErr) {
-      console.error("[uploadAlertAudioFile] storage error:", uploadErr);
-      throw new Error(`Failed to upload audio: ${uploadErr.message}`);
-    }
+    const { uploadStorageObject } = await import("@/lib/storage/s3.server");
+    await uploadStorageObject({
+      bucket: "documents",
+      path: storagePath,
+      body: buffer,
+      contentType: mimeType,
+    });
 
     // Public API route to stream this audio to all devices
     const publicUrl = `/api/public/audio/${safeName}`;
@@ -403,36 +392,29 @@ export const DEFAULT_CALLBACK_PRESET_CONFIG: CallbackReminderPresetConfig = {
 };
 
 async function readCallbackPresetsFromStorage(): Promise<CallbackReminderPresetConfig | null> {
+  const { downloadStorageObject, isStorageObjectNotFound } = await import("@/lib/storage/s3.server");
+  let bytes: Uint8Array;
   try {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data, error } = await supabaseAdmin.storage
-      .from("documents")
-      .download(CALLBACK_PRESETS_STORAGE_PATH);
-
-    if (error || !data) return null;
-    const text = await data.text();
-    return JSON.parse(text) as CallbackReminderPresetConfig;
-  } catch {
-    return null;
+    bytes = await downloadStorageObject("documents", CALLBACK_PRESETS_STORAGE_PATH);
+  } catch (error) {
+    if (isStorageObjectNotFound(error)) return null;
+    throw error;
   }
+
+  return JSON.parse(new TextDecoder().decode(bytes)) as CallbackReminderPresetConfig;
 }
 
 async function writeCallbackPresetsToStorage(config: Partial<CallbackReminderPresetConfig>): Promise<void> {
-  try {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const existing = (await readCallbackPresetsFromStorage()) || DEFAULT_CALLBACK_PRESET_CONFIG;
-    const merged = { ...existing, ...config };
-    const buffer = Buffer.from(JSON.stringify(merged, null, 2), "utf-8");
-
-    await supabaseAdmin.storage
-      .from("documents")
-      .upload(CALLBACK_PRESETS_STORAGE_PATH, buffer, {
-        contentType: "application/json",
-        upsert: true,
-      });
-  } catch (err) {
-    console.warn("[writeCallbackPresetsToStorage] storage config write warning:", err);
-  }
+  const existing = (await readCallbackPresetsFromStorage()) || DEFAULT_CALLBACK_PRESET_CONFIG;
+  const merged = { ...existing, ...config };
+  const body = new TextEncoder().encode(JSON.stringify(merged, null, 2));
+  const { uploadStorageObject } = await import("@/lib/storage/s3.server");
+  await uploadStorageObject({
+    bucket: "documents",
+    path: CALLBACK_PRESETS_STORAGE_PATH,
+    body,
+    contentType: "application/json",
+  });
 }
 
 export const getCallbackReminderPresetSettings = createServerFn({ method: "GET" })

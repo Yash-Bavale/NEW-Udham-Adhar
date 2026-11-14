@@ -1,0 +1,1 @@
+import{j as t}from"./index-Bxfm10zD.js";import{A as o}from"./AssignmentManagementView-DEB4iqCa.js";import"./ui-suQQHHqz.js";import"./react-BpuYg9N3.js";import"./switch-CYgaqT1H.js";import"./history-CL6IpFSd.js";import"./plus-DMI3tnh1.js";import"./sparkles-DEQBvP9T.js";import"./triangle-alert-BEVzxx2H.js";function x(){return t.jsx(o,{})}export{x as component};

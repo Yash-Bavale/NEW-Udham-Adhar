@@ -181,16 +181,18 @@ export const uploadCustomerKyc = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { customerId: string; docType: "pan" | "aadhaar"; fileName: string; contentType: string; base64: string }) => d)
   .handler(async ({ data, context }) => {
-    // Authorize: any signed-in staff already filtered by RLS in other fns, but this is a privileged storage write.
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    // The server function requires Supabase authentication before the upload.
     const ext = (data.fileName.split(".").pop() || "bin").toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 8) || "bin";
     const ts = Date.now();
     const path = `customers/${data.customerId}/${data.docType}-${ts}.${ext}`;
     const bytes = Uint8Array.from(atob(data.base64), (c) => c.charCodeAt(0));
-    const { error: upErr } = await supabaseAdmin.storage
-      .from("documents")
-      .upload(path, bytes, { contentType: data.contentType, upsert: true });
-    if (upErr) throw new Error(upErr.message);
+    const { uploadStorageObject } = await import("@/lib/storage/s3.server");
+    await uploadStorageObject({
+      bucket: "documents",
+      path,
+      body: bytes,
+      contentType: data.contentType,
+    });
     const col = data.docType === "pan" ? "pan_doc_path" : "aadhaar_doc_path";
     const { error: updErr } = await (context.supabase
       .from("customers") as any)
@@ -204,12 +206,9 @@ export const getCustomerKycSignedUrl = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { path: string }) => d)
   .handler(async ({ data }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: signed, error } = await supabaseAdmin.storage
-      .from("documents")
-      .createSignedUrl(data.path, 60 * 10);
-    if (error || !signed?.signedUrl) throw new Error(error?.message ?? "Could not sign URL");
-    return { url: signed.signedUrl };
+    const { createStorageDownloadUrl } = await import("@/lib/storage/s3.server");
+    const url = await createStorageDownloadUrl("documents", data.path, 60 * 10);
+    return { url };
   });
 
 export const getRepeatPurchaseMetrics = createServerFn({ method: "GET" })

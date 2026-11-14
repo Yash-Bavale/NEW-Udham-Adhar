@@ -1,0 +1,1 @@
+import{j as o}from"./index-Bxfm10zD.js";import{W as t}from"./PageHero-Xi06GNOw.js";import r from"./pricing-transparency-Dgs6pST_.js";const i=()=>o.jsx(t,{title:"Pricing Transparency",html:r});export{i as component};

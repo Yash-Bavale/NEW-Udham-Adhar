@@ -167,10 +167,13 @@ export async function generateAndStore(paymentId: string, actor?: { id?: string 
   const pdfBytes = await renderInvoicePdf(data);
   const path = `${new Date(payment.payment_date ?? payment.created_at).getFullYear()}/${invoiceNumber}.pdf`;
 
-  const { error: upErr } = await admin.storage
-    .from(BUCKET)
-    .upload(path, pdfBytes, { contentType: "application/pdf", upsert: true });
-  if (upErr) throw new Error(`Storage upload failed: ${upErr.message}`);
+  const { uploadStorageObject } = await import("@/lib/storage/s3.server");
+  await uploadStorageObject({
+    bucket: BUCKET,
+    path,
+    body: pdfBytes,
+    contentType: "application/pdf",
+  });
 
   await admin.from("invoices").update({
     pdf_path: path,
@@ -214,9 +217,8 @@ export async function loadInvoiceAttachmentByPayment(paymentId: string): Promise
     .is("cancelled_at", null)
     .maybeSingle();
   if (!inv?.pdf_path) return null;
-  const { data: blob, error } = await admin.storage.from(BUCKET).download(inv.pdf_path);
-  if (error || !blob) return null;
-  const buf = new Uint8Array(await blob.arrayBuffer());
+  const { downloadStorageObject } = await import("@/lib/storage/s3.server");
+  const buf = await downloadStorageObject(BUCKET, inv.pdf_path);
   // base64 encode
   let bin = "";
   for (let i = 0; i < buf.length; i++) bin += String.fromCharCode(buf[i]);
@@ -460,7 +462,13 @@ export const regenerateInvoice = createServerFn({ method: "POST" })
     if (inv.pdf_path) {
       const archivePath = inv.pdf_path.replace(/\.pdf$/, `-${Date.now()}.pdf`).replace(/^/, "archive/");
       try {
-        await admin.storage.from(BUCKET).copy(inv.pdf_path, archivePath);
+        const { copyStorageObject } = await import("@/lib/storage/s3.server");
+        await copyStorageObject({
+          sourceBucket: BUCKET,
+          sourcePath: inv.pdf_path,
+          destinationBucket: BUCKET,
+          destinationPath: archivePath,
+        });
         await (admin as any).rpc("noop").catch(() => null);
         const { data: row } = await admin.from("invoices")
           .select("prev_pdf_paths").eq("id", data.invoiceId).maybeSingle();
@@ -532,10 +540,9 @@ export const getInvoiceSignedUrl = createServerFn({ method: "POST" })
       .from("invoices").select("pdf_path, invoice_number").eq("id", data.invoiceId).single();
     if (!inv?.pdf_path) throw new Error("Invoice PDF not generated yet");
 
-    const { data: signed, error } = await (await getAdmin()).storage
-      .from(BUCKET).createSignedUrl(inv.pdf_path, 60 * 5);
-    if (error) throw new Error(error.message);
-    return { url: signed.signedUrl, invoiceNumber: inv.invoice_number };
+    const { createStorageDownloadUrl } = await import("@/lib/storage/s3.server");
+    const url = await createStorageDownloadUrl(BUCKET, inv.pdf_path, 60 * 5);
+    return { url, invoiceNumber: inv.invoice_number };
   });
 
 export const listInvoices = createServerFn({ method: "GET" })
@@ -570,10 +577,9 @@ export const getCustomerInvoiceUrl = createServerFn({ method: "POST" })
       .limit(1)
       .maybeSingle();
     if (!inv?.pdf_path) throw new Error("Invoice not ready yet");
-    const { data: signed, error } = await (await getAdmin()).storage
-      .from(BUCKET).createSignedUrl(inv.pdf_path, 60 * 10);
-    if (error) throw new Error(error.message);
-    return { url: signed.signedUrl, invoiceNumber: inv.invoice_number };
+    const { createStorageDownloadUrl } = await import("@/lib/storage/s3.server");
+    const url = await createStorageDownloadUrl(BUCKET, inv.pdf_path, 60 * 10);
+    return { url, invoiceNumber: inv.invoice_number };
   });
 
 // ── Admin list functions for /admin/payments and /admin/invoices ─────────
@@ -843,13 +849,16 @@ export const previewInvoice = createServerFn({ method: "POST" })
     });
 
     const path = `preview/${inv.id}-${Date.now()}.pdf`;
-    const { error } = await admin.storage.from(BUCKET)
-      .upload(path, pdfBytes, { contentType: "application/pdf", upsert: true });
-    if (error) throw new Error(error.message);
-    const { data: signed, error: sErr } = await admin.storage.from(BUCKET).createSignedUrl(path, 60 * 10);
-    if (sErr) throw new Error(sErr.message);
+    const { uploadStorageObject, createStorageDownloadUrl } = await import("@/lib/storage/s3.server");
+    await uploadStorageObject({
+      bucket: BUCKET,
+      path,
+      body: pdfBytes,
+      contentType: "application/pdf",
+    });
+    const url = await createStorageDownloadUrl(BUCKET, path, 60 * 10);
     await logInvoiceEvent(inv.id, "preview", { path }, await loadActor(context));
-    return { url: signed.signedUrl, invoiceNumber: inv.invoice_number };
+    return { url, invoiceNumber: inv.invoice_number };
   });
 
 /** Upload a user-supplied PDF that replaces the active invoice PDF. */
@@ -871,7 +880,15 @@ export const replaceInvoice = createServerFn({ method: "POST" })
     let archivePath: string | null = null;
     if (inv.pdf_path) {
       archivePath = `archive/${inv.invoice_number}-${Date.now()}.pdf`;
-      try { await admin.storage.from(BUCKET).copy(inv.pdf_path, archivePath); } catch (e) { console.error(e); }
+      try {
+        const { copyStorageObject } = await import("@/lib/storage/s3.server");
+        await copyStorageObject({
+          sourceBucket: BUCKET,
+          sourcePath: inv.pdf_path,
+          destinationBucket: BUCKET,
+          destinationPath: archivePath,
+        });
+      } catch (e) { console.error(e); }
     }
 
     // Decode base64 (strip data URL prefix if present).
@@ -881,9 +898,13 @@ export const replaceInvoice = createServerFn({ method: "POST" })
     for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
 
     const path = inv.pdf_path ?? `${new Date().getFullYear()}/${inv.invoice_number}.pdf`;
-    const { error: upErr } = await admin.storage.from(BUCKET)
-      .upload(path, bytes, { contentType: "application/pdf", upsert: true });
-    if (upErr) throw new Error(upErr.message);
+    const { uploadStorageObject } = await import("@/lib/storage/s3.server");
+    await uploadStorageObject({
+      bucket: BUCKET,
+      path,
+      body: bytes,
+      contentType: "application/pdf",
+    });
 
     const prevArr = Array.isArray((inv as any).prev_pdf_paths) ? (inv as any).prev_pdf_paths : [];
     await (admin as any).from("invoices").update({
@@ -975,7 +996,13 @@ export const updateInvoiceGstin = createServerFn({ method: "POST" })
     if (inv.pdf_path) {
       try {
         const archivePath = `archive/${inv.pdf_path.replace(/\.pdf$/, `-${Date.now()}.pdf`)}`;
-        await admin.storage.from(BUCKET).copy(inv.pdf_path, archivePath);
+        const { copyStorageObject } = await import("@/lib/storage/s3.server");
+        await copyStorageObject({
+          sourceBucket: BUCKET,
+          sourcePath: inv.pdf_path,
+          destinationBucket: BUCKET,
+          destinationPath: archivePath,
+        });
         const { data: row } = await admin.from("invoices").select("prev_pdf_paths").eq("id", inv.id).maybeSingle();
         const arr = Array.isArray((row as any)?.prev_pdf_paths) ? (row as any).prev_pdf_paths : [];
         await (admin as any).from("invoices").update({ prev_pdf_paths: [...arr, archivePath] }).eq("id", inv.id);

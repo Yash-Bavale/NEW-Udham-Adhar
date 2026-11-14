@@ -1,0 +1,1 @@
+import{j as t}from"./index-Bxfm10zD.js";import{W as o}from"./PageHero-Xi06GNOw.js";import m from"./compliance-statement-qa9hNCY3.js";const n=()=>t.jsx(o,{title:"Compliance Statement",html:m,legal:!0});export{n as component};

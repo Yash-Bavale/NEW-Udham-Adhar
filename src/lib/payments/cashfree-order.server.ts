@@ -130,9 +130,10 @@ export async function buildCashfreeOrder(leadCodeInput: string, returnNonce?: st
   // 10) Build Cashfree order via REST API
   const origin =
     process.env.APP_BASE_URL || process.env.PUBLIC_SITE_URL || "https://udyamadhar.in";
-  const returnUrl = `${origin}/api/public/webhooks/cashfree?order_id={order_id}${returnNonce ? `&r=${encodeURIComponent(returnNonce)}` : ""}`;
-  const notifyUrl = `${origin}/api/public/webhooks/cashfree`;
+  const returnOrigin = process.env.LOCAL_RETURN_URL || origin;
 
+  const returnUrl = `${returnOrigin}/api/public/webhooks/cashfree?order_id={order_id}${returnNonce ? `&r=${encodeURIComponent(returnNonce)}` : ""}`;
+  const notifyUrl = `${origin}/api/public/webhooks/cashfree`;
   const phone = String(lead.mobile ?? "").replace(/\D/g, "").slice(-10) || "9999999999";
   const email = String(lead.email ?? "customer@example.com").trim().toLowerCase();
   const name = String(lead.name ?? "Customer").replace(/[^a-zA-Z0-9\s]/g, " ").trim().slice(0, 60) || "Customer";

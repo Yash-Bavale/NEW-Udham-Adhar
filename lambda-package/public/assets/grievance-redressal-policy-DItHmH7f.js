@@ -1,0 +1,1 @@
+import{j as o}from"./index-Bxfm10zD.js";import{W as t}from"./PageHero-Xi06GNOw.js";import e from"./grievance-redressal-policy-BMD0KMQa.js";const s=()=>o.jsx(t,{title:"Grievance Redressal Policy",html:e,legal:!0});export{s as component};

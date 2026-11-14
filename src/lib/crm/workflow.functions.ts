@@ -238,17 +238,13 @@ export const setExternalDelay = createServerFn({ method: "POST" })
       const safeName = `portal-error-${Date.now()}.${ext}`;
       evidenceStoragePath = `orders/${app.id}/technical-delay/${safeName}`;
 
-      const { error: uploadErr } = await admin.storage
-        .from("documents")
-        .upload(evidenceStoragePath, buffer, {
-          contentType: reqMime,
-          upsert: true,
-        });
-
-      if (uploadErr) {
-        console.error("[setExternalDelay] storage upload error:", uploadErr);
-        throw new Error(`Failed to upload evidence screenshot: ${uploadErr.message}`);
-      }
+      const { uploadStorageObject } = await import("@/lib/storage/s3.server");
+      await uploadStorageObject({
+        bucket: "documents",
+        path: evidenceStoragePath,
+        body: buffer,
+        contentType: reqMime,
+      });
 
       const { data: docRow, error: docErr } = await admin
         .from("documents")

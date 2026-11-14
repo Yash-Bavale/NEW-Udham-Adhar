@@ -35,7 +35,7 @@ import razorpayLogo from "@/assets/gateways/razorpay.svg";
 import cashfreeLogo from "@/assets/gateways/cashfree.png";
 
 const PAID_STATUSES = new Set(["payment_successful", "under_process", "completed"]);
-const POST_PAY_SECONDS = 60;
+const POST_PAY_SECONDS = 0;
 const POST_PAY_STEPS: readonly CountdownStep[] = [
   { at: 0,  icon: ShieldCheck,    label: "Verifying payment",          sub: "Confirming transaction with your bank" },
   { at: 10, icon: CreditCard,     label: "Reconciling transaction",    sub: "Matching payment to your application" },
@@ -220,6 +220,7 @@ function PaymentPage() {
     setPayError(null);
     trackEvent("payment_initiated", { gateway: activeGateway, leadCode });
     try {
+      console.log("[payment-return-client]", window.location.origin);
       const res = await createOrder({ data: { leadCode, gatewayCode: activeGateway, accessToken: pickAccessToken(leadCode, ["co"]) ?? "", returnOrigin: window.location.origin } });
       if (res.paymentSessionId) {
         await loadAndTriggerCashfreeCheckout(res.paymentSessionId, res.isProd);
@@ -630,7 +631,7 @@ declare global {
 async function loadAndTriggerCashfreeCheckout(paymentSessionId: string, isProd?: boolean) {
   const scriptUrl = isProd
     ? "https://sdk.cashfree.com/js/v3/cashfree.js"
-    : "https://sdk.cashfree.com/js/v3/cashfree.sandbox.js";
+    : "https://sdk.cashfree.com/js/v3/cashfree.js";
 
   if (!window.Cashfree) {
     await new Promise<void>((resolve, reject) => {
@@ -644,7 +645,7 @@ async function loadAndTriggerCashfreeCheckout(paymentSessionId: string, isProd?:
 
   if (window.Cashfree) {
     const cashfree = window.Cashfree({ mode: isProd ? "production" : "sandbox" });
-    cashfree.checkout({
+    await cashfree.checkout({
       paymentSessionId,
       redirectTarget: "_self",
     });

@@ -1,0 +1,1 @@
+import{j as o}from"./index-Bxfm10zD.js";import{W as t}from"./PageHero-Xi06GNOw.js";import m from"./cookie-policy-CAS9nSUF.js";const i=()=>o.jsx(t,{title:"Cookie Policy",html:m,legal:!0});export{i as component};

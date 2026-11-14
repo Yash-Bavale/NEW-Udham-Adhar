@@ -129,6 +129,7 @@ import { Route as AdminSupportTicketsRouteImport } from './routes/admin.support.
 import { Route as AdminTicketsIndexRouteImport } from './routes/admin.tickets.index'
 import { Route as AdminTicketsTicketIdRouteImport } from './routes/admin.tickets.$ticketId'
 import { Route as AdminWebsiteContentWebsiteIdRouteImport } from './routes/admin.website-content.$websiteId'
+import { Route as ApiInternalDeleteOrderDocumentsRouteImport } from './routes/api/internal/delete-order-documents'
 import { Route as ApiPublicComplaintRouteImport } from './routes/api/public/complaint'
 import { Route as ApiPublicContactRouteImport } from './routes/api/public/contact'
 import { Route as ApiPublicTalkToExpertRouteImport } from './routes/api/public/talk-to-expert'
@@ -154,6 +155,7 @@ import { Route as ApiPublicCronWorkflowTickRouteImport } from './routes/api/publ
 import { Route as ApiPublicCronWorkforceReassignTickRouteImport } from './routes/api/public/cron/workforce-reassign-tick'
 import { Route as ApiPublicCronZohoDiagnoseRouteImport } from './routes/api/public/cron/zoho-diagnose'
 import { Route as ApiPublicFormAssetSplatRouteImport } from './routes/api/public/form-asset.$'
+import { Route as ApiPublicGatewayLogoSplatRouteImport } from './routes/api/public/gateway-logo.$'
 import { Route as ApiPublicGstLeadRouteImport } from './routes/api/public/gst/lead'
 import { Route as ApiPublicGstServicesRouteImport } from './routes/api/public/gst/services'
 import { Route as ApiPublicInvoiceLeadCodeRouteImport } from './routes/api/public/invoice.$leadCode'
@@ -788,6 +790,12 @@ const AdminWebsiteContentWebsiteIdRoute =
     path: '/website-content/$websiteId',
     getParentRoute: () => AdminRoute,
   } as any)
+const ApiInternalDeleteOrderDocumentsRoute =
+  ApiInternalDeleteOrderDocumentsRouteImport.update({
+    id: '/api/internal/delete-order-documents',
+    path: '/api/internal/delete-order-documents',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicComplaintRoute = ApiPublicComplaintRouteImport.update({
   id: '/api/public/complaint',
   path: '/api/public/complaint',
@@ -929,6 +937,12 @@ const ApiPublicFormAssetSplatRoute = ApiPublicFormAssetSplatRouteImport.update({
   path: '/api/public/form-asset/$',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicGatewayLogoSplatRoute =
+  ApiPublicGatewayLogoSplatRouteImport.update({
+    id: '/api/public/gateway-logo/$',
+    path: '/api/public/gateway-logo/$',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicGstLeadRoute = ApiPublicGstLeadRouteImport.update({
   id: '/api/public/gst/lead',
   path: '/api/public/gst/lead',
@@ -1147,6 +1161,7 @@ export interface FileRoutesByFullPath {
   '/admin/support/tickets': typeof AdminSupportTicketsRouteWithChildren
   '/admin/tickets/$ticketId': typeof AdminTicketsTicketIdRoute
   '/admin/website-content/$websiteId': typeof AdminWebsiteContentWebsiteIdRoute
+  '/api/internal/delete-order-documents': typeof ApiInternalDeleteOrderDocumentsRoute
   '/api/public/complaint': typeof ApiPublicComplaintRoute
   '/api/public/contact': typeof ApiPublicContactRoute
   '/api/public/talk-to-expert': typeof ApiPublicTalkToExpertRoute
@@ -1175,6 +1190,7 @@ export interface FileRoutesByFullPath {
   '/api/public/cron/workforce-reassign-tick': typeof ApiPublicCronWorkforceReassignTickRoute
   '/api/public/cron/zoho-diagnose': typeof ApiPublicCronZohoDiagnoseRoute
   '/api/public/form-asset/$': typeof ApiPublicFormAssetSplatRoute
+  '/api/public/gateway-logo/$': typeof ApiPublicGatewayLogoSplatRoute
   '/api/public/gst/lead': typeof ApiPublicGstLeadRoute
   '/api/public/gst/services': typeof ApiPublicGstServicesRoute
   '/api/public/invoice/$leadCode': typeof ApiPublicInvoiceLeadCodeRoute
@@ -1307,6 +1323,7 @@ export interface FileRoutesByTo {
   '/admin/submissions/$submissionId': typeof AdminSubmissionsSubmissionIdRoute
   '/admin/tickets/$ticketId': typeof AdminTicketsTicketIdRoute
   '/admin/website-content/$websiteId': typeof AdminWebsiteContentWebsiteIdRoute
+  '/api/internal/delete-order-documents': typeof ApiInternalDeleteOrderDocumentsRoute
   '/api/public/complaint': typeof ApiPublicComplaintRoute
   '/api/public/contact': typeof ApiPublicContactRoute
   '/api/public/talk-to-expert': typeof ApiPublicTalkToExpertRoute
@@ -1335,6 +1352,7 @@ export interface FileRoutesByTo {
   '/api/public/cron/workforce-reassign-tick': typeof ApiPublicCronWorkforceReassignTickRoute
   '/api/public/cron/zoho-diagnose': typeof ApiPublicCronZohoDiagnoseRoute
   '/api/public/form-asset/$': typeof ApiPublicFormAssetSplatRoute
+  '/api/public/gateway-logo/$': typeof ApiPublicGatewayLogoSplatRoute
   '/api/public/gst/lead': typeof ApiPublicGstLeadRoute
   '/api/public/gst/services': typeof ApiPublicGstServicesRoute
   '/api/public/invoice/$leadCode': typeof ApiPublicInvoiceLeadCodeRoute
@@ -1473,6 +1491,7 @@ export interface FileRoutesById {
   '/admin/support/tickets': typeof AdminSupportTicketsRouteWithChildren
   '/admin/tickets/$ticketId': typeof AdminTicketsTicketIdRoute
   '/admin/website-content/$websiteId': typeof AdminWebsiteContentWebsiteIdRoute
+  '/api/internal/delete-order-documents': typeof ApiInternalDeleteOrderDocumentsRoute
   '/api/public/complaint': typeof ApiPublicComplaintRoute
   '/api/public/contact': typeof ApiPublicContactRoute
   '/api/public/talk-to-expert': typeof ApiPublicTalkToExpertRoute
@@ -1501,6 +1520,7 @@ export interface FileRoutesById {
   '/api/public/cron/workforce-reassign-tick': typeof ApiPublicCronWorkforceReassignTickRoute
   '/api/public/cron/zoho-diagnose': typeof ApiPublicCronZohoDiagnoseRoute
   '/api/public/form-asset/$': typeof ApiPublicFormAssetSplatRoute
+  '/api/public/gateway-logo/$': typeof ApiPublicGatewayLogoSplatRoute
   '/api/public/gst/lead': typeof ApiPublicGstLeadRoute
   '/api/public/gst/services': typeof ApiPublicGstServicesRoute
   '/api/public/invoice/$leadCode': typeof ApiPublicInvoiceLeadCodeRoute
@@ -1640,6 +1660,7 @@ export interface FileRouteTypes {
     | '/admin/support/tickets'
     | '/admin/tickets/$ticketId'
     | '/admin/website-content/$websiteId'
+    | '/api/internal/delete-order-documents'
     | '/api/public/complaint'
     | '/api/public/contact'
     | '/api/public/talk-to-expert'
@@ -1668,6 +1689,7 @@ export interface FileRouteTypes {
     | '/api/public/cron/workforce-reassign-tick'
     | '/api/public/cron/zoho-diagnose'
     | '/api/public/form-asset/$'
+    | '/api/public/gateway-logo/$'
     | '/api/public/gst/lead'
     | '/api/public/gst/services'
     | '/api/public/invoice/$leadCode'
@@ -1800,6 +1822,7 @@ export interface FileRouteTypes {
     | '/admin/submissions/$submissionId'
     | '/admin/tickets/$ticketId'
     | '/admin/website-content/$websiteId'
+    | '/api/internal/delete-order-documents'
     | '/api/public/complaint'
     | '/api/public/contact'
     | '/api/public/talk-to-expert'
@@ -1828,6 +1851,7 @@ export interface FileRouteTypes {
     | '/api/public/cron/workforce-reassign-tick'
     | '/api/public/cron/zoho-diagnose'
     | '/api/public/form-asset/$'
+    | '/api/public/gateway-logo/$'
     | '/api/public/gst/lead'
     | '/api/public/gst/services'
     | '/api/public/invoice/$leadCode'
@@ -1965,6 +1989,7 @@ export interface FileRouteTypes {
     | '/admin/support/tickets'
     | '/admin/tickets/$ticketId'
     | '/admin/website-content/$websiteId'
+    | '/api/internal/delete-order-documents'
     | '/api/public/complaint'
     | '/api/public/contact'
     | '/api/public/talk-to-expert'
@@ -1993,6 +2018,7 @@ export interface FileRouteTypes {
     | '/api/public/cron/workforce-reassign-tick'
     | '/api/public/cron/zoho-diagnose'
     | '/api/public/form-asset/$'
+    | '/api/public/gateway-logo/$'
     | '/api/public/gst/lead'
     | '/api/public/gst/services'
     | '/api/public/invoice/$leadCode'
@@ -2070,6 +2096,7 @@ export interface RootRouteChildren {
   SuccessLeadCodeRoute: typeof SuccessLeadCodeRoute
   DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
   Char91DotmcpChar93InvokeToolToolRoute: typeof Char91DotmcpChar93InvokeToolToolRoute
+  ApiInternalDeleteOrderDocumentsRoute: typeof ApiInternalDeleteOrderDocumentsRoute
   ApiPublicComplaintRoute: typeof ApiPublicComplaintRoute
   ApiPublicContactRoute: typeof ApiPublicContactRoute
   ApiPublicTalkToExpertRoute: typeof ApiPublicTalkToExpertRoute
@@ -2092,6 +2119,7 @@ export interface RootRouteChildren {
   ApiPublicCronWorkforceReassignTickRoute: typeof ApiPublicCronWorkforceReassignTickRoute
   ApiPublicCronZohoDiagnoseRoute: typeof ApiPublicCronZohoDiagnoseRoute
   ApiPublicFormAssetSplatRoute: typeof ApiPublicFormAssetSplatRoute
+  ApiPublicGatewayLogoSplatRoute: typeof ApiPublicGatewayLogoSplatRoute
   ApiPublicGstLeadRoute: typeof ApiPublicGstLeadRoute
   ApiPublicGstServicesRoute: typeof ApiPublicGstServicesRoute
   ApiPublicInvoiceLeadCodeRoute: typeof ApiPublicInvoiceLeadCodeRoute
@@ -2954,6 +2982,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminWebsiteContentWebsiteIdRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/api/internal/delete-order-documents': {
+      id: '/api/internal/delete-order-documents'
+      path: '/api/internal/delete-order-documents'
+      fullPath: '/api/internal/delete-order-documents'
+      preLoaderRoute: typeof ApiInternalDeleteOrderDocumentsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/complaint': {
       id: '/api/public/complaint'
       path: '/api/public/complaint'
@@ -3127,6 +3162,13 @@ declare module '@tanstack/react-router' {
       path: '/api/public/form-asset/$'
       fullPath: '/api/public/form-asset/$'
       preLoaderRoute: typeof ApiPublicFormAssetSplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/gateway-logo/$': {
+      id: '/api/public/gateway-logo/$'
+      path: '/api/public/gateway-logo/$'
+      fullPath: '/api/public/gateway-logo/$'
+      preLoaderRoute: typeof ApiPublicGatewayLogoSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/gst/lead': {
@@ -3547,6 +3589,7 @@ const rootRouteChildren: RootRouteChildren = {
   SuccessLeadCodeRoute: SuccessLeadCodeRoute,
   DotlovableOauthConsentRoute: DotlovableOauthConsentRoute,
   Char91DotmcpChar93InvokeToolToolRoute: Char91DotmcpChar93InvokeToolToolRoute,
+  ApiInternalDeleteOrderDocumentsRoute: ApiInternalDeleteOrderDocumentsRoute,
   ApiPublicComplaintRoute: ApiPublicComplaintRoute,
   ApiPublicContactRoute: ApiPublicContactRoute,
   ApiPublicTalkToExpertRoute: ApiPublicTalkToExpertRoute,
@@ -3570,6 +3613,7 @@ const rootRouteChildren: RootRouteChildren = {
     ApiPublicCronWorkforceReassignTickRoute,
   ApiPublicCronZohoDiagnoseRoute: ApiPublicCronZohoDiagnoseRoute,
   ApiPublicFormAssetSplatRoute: ApiPublicFormAssetSplatRoute,
+  ApiPublicGatewayLogoSplatRoute: ApiPublicGatewayLogoSplatRoute,
   ApiPublicGstLeadRoute: ApiPublicGstLeadRoute,
   ApiPublicGstServicesRoute: ApiPublicGstServicesRoute,
   ApiPublicInvoiceLeadCodeRoute: ApiPublicInvoiceLeadCodeRoute,

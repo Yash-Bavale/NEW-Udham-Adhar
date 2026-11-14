@@ -1,5 +1,5 @@
 import { UserSquare2, Fingerprint, Share2, Download, ArrowRight } from "lucide-react";
-import mapImg from "@/assets/india-map.svg.asset.json";
+const mapImg = "/images/india-map.png";
 
 
 const STEPS = [
@@ -68,7 +68,7 @@ export function TrustBlock() {
           </div>
           <div className="p-4 md:p-6 flex justify-center">
             <img
-              src={mapImg.url}
+              src="/images/india-map.png"
               alt="Map of India showing all states where consultancy services are provided"
               className="w-full max-w-xl h-auto"
               loading="lazy"

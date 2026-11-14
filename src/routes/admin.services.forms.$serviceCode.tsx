@@ -17,7 +17,8 @@ import {
 } from "@/lib/crm/form-builder.functions";
 import { getSchema as getFallbackSchema, withSectionHeadings } from "@/lib/onboarding/schemas";
 import { OnboardingForm } from "@/components/onboarding/OnboardingForm";
-import { supabase } from "@/integrations/supabase/client";
+import { requestFormAssetUpload } from "@/lib/storage/storage.functions";
+import { uploadToStorageUrl } from "@/lib/storage/s3-upload.browser";
 import { toast } from "sonner";
 
 
@@ -1142,6 +1143,7 @@ function SampleFormPicker({
 }) {
   const [busy, setBusy] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const requestUpload = useServerFn(requestFormAssetUpload);
   const isUploaded = value.startsWith("/api/public/form-asset/");
   const fileName = isUploaded ? decodeURIComponent(value.split("/").pop() || "") : "";
 
@@ -1152,12 +1154,15 @@ function SampleFormPicker({
     }
     setBusy(true);
     try {
-      const safe = file.name.replace(/[^a-zA-Z0-9._-]+/g, "_");
-      const path = `${serviceCode}/${Date.now()}-${safe}`;
-      const { error } = await supabase.storage
-        .from("form-assets")
-        .upload(path, file, { upsert: false, contentType: file.type || undefined });
-      if (error) throw error;
+      const { path, signedUrl } = await requestUpload({
+        data: {
+          serviceCode,
+          fileName: file.name,
+          contentType: file.type || "application/octet-stream",
+          sizeBytes: file.size,
+        },
+      });
+      await uploadToStorageUrl(signedUrl, file);
       onChange(`/api/public/form-asset/${path}`);
       toast.success("Sample form uploaded.");
     } catch (e) {

@@ -1,0 +1,1 @@
+import{r as s,j as e}from"./index-Bxfm10zD.js";function i(){return s.useEffect(()=>{const{search:t,hash:n}=window.location;window.location.replace(`/admin-login${t}${n}`)},[]),e.jsx("div",{className:"flex min-h-screen items-center justify-center bg-slate-50 px-4",children:e.jsx("p",{className:"text-sm text-slate-500",children:"Signing you in…"})})}export{i as component};

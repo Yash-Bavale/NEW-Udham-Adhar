@@ -1,0 +1,1 @@
+import{j as e}from"./index-Bxfm10zD.js";const n=({error:o})=>e.jsxs("div",{className:"p-8 text-sm text-red-700",children:["Admin error: ",o.message," ",e.jsx("button",{className:"ml-2 underline",onClick:()=>window.location.reload(),children:"Reload"})]});export{n as errorComponent};

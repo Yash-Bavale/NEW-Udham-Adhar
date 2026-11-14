@@ -1,0 +1,1 @@
+import{j as o}from"./index-Bxfm10zD.js";import{W as t}from"./PageHero-Xi06GNOw.js";import m from"./privacy-policy-d6a5W8qd.js";const i=()=>o.jsx(t,{title:"Privacy Policy",html:m,legal:!0});export{i as component};

@@ -1,0 +1,1 @@
+import{j as t,cv as o}from"./index-Bxfm10zD.js";const e=()=>t.jsx(o,{children:t.jsx("div",{className:"mx-auto max-w-xl px-4 py-16 text-center",children:t.jsx("h1",{className:"text-2xl font-bold",children:"Link not found"})})});export{e as notFoundComponent};

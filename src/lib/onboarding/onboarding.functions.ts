@@ -521,13 +521,14 @@ export const requestDocumentUpload = createServerFn({ method: "POST" })
     const safeDocType = data.docType.replace(/[^a-z0-9_-]/gi, "_").slice(0, 40);
     const path = `${lead.id}/${safeDocType}-${Date.now()}.${ext}`;
 
-    const { data: signed, error } = await supabaseAdmin
-      .storage
-      .from("documents")
-      .createSignedUploadUrl(path);
-    if (error || !signed) throw new Error(error?.message ?? "Could not start upload.");
+    const { createStorageUploadUrl } = await import("@/lib/storage/s3.server");
+    const signedUrl = await createStorageUploadUrl({
+      bucket: "documents",
+      path,
+      contentType: data.mimeType,
+    });
 
-    return { path, token: signed.token, signedUrl: signed.signedUrl };
+    return { path, signedUrl };
   });
 
 const ConfirmInput = z.object({
@@ -559,7 +560,8 @@ export const confirmDocumentUpload = createServerFn({ method: "POST" })
 
     if (existing && existing.length) {
       const oldPaths = existing.map((r) => r.file_path);
-      await supabaseAdmin.storage.from("documents").remove(oldPaths);
+      const { deleteStorageObjects } = await import("@/lib/storage/s3.server");
+      await deleteStorageObjects("documents", oldPaths);
       await supabaseAdmin.from("documents").delete().in("id", existing.map((r) => r.id));
     }
 
@@ -629,12 +631,9 @@ export const getDocumentSignedUrl = createServerFn({ method: "POST" })
       .maybeSingle();
     if (error) throw new Error(error.message);
     if (!doc) throw new Error("Document not found.");
-    const { data: signed, error: sErr } = await supabaseAdmin
-      .storage
-      .from("documents")
-      .createSignedUrl(doc.file_path, 60 * 10);
-    if (sErr || !signed) throw new Error(sErr?.message ?? "Could not generate link.");
-    return { url: signed.signedUrl };
+    const { createStorageDownloadUrl } = await import("@/lib/storage/s3.server");
+    const url = await createStorageDownloadUrl("documents", doc.file_path, 60 * 10);
+    return { url };
   });
 
 export const setDocumentStatus = createServerFn({ method: "POST" })

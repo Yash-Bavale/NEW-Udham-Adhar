@@ -266,22 +266,25 @@ export const uploadGatewayLogo = createServerFn({ method: "POST" })
     await assertRole(supabase, ["super_admin", "admin"]);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    let logoUrl = `data:${data.mimeType};base64,${data.fileBase64}`;
-    try {
-      const buffer = Buffer.from(data.fileBase64, "base64");
-      const ext = data.fileName.split(".").pop() || "png";
-      const filePath = `gateway-logos/${data.id}-${Date.now()}.${ext}`;
-      const { error: uploadErr } = await supabaseAdmin.storage
-        .from("documents")
-        .upload(filePath, buffer, { contentType: data.mimeType, upsert: true });
-
-      if (!uploadErr) {
-        const { data: pubUrlData } = supabaseAdmin.storage.from("documents").getPublicUrl(filePath);
-        if (pubUrlData?.publicUrl) logoUrl = pubUrlData.publicUrl;
-      }
-    } catch (e) {
-      console.warn("[uploadGatewayLogo] storage upload fallback to data URL", e);
-    }
+    const buffer = Buffer.from(data.fileBase64, "base64");
+    const imageExtensions: Record<string, string> = {
+      "image/png": "png",
+      "image/jpeg": "jpg",
+      "image/jpg": "jpg",
+      "image/gif": "gif",
+      "image/webp": "webp",
+    };
+    const ext = imageExtensions[data.mimeType.toLowerCase()];
+    if (!ext) throw new Error("Unsupported logo type. Use PNG, JPG, GIF or WEBP.");
+    const filePath = `gateway-logos/${data.id}-${Date.now()}.${ext}`;
+    const { uploadStorageObject } = await import("@/lib/storage/s3.server");
+    await uploadStorageObject({
+      bucket: "documents",
+      path: filePath,
+      body: buffer,
+      contentType: data.mimeType,
+    });
+    const logoUrl = `/api/public/gateway-logo/${filePath}`;
 
     const { data: current } = await supabaseAdmin
       .from("payment_gateways")

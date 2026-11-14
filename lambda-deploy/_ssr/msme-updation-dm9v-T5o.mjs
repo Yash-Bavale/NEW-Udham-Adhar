@@ -1,0 +1,25 @@
+const msmeUpdation = `<h2>MSME Updation - How to Update Your MSME Registration Details</h2>
+<p role="status" aria-live="polite" aria-atomic="true"></p> <ul></ul>
+
+                    <style>
+                        .htmega-form-wrapper.sidd1f6062 .wpcf7-select {
+                                appearance: none;
+                                background-image: url('https://udyamadhar.in/wp-content/plugins/ht-mega-for-elementor/assets/images/icons/select-arrow-icon.svg');
+                                background-repeat: no-repeat;
+                            }
+                    </style>
+					<h2>Sample Certificate</h2>				
+																<a href="/__l5e/assets-v1/4fb73dad-846b-4c39-879e-ee54d21d1925/udyam-sample-certificate.webp" data-elementor-open-lightbox="yes" data-elementor-lightbox-title="udyam-certificate-design-1" data-e-action-hash="#elementor-action%3Aaction%3Dlightbox%26settings%3DeyJpZCI6OTk0MSwidXJsIjoiaHR0cHM6XC9cL3VkeWFtYWRoYXIuaW5cL3dwLWNvbnRlbnRcL3VwbG9hZHNcLzIwMjZcLzA1XC91ZHlhbS1jZXJ0aWZpY2F0ZS1kZXNpZ24tMS53ZWJwIn0%3D">
+							<img width="1110" height="1595" src="/__l5e/assets-v1/4fb73dad-846b-4c39-879e-ee54d21d1925/udyam-sample-certificate.webp" alt="" srcset="/__l5e/assets-v1/4fb73dad-846b-4c39-879e-ee54d21d1925/udyam-sample-certificate.webp 1110w, /__l5e/assets-v1/4fb73dad-846b-4c39-879e-ee54d21d1925/udyam-sample-certificate.webp 209w, /__l5e/assets-v1/4fb73dad-846b-4c39-879e-ee54d21d1925/udyam-sample-certificate.webp 713w, /__l5e/assets-v1/4fb73dad-846b-4c39-879e-ee54d21d1925/udyam-sample-certificate.webp 768w, /__l5e/assets-v1/4fb73dad-846b-4c39-879e-ee54d21d1925/udyam-sample-certificate.webp 1069w" sizes="(max-width: 1110px) 100vw, 1110px" />								</a>
+		<p>Note: Sample Udyam Certificate shown for reference purposes only.</p>		
+					<h1>MSME Updation - How to Update Your MSME Registration Details</h1>				
+											<a href="/">
+						<h1>
+				MSME Updation - How to Update Your MSME Registration Details
+			</h1 > 
+									</a>
+		<p>MSME updation allows registered businesses to keep their details current on the Udyam portal. Entrepreneurs can update business type, address, owner details, and nature of activity to ensure accuracy and compliance. Regular updates are necessary to maintain eligibility for government schemes, subsidies, loans, and procurement tenders. The process is free, paperless, and secure, ensuring that businesses retain valid MSME status and access benefits without interruption. MSME updation also enhances credibility with financial institutions, clients, and government authorities. Accurate information allows businesses to fully leverage government support, operational guidance, and financial assistance, promoting growth, competitiveness, and sustainability in India’s MSME sector.</p>
+`;
+export {
+  msmeUpdation as default
+};

@@ -15,6 +15,7 @@ import {
 import {
   requestOrderDocumentUpload, confirmOrderDocumentUpload, getOrderDetailV2,
 } from "@/lib/crm/orders-v2.functions";
+import { uploadToStorageUrl } from "@/lib/storage/s3-upload.browser";
 
 export function CompletionGateDialogStandalone({
   open, onOpenChange, orderId, busy, onConfirm,
@@ -109,17 +110,13 @@ export function CompletionGateDialogStandalone({
       let documentId = uploaded?.file === file ? uploaded.documentId : null;
       if (!documentId) {
         setStage("uploading");
-        const { path, token } = await requestFn({
+        const { path, signedUrl } = await requestFn({
           data: {
             orderId, docType: "certificate", fileName: file.name,
             mimeType: file.type || "application/octet-stream", sizeBytes: file.size,
           },
         });
-        const { supabase } = await import("@/integrations/supabase/client");
-        const { error: uploadError } = await supabase.storage.from("documents").uploadToSignedUrl(path, token, file, {
-          contentType: file.type || undefined, upsert: true,
-        });
-        if (uploadError) throw uploadError;
+        await uploadToStorageUrl(signedUrl, file);
         setStage("preparing");
         const confirmed = await confirmFn({
           data: {

@@ -1,109 +1,88 @@
-// Service-role edge function: permanently delete documents for an application
-// (skipping certificates) after a refund is processed.
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.43.0";
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response(null, {
-      status: 204,
-      headers: {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "POST, OPTIONS",
-        "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-      },
-    });
+    return new Response(null, { status: 204, headers: CORS_HEADERS });
   }
   if (req.method !== "POST") return new Response("Method Not Allowed", { status: 405 });
 
-  // Auth: this function performs an irreversible destructive operation using the
-  // service role key. Only trusted server-side callers (server functions invoking
-  // via admin.functions.invoke, which forwards the service role bearer, or a
-  // pg_cron/internal call presenting CRON_SECRET) may run it. Reject everyone else.
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
   const cronSecret = Deno.env.get("CRON_SECRET") ?? "";
-  const authHeader = req.headers.get("authorization") ?? "";
-  const bearer = authHeader.toLowerCase().startsWith("bearer ")
-    ? authHeader.slice(7).trim()
+  const authorization = req.headers.get("authorization") ?? "";
+  const bearer = authorization.toLowerCase().startsWith("bearer ")
+    ? authorization.slice(7).trim()
     : "";
-  const apikey = req.headers.get("apikey") ?? "";
+  const apiKey = req.headers.get("apikey") ?? "";
   const authorized =
-    (!!serviceKey && (bearer === serviceKey || apikey === serviceKey)) ||
-    (!!cronSecret && (bearer === cronSecret || apikey === cronSecret));
+    (!!serviceKey && (bearer === serviceKey || apiKey === serviceKey)) ||
+    (!!cronSecret && (bearer === cronSecret || apiKey === cronSecret));
   if (!authorized) {
-    return new Response(JSON.stringify({ error: "unauthorized" }), {
-      status: 401,
-      headers: { "content-type": "application/json", "Access-Control-Allow-Origin": "*" },
-    });
+    return Response.json(
+      { error: "unauthorized" },
+      {
+        status: 401,
+        headers: CORS_HEADERS,
+      },
+    );
   }
 
-  let payload: { application_id?: string; reason?: string; keep_document_id?: string } = {};
+  let payload: unknown;
   try {
     payload = await req.json();
   } catch {
-    return new Response("Invalid JSON", { status: 400 });
+    return new Response("Invalid JSON", { status: 400, headers: CORS_HEADERS });
   }
-  const applicationId = payload.application_id;
-  const reason = payload.reason ?? "refund";
-  const keepDocumentId = payload.keep_document_id ?? null;
-  if (!applicationId) return new Response("application_id required", { status: 400 });
 
-  const supabase = createClient(
-    Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-    { auth: { persistSession: false } }
-  );
+  const workerUrl = Deno.env.get("CLOUDFLARE_WORKER_URL");
+  if (!workerUrl) {
+    return Response.json(
+      { error: "Cloudflare worker URL is not configured." },
+      {
+        status: 503,
+        headers: CORS_HEADERS,
+      },
+    );
+  }
 
-  // 1. List documents (certificates live in a separate `certificates` table).
-  const { data: docs, error: listErr } = await supabase
-    .from("documents")
-    .select("id, file_path, doc_type")
-    .eq("application_id", applicationId);
-  if (listErr) {
-    return new Response(JSON.stringify({ error: listErr.message }), {
-      status: 500,
-      headers: { "content-type": "application/json" },
+  let endpoint: URL;
+  try {
+    endpoint = new URL("/api/internal/delete-order-documents", workerUrl);
+    if (endpoint.protocol !== "https:") throw new Error("Worker URL must use HTTPS.");
+  } catch {
+    return Response.json(
+      { error: "Cloudflare worker URL is invalid." },
+      {
+        status: 503,
+        headers: CORS_HEADERS,
+      },
+    );
+  }
+
+  try {
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization,
+        apikey: apiKey,
+      },
+      body: JSON.stringify(payload),
     });
+    const headers = new Headers(CORS_HEADERS);
+    const contentType = response.headers.get("content-type");
+    if (contentType) headers.set("content-type", contentType);
+    return new Response(response.body, { status: response.status, headers });
+  } catch {
+    return Response.json(
+      { error: "Could not reach the Cloudflare worker." },
+      {
+        status: 502,
+        headers: CORS_HEADERS,
+      },
+    );
   }
-  const toDelete = (docs ?? []).filter((d: any) => {
-    if (keepDocumentId && d.id === keepDocumentId) return false;
-    if (String(d.doc_type ?? "").toLowerCase() === "certificate") return false;
-    return true;
-  });
-  const paths = toDelete.map((d: any) => d.file_path).filter(Boolean);
-  const ids = toDelete.map((d: any) => d.id);
-
-  // 2. Remove from storage.
-  let storageDeleted = 0;
-  if (paths.length > 0) {
-    const { data: rm, error: rmErr } = await supabase.storage.from("documents").remove(paths);
-    if (rmErr) console.error("storage remove failed:", rmErr.message);
-    storageDeleted = rm?.length ?? 0;
-  }
-
-  // 3. Delete document rows.
-  let rowsDeleted = 0;
-  if (ids.length > 0) {
-    const { error: delErr } = await supabase.from("documents").delete().in("id", ids);
-    if (delErr) {
-      return new Response(JSON.stringify({ error: delErr.message }), {
-        status: 500,
-        headers: { "content-type": "application/json" },
-      });
-    }
-    rowsDeleted = ids.length;
-  }
-
-  // 4. Stamp application.
-  await supabase
-    .from("applications")
-    .update({
-      documents_deleted_at: new Date().toISOString(),
-      documents_deleted_reason: reason,
-    })
-    .eq("id", applicationId);
-
-  return new Response(
-    JSON.stringify({ ok: true, storage_deleted: storageDeleted, rows_deleted: rowsDeleted, reason }),
-    { headers: { "content-type": "application/json", "Access-Control-Allow-Origin": "*" } }
-  );
 });

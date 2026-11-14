@@ -1,0 +1,1 @@
+import{j as o}from"./index-Bxfm10zD.js";import{W as t}from"./PageHero-Xi06GNOw.js";import m from"./terms-conditions-Dz9SKhbM.js";const i=()=>o.jsx(t,{title:"Terms & Conditions",html:m});export{i as component};

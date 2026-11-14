@@ -1,0 +1,1 @@
+import{j as t}from"./index-Bxfm10zD.js";import{W as o}from"./PageHero-Xi06GNOw.js";import e from"./consent-acknowledgment-BnVuzAdh.js";const r=()=>t.jsx(o,{title:"Consent & Acknowledgment",html:e,legal:!0});export{r as component};

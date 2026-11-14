@@ -1,0 +1,25 @@
+const udyamPrintWithAnnexure = `<h2>Udyam Print With Annexure | Download Full MSME Certificate</h2>
+<p role="status" aria-live="polite" aria-atomic="true"></p> <ul></ul>
+
+                    <style>
+                        .htmega-form-wrapper.sidea5df1c .wpcf7-select {
+                                appearance: none;
+                                background-image: url('https://udyamadhar.in/wp-content/plugins/ht-mega-for-elementor/assets/images/icons/select-arrow-icon.svg');
+                                background-repeat: no-repeat;
+                            }
+                    </style>
+					<h2>Sample Certificate</h2>				
+																<a href="/__l5e/assets-v1/4fb73dad-846b-4c39-879e-ee54d21d1925/udyam-sample-certificate.webp" data-elementor-open-lightbox="yes" data-elementor-lightbox-title="udyam-certificate-design-1" data-e-action-hash="#elementor-action%3Aaction%3Dlightbox%26settings%3DeyJpZCI6OTk0MSwidXJsIjoiaHR0cHM6XC9cL3VkeWFtYWRoYXIuaW5cL3dwLWNvbnRlbnRcL3VwbG9hZHNcLzIwMjZcLzA1XC91ZHlhbS1jZXJ0aWZpY2F0ZS1kZXNpZ24tMS53ZWJwIn0%3D">
+							<img width="1110" height="1595" src="/__l5e/assets-v1/4fb73dad-846b-4c39-879e-ee54d21d1925/udyam-sample-certificate.webp" alt="" srcset="/__l5e/assets-v1/4fb73dad-846b-4c39-879e-ee54d21d1925/udyam-sample-certificate.webp 1110w, /__l5e/assets-v1/4fb73dad-846b-4c39-879e-ee54d21d1925/udyam-sample-certificate.webp 209w, /__l5e/assets-v1/4fb73dad-846b-4c39-879e-ee54d21d1925/udyam-sample-certificate.webp 713w, /__l5e/assets-v1/4fb73dad-846b-4c39-879e-ee54d21d1925/udyam-sample-certificate.webp 768w, /__l5e/assets-v1/4fb73dad-846b-4c39-879e-ee54d21d1925/udyam-sample-certificate.webp 1069w" sizes="(max-width: 1110px) 100vw, 1110px" />								</a>
+		<p>Note: Sample Udyam Certificate shown for reference purposes only.</p>		
+					<h1>Udyam Print With Annexure | Download Full MSME Certificate</h1>				
+											<a href="/">
+						<h1>
+				Udyam Print With Annexure | Download Full MSME Certificate
+			</h1 > 
+									</a>
+		<p>Udyam Print With Annexure allows businesses to download and print their Udyam certificate along with the annexure, which contains detailed business information for official verifications. By completing OTP verification, both documents are available in PDF format for printing. The certificate and annexure are essential for banks, tenders, subsidies, and government schemes. The process is fast, secure, paperless, and easy to follow. Step-by-step guidance ensures accurate printing without errors. Maintaining printed copies of both the certificate and annexure ensures compliance with MSME regulations and uninterrupted access to official benefits. Udyam Print With Annexure streamlines documentation management for entrepreneurs.</p>
+`;
+export {
+  udyamPrintWithAnnexure as default
+};

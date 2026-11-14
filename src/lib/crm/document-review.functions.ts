@@ -73,11 +73,9 @@ export const getDocumentSignedUrl = createServerFn({ method: "GET" })
       .eq("id", data.documentId)
       .single();
     if (!doc) throw new Error("Document not found");
-    const { data: signed, error } = await (await getAdmin()).storage
-      .from("documents")
-      .createSignedUrl(doc.file_path, 60 * 10);
-    if (error) throw new Error(error.message);
-    return { url: signed.signedUrl, mimeType: doc.mime_type, fileName: doc.file_name };
+    const { createStorageDownloadUrl } = await import("@/lib/storage/s3.server");
+    const url = await createStorageDownloadUrl("documents", doc.file_path, 60 * 10);
+    return { url, mimeType: doc.mime_type, fileName: doc.file_name };
   });
 
 export const approveDocument = createServerFn({ method: "POST" })

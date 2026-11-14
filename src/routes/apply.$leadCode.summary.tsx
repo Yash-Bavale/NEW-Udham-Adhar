@@ -163,12 +163,21 @@ function SummaryPage() {
   const updateContact = useServerFn(updateLeadContact);
   const createOrder = useServerFn(initiatePayment);
 
-  const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ["apply.summary", leadCode, accessToken],
-    queryFn: () => getSummary({ data: { leadCode, accessToken: accessToken as string } }),
-    enabled: !!accessToken,
-    retry: false,
-  });
+const { data, isLoading, error, refetch } = useQuery({
+  queryKey: ["apply.summary", leadCode, accessToken],
+  queryFn: async () => {
+    try {
+      return await getSummary({
+        data: { leadCode, accessToken: accessToken as string },
+      });
+    } catch (error) {
+      console.error("APPLICATION SUMMARY ERROR:", error);
+      throw error;
+    }
+  },
+  enabled: !!accessToken,
+  retry: false,
+});
 
   const [chosen, setChosen] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
@@ -693,7 +702,7 @@ declare global {
 async function loadAndTriggerCashfreeCheckout(paymentSessionId: string, isProd?: boolean) {
   const scriptUrl = isProd
     ? "https://sdk.cashfree.com/js/v3/cashfree.js"
-    : "https://sdk.cashfree.com/js/v3/cashfree.sandbox.js";
+    : "https://sdk.cashfree.com/js/v3/cashfree.js";
 
   if (!window.Cashfree) {
     await new Promise<void>((resolve, reject) => {
@@ -707,7 +716,7 @@ async function loadAndTriggerCashfreeCheckout(paymentSessionId: string, isProd?:
 
   if (window.Cashfree) {
     const cashfree = window.Cashfree({ mode: isProd ? "production" : "sandbox" });
-    cashfree.checkout({
+    await cashfree.checkout({
       paymentSessionId,
       redirectTarget: "_self",
     });

@@ -17,7 +17,7 @@ export type IngestedAttachmentResult = {
 };
 
 /**
- * Process and upload all attachments for an inbound Zoho message to Supabase Storage,
+ * Process and upload all attachments for an inbound Zoho message to private S3 storage,
  * linking them to the ticket and ticket reply.
  */
 export async function processInboundAttachments(input: {
@@ -59,16 +59,13 @@ export async function processInboundAttachments(input: {
       const storagePath = `support-tickets/${input.ticketId}/${input.ticketReplyId}/${Date.now()}_${safeFilename}`;
       const bucket = "documents";
 
-      const { error: uploadErr } = await supabaseAdmin.storage
-        .from(bucket)
-        .upload(storagePath, downloaded.buffer, {
-          contentType: downloaded.contentType || meta.contentType || "application/octet-stream",
-          upsert: true,
-        });
-
-      if (uploadErr) {
-        throw new Error(`Storage upload error: ${uploadErr.message}`);
-      }
+      const { uploadStorageObject } = await import("@/lib/storage/s3.server");
+      await uploadStorageObject({
+        bucket: "documents",
+        path: storagePath,
+        body: downloaded.buffer,
+        contentType: downloaded.contentType || meta.contentType || "application/octet-stream",
+      });
 
       const identifier = meta.cid || meta.attachmentId;
 
